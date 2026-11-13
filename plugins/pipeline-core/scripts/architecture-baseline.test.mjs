@@ -682,6 +682,19 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
     const BIND = path.join(here, "bind-adr-proposals.mjs");
     const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
     const ok = (script, ...args) => { const out = run(script, ...args); assert.equal(out.status, 0, `${path.basename(script)} ${args.join(" ")}: ${out.stderr}`); return out; };
+    // Glossover G1 (candidate 28e): --feature takes exactly the lifecycle's feature-id shape, refused before any file is read or written.
+    it("bind-adr-proposals refuses a feature id the design chain would refuse later, naming --feature", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "bind-feature-id-"));
+      try {
+        for (const feature of ["2026-10-26-epic2", "Epic2", "epic2.kontakt", "ab"]) {
+          const out = run(BIND, "--root", root, "--feature", feature, "--carrier", "specs/x/design.md", "--selection", "specs/x/po-selection.json", "--draft", "d");
+          assert.equal(out.status, 1, feature);
+          assert.match(out.stderr, /bind-adr-proposals refused: --feature ".*" is not a valid feature id: .*\^\[a-z\]\[a-z0-9-\]\{2,63\}\$/u, feature);
+        }
+        assert.match(run(BIND, "--root", root, "--feature", "2026-10-26-epic2", "--carrier", "c.md", "--selection", "s.json", "--draft", "d").stderr, /starts with a digit/u);
+        assert.deepEqual(fs.readdirSync(root), [], "nothing was written");
+      } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    });
     const HISTORIC = "# ADR-9997: METHOD original\n\nAccepted original requirement.\n";
     const filled = (title) => `# ${title}\n\n## Context\n\nOne owner performs analysis, tests, code and targeted fixes.\n\n## Decision\n\nThe item owner is the only writer.\n\n## Consequences\n\nOne review per item.\n\n## Affected Contracts\n\nnone\n`;
     const SELECTION = { attributedTo: "PO chat selection 2026-11-07", selections: [{ topic: "ownership", text: "One item Goldfish owns analysis, tests, code and fixes." }] };

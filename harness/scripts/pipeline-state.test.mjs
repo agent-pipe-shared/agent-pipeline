@@ -1207,7 +1207,7 @@ function canonicalFixtureJson(value) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), "{ this is not json");
   const before = readFileSync(statePath(dir), "utf8");
-  const code = run(["set-feature", "--id", "x", "--plan-path", "p.md"], { dir, now: FIXED_NOW });
+  const code = run(["set-feature", "--id", "xyz", "--plan-path", "p.md"], { dir, now: FIXED_NOW });
   ok("PS05a malformed existing file -> exit 2", code === 2, `got ${code}`);
   const after = readFileSync(statePath(dir), "utf8");
   ok("PS05b file left byte-identical (no silent overwrite)", after === before);
@@ -1261,23 +1261,47 @@ function canonicalFixtureJson(value) {
 // ---- PS07: set-feature resets planApproved to false + phase design ---------------------
 {
   const dir = freshDir("set-feature-reset");
-  run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
+  run(["set-feature", "--id", "feat-1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
   const approved = readState(dir).state;
   approved.planApproved = true;
   approved.planApproval = { approvedBy: "legacy-po", approvedAt: FIXED_NOW() };
   writeFileSync(statePath(dir), `${JSON.stringify(approved, null, 2)}\n`);
-  run(["set-feature", "--id", "f2", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
+  run(["set-feature", "--id", "feat-2", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
   const state = readState(dir).state;
   ok("PS07a new feature resets planApproved=false", state.planApproved === false);
   ok("PS07b phase reset to design (inside activeFeature, F1 fix)", state.activeFeature?.phase === "design");
   ok("PS07c prior planApproval cleared", state.planApproval === undefined);
-  ok("PS07d activeFeature reflects the NEW feature", state.activeFeature?.id === "f2");
+  ok("PS07d activeFeature reflects the NEW feature", state.activeFeature?.id === "feat-2");
+}
+
+// ---- PS07-G1: set-feature refuses an id the later lifecycle steps refuse (Glossover G1, candidate 28e) -----------
+{
+  const dir = freshDir("set-feature-id-shape");
+  for (const id of ["2026-10-26-epic2-kontakt", "Epic2", "ab", "epic_2", "epic2.kontakt", "x".repeat(65)]) {
+    const errors = [];
+    const original = console.error;
+    console.error = (...parts) => { errors.push(parts.join(" ")); };
+    let code;
+    try { code = run(["set-feature", "--id", id, "--plan-path", "p1.md"], { dir, now: FIXED_NOW }); } finally { console.error = original; }
+    const text = errors.join("\n");
+    ok(`PS07-G1a set-feature --id ${JSON.stringify(id.slice(0, 24))} refused with exit 2`, code === 2, `got ${code}`);
+    ok(`PS07-G1b the refusal names --id and the expected shape (${JSON.stringify(id.slice(0, 24))})`,
+      text.includes("--id") && text.includes("^[a-z][a-z0-9-]{2,63}$"), text);
+    ok(`PS07-G1c no State was written for ${JSON.stringify(id.slice(0, 24))}`, !existsSync(statePath(dir)));
+  }
+  const digitErrors = [];
+  const original = console.error;
+  console.error = (...parts) => { digitErrors.push(parts.join(" ")); };
+  try { run(["set-feature", "--id", "2026-10-26-epic2", "--plan-path", "p1.md"], { dir, now: FIXED_NOW }); } finally { console.error = original; }
+  ok("PS07-G1d a leading digit gets the hint to put a word first", digitErrors.join("\n").includes("starts with a digit"));
+  const accepted = run(["set-feature", "--id", "epic2-kontakt", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
+  ok("PS07-G1e the same id without the date prefix is accepted", accepted === 0 && readState(dir).state.activeFeature?.id === "epic2-kontakt", `got ${accepted}`);
 }
 
 // ---- PS08: reopen-design invalidates exact submission/approval authority --------------
 {
   const dir = freshDir("revoke");
-  run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
+  run(["set-feature", "--id", "feat-1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
   submitAndApprove(dir, "p1.md");
   const code = run(["reopen-design", "--by", "po-test"], { dir, now: FIXED_NOW });
   ok("PS08a reopen-design exit 0", code === 0, `got ${code}`);
@@ -1375,14 +1399,14 @@ function canonicalFixtureJson(value) {
 // ---- PS09: set-phase updates only phase ------------------------------------------------
 {
   const dir = freshDir("set-phase");
-  run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
+  run(["set-feature", "--id", "feat-1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
   submitAndApprove(dir, "p1.md");
   const code = enterImplementation(dir, lifecycleDeps(dir, "p1.md"));
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS09b phase updated (inside activeFeature, F1 fix)", state.activeFeature?.phase === "implementation");
   ok("PS09c planApproved untouched", state.planApproved === true);
-  ok("PS09d activeFeature id/planPath untouched by set-phase", state.activeFeature?.id === "f1" && state.activeFeature?.planPath === "p1.md");
+  ok("PS09d activeFeature id/planPath untouched by set-phase", state.activeFeature?.id === "feat-1" && state.activeFeature?.planPath === "p1.md");
 }
 
 // ---- PS10: approve-push rejects attribution-only approval ------------------------------

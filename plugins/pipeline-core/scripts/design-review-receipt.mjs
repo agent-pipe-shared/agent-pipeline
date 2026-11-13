@@ -47,6 +47,8 @@ export const OBSERVED_IDENTITY_UNKNOWN = "unknown";
 export const REVIEWER_ROLE = "critic";
 const OBSERVED_IDENTITY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,127}$/u;
 const REQUESTED_ROUTE_PATTERN = /^[\x21-\x7e]{1,128}$/u;
+// The library's own feature-id shape (lib/design-review-receipt.mjs FEATURE_ID), used only to name the field in a DRR-SHAPE refusal.
+const DESIGN_FEATURE_ID = /^[a-z][a-z0-9-]{0,63}$/u;
 
 const SINGLE_FLAGS = new Map([
   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
@@ -270,6 +272,10 @@ export function createReceiptFromDisk(input, deps = {}) {
     }
     if (created.code === "DRR-DELTA-UNCHANGED") {
       return refuse(created.code, "design review receipt refused: DRR-DELTA-UNCHANGED: the documents did not change, so a second receipt may only withdraw findings of the first (fewer open ids, no new id, the reviewer's report says so). Otherwise change a document and review again.");
+    }
+    // Glossover G1: DRR-SHAPE alone did not say that the feature id was the malformed field.
+    if (created.code === "DRR-SHAPE" && !DESIGN_FEATURE_ID.test(request.featureId)) {
+      return refuse(created.code, `design review receipt refused: DRR-SHAPE: --feature ${JSON.stringify(request.featureId.slice(0, 80))} is not a valid feature id (a lowercase letter, then up to 63 lowercase letters, digits or hyphens; ^[a-z][a-z0-9-]{0,63}$). Use the id the State's activeFeature carries; an id that starts with a digit is refused from candidate 28e on already by set-feature.`);
     }
     return refuse(created.code, `design review receipt refused: ${created.code}`);
   }

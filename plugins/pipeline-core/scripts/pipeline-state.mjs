@@ -386,6 +386,7 @@ import {
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture, inspectSpecCriterionRows } from "../lib/critic-accepted-contract.mjs";
 import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
+import { featureIdProblem } from "../lib/feature-id.mjs";
 import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
 import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
 import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
@@ -12031,6 +12032,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const planPath = flags["plan-path"];
       if (isBlank(id) || isBlank(planPath)) {
         console.error('Error: set-feature requires --id <id> and --plan-path <path> (both non-empty).');
+        return 2;
+      }
+      const idProblem = featureIdProblem("--id", id);
+      if (idProblem) {
+        console.error(`Error: set-feature ${idProblem}`);
         return 2;
       }
       const hasActiveContinuity = base.continuity !== undefined

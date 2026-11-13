@@ -336,6 +336,11 @@ test("library refusals pass through under their own code and write nothing", wit
   assert.equal(sameSources.code, "DRR-SOURCES");
   const badFeature = createReceiptFromDisk(request(repo, { featureId: "Not A Feature" }), { env: CLAUDE, now });
   assert.equal(badFeature.code, "DRR-SHAPE");
+  // Glossover G1: the refusal names the field and the shape instead of the bare code.
+  assert.match(badFeature.message, /DRR-SHAPE: --feature "Not A Feature" is not a valid feature id .*\^\[a-z\]\[a-z0-9-\]\{0,63\}\$/u);
+  const datedFeature = createReceiptFromDisk(request(repo, { featureId: "2026-10-26-epic2" }), { env: CLAUDE, now });
+  assert.equal(datedFeature.code, "DRR-SHAPE");
+  assert.match(datedFeature.message, /--feature "2026-10-26-epic2" is not a valid feature id/u);
   assert.equal(existsSync(join(repo, RECEIPT1)), false);
 }));
 

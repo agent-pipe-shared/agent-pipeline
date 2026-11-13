@@ -32,12 +32,12 @@ import {
   inspectProspectiveArchitectureManifest, prospectiveJson,
 } from "../lib/architecture-prospective-materialization.mjs";
 import { parseDesignDecisionBindings } from "../lib/design-decision-bindings.mjs";
+import { featureIdProblem } from "../lib/feature-id.mjs";
 import { intakePrivateIdentifierFindings } from "../lib/onboarding-continuity.mjs";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import { nextFreeNumber } from "./create-adr.mjs";
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
-const FEATURE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const REL_PATH = /^[A-Za-z0-9_@][A-Za-z0-9._@/-]{0,239}$/u;
 const FLAGS = new Set(["--root", "--feature", "--carrier", "--selection", "--draft"]);
 const BLOCK = /^```pipeline-design-decision-bindings\r?\n[\s\S]*?^```[ \t]*\r?$\n?/mu;
@@ -138,7 +138,8 @@ function commitAll(root, writes) {
 
 function bind(root, values, slugs) {
   const feature = values.get("--feature");
-  if (typeof feature !== "string" || !FEATURE.test(feature)) refuse("--feature must be the active feature id (letters, digits, '.', '_' and '-')");
+  const featureProblem = featureIdProblem("--feature", feature);
+  if (featureProblem) refuse(featureProblem);
   const carrierPath = safeRelative("--carrier", values.get("--carrier"));
   const selectionPath = safeRelative("--selection", values.get("--selection"));
   if (!carrierPath.endsWith(".md")) refuse("--carrier must be the design Markdown file of this package (a .md file that is one of its companions)");
