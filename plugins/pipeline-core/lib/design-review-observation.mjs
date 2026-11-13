@@ -9,8 +9,8 @@
  *    the returned text blocks) -> assurance `host-observed-tool-use`;
  *  - background: the SubagentStop carries no model, so the models come from the child's own host-written transcript
  *    (`<transcript without .jsonl>/subagents/agent-<agent_id>.jsonl`, `message.model` of its assistant records), the same
- *    file the Goldfish stop already trusts for a SubagentHandback; the returned text is `last_assistant_message`, else the
- *    child's last handback -> assurance `host-observed-child-transcript`.
+ *    file the Goldfish stop already trusts for a SubagentHandback; the returned text is the child's last SubagentHandback
+ *    message (what the parent receives), else `last_assistant_message` -> assurance `host-observed-child-transcript`.
  * The hook reads the transcript itself, bounded, and keeps only the model ids and the returned text: nothing of it reaches
  * the agent's context (PO 2026-11-13: without flooding the context).
  *
@@ -108,11 +108,14 @@ export function observeClaudeDesignReview(input, { readHandbackFn = null, readMo
     const read = readModelsFn(input);
     if (!read.ok) return { status: "unobserved", code: read.code };
     if (read.models.length === 0) return { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" };
-    let text = typeof input.last_assistant_message === "string" && input.last_assistant_message.trim() !== "" ? input.last_assistant_message : null;
-    if (text === null && typeof readHandbackFn === "function") {
+    // PF-61/PF-70: a background child ends with a SubagentHandback tool call, and that message is what the parent
+    // receives; last_assistant_message is then absent or later trailing prose. The handback wins whenever there is one.
+    let text = null;
+    if (typeof readHandbackFn === "function") {
       const handback = readHandbackFn(input);
       if (handback?.ok === true && typeof handback.message === "string" && handback.message.trim() !== "") text = handback.message;
     }
+    if (text === null && typeof input.last_assistant_message === "string" && input.last_assistant_message.trim() !== "") text = input.last_assistant_message;
     if (text === null) return { status: "unobserved", code: "DRO-NO-TEXT" };
     return { status: "observed", assurance: "host-observed-child-transcript", modelsUsed: read.models, text };
   }

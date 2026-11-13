@@ -523,6 +523,21 @@ test("D247: a child transcript that is a symlink or holds no model is refused, n
   assert.deepEqual(observeClaudeDesignReview(linked.stop("r")), { status: "unobserved", code: "DRO-TRANSCRIPT-UNSAFE" });
 });
 
+test("D247: a background reviewer's SubagentHandback is the observed text, never later trailing prose (PF-61/PF-70)", async (t) => {
+  const { observeClaudeDesignReview } = await import("../lib/design-review-observation.mjs");
+  const { readSubagentHandbackMessage } = await import("../lib/native-goldfish-host-finalizer.mjs");
+  const world = observationWorld(t);
+  const file = join(world.stop("r").transcript_path.slice(0, -".jsonl".length), "subagents", "agent-a1.jsonl");
+  const handback = JSON.stringify({ type: "assistant", message: { role: "assistant", model: "claude-opus-4", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: "# Review\n\nVerdict: PASS\n" } }] } });
+  const trailing = JSON.stringify({ type: "assistant", message: { role: "assistant", model: "claude-opus-4", content: [{ type: "text", text: "Handed back." }] } });
+  writeFileSync(file, `${handback}\n${trailing}\n`);
+  const seen = observeClaudeDesignReview(world.stop("Handed back."), { readHandbackFn: readSubagentHandbackMessage });
+  assert.equal(seen.status, "observed");
+  assert.equal(seen.text, "# Review\n\nVerdict: PASS\n", "the parent receives the handback, so the handback is the report");
+  const noHandback = observationWorld(t);
+  assert.equal(observeClaudeDesignReview(noHandback.stop("# Plain\n"), { readHandbackFn: readSubagentHandbackMessage }).text, "# Plain\n", "without a handback the last message is the return");
+});
+
 test("D247: export-report writes the observed text, and create stamps the observation and the observed model", withRepo(async (repo, t) => {
   const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
   const world = observationWorld(t);
