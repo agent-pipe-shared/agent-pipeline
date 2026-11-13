@@ -30,22 +30,50 @@ export function openChecksOf(named) {
 }
 
 /**
- * C28 (AC-108): the ONE fixed answer form of a yes. The words come from the project's human-facing language as Continuity records it
+ * C28 (AC-108): the printed answer form of a yes (C29 widens what counts to the closed list below). The words come from the project's human-facing language as Continuity records it
  * (`continuity.runtime.humanFacingLanguage`), so a German-speaking human answers in German; every other language, and a project without a
  * Continuity binding, falls back to the English form. Only the form of the project's own language is a yes.
  */
 export const ACCEPTANCE_YES_FORMS = Object.freeze({ en: "yes, I accept", de: "ja, ich akzeptiere" });
-export function acceptanceYesForm(language) {
+/**
+ * Candidate 29 (Codex greenfield run 3, C8; PO tile 2026-11-13): a CLOSED list of clear yes answers per language. The run's human
+ * answered "ja akzeptiert" and was told only "ja, ich akzeptiere" counts. Each list starts with the form the question prints; only the
+ * list of the project's own language counts, a comma and repeated spaces do not matter (see yesKey), and nothing outside the list is a
+ * yes: no keyword is searched in free text, so "ja, aber ..." or "yes, but ..." stays a decline.
+ */
+export const ACCEPTANCE_YES_ANSWERS = Object.freeze({
+  en: Object.freeze(["yes, I accept", "yes", "yes, accepted", "accepted", "I accept"]),
+  de: Object.freeze(["ja, ich akzeptiere", "ja", "ja, akzeptiert", "akzeptiert", "ich akzeptiere"]),
+});
+const languageKey = (language) => {
   const key = typeof language === "string" ? language.trim().toLowerCase().split(/[-_]/u)[0] : "";
-  return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? ACCEPTANCE_YES_FORMS[key] : ACCEPTANCE_YES_FORMS.en;
+  return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? key : "en";
+};
+export function acceptanceYesForm(language) { return ACCEPTANCE_YES_FORMS[languageKey(language)]; }
+const formLanguage = (form) => Object.keys(ACCEPTANCE_YES_FORMS).find((key) => ACCEPTANCE_YES_FORMS[key] === form) ?? null;
+const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").replace(/,/gu, " ").replace(/\s+/gu, " ").trim().toLowerCase();
+/**
+ * An acceptance only for an answer on the closed list of the form's language (normalised for case, commas, inner and surrounding
+ * space and a closing `.` or `!`). A form outside ACCEPTANCE_YES_FORMS keeps the old one-form rule. No keyword search in free text.
+ */
+export function isAcceptanceYes(answer, form) {
+  if (typeof answer !== "string") return false;
+  const language = formLanguage(form);
+  const allowed = language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language];
+  return allowed.some((entry) => yesKey(answer) === yesKey(entry));
 }
-const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").trim().toLowerCase();
-/** An acceptance only for exactly the fixed form, normalised for case, surrounding space and closing `.` or `!`. No keyword search in free text. */
-export function isAcceptanceYes(answer, form) { return typeof answer === "string" && yesKey(answer) === yesKey(form); }
+/** The clear yes answers of the form's language, quoted for a sentence. */
+export function acceptanceYesAnswersText(form) {
+  const language = formLanguage(form);
+  return (language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language]).map((entry) => `"${entry}"`).join(", ");
+}
 
-/** The one sentence the agent asks the human in the chat; it ends with the fixed yes form. */
+/** The one sentence the agent asks the human in the chat, in the project's language (the form's language); it names the clear yes answers. */
 export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer exactly "${form}"; any other answer is not an acceptance.`;
+  if (formLanguage(form) === "de") {
+    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; jede andere Antwort ist keine Abnahme.`;
+  }
+  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; any other answer is not an acceptance.`;
 }
 
 export const DECLINE_BEGIN = "<!-- close-decline:begin -->";

@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
-import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, featureStatusVocabulary, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
+import { acceptanceQuestion, acceptanceTarget, acceptanceYesAnswersText, acceptanceYesForm, featureStatusVocabulary, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
@@ -435,7 +435,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form. An answer that is not exactly that form is never an acceptance and no keyword is searched in it; the way out is the decline.
       const yesForm = acceptanceYesForm(state.continuity?.runtime?.humanFacingLanguage);
       const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
-      const bothWays = `if the human answered exactly "${yesForm}", rerun the identical command: ${rerun(again)}${named} --human-acceptance "${yesForm}". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
+      const bothWays = `if the human answered with one of the clear yes forms (${acceptanceYesAnswersText(yesForm)}), rerun the identical command: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
       if (humanDecline !== null) {
         const declineRepair = (error) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command with --human-decline "<the human's literal answer>": ${rerun(again)}${named}`;
         stages.push("decline-record");
@@ -504,7 +504,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
       }
       if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is not the fixed yes form "${yesForm}" (case, surrounding space and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is none of the clear yes forms ${acceptanceYesAnswersText(yesForm)} (case, commas, spaces and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
           `nothing was written. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
       }
       const recorded = readAcceptanceRecord(root, featureId);

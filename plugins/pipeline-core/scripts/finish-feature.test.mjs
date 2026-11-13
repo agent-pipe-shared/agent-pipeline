@@ -733,25 +733,26 @@ test("C28: the acceptance question states the one fixed yes form and the stop na
     const stopped = oneShotClose(f.input, { runCommand: f.runner });
     assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
     assert.ok(stopped.stop.reason.includes("\"yes, I accept\""), `the question states the fixed form: ${stopped.stop.reason}`);
-    assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
+    assert.match(stopped.stop.repair, /"yes, I accept", "yes", "yes, accepted", "accepted", "I accept"/u); // C29 (C8, PO tile 2026-11-13): the closed list of clear yes forms replaces the one fixed form.
+    assert.match(stopped.stop.repair, /--human-acceptance "<the human's literal answer>"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
     assert.deepEqual(f.calls, []); assert.equal(f.git("status", "--porcelain").trim(), "");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("C28: an answer that is not the fixed yes form is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
-  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "yes", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?"]) {
+test("C28: an answer that is not on the closed yes list is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
+  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?", "yes yes", "not accepted", "ja"]) { // C29 (C8): a bare "yes" is on the closed list now; "ja" is not an English project's form.
     const f = oneShotFixture({ acceptance: false });
     try {
       const stopped = oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner });
       assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 300)); assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
-      assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline/u);
+      assert.match(stopped.stop.repair, /--human-acceptance "<the human's literal answer>"/u); assert.match(stopped.stop.repair, /--human-decline/u);
       assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
     } finally { rmSync(f.root, { recursive: true, force: true }); }
   }
 });
 
 test("C28: the fixed yes form is read normalised for case, surrounding space and closing punctuation, and the literal answer is recorded as given", () => {
-  for (const answer of ["  YES, I accept!  ", "Yes, I accept.", "yes, i ACCEPT"]) {
+  for (const answer of ["  YES, I accept!  ", "Yes, I accept.", "yes, i ACCEPT", "yes", "Yes!", "accepted", "yes accepted", "I accept."]) {
     const f = oneShotFixture({ acceptance: false });
     try {
       assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer);
@@ -766,8 +767,14 @@ test("C28: the fixed form follows the project's human-facing language so a Germa
     const stopped = oneShotClose(de.input, { runCommand: de.runner });
     assert.ok(stopped.stop.reason.includes("\"ja, ich akzeptiere\""), stopped.stop.reason);
     assert.equal(oneShotClose({ ...de.input, humanAcceptance: "yes, I accept" }, { runCommand: de.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", "the English form is not the German project's form");
+    assert.match(stopped.stop.reason, /^Nehmen Sie das Feature-Paket /u, "C29 (C8): the question itself is asked in the project's language");
+    for (const refused of ["yes", "ja, aber Level 2 klemmt", "nein", "ja ja"]) assert.equal(oneShotClose({ ...de.input, humanAcceptance: refused }, { runCommand: de.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", refused);
     assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere." }, { runCommand: de.runner }).status, "commit-required");
   } finally { rmSync(de.root, { recursive: true, force: true }); }
+  const deShort = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+  try { // C29 (C8, Codex run 3): the human answered "ja akzeptiert" and was refused; it is on the closed German list now.
+    assert.equal(oneShotClose({ ...deShort.input, humanAcceptance: "ja akzeptiert" }, { runCommand: deShort.runner }).status, "commit-required");
+  } finally { rmSync(deShort.root, { recursive: true, force: true }); }
   const fr = oneShotFixture({ acceptance: false, continuity: true, language: "fr" });
   try { assert.ok(oneShotClose(fr.input, { runCommand: fr.runner }).stop.reason.includes("\"yes, I accept\"")); } finally { rmSync(fr.root, { recursive: true, force: true }); }
 });
