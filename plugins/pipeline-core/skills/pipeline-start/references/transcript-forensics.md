@@ -111,8 +111,11 @@ human message to the last response before the next one, the human wait between t
 net, per-response token usage with its actor (`main` or `subagent:<name>`), and refusals per code (a coded denial
 in a tool result; Claude: an error result, Codex: an output that says blocked, denied or refused). `--json` prints
 the same figures as `pipeline.usage-timeline.v1` (`null` where the text says `n/a`). A field the format does not
-carry is `n/a`, never a guess: the Antigravity transcript has no human message or tool result, so its turns, wait,
-net time and refusals are `n/a`. Run it per file: a subagent file is its own run, and a restarted Codex session
+carry is `n/a`, never a guess. The Antigravity brain transcript (`.system_generated/logs/transcript.jsonl` of the
+conversation) carries the human input (`USER_INPUT`), each model step with exact timestamps and input, cache-read and
+output tokens (`PLANNER_RESPONSE`) and each tool result (`GENERIC`), so all figures are measured; only the older
+`turn.started`/`turn.completed` form has no human message or tool result, and there turns, wait, net time and refusals
+are `n/a`. Run it per file: a subagent file is its own run, and a restarted Codex session
 needs each rollout file read in turn. It is exclusive with `--row` and `--metering`.
 
 ## Report shape — one section per claim, independently traceable

@@ -167,8 +167,8 @@ function readMeteringBundle(file) {
 }
 
 // --- Timeline mode (`--timeline <file> [--json]`): one session's run timeline, read from ONE transcript file. ---
-// Formats are detected from the file content: Claude project JSONL, Codex rollout JSONL, Antigravity transcript
-// (`turn.started` / `turn.completed` records). Output is path-free and never carries a human message's text or a tool
+// Formats are detected from the file content: Claude project JSONL, Codex rollout JSONL, the Antigravity brain transcript
+// (USER_INPUT / PLANNER_RESPONSE / GENERIC steps) and the older Antigravity form (`turn.started` / `turn.completed` records). Output is path-free and never carries a human message's text or a tool
 // result's text; only lengths, times, token counts and refusal codes. A field the format does not carry prints as `n/a`.
 const TIMELINE_SCHEMA = "pipeline.usage-timeline.v1";
 const TIMELINE_MAX_BYTES = 512 * 1024 * 1024;
@@ -215,6 +215,8 @@ function detectTimelineFormat(records) {
     if (!isTimelineObject(record)) continue;
     if (["session_meta", "response_item", "event_msg", "turn_context"].includes(record.type)) return "codex";
     if (record.type === "turn.started" || record.type === "turn.completed") return "antigravity";
+    // Candidate 29 (AGY run 3, R3): the brain transcript (.system_generated/logs/transcript.jsonl) records numbered steps.
+    if (["USER_INPUT", "PLANNER_RESPONSE", "GENERIC"].includes(record.type) && Number.isInteger(record.step_index) && typeof record.created_at === "string") return "antigravity-steps";
     if ((record.type === "user" || record.type === "assistant") && isTimelineObject(record.message)) return "claude";
   }
   return null;
@@ -318,10 +320,34 @@ function antigravityTimelineEvents(records) {
   return events;
 }
 
-function buildTimeline(runner, records, actor, malformed) {
-  const events = runner === "claude" ? claudeTimelineEvents(records) : runner === "codex" ? codexTimelineEvents(records) : antigravityTimelineEvents(records);
-  const observed = runner !== "antigravity"; // human messages and tool results are recorded
-  const stamps = records.map((record) => (isTimelineObject(record) ? timelineMs(record.timestamp ?? record.payload?.timestamp) : null)).filter((ms) => ms !== null);
+// Candidate 29 (AGY run 3, R3), measured on a real run: the brain transcript records the human's input as USER_INPUT (source
+// USER_EXPLICIT), each model step as PLANNER_RESPONSE with input_tokens, cache_read_tokens and output_tokens, and each tool result
+// as GENERIC (`content`, and `error` when it failed). Every record carries `created_at`. One refusal code per tool result at most.
+function antigravityStepTimelineEvents(records) {
+  const events = [];
+  for (const record of records) {
+    if (!isTimelineObject(record)) continue;
+    const ms = timelineMs(record.created_at);
+    if (record.type === "USER_INPUT" && record.source === "USER_EXPLICIT") {
+      events.push({ kind: "human", ms, chars: typeof record.content === "string" ? timelineChars(record.content) : null });
+    } else if (record.type === "PLANNER_RESPONSE") {
+      const usage = { input: timelineNumber(record.input_tokens), output: timelineNumber(record.output_tokens), cacheWrite: null, cacheRead: timelineNumber(record.cache_read_tokens) };
+      events.push({ kind: "response", ms, listed: true, model: null, usage });
+    } else if (record.type === "GENERIC") {
+      const text = [record.error, record.content].filter((value) => typeof value === "string").join("\n");
+      const code = text === "" ? null : timelineRefusal(text, true);
+      if (code) events.push({ kind: "refusal", code });
+    }
+  }
+  return events;
+}
+
+function buildTimeline(format, records, actor, malformed) {
+  const runner = format === "antigravity-steps" ? "antigravity" : format;
+  const events = format === "claude" ? claudeTimelineEvents(records) : format === "codex" ? codexTimelineEvents(records)
+    : format === "antigravity-steps" ? antigravityStepTimelineEvents(records) : antigravityTimelineEvents(records);
+  const observed = format !== "antigravity"; // human messages and tool results are recorded (not in the older turn.* form)
+  const stamps = records.map((record) => (isTimelineObject(record) ? timelineMs(record.timestamp ?? record.payload?.timestamp ?? record.created_at) : null)).filter((ms) => ms !== null);
   const grossMs = stamps.length > 0 ? Math.max(...stamps) - Math.min(...stamps) : null;
   const humanIndexes = events.flatMap((event, index) => (event.kind === "human" ? [index] : []));
   let waitKnown = true;

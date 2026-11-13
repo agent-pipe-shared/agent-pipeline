@@ -473,6 +473,35 @@ test("usage-ledger --timeline (antigravity transcript) prints n/a for what the f
   }
 });
 
+// Candidate 29 (AGY run 3, R3): the record family a real Antigravity brain transcript carries (shape measured on a run).
+test("usage-ledger --timeline (antigravity brain transcript) reads human turns, per-step tokens and hook refusals", () => {
+  const step = (index, at, type, extra) => ({ step_index: index, source: "MODEL", type, status: "DONE", created_at: at, ...extra });
+  const { dir, file } = timelineFile([
+    { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
+    step(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 120, cache_read_tokens: 30, output_tokens: 7, tool_calls: [] }),
+    step(2, "2026-08-19T10:00:04Z", "GENERIC", { status: "ERROR", content: "x", error: `BLOCKED (Antigravity native child): AGY-NATIVE-BRAIN-WRITE: ${SECRET_MARKER}` }),
+    step(3, "2026-08-19T10:00:05Z", "GENERIC", { content: "ok GHCR-COMMITTED" }),
+    { step_index: 4, source: "SYSTEM", type: "SYSTEM_MESSAGE", status: "DONE", created_at: "2026-08-19T10:00:06Z", content: "system note" },
+    step(5, "2026-08-19T10:00:10Z", "PLANNER_RESPONSE", { input_tokens: 200, cache_read_tokens: 150, output_tokens: 9, content: "done" }),
+    { step_index: 6, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:40Z", content: "again" },
+    step(7, "2026-08-19T10:00:42Z", "PLANNER_RESPONSE", { input_tokens: 210, cache_read_tokens: 200, output_tokens: 3 }),
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /Run timeline \(antigravity\)/);
+    assert.match(out, new RegExp(`- turn 1 \\| 2026-08-19T10:00:00.000Z \\| ${HUMAN_TEXT.length} chars \\| duration 10.0 s \\| human wait after 30.0 s`));
+    assert.match(out, /\| main \| n\/a \| input 120 \| output 7 \| cache-write n\/a \| cache-read 30/);
+    assert.match(out, /- AGY-NATIVE-BRAIN-WRITE: 1/);
+    assert.doesNotMatch(out, /GHCR-COMMITTED/, "a success code is not a refusal");
+    assert.match(out, /TOTAL: run time gross 42.0 s \| human wait 30.0 s \| run time net 12.0 s \| refusals 1 \| human turns 2/);
+    assert.doesNotMatch(out, new RegExp(`${SECRET_MARKER}|system note`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("usage-ledger --timeline is exclusive with --row and --metering and refuses unreadable or unknown input without a path", () => {
   const { dir, file } = timelineFile([{ type: "something-else", note: "x" }]);
   try {
