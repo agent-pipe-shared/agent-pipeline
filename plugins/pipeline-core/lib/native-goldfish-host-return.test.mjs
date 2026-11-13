@@ -228,6 +228,12 @@ const cases = [
     assert.equal(prose.code, "NGHR-FINAL-JSON");
     assert.equal(prose.detail?.condition, "json-syntax");
     assert.equal(JSON.stringify(prose).includes("All done"), false);
+    // C29 (Glossover K-27): a complete object followed by a closing sentence stays refused, and the detail says so instead of a bare position.
+    const trailing = validateNativeGoldfishFinal(`${finalText}\n\nAll checks are green.`, { binding, allowCheckpoint: true });
+    assert.equal(trailing.code, "NGHR-FINAL-JSON");
+    assert.equal(trailing.detail?.condition, "json-trailing-text", JSON.stringify(trailing));
+    assert.match(trailing.detail.errorMessage, new RegExp(`^a complete JSON value ends at character ${finalText.length}; \\d+ characters of other text follow it`, "u"));
+    assert.equal(JSON.stringify(trailing).includes("All checks"), false, "the trailing text never travels in the detail");
     // A duplicate key and a text the strict parser refuses although native JSON accepts it are told apart.
     assert.equal(validateNativeGoldfishFinal(`{"schema":"${final.schema}","schema":"forged"}`, { binding }).detail?.condition, "json-duplicate-key");
     assert.equal(validateNativeGoldfishFinal(finalText.replace("Implemented and verified.", "lone\\ud800surrogate"), { binding }).detail?.condition, "json-not-strict");

@@ -179,6 +179,13 @@ function jsonFailureDetail(text, error) {
   const found = /\bposition (\d+)/u.exec(message);
   const position = found ? Number(found[1]) : /end of JSON input/u.test(message) ? text.length : null;
   if (!Number.isSafeInteger(position) || position > text.length) return { condition: "json-syntax" };
+  // C29 (Glossover K-27): a complete JSON value followed by more text (a closing sentence, a second fence) is its own condition, so the
+  // refusal says what to change instead of reading like a broken object. Still refused: the final message is the one object only.
+  if (/after JSON at position/u.test(message) && position < text.length) {
+    let complete = false;
+    try { parseStrictJson(text.slice(0, position)); complete = true; } catch { complete = false; }
+    if (complete) return { condition: "json-trailing-text", errorMessage: `a complete JSON value ends at character ${text.slice(0, position).trimEnd().length}; ${text.length - position} characters of other text follow it (the final message must be the JSON object only, optionally in one fence around the whole message)` };
+  }
   return { condition: position >= text.length ? "json-truncated" : "json-syntax", errorMessage: `parse failed at position ${position} of ${text.length} characters` };
 }
 
