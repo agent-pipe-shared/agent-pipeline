@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28e: 40 held patches exported from the build clone chain d97861aad..c1462422d
+# PO apply script for candidate 28e: 41 held patches exported from the build clone chain d97861aad..6653ab12a
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -54,6 +54,7 @@ step 37-41bf4f051 'feat(dispatch): the Goldfish briefing names the approved Spec
 step 38-7483b2ea9 'docs(adr): state ADR-0095 as built (who runs what, order, coverage)'
 step 39-20714b90d 'fix(design): skip a candidate source that is in neither the commit nor the tree'
 step 40-c1462422d 'feat(guard): make reopen-design the PO'"'"'s own step'
+step 41-6653ab12a 'test(verify): register the two Spec addendum suites'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
