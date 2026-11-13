@@ -10637,7 +10637,8 @@ function acceptedCandidateFile({dir,candidate,path}) {
 /**
  * The files the accepted delivery contract later reads from the request's commit, checked before the request exists: each one
  * must be in that commit and byte-equal to the working tree. Returns null when all are, otherwise one entry per file
- * (DAB-CANDIDATE-FILE-MISSING: not in the commit; DAB-CANDIDATE-FILE-DRIFT: committed bytes differ from the working tree).
+ * (DAB-CANDIDATE-FILE-MISSING: in the working tree but not in the commit; DAB-CANDIDATE-FILE-DRIFT: committed bytes differ
+ * from the working tree). A file in neither place is skipped.
  */
 function designCandidateSourceGaps(dir, candidate, paths, deps = {}) {
   const readCommitted = deps.readCandidateFile ?? acceptedCandidateFile;
@@ -10646,6 +10647,9 @@ function designCandidateSourceGaps(dir, candidate, paths, deps = {}) {
     let committed = null;
     try { committed = Buffer.from(readCommitted({ dir, candidate, path })); } catch { committed = null; }
     const physical = physicalRebindFile(dir, path);
+    // A file absent from the commit AND from the working tree is not an uncommitted file: whether the route needs it at all
+    // is the existing checks' and approve-plan's own question (a project without a proof policy predates this gate).
+    if (committed === null && !physical) continue;
     if (committed === null) {
       gaps.push({ code: "DAB-CANDIDATE-FILE-MISSING", path, message: `${path} is not in the commit the approval request binds (${candidate.commit.slice(0, 12)}); approve-plan reads it from there`,
         repair: `Commit ${path} (git add -- ${path}, then git commit), then run present-plan again: the request binds HEAD.` });
