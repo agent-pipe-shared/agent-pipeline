@@ -4879,6 +4879,12 @@
       "file": "plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs",
       "invariantPinned": "The close SBOM reads yarn.lock (v1, Berry), pnpm-lock.yaml (5, 6, 9), bun.lock, uv.lock, Gradle lockfiles, NuGet packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock and committed CycloneDX files: a registry package is a component, a workspace or link member is left out, a git, path or URL pin is partial and its URL is never written, an unknown format version is unsupported and an unreadable entry invalid; a Maven pom is partial unless a CycloneDX file in its directory or above lists every direct dependency, and a .NET project or Gradle build without its lockfile is partial with help naming the switch",
       "nonOverlapNote": "Unique cases: the readers added in candidate 28d and the Maven coverage rule; sbom-close.test.mjs keeps the npm, Python, Go and Rust readers and the close record"
+    },
+    {
+      "name": "toolchain-registry-tests",
+      "file": "plugins/pipeline-core/lib/toolchain-registry.test.mjs",
+      "invariantPinned": "One tool registry names every program the Pipeline needs, with its class, floor and an install route per platform; every preflight tool except the license control is required there and the preflight takes its version floors from it; the pointer a preflight result carries names the document and holds no command and no version; a required tool's deferral is recorded machine-locally with the answer word for word, never makes a readiness finding ok and never lifts a critical calibration's scanner refusal; a scanner the check could not observe asks for no install",
+      "nonOverlapNote": "Unique cases: the registry, its agreement with the preflight floors and the deferral; toolchain-preflight.test.mjs keeps the preflight's statuses, the W7-2 contract and the readiness report shape"
     }
   ]
 }

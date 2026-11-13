@@ -70,6 +70,8 @@ import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs"
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
 import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { meetsVersionFloor, toolchainDocAnchor, toolchainDocPointer, toolchainEntry } from "../lib/toolchain-registry.mjs";
+import { readToolDeferral } from "../lib/toolchain-deferrals.mjs";
 
 export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
 export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
@@ -134,7 +136,10 @@ function actionableResult(entry, platform, installers = new Set()) {
       ? `Create the configured project inputs required by ${entry.tool}.`
       : GUIDANCE[platform][entry.tool]
     : null;
-  const installerGuidance = contract === null ? "" : ` ${contract}`;
+  // C28e: a missing or incompatible tool also names its section of docs/toolchain.md, where the install route for each platform stands; the
+  // pointer itself holds no command and no version number (W7-2).
+  const docPointer = contract === null ? null : toolchainDocPointer(entry.tool);
+  const installerGuidance = contract === null ? "" : ` ${contract}${docPointer === null ? "" : ` ${docPointer}`}`;
   return {
     ...entry,
     affectedClaim,
@@ -146,10 +151,11 @@ function actionableResult(entry, platform, installers = new Set()) {
 function readyCompatibility(tool, observed) {
   if (!observed.ok) return result(tool, observed.status ?? "probe_error", observed);
   const parsed = semver(observed.handle.version);
-  if (tool === "node" && (!parsed || parsed[0] < 24)) return result(tool, "incompatible_version", observed);
+  // C28e: the major-version floors come from the one tool registry (lib/toolchain-registry.mjs), which also writes docs/toolchain.md.
+  if (tool === "node" && !meetsVersionFloor("node", parsed)) return result(tool, "incompatible_version", observed);
   if (tool === "git" && (!parsed || !["object-format", "diff-paths"].every((capability) => observed.handle.capabilities.includes(capability)))) return result(tool, parsed ? "incompatible_capability" : "incompatible_version", observed);
   if (tool === "gitleaks" && !parsed) return result(tool, "incompatible_version", observed);
-  if (tool === "osv-scanner" && (!parsed || parsed[0] < 2 || parsed[0] >= 3)) return result(tool, "incompatible_version", observed);
+  if (tool === "osv-scanner" && !meetsVersionFloor("osv-scanner", parsed)) return result(tool, "incompatible_version", observed);
   if (tool === "semgrep" && !parsed) return result(tool, "incompatible_version", observed);
   const required = REQUIRED_CAPABILITIES[tool] ?? [];
   if (!required.every((capability) => observed.handle.capabilities.includes(capability))) return result(tool, "incompatible_capability", observed);
@@ -308,6 +314,7 @@ export const ENVIRONMENT_READINESS_SCHEMA = "pipeline.environment-readiness.v1";
 export const GIT_HOOKS_REPAIR_SCHEMA = "pipeline.git-hooks-repair.v1";
 export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable", "scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
 const FINDING_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
+const HOST_BOUNDARY_STATES = new Set(["execution_environment", "probe_timeout", "probe_error"]);
 const MAX_CAUSE_CHARS = 400;
 const MANDATORY_HOOK_IDS = Object.freeze(["pre-push-hook", "pre-commit-hook", "commit-msg-hook"]);
 const HOOK_INSTALLERS = Object.freeze({ "pre-push-hook": "./pre-push-hook-install.mjs", "pre-commit-hook": "./pre-commit-hook-install.mjs", "commit-msg-hook": "./commit-msg-hook-install.mjs" });
@@ -476,7 +483,24 @@ const scannerProbe = (tool) => (context) => {
   const entry = context.scanners.results.find((candidate) => candidate.tool === tool);
   if (entry?.status === "ready") return { status: "ok", cause: `${tool} ${entry.version ?? "(version unreported)"} is ready`, repair: null };
   const status = entry?.status ?? "unobserved";
-  return { status: "attended", cause: `${tool} prerequisite status: ${status}`, repair: attendedPrerequisite(`${tool}-installed`, GUIDANCE[platformName(context.platform)][tool]) };
+  // C28e: a state that says the check itself could not look (a sandboxed session on WSL) asks for no install: the tool may well be present.
+  if (HOST_BOUNDARY_STATES.has(status)) {
+    return { status: "unknown", cause: `${tool} could not be observed at this execution boundary (${status})`, repair: attendedPrerequisite(`${tool}-observable`, `re-run the readiness report in your own terminal, outside any sandbox; do not reinstall ${tool} from this result.`) };
+  }
+  // C28e (PO tiles 2026-11-12): the repair names the tool's class in the one registry and its section of docs/toolchain.md, and a deferral the
+  // person recorded on this machine (lib/toolchain-deferrals.mjs). A deferral never makes the finding ok and never reaches the plan or close
+  // check (lib/security-close-status.mjs scannerEntryReadiness reads the preflight result, not this report).
+  const deferral = (context.deps.readToolDeferral ?? readToolDeferral)(tool, context.deps.deferralDependencies ?? {});
+  return {
+    status: "attended",
+    cause: `${tool} prerequisite status: ${status}${deferral === null ? "" : `; installing it was deferred on this machine (${deferral.deferredAt})`}`,
+    repair: {
+      ...attendedPrerequisite(`${tool}-installed`, `${GUIDANCE[platformName(context.platform)][tool]} ${toolchainDocPointer(tool) ?? ""}`.trim()),
+      toolClass: toolchainEntry(tool)?.class ?? null,
+      installDoc: toolchainDocAnchor(tool),
+      deferred: deferral !== null,
+    },
+  };
 };
 
 const DEFAULT_FINDING_PROBES = Object.freeze({

@@ -140,6 +140,13 @@ export const UNIVERSAL_STANDALONE_FILES = Object.freeze([
       "the vendored artifacts themselves cite this file as their own normative source. Vendored as a " +
       "single standalone doc rather than rewriting every citing role/guardrail file.",
   },
+  {
+    path: "docs/toolchain.md",
+    reason:
+      "Candidate 28e (PO tiles 2026-11-12): the list of every tool a consuming project's machine needs, with the install " +
+      "route per platform. The toolchain preflight's guidance and the readiness findings point at it, and a consumer has " +
+      "no repository docs/ of the Pipeline, so it ships with the plugin. Generated from lib/toolchain-registry.mjs.",
+  },
 ]);
 
 /**

@@ -809,6 +809,17 @@ uses no network, and it imports only `lib/sbom-manifest.mjs`, itself a kernel pa
 loosened its rules (a git pin read as a registry package, an unknown format read as empty) would
 let a close pass with an incomplete SBOM, which is why it cannot be lifted by a window.
 
+Candidate 28e adds the one tool registry and the machine-local deferral of a required tool.
+`scripts/toolchain-preflight.mjs` imports `plugins/pipeline-core/lib/toolchain-registry.mjs` (the
+version floors it checks and the document pointer it prints) and
+`plugins/pipeline-core/lib/toolchain-deferrals.mjs` (whether the person deferred installing a
+scanner on this machine), so both execute with kernel authority and are kernel paths now. The
+registry is pure data; the deferral module reads and writes only its own file next to the machine
+plane and imports only `lib/machine-plane.mjs`, itself a kernel path, and the registry. A loosened
+floor would admit a scanner version the close cannot drive, and a deferral read as a pass would
+hide a missing scanner, which is why neither can be lifted by a window. A deferral never reaches
+the plan or close check: `lib/security-close-status.mjs` reads the preflight result, not the report.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
