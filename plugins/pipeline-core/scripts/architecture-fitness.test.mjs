@@ -421,6 +421,29 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(navigation(["docs/adr/9999-planned-not-written.md"]).outcome, OUTCOME_FINDING, "a planned numbered ADR still needs its map reference (AC-127)");
     });
 
+    it("Class 7: an existing draft ADR is current once the map references the numbered ADR of the same slug and that file exists (Glossover K-23)", () => {
+      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-draft-"));
+      try {
+        fs.mkdirSync(path.join(rootDir, "architecture", "map"), { recursive: true });
+        fs.writeFileSync(path.join(rootDir, "architecture", "map", "index.md"), "# Map\n");
+        fs.mkdirSync(path.join(rootDir, "docs", "adr"), { recursive: true });
+        for (const name of ["draft-content-assistant.md", "0015-content-assistant.md", "draft-image-storage.md", "draft-other.md"]) {
+          fs.writeFileSync(path.join(rootDir, "docs", "adr", name), "# ADR\n");
+        }
+        const inventory = [
+          { id: "documentation", ownedPaths: ["docs/adr/**"], publicContracts: [], adrReferences: [] },
+          { id: "app", ownedPaths: ["src/**"], publicContracts: [], adrReferences: ["docs/adr/0015-content-assistant.md", "docs/adr/0018-image-storage.md"] },
+        ];
+        const navigation = (touchedContracts) => evaluateNavigationCurrency({ rootDir, inventory, touchedContracts });
+        assert.equal(navigation(["docs/adr/draft-content-assistant.md"]).outcome, OUTCOME_PASS, "the draft of a referenced, existing numbered ADR is current");
+        assert.equal(navigation(["docs/adr/draft-image-storage.md"]).outcome, OUTCOME_FINDING, "a referenced numbered ADR that is not on disk does not cover its draft");
+        assert.equal(navigation(["docs/adr/draft-other.md"]).outcome, OUTCOME_FINDING, "a draft with no numbered ADR in the map stays stale");
+        assert.equal(navigation(["docs/adr/draft-content-assistant.md", "docs/adr/draft-other.md"]).outcome, OUTCOME_FINDING);
+      } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
     it("Class 8: parallel-overlap checks concurrent write surfaces", () => {
       const disjoint = evaluateParallelOverlap({
         concurrentDispatches: [

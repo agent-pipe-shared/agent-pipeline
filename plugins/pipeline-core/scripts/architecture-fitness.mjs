@@ -659,9 +659,24 @@ export function evaluateNavigationCurrency({ rootDir, inventory, candidatePaths 
     try { return !fs.lstatSync(path.join(rootDir, target)).isFile(); } catch { return true; }
   };
 
+  // Candidate 29 (Glossover K-23): materialization writes the accepted record to docs/adr/NNNN-<slug>.md and keeps
+  // docs/adr/draft-<slug>.md on disk as history (create-adr.mjs), and the map references the numbered record, never the
+  // draft. A touched draft is therefore current once a module lists the numbered ADR of the same slug and that file exists.
+  // A draft with no accepted record referenced by the map stays stale.
+  const isFile = (relative) => { try { return fs.lstatSync(path.join(rootDir, relative)).isFile(); } catch { return false; } };
+  const draftSupersededByReferencedAdr = (touched) => {
+    const target = normalizeRef(touched);
+    const slug = /^docs\/adr\/draft-([^/]+)\.md$/u.exec(target)?.[1];
+    if (slug === undefined || typeof rootDir !== "string") return false;
+    return [...adrReferences].some((reference) => {
+      const name = /^docs\/adr\/(\d{3,})-([^/]+)\.md$/u.exec(reference);
+      return name !== null && name[2] === slug && isFile(reference);
+    });
+  };
+
   // Check if any touched contract is missing from concept files
   for (const tc of touchedContracts) {
-    if (adrReferenceCovers(tc) || adrFileAbsent(tc)) continue;
+    if (adrReferenceCovers(tc) || adrFileAbsent(tc) || draftSupersededByReferencedAdr(tc)) continue;
     const owningMod = resolveModuleForPath(tc, inventory);
     if (owningMod && !(owningMod.publicContracts || []).includes(tc)) {
       isStale = true;
