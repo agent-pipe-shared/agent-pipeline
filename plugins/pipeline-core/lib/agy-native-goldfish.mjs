@@ -277,7 +277,11 @@ export function nativeBrainWriteRefusal({ filePath, command } = {}) {
   if (typeof filePath === "string" && touchesHostOwnedPath(filePath, { isPath: true })) return BRAIN_REFUSAL;
   if (typeof command === "string" && touchesHostOwnedPath(command, { isPath: false })) {
     const readOnly = /^\s*(?:cat|ls|rg|grep|head|tail|wc|stat|file|find|pwd)\b/u.test(command) && !/>|\btee\b|-delete\b|-exec\b/u.test(command);
-    if (!readOnly) return BRAIN_REFUSAL;
+    // Candidate 29 (AGY run 3, R4): the Pipeline's own read-only run timeline over the brain transcript names that path but writes
+    // nothing (it prints to stdout). Exactly `node <...>/scripts/usage-ledger.mjs --timeline <file> [--json]`, no shell operator.
+    const timelineRead = !/[<>|;&`$()]/u.test(command)
+      && /^\s*node(?:\.exe)?\s+\S*[\\/]scripts[\\/]usage-ledger\.mjs\s+--timeline\s+\S+(?:\s+--json)?\s*$/u.test(command);
+    if (!readOnly && !timelineRead) return BRAIN_REFUSAL;
   }
   return null;
 }

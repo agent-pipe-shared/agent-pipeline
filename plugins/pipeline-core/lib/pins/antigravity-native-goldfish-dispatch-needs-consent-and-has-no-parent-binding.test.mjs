@@ -446,6 +446,15 @@ test("an agent write under the Antigravity brain or config directory is refused"
     assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${cli}/worktrees/../brain/x.json` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
     assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${descriptorPath}` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
     assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `cat ${descriptorPath}` }), null);
+    // Candidate 29 (AGY run 3, R4): the Pipeline's read-only run timeline over the brain transcript is a read; any write form stays refused.
+    const transcript = `${cli}/brain/${PARENT}/.system_generated/logs/transcript.jsonl`;
+    const ledger = "/plugins/pipeline-core/scripts/usage-ledger.mjs";
+    assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `node ${ledger} --timeline ${transcript} --json` }), null);
+    assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `node ${ledger} --timeline ${transcript}` }), null);
+    for (const command of [`node ${ledger} --timeline ${transcript} > ${transcript}`, `node ${ledger} --timeline ${transcript}; rm ${transcript}`,
+      `node ${ledger} ${cli}/brain`, `node /tmp/other.mjs --timeline ${transcript}`, `node ${ledger} --timeline ${transcript} --row`]) {
+      assert.match(nativeBrainWriteRefusal({ filePath: null, command }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, command);
+    }
     const res = runAdapter(fx, payload(fx, {
       conversationId: PARENT, toolCall: { name: "write_to_file", args: { TargetFile: descriptorPath, CodeContent: "{}" } },
     }));
