@@ -1,0 +1,50 @@
+diff --git a/plugins/pipeline-core/lib/review-admission-read.mjs b/plugins/pipeline-core/lib/review-admission-read.mjs
+index 55d43457ae625219a753bd6e2ac1bd43ec2632ec..da2849b943847a016c78376430cb840351f8dfcc 100644
+--- a/plugins/pipeline-core/lib/review-admission-read.mjs
++++ b/plugins/pipeline-core/lib/review-admission-read.mjs
+@@ -706,11 +706,19 @@ export function evaluateReviewAdmissionCore(options = {}, historicalEntries = []
+       usedAddenda.add(path);
+     }
+     if (disposition === "required") {
++      // An addendum resolves the round it was written for. For the requested task at another review candidate it is an
++      // EARLIER round's resolution: it is still validated, but it must not shadow this round's exact/descendant admission
++      // (AGY run 3, R2: a second round of the same task was refused with no admitted record).
++      const earlierRoundAddendum = addendum !== undefined && record.taskId === taskId
++        && addendum.addendum?.reviewCandidateCommit !== candidateCommit;
+       if (addendum) {
+         usedAddenda.add(path);
+         const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
+         if (addendumFinding) findings.push(addendumFinding);
+-        else coveredRecordCount += 1;
++        else if (!earlierRoundAddendum) coveredRecordCount += 1;
++      }
++      if (addendum && !earlierRoundAddendum) {
++        // resolved for exactly this review candidate
+       } else if (record.taskId === taskId && record.candidateCommit === candidateCommit && isV4
+         && !["authored-commit", "orchestrator-attested"].includes(record.outcomeClassification.kind)) {
+         targetRecordCandidateCommit = record.candidateCommit;
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index 804a3d76b18e5c36bb041375ed42597ece4a9e67..c1df7c2611e8671b7d0f302d8aa40d85a2040397 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -232,6 +232,20 @@ test("immutable authored Agy v4 record can be resolved by the same independently
+   assert.equal(verifyCriticDispositionAddendumForRecord({ root, taskId, record: authored,
+     recordBytes: Buffer.from(recordBytes), options: boundReview(recordBytes) }).code,
+   "critic-addendum-bound");
++  // AGY run 3, R2: the addendum resolved round 1 at its review candidate. Round 2 of the SAME task at a later candidate descends
++  // from the delivered record and is admitted by descendant; the earlier round's addendum is still validated and does not shadow it.
++  const laterCandidate = "f".repeat(40);
++  const secondRound = evaluateReviewAdmission({ root, taskId, candidateCommit: laterCandidate, readChangedPaths: () => [], ...boundReview(recordBytes) });
++  assert.equal(secondRound.ok, true, secondRound.readFindings.join("\n"));
++  assert.equal(secondRound.admittedCount, 1);
++  assert.equal(secondRound.admittedByDescendant, true);
++  assert.equal(secondRound.coveredRecordCount, 0, "the earlier round's addendum does not count the record as covered for this round");
++  const sameRound = evaluateReviewAdmission({ root, taskId, candidateCommit: reviewCandidateCommit, readChangedPaths: () => [], ...boundReview(recordBytes) });
++  assert.equal(sameRound.admittedCount, 0, "at the addendum's own review candidate the record stays resolved, not re-admitted");
++  assert.equal(sameRound.coveredRecordCount, 1);
++  const unboundSecond = evaluateReviewAdmission({ root, taskId, candidateCommit: laterCandidate, readChangedPaths: () => [], gitRead: boundReview(recordBytes).gitRead });
++  assert.equal(unboundSecond.ok, false, "an earlier round's addendum that does not bind still refuses");
++  assert.match(unboundSecond.readFindings.join("\n"), /consumed Critic receipt is unavailable/u);
+   writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`),
+     json({ ...authored, commits: [] }));
+   assert.match(evaluate(root, ["src.txt"], boundReview(recordBytes)).readFindings.join("\n"),

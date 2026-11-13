@@ -1,0 +1,51 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.mjs b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+index 59bed8863b82ef7ba8fa34526966d3c8fa732b97..83a100666923f169a1cf2ce31aef0969be150b9b 100755
+--- a/plugins/pipeline-core/scripts/architecture-fitness.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+@@ -647,9 +647,21 @@ export function evaluateNavigationCurrency({ rootDir, inventory, candidatePaths
+     return [...adrReferences].some((reference) => reference.startsWith(prefix));
+   };
+ 
++  // Candidate 29 (Glossover K-23): a docs/adr/ token that is neither a file on disk nor named like a numbered ADR (a prose fragment
++  // such as "docs/adr/00NN-" or "docs/adr/draft-", or a draft name the PRD mentions historically after the ADR was numbered) is no
++  // navigation target, so the map cannot be stale against it. A numbered ADR the plan names is checked even before it is written
++  // (AC-127), a prefix form (trailing "/" or "*") keeps the rule above, and an existing ADR file nobody references is still checked.
++  const NUMBERED_ADR = /^\d{3,}-[^/]+\.md$/u;
++  const adrFileAbsent = (touched) => {
++    const target = normalizeRef(touched);
++    if (!target.startsWith("docs/adr/") || target.endsWith("/") || target.includes("*") || typeof rootDir !== "string") return false;
++    if (NUMBERED_ADR.test(target.slice(target.lastIndexOf("/") + 1))) return false;
++    try { return !fs.lstatSync(path.join(rootDir, target)).isFile(); } catch { return true; }
++  };
++
+   // Check if any touched contract is missing from concept files
+   for (const tc of touchedContracts) {
+-    if (adrReferenceCovers(tc)) continue;
++    if (adrReferenceCovers(tc) || adrFileAbsent(tc)) continue;
+     const owningMod = resolveModuleForPath(tc, inventory);
+     if (owningMod && !(owningMod.publicContracts || []).includes(tc)) {
+       isStale = true;
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+index d392b5c69be15974cfa83a688e3623b3889c64ff..f2b4bf7b91f89a7332515040337e13b60923325a 100644
+--- a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+@@ -408,6 +408,19 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
+       assert.equal(navigation(["docs/adr/0004-tenancy-model.md", "schemas/y.json"]).violations[0].ruleId, "architecture-map-stale");
+     });
+ 
++    it("Class 7: a docs/adr/ token that is no file and no numbered ADR name is no navigation target; an existing draft or a planned numbered ADR still is (Glossover K-23)", () => {
++      const adrInventory = [
++        { id: "documentation", ownedPaths: ["docs/adr/**"], publicContracts: [], adrReferences: [] },
++        { id: "app", ownedPaths: ["src/**"], publicContracts: [], adrReferences: ["docs/adr/0004-tenancy-model.md"] },
++      ];
++      const navigation = (touchedContracts) => evaluateNavigationCurrency({ rootDir: REPO_ROOT, inventory: adrInventory, touchedContracts });
++      assert.equal(navigation(["docs/adr/00NN-", "docs/adr/draft-", "docs/adr/draft-ai-content-assistant.md", "docs/adr/0004-tenancy-model.md"]).outcome, OUTCOME_PASS,
++        "prose fragments and a draft name with no file are skipped");
++      assert.equal(navigation(["docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md"]).outcome, OUTCOME_FINDING,
++        "an existing draft ADR nobody references is still stale");
++      assert.equal(navigation(["docs/adr/9999-planned-not-written.md"]).outcome, OUTCOME_FINDING, "a planned numbered ADR still needs its map reference (AC-127)");
++    });
++
+     it("Class 8: parallel-overlap checks concurrent write surfaces", () => {
+       const disjoint = evaluateParallelOverlap({
+         concurrentDispatches: [
