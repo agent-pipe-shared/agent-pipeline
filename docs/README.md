@@ -24,6 +24,9 @@ guides, release records, architecture decision records, and state archives.
 
 - [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
   later source-maintainer reference.
+- [`toolchain.md`](toolchain.md) — every tool the Pipeline needs on a machine
+  (required, required to sign, optional) with the install route per platform,
+  and the build settings the SBOM of the close reads.
 - [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — route selection, gates,
   recovery, and close. [Deutsche Lesefassung](../PIPELINE_FLOW.de.md).
 - [`usage.md`](usage.md) — the normal user journey after a project is ready.

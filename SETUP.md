@@ -19,7 +19,12 @@ terminology, continue with this setup guide, then read the operator-facing
 <!-- capability:plugin-distribution-and-publication -->
 <a id="capability-plugin-distribution-and-publication"></a>
 
-- Node.js 24 or newer and Git are required for the included scripts.
+- **Required tools, with the install route for Linux/WSL, macOS and Windows:**
+  [`docs/toolchain.md`](docs/toolchain.md) (generated from the Pipeline's one
+  tool registry; the plugin ships the same file). Every machine needs Node.js 24
+  or newer, Git, `gitleaks`, `osv-scanner` and `semgrep`; the machine where the
+  PO signs also needs OpenSSL with Ed25519. The same page names the optional
+  tools and the build settings the SBOM of the close reads.
 - Four categories back the security gates: secrets (`gitleaks`), dependency
   vulnerabilities (`osv-scanner`), static analysis (`semgrep`), and licenses.
   The license check is a built-in `license-check` control that reads a license
@@ -28,10 +33,13 @@ terminology, continue with this setup guide, then read the operator-facing
   **A missing scanner makes its gate report `skipped`, not `pass`.** `skipped`
   means the gate checked nothing for that category — it is not a substitute for
   a passing scan, and a green Verify result built on a skipped gate does not
-  mean that category was actually scanned. After binding the plugin, the
+  mean that category was actually scanned. Onboarding checks the required tools
+  and asks you to install a missing one together with your agent; you may defer
+  it, and the deferral is recorded on your machine without lifting any check.
+  After binding the plugin, the
   [toolchain preflight](#missing-prerequisite-guidance-in-a-consumer-project)
-  shows every configured tool with its observed version, or a copyable
-  platform-appropriate install command for whatever is missing.
+  shows every configured tool with its observed version, and for a missing one
+  the section of `docs/toolchain.md` with its install route.
 - Keep each governed repository under version control. The pipeline itself is
   obtained from its approved GitHub distribution; do not copy a maintainer
   checkout or its generated files into the governed repository.
@@ -177,7 +185,9 @@ without scrolling past it. Follow that procedure, then continue at step 1.
 #### Missing prerequisite guidance in a consumer project
 
 The installed plugin's read-only toolchain preflight reports each configured
-tool, observed version, blocked claim and a copyable platform command. In this
+tool, observed version and blocked claim, and for a missing tool the section of
+`docs/toolchain.md` that holds its install route per platform; it installs
+nothing and prints no install command itself. In this
 guide `<plugin-root>` is the installed Pipeline plugin directory and
 `<project-root>` the governed repository root (see the
 [command convention](docs/README.md)). From the governed project root, run:
@@ -186,8 +196,11 @@ guide `<plugin-root>` is the installed Pipeline plugin directory and
 node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
 ```
 
-Review any offered installer command under your host/package-management
-policy, then repeat the preflight. npm is never substituted for non-npm
+Run the install route from `docs/toolchain.md` yourself, under your
+host/package-management policy, then repeat the preflight. To install a
+required tool later, record that on this machine with
+`node "<plugin-root>/scripts/toolchain-defer.mjs" --tool <id> --answer "<your answer>"`;
+the readiness report keeps naming it. npm is never substituted for non-npm
 scanners; bounded Semgrep settings avoid treating ordinary home-directory
 writes as a missing installation.
 

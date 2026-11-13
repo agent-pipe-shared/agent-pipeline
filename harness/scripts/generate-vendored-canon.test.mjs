@@ -87,7 +87,7 @@ test("AC-2: manifest completeness -- every tracked vendored file has an entry, e
   const manifestDests = new Set(manifest.map((entry) => entry.dest));
 
   const scanDirs = ["plugins/pipeline-core/guardrails", "plugins/pipeline-core/roles", "plugins/pipeline-core/templates/prompts", "plugins/pipeline-core/docs/adr"];
-  const standaloneVendored = ["plugins/pipeline-core/docs/push-release-flow.md", "plugins/pipeline-core/docs/operating-model.md"];
+  const standaloneVendored = ["plugins/pipeline-core/docs/push-release-flow.md", "plugins/pipeline-core/docs/operating-model.md", "plugins/pipeline-core/docs/toolchain.md"];
   const trackedVendored = execFileSync("git", ["ls-files", "--", ...scanDirs, ...standaloneVendored], {
     cwd: REPO_ROOT,
     encoding: "utf8",
