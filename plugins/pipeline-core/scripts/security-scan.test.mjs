@@ -2194,13 +2194,22 @@ security:
   const semgrep = byTool("semgrep")?.ruleSet;
   assertEqual("rule provenance: semgrep names the plugin default rule file it really passed to --config", [semgrep?.source, semgrep?.ref], ["plugin-default", "plugin:security/semgrep/pipeline.yml"]);
   // QG-04 restated in place (C28, AC-108): the file listed two ids; it now also carries the default web/Node pack. The original two stay first and unchanged,
-  // and the provenance still lists exactly the ids of the file, in file order.
-  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, [
+  // and the provenance still lists exactly the ids of the file, in file order. C28e (ADR-0094) appends the per-language pack, language by language and
+  // class by class in the order below; Go has no deserialization or XXE rule, and JS/TS keeps its command rule in the web/Node pack above.
+  const c28eClasses = ["sql-injection", "command-injection", "insecure-deserialization", "tls-verification-disabled", "xxe", "path-traversal", "ssrf", "weak-crypto"];
+  const c28eNotShipped = { go: ["insecure-deserialization", "xxe"], js: ["command-injection"] };
+  const c28eIds = ["java", "csharp", "python", "go", "js", "kotlin", "php", "ruby"]
+    .flatMap((lang) => c28eClasses.filter((cls) => !(c28eNotShipped[lang] ?? []).includes(cls)).map((cls) => `pipeline-${lang}-${cls}`));
+  const allIds = [
     "pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval",
     "pipeline-default-dom-injection-sink", "pipeline-default-eval-like-call", "pipeline-default-unsafe-url-scheme", "pipeline-default-unvalidated-redirect",
     "pipeline-default-postmessage-no-origin-check", "pipeline-default-prototype-pollution", "pipeline-default-child-process-shell-string",
     "pipeline-default-hardcoded-secret", "pipeline-default-hardcoded-credential-assignment",
-  ]);
+    ...c28eIds,
+  ];
+  // The record keeps the first 50 ids (MAX_RULE_IDS) and counts all of them; the printed line then says "(+N more)".
+  assertEqual("rule provenance: semgrep lists the rule ids of that file", [semgrep?.ruleIds, semgrep?.ruleCount], [allIds.slice(0, 50), allIds.length]);
+  assertTrue("rule provenance: the printed rule set line names how many ids it left out", scanModule.formatRuleSetLines(evidence.scanners).find((l) => l.startsWith("semgrep: "))?.includes(`(+${allIds.length - 50} more)`), "no (+N more) on the semgrep line");
   assertTrue("rule provenance: semgrep binds the rule file bytes by digest", /^[0-9a-f]{64}$/u.test(semgrep?.sha256 ?? ""), JSON.stringify(semgrep));
   assertEqual("rule provenance: gitleaks names its config and says it extends the built-in default ruleset", [byTool("gitleaks")?.ruleSet?.ref?.endsWith("gitleaks-default.toml") || byTool("gitleaks")?.ruleSet?.ref === ".gitleaks.toml", /built-in default/u.test(byTool("gitleaks")?.ruleSet?.description ?? "")], [true, true]);
   assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");

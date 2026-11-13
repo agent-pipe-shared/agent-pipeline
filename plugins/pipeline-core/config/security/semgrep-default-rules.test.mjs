@@ -13,7 +13,7 @@
  * Run:   node plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
  * Exit:  0 = every case passed or was honestly skipped, 1 = a real semgrep run disagreed.
  */
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -81,13 +81,30 @@ const FIXTURES = [
   { rule: "pipeline-default-hardcoded-credential-assignment", name: "environment reads and placeholders", fires: false, code: "const password = process.env.DB_PASSWORD;\nconst apiKey = '<your-api-key>';\nconst token = '';" },
 ];
 
+// C28e (ADR-0094): the per-language pack. Its ids are read from the YAML, never listed twice; the expected inventory below is the class table of
+// ADR-0094 (Go has no deserialization or XXE rule, JS/TS keeps its command rule in the web/Node pack). The fixtures live in semgrep-pack-fixtures/
+// as <lang>/hits.<ext> (every rule of the language fires) and <lang>/quiet.<ext> (one look-alike per class, nothing fires); they are copied into
+// a temporary directory before the scan so the repository path never meets a rule's test-path exclude.
+const FIXTURE_DIR = fileURLToPath(new URL("./semgrep-pack-fixtures/", import.meta.url));
+const LANG_EXT = { java: "java", csharp: "cs", kotlin: "kt", python: "py", go: "go", js: "ts", php: "php", ruby: "rb" };
+const PACK_CLASSES = ["sql-injection", "command-injection", "insecure-deserialization", "tls-verification-disabled", "xxe", "path-traversal", "ssrf", "weak-crypto"];
+const NOT_SHIPPED = { go: ["insecure-deserialization", "xxe"], js: ["command-injection"] };
+const WARNING_CLASSES = new Set(["weak-crypto"]);
+const LANG_ID = /^pipeline-(java|csharp|kotlin|python|go|js|php|ruby)-(.+)$/u;
+const expectedLangIds = Object.keys(LANG_EXT)
+  .flatMap((lang) => PACK_CLASSES.filter((cls) => !(NOT_SHIPPED[lang] ?? []).includes(cls)).map((cls) => `pipeline-${lang}-${cls}`));
+
 const binary = findSemgrep();
 record("semgrep-default-rules.yml exists on disk", existsSync(RULES_PATH), RULES_PATH);
+const rulesText = existsSync(RULES_PATH) ? readFileSync(RULES_PATH, "utf8") : "";
+const langIds = [...rulesText.matchAll(/^\s*-\s+id:\s*(\S+)/gmu)].map((m) => m[1]).filter((id) => LANG_ID.test(id));
 {
-  const rulesText = existsSync(RULES_PATH) ? readFileSync(RULES_PATH, "utf8") : "";
   const listed = new Set([...rulesText.matchAll(/^\s*-\s+id:\s*(\S+)/gmu)].map((m) => m[1]));
   record("default pack lists both original rules and every new rule id (no semgrep binary needed)", ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].every((id) => listed.has(id)), `missing: ${JSON.stringify(["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].filter((id) => !listed.has(id)))}`);
   record("default pack: every new rule has at least one positive and one negative fixture", NEW_RULES.every((id) => FIXTURES.some((f) => f.rule === id && f.fires) && FIXTURES.some((f) => f.rule === id && !f.fires)), "fixture table incomplete");
+  record("language pack: the YAML carries exactly the class table of ADR-0094 (no semgrep binary needed)", JSON.stringify([...langIds].sort()) === JSON.stringify([...expectedLangIds].sort()), `missing ${JSON.stringify(expectedLangIds.filter((id) => !langIds.includes(id)))}, extra ${JSON.stringify(langIds.filter((id) => !expectedLangIds.includes(id)))}`);
+  const missingFixtures = Object.entries(LANG_EXT).flatMap(([lang, ext]) => [`${lang}/hits.${ext}`, `${lang}/quiet.${ext}`]).filter((rel) => !existsSync(join(FIXTURE_DIR, rel)));
+  record("language pack: every language has a firing and a quiet fixture file", missingFixtures.length === 0, `missing: ${JSON.stringify(missingFixtures)}`);
 }
 
 if (!binary) {
@@ -158,6 +175,53 @@ if (!binary) {
     const fired = firedIn(index).has(fixture.rule);
     record(`default pack: ${fixture.rule} ${fixture.fires ? "fires on" : "stays quiet on"} ${fixture.name}`, fired === fixture.fires, `fired: ${JSON.stringify([...firedIn(index)])}`);
   });
+
+  // Case 4 (C28e, ADR-0094): the per-language pack. All 16 fixture files in ONE semgrep spawn. Every rule fires in its language's hits file with the
+  // severity of the class table (weak-crypto WARNING, every other class ERROR), and no language rule fires in any quiet file.
+  const langDir = join(scratch, "lang");
+  for (const [lang, ext] of Object.entries(LANG_EXT)) {
+    mkdirSync(join(langDir, lang), { recursive: true });
+    for (const kind of ["hits", "quiet"]) copyFileSync(join(FIXTURE_DIR, lang, `${kind}.${ext}`), join(langDir, lang, `${kind}.${ext}`));
+  }
+  const langRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, langDir], { encoding: "utf8", env, shell: false, maxBuffer: 64 * 1024 * 1024 });
+  let langParsed = null;
+  try { langParsed = JSON.parse(langRun.stdout ?? ""); } catch { /* asserted below */ }
+  record("language pack: the fixture directory scans to parseable JSON with no error payload", langParsed !== null && (langParsed.errors ?? []).length === 0, `${langRun.stderr?.slice(0, 300)} ${JSON.stringify(langParsed?.errors)?.slice(0, 300)}`);
+  const langResults = (langParsed?.results ?? []).map((r) => ({ rule: r.check_id.split(".").pop(), file: r.path.split(/[\\/]/u).slice(-2).join("/"), severity: r.extra?.severity }));
+  for (const id of langIds) {
+    const [, lang, cls] = LANG_ID.exec(id);
+    const hitsFile = `${lang}/hits.${LANG_EXT[lang]}`;
+    const fired = langResults.filter((r) => r.rule === id && r.file === hitsFile);
+    const expectedSeverity = WARNING_CLASSES.has(cls) ? "WARNING" : "ERROR";
+    record(`language pack: ${id} fires on ${hitsFile} as ${expectedSeverity}`, fired.length > 0 && fired.every((r) => r.severity === expectedSeverity), JSON.stringify(fired));
+    const quiet = langResults.filter((r) => r.rule === id && r.file.endsWith(`/quiet.${LANG_EXT[lang]}`));
+    record(`language pack: ${id} stays quiet on ${lang}/quiet.${LANG_EXT[lang]}`, quiet.length === 0, JSON.stringify(quiet));
+  }
+  const quietAny = langResults.filter((r) => LANG_ID.test(r.rule) && /\/quiet\./u.test(`/${r.file}`));
+  record("language pack: no language rule fires on any quiet file", quietAny.length === 0, JSON.stringify(quietAny));
+
+  // Case 5 (C28e): test code is excluded from the ERROR rules. The same firing fixtures under test-shaped names produce no ERROR finding of the
+  // language pack; weak-crypto (WARNING, no exclude) may still appear and blocks nothing.
+  const exclDir = join(scratch, "excluded");
+  const exclCopies = [
+    ["java", "hits.java", join("src", "main", "OrderServiceTest.java")],
+    ["csharp", "hits.cs", join("Orders.Tests", "OrdersControllerTests.cs")],
+    ["go", "hits.go", join("orders", "orders_test.go")],
+    ["python", "hits.py", join("app", "test_orders.py")],
+    ["js", "hits.ts", join("web", "orders.spec.ts")],
+    ["ruby", "hits.rb", join("spec", "orders_spec.rb")],
+    ["php", "hits.php", join("app", "OrdersTest.php")],
+    ["kotlin", "hits.kt", join("src", "main", "OrderServiceTest.kt")],
+  ];
+  for (const [lang, file, target] of exclCopies) {
+    mkdirSync(dirname(join(exclDir, target)), { recursive: true });
+    copyFileSync(join(FIXTURE_DIR, lang, file), join(exclDir, target));
+  }
+  const exclRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, exclDir], { encoding: "utf8", env, shell: false, maxBuffer: 64 * 1024 * 1024 });
+  let exclParsed = null;
+  try { exclParsed = JSON.parse(exclRun.stdout ?? ""); } catch { /* asserted below */ }
+  const exclErrors = (exclParsed?.results ?? []).filter((r) => LANG_ID.test(r.check_id.split(".").pop()) && r.extra?.severity === "ERROR");
+  record("language pack: test-shaped paths carry no ERROR finding of the language pack", exclParsed !== null && exclErrors.length === 0, JSON.stringify(exclErrors.map((r) => `${r.path}:${r.start?.line} ${r.check_id.split(".").pop()}`)));
 
   try { rmSync(scratch, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
 }
