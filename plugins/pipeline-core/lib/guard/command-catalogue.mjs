@@ -710,6 +710,10 @@ function isAnsweredScriptHelp(script, args, options) {
 /** PO tile 2026-11-09: what a refusal owes a usage question on a plugin script that cannot answer it, instead of a sentence about the lifecycle; null for every other command. */
 export function scriptHelpRefusalHint(command, root, options = {}) {
   const resolved = resolveSanctionedScriptInvocation(command, root, options);
+  // Candidate 29 (AGY run 3, R7): `pipeline-state.mjs status` does not exist; the read-only state view is `inspect`.
+  if (resolved !== null && resolved.script === PIPELINE_STATE_SCRIPT && resolved.args[0] === "status") {
+    return `pipeline-state.mjs has no \`status\` command. The read-only view of the feature state is \`node ${PIPELINE_STATE_SCRIPT} inspect\`, run from the project root; it is admitted in every lifecycle state. This refusal is about the command name, not about the feature's lifecycle.`;
+  }
   if (resolved === null || resolved.args.length !== 1 || !["--help", "-h"].includes(resolved.args[0])) return null;
   const name = relativeUnderRoot(resolved.script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
   if (name === null || name === "" || name.includes("/") || !name.endsWith(".mjs")) return null;
@@ -794,6 +798,13 @@ function sanctionedLifecycleScriptArgs(script, typedArgs, root, options = {}) {
   // AC-123 (PF-21): the bootstrap's mandatory resume-hint read, exactly `inspect --root <this root>`, in every lifecycle state.
   if (script === fileURLToPath(new URL("../../scripts/resume-hint.mjs", import.meta.url))) {
     if (args[0] === "inspect") return exactRoot(args, root, 1) && args.length === 3;
+    // Candidate 29 (AGY run 3, R7): `consume` and `query` record or read only whether this session received the card (observation,
+    // no readiness/authority/approval effect; lib/resume-hint.mjs). The bootstrap tells the agent to run `consume` once delivery
+    // begins, which in a draft project used to be refused as an opaque script. Exactly `<verb> --root <this root> --session-id <id>`.
+    if (args[0] === "consume" || args[0] === "query") {
+      return exactRoot(args, root, 1) && args.length === 5 && args[3] === "--session-id"
+        && typeof args[4] === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(args[4]);
+    }
     // 17: the bootstrap skill (pipeline-start step 7) tells an agent to capture the material input BEFORE a restart, in a session that is
     // not ready, and names exactly one argv shape for it: the card at the fixed path, consumed, no other flag. That shape is admitted in
     // every lifecycle state, nothing wider (no other card path, no other flag). `--help` is decided above, at the head of this function.

@@ -185,4 +185,36 @@ test("C20K: module-slice-proposal stays refused for any other argv shape", () =>
     assert.equal(admitted(`node ${sliceProposal} ${tail}`.trim()), false, tail);
   }
 });
+// Candidate 29 (AGY run 3, R7): the bootstrap's resume-hint consumption record is observation only and runs in draft; the
+// nonexistent `pipeline-state.mjs status` is refused with the name of the read-only verb, and no signature is offered for it.
+const resumeHint = join(scripts, "resume-hint.mjs");
+const pipelineState = join(scripts, "pipeline-state.mjs");
+test("C29-R7: resume-hint consume and query pass the actual draft lifecycle admission", () => {
+  const fx = draftFixture();
+  try {
+    for (const verb of ["consume", "query"]) {
+      assert.deepEqual(fx.run(`node ${resumeHint} ${verb} --root ${fx.project} --session-id sess-1234`), { exitCode: 0, stderr: "" }, verb);
+    }
+  } finally { fx.cleanup(); }
+});
+test("C29-R7: resume-hint consume stays refused for any other argv shape", () => {
+  for (const tail of [
+    `consume --root ${root}`,                                        // no session id
+    `consume --root ${root}/foreign --session-id s1`,                // a different root
+    `consume --root ${root} --session-id $(id)`,                     // an unsafe session id
+    `consume --root ${root} --session-id s1 --extra`,                // an extra argument
+    `consume --session-id s1 --root ${root}`,                        // wrong order
+    `discard --root ${root}`,                                        // the discard verb stays outside
+  ]) assert.equal(admitted(`node ${resumeHint} ${tail}`), false, tail);
+});
+test("C29-R7: pipeline-state.mjs status is refused with the name of the read-only inspect verb and no signature", () => {
+  const fx = draftFixture();
+  try {
+    const result = fx.run(`node ${pipelineState} status`);
+    assert.equal(result.exitCode, 2, result.stderr);
+    assert.match(result.stderr, /has no `status` command/u);
+    assert.match(result.stderr, / inspect`/u);
+    assert.doesNotMatch(result.stderr, /emit-signature-digest|authorize-by-signature/u);
+  } finally { fx.cleanup(); }
+});
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
