@@ -5,7 +5,7 @@
 // protection; there it must say so honestly (`nofollow-unavailable`), and the cases that need a
 // successful readback are skipped with that typed host-limitation reason.
 import assert from "node:assert/strict";
-import { appendFileSync, constants, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, constants, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -383,7 +383,9 @@ test("a parent that cannot be found is stated as incomplete, never silently omit
   } finally { cleanup(fx); }
 });
 
-test("a session file beyond the former 8 MiB cap is read by head and tail windows; growth during the audit is tolerated, shrinkage is not", { skip: HOST_LIMIT }, () => {
+// C29 (Codex run 3, C1; PO tile 2026-11-13 "full paginated audit export"), restating the former head-and-tail case: the run's
+// audit skipped about 33.9 MB of middles and still could not give exact counts. Every byte is read now, page by page, and hashed.
+test("a session file beyond the former 8 MiB cap is read whole, page by page and hashed; growth during the audit is tolerated, shrinkage is not", { skip: HOST_LIMIT }, () => {
   const fx = fixture();
   try {
     const filler = Array.from({ length: 90 }, (_, n) => at("2026-10-19T10:10:00.000Z", { type: "response_item", payload: { n, text: "x".repeat(100 * 1024) } }));
@@ -393,10 +395,14 @@ test("a session file beyond the former 8 MiB cap is read by head and tail window
     });
     withEnv(ENV(fx), () => {
       const out = audit(fx);
-      assert.equal(out.status, "available", JSON.stringify(out));
+      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
       const [segment] = out.segments;
-      assert.equal(segment.observation, "head-and-tail-windows");
-      assert.equal(segment.unreadBytes > 0, true);
+      assert.equal(segment.observation, "complete");
+      assert.equal(segment.unreadBytes, 0);
+      assert.equal(segment.pages > 2, true, "more than one page");
+      assert.equal(segment.contentSha256, sha256(readFileSync(file)));
+      assert.equal(segment.recordCount, 93, "every middle record is read");
+      assert.equal(out.completeness, "complete"); assert.equal(out.unreadBytes, 0); assert.equal(out.totals.status, "complete"); assert.equal(out.totals.records, 93);
       assert.equal(segment.endedAt, "2026-10-19T10:59:00.000Z");
       assert.deepEqual(segment.tokenCounters, usageOf(5));
       assert.equal(segment.tokenDelta.total_tokens, 60);
@@ -410,6 +416,79 @@ test("a session file beyond the former 8 MiB cap is read by head and tail window
       const shrunk = audit(fx, { afterRead: (path) => { if (path === growing) writeFileSync(path, ""); } });
       assert.equal(shrunk.status, "unavailable");
       assert.equal(shrunk.reason, "snapshot-changed");
+    });
+  } finally { cleanup(fx); }
+});
+
+test("C29-C1 records split across tiny pages are carried whole; an over-long record is read and hashed but counted unparsed once; an in-progress last line is not unread", { skip: HOST_LIMIT }, () => {
+  const fx = fixture();
+  try {
+    const rows = [at("2026-10-19T10:01:00.000Z", { type: "turn_context", payload: { model: "gpt-5.5" } }),
+      at("2026-10-19T10:02:00.000Z", { type: "response_item", payload: { type: "function_call", name: "shell", call_id: "c1", arguments: "{}" } }),
+      at("2026-10-19T10:03:00.000Z", { type: "response_item", payload: { type: "message", text: "y".repeat(5000) } }),
+      usageRow("2026-10-19T10:04:00.000Z", 1), usageRow("2026-10-19T10:05:00.000Z", 2)];
+    const file = put(fx, "2026/10", SESSION, fx.project, { ts: "2026-10-19T10:00:00.000Z", rows });
+    withEnv(ENV(fx), () => {
+      const out = audit(fx, { limits: { windowBytes: 64 } });
+      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
+      const [segment] = out.segments;
+      assert.equal(segment.recordCount, 6); assert.equal(segment.unparsedRecordCount, 0);
+      assert.equal(segment.turnCount, 1); assert.equal(segment.toolCallCount, 1);
+      assert.equal(segment.contentSha256, sha256(readFileSync(file))); assert.equal(segment.unreadBytes, 0);
+      assert.equal(out.completeness, "complete");
+      const tight = audit(fx, { limits: { windowBytes: 64, recordBytes: 1024 } });
+      assert.equal(tight.segments[0].unparsedRecordCount, 1, "the 5000-byte record is one unparsed record");
+      assert.equal(tight.segments[0].recordCount, 5); assert.equal(tight.segments[0].unreadBytes, 0);
+      assert.equal(tight.completeness, "partial"); assert.ok(tight.incompleteReasons.includes("records-skipped"));
+      assert.equal(tight.totals.status, "partial", "sums over a partial audit are labelled partial");
+    });
+    appendFileSync(file, '{"timestamp":"2026-10-19T10:06:00.000Z","type":"event_m');
+    withEnv(ENV(fx), () => {
+      const live = audit(fx, { limits: { windowBytes: 64 } });
+      assert.equal(live.segments[0].trailingPartialBytes > 0, true); assert.equal(live.segments[0].unreadBytes, 0);
+      assert.equal(live.completeness, "complete", "an in-progress record of a live session is not unread");
+    });
+  } finally { cleanup(fx); }
+});
+
+test("C29-C1 a spawned child with no session file is an unknown child, one in another repository is named outside; both make the audit partial", { skip: HOST_LIMIT }, () => {
+  const fx = fixture();
+  try {
+    const spawn = (ts, callId, agentId) => [at(ts, { type: "response_item", payload: { type: "function_call", name: "spawn_agent", call_id: callId, arguments: "{}" } }),
+      at(ts, { type: "response_item", payload: { type: "function_call_output", call_id: callId, output: JSON.stringify({ agent_id: agentId }) } })];
+    put(fx, "2026/10", SESSION, fx.project, { ts: "2026-10-19T10:00:00.000Z", rows: [...spawn("2026-10-19T10:01:00.000Z", "c1", "audit-kid-found"), ...spawn("2026-10-19T10:02:00.000Z", "c2", "audit-kid-missing"), ...spawn("2026-10-19T10:03:00.000Z", "c3", "audit-kid-elsewhere")] });
+    put(fx, "2026/10", "audit-kid-found", fx.project, { ts: "2026-10-19T10:01:05.000Z", payload: viaSource(SESSION) });
+    put(fx, "2026/10", "audit-kid-elsewhere", fx.foreign, { ts: "2026-10-19T10:03:05.000Z", payload: viaSource(SESSION) });
+    withEnv(ENV(fx), () => {
+      const out = audit(fx);
+      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
+      assert.equal(out.unknownChildren, 1); assert.equal(out.outsideChildren, 1);
+      assert.equal(out.completeness, "partial");
+      assert.ok(out.incompleteReasons.includes("child-segment-not-found")); assert.ok(out.incompleteReasons.includes("child-outside-repository"));
+      assert.equal(out.segments.find((segment) => segment.role === "current").spawnedChildren, 3);
+      const text = JSON.stringify(out);
+      for (const leak of ["audit-kid-found", "audit-kid-missing", "audit-kid-elsewhere"]) assert.equal(text.includes(leak), false, leak);
+    });
+    put(fx, "2026/10", "audit-kid-missing", fx.project, { ts: "2026-10-19T10:02:05.000Z", payload: viaSource(SESSION) });
+    withEnv(ENV(fx), () => {
+      const out = audit(fx);
+      assert.equal(out.unknownChildren, 0); assert.equal(out.outsideChildren, 1);
+    });
+  } finally { cleanup(fx); }
+});
+
+test("C29-C1 a lineage member over the byte bound is not read and its whole size is counted unread, never dropped silently", { skip: HOST_LIMIT }, () => {
+  const fx = fixture();
+  try {
+    put(fx, "2026/10", SESSION, fx.project, { ts: "2026-10-19T10:00:00.000Z" });
+    const child = put(fx, "2026/10", "audit-big-child", fx.project, { ts: "2026-10-19T10:01:00.000Z", payload: viaSource(SESSION), rows: [at("2026-10-19T10:02:00.000Z", { type: "response_item", payload: { text: "z".repeat(4096) } })] });
+    withEnv(ENV(fx), () => {
+      const out = audit(fx, { limits: { segmentBytes: 1024 } });
+      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
+      assert.equal(out.unreadSegments, 1); assert.equal(out.unreadBytes, statSync(child).size);
+      assert.equal(out.completeness, "partial"); assert.equal(out.truncated, true);
+      assert.ok(out.incompleteReasons.includes("segment-byte-bound-reached")); assert.ok(out.incompleteReasons.includes("segment-bytes-unread"));
+      assert.equal(audit(fx).completeness, "complete");
     });
   } finally { cleanup(fx); }
 });
