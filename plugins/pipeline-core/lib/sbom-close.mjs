@@ -193,7 +193,7 @@ export function observeSbomInputs({ tracked, read }) {
     if (chosen !== null) {
       const raw = read(path);
       if (typeof raw !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
-      const text = raw.replace(/^﻿/u, ""); // C28e: Windows tools write a UTF-8 byte-order mark; the digest below still binds the raw bytes
+      const text = raw.replace(/^\uFEFF/u, ""); // C28e: Windows tools write a UTF-8 byte-order mark; the digest below still binds the raw bytes
       // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one. C28e: a bom.json that
       // is not JSON at all is invalid, never skipped (skipping it made a pom report "no CycloneDX file covers" for a damaged one).
       if (name === "bom.json") {
@@ -214,7 +214,7 @@ export function observeSbomInputs({ tracked, read }) {
     if (lockCovers(needs, dir) || ancestors(dir).some((candidate) => unsupportedDirs.has(candidate)) || (name === "pyproject.toml" && paths.some((other) => baseName(other) === "requirements.txt" && dirOf(other) === dir))) continue;
     const text = read(path);
     if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
-    if (manifestDeclaresDependencies(name, text.replace(/^﻿/u, ""))) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
+    if (manifestDeclaresDependencies(name, text.replace(/^\uFEFF/u, ""))) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
   }
   // Maven: a pom lists its direct dependencies only. It is complete when a CycloneDX file in its directory or an ancestor lists every one of
   // them (by version where the pom fixes one); otherwise it is partial and names what is missing, so a stale CycloneDX file does not pass.

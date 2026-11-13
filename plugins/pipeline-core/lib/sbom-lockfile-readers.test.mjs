@@ -602,6 +602,11 @@ test("C28e: private registries without the default tarball path, aliases to scop
   const v1 = parseYarnLock(github, "yarn.lock");
   assert.deepEqual(purls(v1), ["pkg:npm/%40owner/pkg@1.0.0", "pkg:npm/%40corp/ui@2.1.0"], "GitHub Packages serves tarballs without /-/; the descriptor's range decides");
   assert.deepEqual(states(v1), ["partial"]); assert.doesNotMatch(JSON.stringify(v1), /:\/\/|codeload|npm\.pkg/u);
+  // A `resolutions` override keeps the semver descriptor but resolves a git source: still partial. A registry package merely named archive is not.
+  const overridden = `# yarn lockfile v1\n\n\nleft-pad@^1.3.0:\n  version "1.3.0"\n  resolved "https://codeload.github.com/owner/left-pad/tar.gz/abc"\n\nis-odd@^3.0.0:\n  version "3.0.1"\n  resolved "git+ssh://git@example.invalid/owner/is-odd.git#abc"\n\nleft-zip@^1.0.0:\n  version "1.0.0"\n  resolved "https://gitlab.example.invalid/owner/left-zip/-/archive/abc/left-zip-abc.tar.gz"\n\narchive@^1.0.0:\n  version "1.0.0"\n  resolved "https://registry.yarnpkg.com/archive/-/archive-1.0.0.tgz#abc"\n`;
+  const resolvedGit = parseYarnLock(overridden, "yarn.lock");
+  assert.deepEqual(purls(resolvedGit), ["pkg:npm/archive@1.0.0"]);
+  assert.deepEqual(states(resolvedGit), ["partial", "partial", "partial"]); noUrl(resolvedGit, "yarn v1 resolutions");
   const pnpm6 = "lockfileVersion: '6.0'\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui@2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
   const pnpm5 = "lockfileVersion: 5.4\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui/2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
   for (const [label, text] of [["pnpm 6", pnpm6], ["pnpm 5", pnpm5]]) {
@@ -617,7 +622,7 @@ test("C28e: a UTF-8 byte-order mark and CRLF line ends read exactly like the pla
     "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK, "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX,
     "g/conan.lock": JSON.stringify({ version: "0.5", requires: ["zlib/1.3#x"], build_requires: [], python_requires: [] }, null, 2),
     "j/packages.config": PACKAGES_CONFIG, "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
-  const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `﻿${text.replace(/\r?\n/gu, "\r\n")}`]));
+  const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `\uFEFF${text.replace(/\r?\n/gu, "\r\n")}`]));
   const plain = observe(files); const crlf = observe(windows);
   assert.ok(plain.components.length >= 25);
   assert.deepEqual(crlf.components, plain.components);

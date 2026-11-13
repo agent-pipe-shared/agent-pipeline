@@ -48,6 +48,10 @@ function yarnEntries(text) {
 }
 const unquote = (value) => value.replace(/^"(.*)"$/u, "$1");
 const safePathname = (url) => { try { return new URL(url).pathname; } catch { return ""; } };
+const safeHost = (url) => { try { return new URL(url).host; } catch { return ""; } };
+// A forge's source archive (GitLab `/-/archive/`, GitHub `/archive/` or `/tar.gz/`); a registry tarball always sits under `<name>/-/`, so a
+// package that is merely NAMED archive or zip is not one.
+const gitArchivePath = (pathname) => /\/-\/archive\//iu.test(pathname) || (!pathname.includes("/-/") && /\/(?:archive|tar\.gz|zip|legacy\.tar\.gz)\//iu.test(pathname));
 const yarnProp = (props, key) => { for (const line of props) { const match = new RegExp(`^ {2}"?${key}"?:? (.+)$`, "u").exec(line); if (match) return unquote(match[1].trim()); } return null; };
 
 export function parseYarnLock(text, path) {
@@ -76,6 +80,11 @@ export function parseYarnLock(text, path) {
       if (/^link:/u.test(range)) continue;
       if (/^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
       if (/^[a-z][a-z0-9+.-]*:/iu.test(range) || range.includes("/")) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
+      // A `resolutions` override can put a git or local source under a plain semver descriptor: a resolved source that is recognisably git
+      // (a git protocol, a codeload or archive tarball, a .git repository) or a local file is still not a registry version.
+      if (resolved !== null && (/^(?:git\+|git:|ssh:|github:|gitlab:|bitbucket:|file:|link:)/iu.test(resolved) || /\.git(?:#|$)/iu.test(resolved) || /(?:^|\.)codeload\./iu.test(safeHost(resolved)) || gitArchivePath(safePathname(resolved)))) {
+        issues.push(finding("partial", path, `${name} is resolved from a git commit or a local path (an override of its range), not a registry version`)); continue;
+      }
       if (typeof version !== "string" || !SEMVER.test(version)) throw new Error(`${name}: entry without a version`);
       const real = resolved === null ? undefined : /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(safePathname(resolved))?.[1];
       out.push(npm(real === undefined ? name : decodeURIComponent(real), version));
