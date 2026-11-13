@@ -173,13 +173,24 @@ function resolveRigor(state) {
 }
 
 /** The candidate-evidence entries of a manifest that lists only earlier approvals of this feature, or null when it is anything else. */
-function supersededRegistrations(bytes, featureId, envelopePath) {
+// C28e (Claude test run 2026-11-13): after a Critic round the package also lists that round's evidence (diagnostic, lineage, Verify), so a
+// re-approved design met FPR-MANIFEST-CONFLICT with no route. A package that has not reached verification (state approved or implementing,
+// no candidate) is superseded by the new approval as well: every earlier candidate-evidence entry under the feature's directory is
+// retained with its recorded digest, provided its file still holds exactly those bytes.
+const SUPERSEDABLE_STATES = Object.freeze(["approved", "implementing"]);
+function supersededRegistrations(bytes, featureId, envelopePath, root = null) {
   let manifest;
   try { manifest = JSON.parse(bytes.toString("utf8")); } catch { return null; }
   if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== null || !Array.isArray(manifest.artifacts)) return null;
   const evidence = manifest.artifacts.filter((entry) => entry?.class === "candidate-evidence");
-  const earlier = new RegExp(`^specs/${featureId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}/evidence/accepted-delivery-contract-[a-f0-9]{64}\\.json$`, "u");
-  return evidence.length > 0 && evidence.every((entry) => typeof entry.path === "string" && earlier.test(entry.path) && entry.path !== envelopePath && SHA256.test(entry.sha256 ?? "")) ? evidence : null;
+  const escaped = featureId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const earlier = new RegExp(`^specs/${escaped}/evidence/accepted-delivery-contract-[a-f0-9]{64}\\.json$`, "u");
+  if (evidence.length > 0 && evidence.every((entry) => typeof entry.path === "string" && earlier.test(entry.path) && entry.path !== envelopePath && SHA256.test(entry.sha256 ?? ""))) return evidence;
+  if (root === null || !SUPERSEDABLE_STATES.includes(manifest.state) || !evidence.some((entry) => typeof entry.path === "string" && earlier.test(entry.path))) return null;
+  const own = new RegExp(`^specs/${escaped}/`, "u");
+  const retained = evidence.every((entry) => typeof entry.path === "string" && repositoryRelative(entry.path) && own.test(entry.path) && entry.path !== envelopePath
+    && SHA256.test(entry.sha256 ?? "") && (() => { const seen = inspect(root, entry.path); return seen.kind === "file" && digest(seen.bytes) === entry.sha256; })());
+  return retained ? evidence : null;
 }
 
 /** Sources the PO's approval binds, from the envelope that was itself re-derived from the retained approval. */
@@ -242,7 +253,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
     }
     // Antigravity greenfield 2026-11-08: after a reopen the old manifest blocked the new approval and the agent hand-edited it.
     // A manifest that lists only earlier approvals of this feature is superseded by the current one: rebuilt here, the earlier envelopes retained.
-    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath) : null;
+    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath, root) : null;
     if (superseded === null) {
       const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
       return refused("FPR-MANIFEST-CONFLICT", checked.ok

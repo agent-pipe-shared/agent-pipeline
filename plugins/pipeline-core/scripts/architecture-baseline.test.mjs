@@ -773,6 +773,47 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.deepEqual(evidence, [earlierPath, envelope.path], "the earlier approval is retained and the current one registered");
     });
 
+    // C28e (Claude test run 2026-11-13): after a Critic round the package also lists that round's evidence, so the re-approved design met
+    // FPR-MANIFEST-CONFLICT with no route. A package that has not reached verification is superseded with every unchanged entry retained.
+    it("7.13c a re-approval after a Critic round supersedes an approved or implementing package and retains its unchanged evidence; drifted, foreign or verifying ones stay a conflict", async () => {
+      const { f } = await fixtureWalk({ predecessorSidecar: false });
+      const REGISTER = path.join(here, "register-feature-package.mjs");
+      const manifestPath = path.join(f.dir, "specs/e2e/lifecycle.json");
+      const current = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      const envelope = current.artifacts.find((entry) => entry.class === "candidate-evidence");
+      const earlierBytes = "earlier approval\n";
+      const earlierPath = `specs/e2e/evidence/accepted-delivery-contract-${sha(earlierBytes)}.json`;
+      const roundBytes = "{\"round\":1}\n";
+      const roundPath = "specs/e2e/evidence/critic-lineage-round-1.json";
+      fs.writeFileSync(path.join(f.dir, earlierPath), earlierBytes);
+      fs.writeFileSync(path.join(f.dir, roundPath), roundBytes);
+      // As observed: the package still binds the PRD and Spec digests of the earlier approval (FTP-ARTIFACT-0/1 in the refusal).
+      const others = current.artifacts.filter((entry) => entry !== envelope)
+        .map((entry) => (entry.class === "prd" || entry.class === "spec" ? { ...entry, sha256: sha(`earlier ${entry.class}\n`) } : entry));
+      const listed = ({ state = "implementing", round = { path: roundPath, sha256: sha(roundBytes) } } = {}) => ({ ...current, state,
+        artifacts: [...others, { ...envelope, path: earlierPath, sha256: sha(earlierBytes) }, { ...envelope, ...round }] });
+      const refusedWith = (manifest, name) => {
+        fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+        const before = fs.readFileSync(manifestPath);
+        const out = run(REGISTER, "--root", f.dir);
+        assert.notEqual(out.status, 0, name);
+        assert.match(out.stdout, /FPR-MANIFEST-CONFLICT/u, name);
+        assert.ok(fs.readFileSync(manifestPath).equals(before), `${name}: the manifest is left as it was`);
+      };
+      refusedWith(listed({ state: "verifying" }), "a package past implementation");
+      refusedWith(listed({ round: { path: roundPath, sha256: sha("other bytes\n") } }), "an entry whose file no longer holds its recorded bytes");
+      refusedWith(listed({ round: { path: "specs/other/evidence/critic-lineage-round-1.json", sha256: sha(roundBytes) } }), "an entry outside the feature's directory");
+      for (const state of ["approved", "implementing"]) {
+        fs.writeFileSync(manifestPath, `${JSON.stringify(listed({ state }), null, 2)}\n`);
+        const rebuilt = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
+        assert.equal(rebuilt.status, "registered", state);
+        const evidence = JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.filter((entry) => entry.class === "candidate-evidence").map((entry) => entry.path);
+        assert.deepEqual(evidence, [earlierPath, roundPath, envelope.path], `${state}: the earlier approval and the round's evidence are retained, the current approval registered`);
+        const sources = JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.filter((entry) => entry.class === "prd" || entry.class === "spec");
+        for (const entry of sources) assert.equal(entry.sha256, sha(fs.readFileSync(path.join(f.dir, entry.path))), `${state}: ${entry.class} is rebound to the approved bytes`);
+      }
+    });
+
     it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {
       const root = makeRoot();
       assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
