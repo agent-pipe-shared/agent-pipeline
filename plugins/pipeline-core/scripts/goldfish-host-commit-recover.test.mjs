@@ -135,6 +135,19 @@ test("K-32: a framework route folder ([...slug], (group)) lands literally; a sib
   } finally { cleanup(root); }
 });
 
+test("K-33: after a whitespace refusal the plan names the flagged files and the .gitattributes route for generated files", () => {
+  const { root } = fixture({ stopOver: { code: "NATIVE-HOST-COMMIT-DIFF-CHECK", detail: { reason: "staged-diff-whitespace", condition: "index-restored", paths: ["allowed/new.txt"] } } });
+  try {
+    const { status, json } = run(root, "plan");
+    assert.equal(status, 0, JSON.stringify(json));
+    assert.equal(json.status, "ready");
+    assert.match(json.diffCheckNote, /in allowed\/new\.txt/u);
+    assert.match(json.diffCheckNote, /-whitespace/u);
+  } finally { cleanup(root); }
+  const plain = fixture();
+  try { assert.equal(run(plain.root, "plan").json.diffCheckNote, undefined, "no note for another stop code"); } finally { cleanup(plain.root); }
+});
+
 test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and stage, and the detail's own reason when the record has none", () => {
   const recorded = fixture({ stopOver: { stage: "pending-read", reason: "NGHS-PENDING-MISSING" } });
   try {

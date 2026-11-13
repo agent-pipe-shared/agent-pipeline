@@ -130,7 +130,16 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
   // A patch or diff file stores its context lines as " " + the line, so every blank context line is a trailing-whitespace "error" in
   // the file that carries it: the check must not read those files as source, or every Goldfish that delivers a held patch fails here
   // (measured 2026-11-01: 16 stop failures, 12 of them in the last two days, and a member left armed for the repair to clear).
-  if (git(root, ["diff", "--cached", "--check", "--", ".", ":(exclude,glob)**/*.patch", ":(exclude,glob)**/*.diff"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
+  const check = runGit(root, ["diff", "--cached", "--check", "--", ".", ":(exclude,glob)**/*.patch", ":(exclude,glob)**/*.diff"], spawn);
+  if (check.error || check.status !== 0) {
+    // K-33 (Glossover, 29c): the refusal leaves the index as it found it (the admission demanded an empty one), so the recovery route
+    // can run at once, and it names the files git flagged. A generated file (a framework's SQL migration) is excused by the project's
+    // own `.gitattributes` line `<pattern> -whitespace`, which git honours in this same check; the check itself is never skipped.
+    const flagged = [...new Set(String(check.stdout ?? "").split("\n").map((line) => /^(.+?):\d+: /u.exec(line)?.[1]).filter((path) => admitted.paths.includes(path)))];
+    const restored = runGit(root, ["--literal-pathspecs", "reset", "-q", "--", ...admitted.paths], spawn);
+    return { ...fail(code("HOST-COMMIT-DIFF-CHECK")), detail: { reason: "staged-diff-whitespace", condition: restored.error || restored.status !== 0 ? "index-left-staged" : "index-restored",
+      ...(flagged.length > 0 ? { paths: flagged.slice(0, 5) } : {}), ...(flagged.length > 5 ? { extraCount: flagged.length - 5 } : {}) } };
+  }
   const stagedTree = git(root, ["write-tree"], spawn)?.trim();
   if (!stagedTree) return fail(code("HOST-COMMIT-TREE"));
   // Neither --no-verify nor a temporary hooksPath is permitted here. A hook

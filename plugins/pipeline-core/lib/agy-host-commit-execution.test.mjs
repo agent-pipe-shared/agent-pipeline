@@ -16,7 +16,7 @@ function git(root, ...args) {
   assert.equal(run.status, 0, run.stderr);
   return run.stdout.trim();
 }
-function fixture(run) {
+function fixture(run, baselineFiles = {}) {
   const root = mkdtempSync(join(tmpdir(), "agy-host-commit-execution-"));
   try {
     git(root, "init", "-q");
@@ -24,7 +24,8 @@ function fixture(run) {
     git(root, "config", "user.email", "fixture@example.invalid");
     git(root, "config", "commit.gpgsign", "false");
     writeFileSync(join(root, "file.txt"), "before\n");
-    git(root, "add", "--", "file.txt");
+    for (const [path, text] of Object.entries(baselineFiles)) writeFileSync(join(root, path), text);
+    git(root, "add", "--", "file.txt", ...Object.keys(baselineFiles));
     git(root, "commit", "-q", "-m", "fixture baseline");
     const parent = git(root, "rev-parse", "HEAD");
     const capture = captureAgyHostCommitBaseline({ root, candidateCommit: parent, resultPath: "scratch/return.json" });
@@ -277,9 +278,23 @@ test("AHE15 trailing whitespace in any other file is still refused by the diff c
   assert.equal(result.ok, false);
   assert.equal(result.code, "AGY-HOST-COMMIT-DIFF-CHECK");
   assert.equal(git(root, "rev-parse", "HEAD"), parent);
+  // K-33 (Glossover, 29c): the refusal restores the empty index the admission found and names the flagged file, so recovery runs at once.
+  assert.equal(git(root, "diff", "--cached", "--name-only"), "", "nothing is left staged");
+  assert.deepEqual(result.detail, { reason: "staged-diff-whitespace", condition: "index-restored", paths: ["file.txt"] });
 }));
 
-assert.equal(cases.length, 15, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
+test("AHE16 K-33: a generated file the project marks -whitespace in .gitattributes passes the same check; the check is never skipped", () => fixture(({ root, parent, baseline }) => {
+  // The shape `payload migrate:create` writes: SQL in a template literal with a space before a tab and trailing blanks.
+  writeFileSync(join(root, "0001_init.sql"), "CREATE TABLE \"items\" (\n \t\"id\" serial PRIMARY KEY NOT NULL \n);\n");
+  const result = commitFromObservedAdmission({
+    baseline, final: { outcome: "succeeded", changedPaths: ["0001_init.sql"] },
+    allowedPaths: ["0001_init.sql"], taskId: "AGY-EXAMPLE-16",
+  });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(git(root, "rev-parse", "HEAD~1"), parent);
+}, { ".gitattributes": "*.sql -whitespace\n" }));
+
+assert.equal(cases.length, 16, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
