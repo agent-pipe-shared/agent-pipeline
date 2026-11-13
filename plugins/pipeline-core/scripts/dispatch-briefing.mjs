@@ -49,6 +49,7 @@ import { fileURLToPath } from "node:url";
 import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
 import { readSettledPendingPreview } from "../lib/routine-repair.mjs";
 import { readSpecAddenda } from "../lib/spec-addendum.mjs";
+import { classifyCriticChangedPaths } from "../lib/critic-skip-decision.mjs";
 
 const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const cliArguments = process.argv.slice(2);
@@ -1155,6 +1156,7 @@ export function generateDispatchBinding(options, deps = {}) {
     }
   }
 
+  const declaredDiff = classifyCriticChangedPaths(allowedPaths);
   const binding = {
     schema: NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA,
     dispatchId,
@@ -1171,7 +1173,9 @@ export function generateDispatchBinding(options, deps = {}) {
       schema: "pipeline.critic-required-decision.v1",
       trigger: {
         schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
-        diff: { mechanical: false, architecture: true, guardrails: false, security: false },
+        // C29 (Glossover K-29): guardrails and security are derived from the allowed paths with the classifier the host checks
+        // the real diff with (criticDecisionPathFinding), so a write scope under docs/security/** or an auth path is never under-declared.
+        diff: { mechanical: false, architecture: true, guardrails: declaredDiff.guardrails, security: declaredDiff.security },
       },
       appliedRow: "T1",
     },

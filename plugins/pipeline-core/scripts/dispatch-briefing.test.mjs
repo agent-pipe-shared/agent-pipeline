@@ -188,6 +188,18 @@ process.on('exit',()=>process.stderr.write('HELP-AUDIT:'+JSON.stringify(calls)+'
   }
 });
 
+test("C29 (Glossover K-29): a security or guardrail write scope is declared in the Critic trigger, so the host's path check finds no under-declaration", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { criticDecisionPathFinding } = await import("../lib/critic-skip-decision.mjs");
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, {}, ["--path", "docs/security/audit-exceptions.md", "--path", "src/app/api/auth/route.ts", "--path", "plugins/x/policies/rule.mjs"]), depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const { diff } = result.binding.criticDecision.trigger;
+  assert.deepEqual(diff, { mechanical: false, architecture: true, guardrails: true, security: true });
+  assert.equal(result.binding.criticDecision.appliedRow, "T1");
+  assert.equal(criticDecisionPathFinding(result.binding.criticDecision, result.binding.allowedPaths), null);
+});
+
 test("binding fields equal the facts of their own sources", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();
