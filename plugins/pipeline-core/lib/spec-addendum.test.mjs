@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildSpecAddendumSubject, criterionIdsIn, isSpecAddendumPath, parseSpecAddendum, readSpecAddenda, specAddendumApprovalBytes,
-  specAddendumApprovalPath, specAddendumCriteriaRefusal, specAddendumNumber,
+  specAddendumApprovalPath, specAddendumCriteriaRefusal, specAddendumNumber, SPEC_ADDENDUM_CRITERION_ID_SOURCE, specAddendumReceiptCanonicalJson,
 } from "./spec-addendum.mjs";
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
@@ -138,5 +138,20 @@ describe("Spec addendum (ADR-0095)", () => {
     const drifted = readSpecAddenda({ root, featureId: "f1", manifest: registered });
     assert.equal(drifted.ok, false);
     assert.match(drifted.findings.join("\n"), /SPEC-ADDENDUM-DIGEST/u);
+  });
+});
+
+describe("SA-07 the leaf module restates two values; both stay equal to their owners", () => {
+  it("criterion id pattern and receipt canonical JSON", async () => {
+    const { CRITERION_ID_SOURCE } = await import("./critic-accepted-contract.mjs");
+    const { canonicalJson } = await import("./critic-packet-preflight-read.mjs");
+    assert.equal(SPEC_ADDENDUM_CRITERION_ID_SOURCE, CRITERION_ID_SOURCE);
+    const receipt = { schema: "x", nested: { b: 1, a: [2, 3] } };
+    assert.equal(specAddendumReceiptCanonicalJson(receipt), canonicalJson(receipt));
+  });
+  it("the module imports node built-ins only (no cycle through pipeline-state.mjs)", () => {
+    const source = readFileSync(new URL("./spec-addendum.mjs", import.meta.url), "utf8");
+    const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gmu)].map((match) => match[1]);
+    assert.ok(imports.length > 0 && imports.every((name) => name.startsWith("node:")), imports.join(", "));
   });
 });

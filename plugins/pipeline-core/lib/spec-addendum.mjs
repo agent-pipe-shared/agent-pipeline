@@ -18,8 +18,15 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
-import { canonicalJson } from "./critic-packet-preflight-read.mjs";
+
+// This module is a LEAF (node built-ins only): po-human-approval.mjs, pipeline-state.mjs, the close and the briefing generator import it,
+// and an import of critic-accepted-contract.mjs here closed a cycle through pipeline-state.mjs that left SPEC_ADDENDUM_KIND uninitialized
+// when the briefing generator was the entry point. The two values below are therefore restated; spec-addendum.test.mjs pins both equal to
+// their owners (critic-accepted-contract.mjs CRITERION_ID_SOURCE, critic-packet-preflight-read.mjs canonicalJson).
+export const SPEC_ADDENDUM_CRITERION_ID_SOURCE = "AC-(?:[1-9][0-9]{0,60}|E[1-9][0-9]{0,3}-[0-9]{1,4}-[0-9]{1,4})";
+const CRITERION_ID_SOURCE = SPEC_ADDENDUM_CRITERION_ID_SOURCE;
+export const specAddendumReceiptCanonicalJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
+const canonicalJson = specAddendumReceiptCanonicalJson;
 
 export const SPEC_ADDENDUM_KIND = "spec-addendum";
 export const SPEC_ADDENDUM_APPROVAL_SCHEMA = "pipeline.spec-addendum-approval.v1";
