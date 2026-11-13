@@ -47,18 +47,31 @@ export function parseCommitPaths(output) {
 }
 
 /**
- * @param {{ rootDir: string, featureId: string, head?: string, runGit?: (args: string[]) => { status: number, stdout: string } }} input
- *   `runGit` runs git in the root and defaults to a real process; a close passes its own injectable runner.
+ * The one definition of where a feature's range starts (C28e: shared by this count and the Semgrep baseline of the security scan, ADR-0093):
+ * the parent of the first first-parent commit that touched specs/<feature>/. `{ status: "found", first, base }`, where `base` is null when that
+ * first commit has no parent (the feature starts the history); `{ status: "unavailable", reason }` otherwise.
  */
-export function featureRangeCommitSplit({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
-  if (!FEATURE.test(featureId ?? "")) return unavailable("the feature id is not valid");
+export function featureRangeBase({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
+  if (!FEATURE.test(featureId ?? "")) return Object.freeze({ status: "unavailable", reason: "the feature id is not valid" });
   const git = runGit ?? ((args) => spawnSync("git", ["-C", rootDir, ...args], { encoding: "utf8", timeout: 15000 }));
   const text = (result) => (result?.status === 0 ? String(result.stdout ?? "") : null);
   const feature = text(git(["log", "--first-parent", "--reverse", "--format=%H", head, "--", `specs/${featureId}`]));
   const first = feature === null ? undefined : feature.split("\n").find((line) => OID.test(line.trim()))?.trim();
-  if (first === undefined) return unavailable(feature === null ? "git log could not read the history" : `no commit touches specs/${featureId}`);
+  if (first === undefined) return Object.freeze({ status: "unavailable", reason: feature === null ? "git log could not read the history" : `no commit touches specs/${featureId}` });
   const parent = text(git(["rev-parse", "--verify", "--quiet", `${first}^`]))?.trim() ?? "";
-  const base = OID.test(parent) ? parent : null;
+  return Object.freeze({ status: "found", first, base: OID.test(parent) ? parent : null });
+}
+
+/**
+ * @param {{ rootDir: string, featureId: string, head?: string, runGit?: (args: string[]) => { status: number, stdout: string } }} input
+ *   `runGit` runs git in the root and defaults to a real process; a close passes its own injectable runner.
+ */
+export function featureRangeCommitSplit({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
+  const git = runGit ?? ((args) => spawnSync("git", ["-C", rootDir, ...args], { encoding: "utf8", timeout: 15000 }));
+  const text = (result) => (result?.status === 0 ? String(result.stdout ?? "") : null);
+  const range = featureRangeBase({ rootDir, featureId, head, runGit: git });
+  if (range.status !== "found") return unavailable(range.reason);
+  const { base } = range;
   const listing = text(git(["-c", "core.quotepath=off", "log", "--first-parent", "-m", "--no-renames", "--name-only", "--format=%x00%H", base === null ? head : `${base}..${head}`]));
   if (listing === null) return unavailable("git log could not read the range");
   const counts = { product: 0, evidence: 0 };

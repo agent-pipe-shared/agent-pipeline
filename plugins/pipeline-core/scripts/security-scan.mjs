@@ -116,6 +116,7 @@ import {
   securityCloseWarnings,
 } from "../lib/security-close-status.mjs";
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+import { blockingFindings, existingInAddedFiles, existingSemgrepFindings, formatSemgrepBaselineLines, resolveSemgrepBaseline, SEMGREP_BASELINE_SCHEMA, unmatchedNewFindings } from "../lib/semgrep-baseline.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
@@ -572,6 +573,65 @@ function cleanupCandidateSnapshot(rootDir, snapshot) {
   return { status: removed.status === 0 ? "removed" : "retained" };
 }
 
+/**
+ * C28e (PO tile 2026-11-12, D242, ADR-0093): which blocking-severity Semgrep findings existed before the feature.
+ * Runs only when the full Semgrep scan has a finding at a blocking severity; the baseline comes from the candidate
+ * snapshot (lib/semgrep-baseline.mjs), never from a caller. The `--baseline-commit` pass runs in a second throwaway
+ * worktree of the same candidate, because Semgrep checks the base out in the tree it scans (a killed pass leaves that
+ * tree on the base), and the worktree is removed afterwards whatever happened. Any failure leaves the record
+ * `unavailable`, and then every blocking-severity finding blocks as before.
+ */
+async function semgrepBaselineStep({ rootDir, scanRoot, candidate, remoteName, authority, semgrepRun, blockOn, timeoutMs, env, spawnFn }) {
+  const blockOnSet = new Set(blockOn);
+  const candidates = (semgrepRun?.findings ?? []).filter((finding) => blockOnSet.has(finding.severity));
+  if (semgrepRun === null || candidates.length === 0) return { schema: SEMGREP_BASELINE_SCHEMA, status: "not-needed" };
+  const resolved = resolveSemgrepBaseline({ rootDir: scanRoot, authority, runGit: (args) => gitResult(scanRoot, args) });
+  if (resolved.status !== "applied") return { ...resolved };
+  const second = materializeCandidate(rootDir, candidate, remoteName);
+  if (!second.ok) return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-WORKTREE", reason: `the worktree for the baseline pass could not be created (${second.reason})` };
+  let result;
+  let cleanup;
+  try {
+    // Semgrep derives a rule id from the rule file's path relative to its working directory, so a project rules_dir inside
+    // the snapshot is read from the second worktree's own copy (same relative path, same ids). A pack outside both trees
+    // (the plugin's default) keeps its path. The id check below still refuses any pass whose ids do not line up.
+    const rulesDir = semgrepRun.config.rulesDir;
+    const relativeRules = typeof rulesDir === "string" ? relative(scanRoot, rulesDir) : null;
+    const ownRules = relativeRules !== null && relativeRules !== "" && !relativeRules.startsWith("..") && !relativeRules.startsWith(sep) && !/^[A-Za-z]:/u.test(relativeRules)
+      ? join(second.rootDir, relativeRules)
+      : rulesDir;
+    const runArgs = { rootDir: second.rootDir, config: { ...semgrepRun.config, rulesDir: ownRules, baselineCommit: resolved.commit }, timeoutMs, env };
+    if (spawnFn) runArgs.spawnFn = spawnFn;
+    result = await semgrepRun.adapter.run(runArgs);
+  } catch (error) {
+    result = { status: "ERROR", reason: `adapter threw: ${error?.message ?? "unknown error"}` };
+  } finally {
+    cleanup = cleanupCandidateSnapshot(rootDir, second);
+  }
+  if (result?.status !== "PASS" && result?.status !== "FINDINGS") {
+    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-PASS-FAILED", reason: String(result?.reason ?? "the baseline pass did not complete").slice(0, 300), worktreeCleanup: cleanup.status };
+  }
+  const fullPath = (path) => semgrepAdapter.scanRootRelativePath(path, scanRoot);
+  const newPath = (path) => semgrepAdapter.scanRootRelativePath(path, second.rootDir);
+  // Fail closed: both passes scanned the same candidate files, so every new finding must be one of the full scan's findings.
+  // One without a counterpart (another rule id, an unrelatable path) means the two passes cannot be compared.
+  const unmatched = unmatchedNewFindings(semgrepRun.findings, result.findings, { fullPath, newPath });
+  if (unmatched > 0) {
+    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-PASSES-DISAGREE", reason: `${unmatched} finding(s) of the baseline pass have no counterpart in the full scan`, worktreeCleanup: cleanup.status };
+  }
+  const existing = existingSemgrepFindings(semgrepRun.findings, result.findings, blockOn, { fullPath, newPath });
+  // Fail closed: a finding in a file the feature added cannot predate it; one judged existing means the pass under-reported.
+  const addedListing = gitResult(scanRoot, ["-c", "core.quotepath=off", "diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", resolved.commit, "HEAD"]);
+  if (addedListing?.status !== 0) {
+    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-DIFF-UNREADABLE", reason: "the files added since the feature start could not be listed", worktreeCleanup: cleanup.status };
+  }
+  const inAdded = existingInAddedFiles(existing, String(addedListing.stdout ?? "").split("\0").filter(Boolean));
+  if (inAdded.length > 0) {
+    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-PASSES-DISAGREE", reason: `${inAdded.length} finding(s) in files the feature added were not reported as new by the baseline pass`, worktreeCleanup: cleanup.status };
+  }
+  return { ...resolved, existing, newCount: candidates.length - existing.length, worktreeCleanup: cleanup.status };
+}
+
 function childProcessError({ tool, error, timeoutMs }) {
   if (error?.code === "EPERM" || error?.code === "EACCES") {
     return {
@@ -1000,6 +1060,7 @@ export async function runSecurityScan({
   // Never read by the v1 evidence or the exit-code logic.
   const rawByTool = {};
   const diagnosticRecords = [];
+  let semgrepRun = null; // C28e: the completed full Semgrep scan, for the baseline step after the loop
   const childProcessPreflight = scanRoot
     ? runChildProcessPreflight({ rootDir: scanRoot, timeoutMs, spawnFn })
     : { status: "ERROR", classification: "candidate_snapshot", reason: snapshot.reason };
@@ -1060,6 +1121,9 @@ export async function runSecurityScan({
           rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
           entry = scannerEntry(adapter, result, fileSha256(inst.path));
           entry.ruleSet = describeRuleSet(key, builtConfig, scanRoot); // CGR-10: what really ran, from the config the adapter was handed
+          if (key === "semgrep" && (result.status === "PASS" || result.status === "FINDINGS")) {
+            semgrepRun = { adapter, config: adapterConfig, findings: result.findings };
+          }
           if (key === "semgrep") {
             // SEM-F: a degraded-coverage result (warn-level PartialParsing only) is merged onto the
             // entry's existing {subject, exclusions} coverage object, never replacing those keys.
@@ -1087,9 +1151,12 @@ export async function runSecurityScan({
   // built it -- see deriveReportStatus()'s own doc comment above.
   for (const entry of scanners) entry.reportStatus = deriveReportStatus(entry);
 
-  const blockOnSet = new Set(blockOn);
+  const semgrepBaseline = scanRoot
+    ? await semgrepBaselineStep({ rootDir, scanRoot, candidate: candidateBefore, remoteName, authority, semgrepRun, blockOn, timeoutMs, env, spawnFn })
+    : { schema: SEMGREP_BASELINE_SCHEMA, status: "not-needed" };
   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
-  const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
+  // C28e: the one verdict function (lib/semgrep-baseline.mjs); every gate reading exitCode inherits it.
+  const hasBlockingFinding = blockingFindings(findings, blockOn, semgrepBaseline).length > 0;
   const snapshotAfter = scanRoot ? observeCandidate(scanRoot, remoteName) : null;
   const candidateAfter = observeSubject(rootDir);
   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
@@ -1139,6 +1206,7 @@ export async function runSecurityScan({
         source: authority.status === "ready" ? authority.source : null,
       },
       snapshotCleanup: cleanup,
+      semgrepBaseline,
     },
     scanners,
     findings,
@@ -1256,6 +1324,8 @@ function printSummary(evidence, critical = false, exceptions = null) {
   // Candidate 22 (CGR-10): which rules or rule sets really ran, for each scanner.
   console.log("Rules that ran:");
   for (const line of formatRuleSetLines(evidence.scanners)) console.log(`  ${line}`);
+  // C28e (D242): Semgrep findings that existed before the feature are listed and named non-blocking.
+  for (const line of formatSemgrepBaselineLines(evidence.execution?.semgrepBaseline)) console.log(line);
   // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
   // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
   // executed and shows every applied named exception on its line.

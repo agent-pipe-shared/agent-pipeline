@@ -4885,6 +4885,12 @@
       "file": "plugins/pipeline-core/lib/toolchain-registry.test.mjs",
       "invariantPinned": "One tool registry names every program the Pipeline needs, with its class, floor and an install route per platform; every preflight tool except the license control is required there and the preflight takes its version floors from it; the pointer a preflight result carries names the document and holds no command and no version; a required tool's deferral is recorded machine-locally with the answer word for word, never makes a readiness finding ok and never lifts a critical calibration's scanner refusal; a scanner the check could not observe asks for no install",
       "nonOverlapNote": "Unique cases: the registry, its agreement with the preflight floors and the deferral; toolchain-preflight.test.mjs keeps the preflight's statuses, the W7-2 contract and the readiness report shape"
+    },
+    {
+      "name": "semgrep-baseline-tests",
+      "file": "plugins/pipeline-core/lib/semgrep-baseline.test.mjs",
+      "invariantPinned": "A Semgrep finding at a blocking severity blocks only when the feature introduced it: the baseline is read from the candidate (active or last closed feature, the shared feature-range start, an ancestor commit) and never from a caller; existing findings are matched by rule, relative path and line, recorded and listed, never removed; any unreadable baseline, failed pass, unmatched new finding or existing finding in an added file falls back to blocking everything; the real scan chain blocks a new finding, passes an older one and leaves no worktree behind",
+      "nonOverlapNote": "Unique cases: the baseline resolution, the one verdict function and the real two-pass chain; security-scan.test.mjs keeps the adapter contract and the fail-closed exit mapping, close-commit-split tests keep the commit count"
     }
   ]
 }

@@ -116,7 +116,8 @@ function semgrepErrorTypeName(type) {
 // A path semgrep reported, as a scan-root-relative forward-slash path -- or null when it cannot be
 // named that way (not a string, empty, outside the scan root, another drive/absolute flavor).
 // Never returns an absolute path: coverage.files and every line printed from it stay host-neutral.
-function scanRootRelativePath(file, rootDir) {
+// C28e: exported for the baseline comparison, which compares two worktrees of the same candidate by relative path.
+export function scanRootRelativePath(file, rootDir) {
   if (typeof file !== "string" || file.length === 0) return null;
   const hostAbsolute = pathIsAbsolute(file);
   if (!hostAbsolute && (pathPosix.isAbsolute(file) || pathWin32.isAbsolute(file))) return null;
@@ -174,7 +175,14 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
   // startup/shutdown; `--timeout-threshold 0` disables semgrep's own "skip this file
   // after N per-rule timeouts" behavior so a slow file is retried at full budget on
   // every rule rather than silently skipped partway through.
-  const args = ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", configArg, rootDir];
+  // C28e (D242, ADR-0093): the baseline pass. Semgrep checks the base commit out IN the scanned tree while it runs and, when
+  // killed, leaves that tree on the base (measured 2026-11-12), so the scan driver runs this pass only in a throwaway
+  // worktree of its own, never in the shared candidate snapshot. Only a full commit id is passed on.
+  const baselineCommit = config.baselineCommit;
+  if (baselineCommit !== undefined && baselineCommit !== null && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(String(baselineCommit))) {
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: "the baseline commit is not a full commit id" };
+  }
+  const args = ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", configArg, ...(baselineCommit ? ["--baseline-commit", baselineCommit] : []), rootDir];
 
   let scratch;
   try {

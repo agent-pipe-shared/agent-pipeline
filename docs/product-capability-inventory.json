@@ -1120,6 +1120,7 @@
         "verify-phase:harness/scripts/verify.mjs:security-scanner-diagnostics-tests",
         "verify-phase:harness/scripts/verify.mjs:self-application-attestation-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:self-verify-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:semgrep-baseline-tests",
         "verify-phase:harness/scripts/verify.mjs:semgrep-default-rules-tests",
         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
