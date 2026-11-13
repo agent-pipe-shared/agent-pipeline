@@ -769,9 +769,20 @@ export function stageOneShotCommit(root, result) {
   return { ...result, staged };
 }
 
+// Candidate 29 (Codex greenfield run 3, T1): `--one-shot` (and `--stage`) had to be the first (last) argument; the same
+// flags in another order ended in FINISH-USAGE. No flag value may start with `--`, so neither word can be a value: each
+// is taken from any position, at most once, and the remaining words are the flag/value pairs as before.
+export function splitOneShotArgv(argv) {
+  const count = (word) => argv.filter((entry) => entry === word).length;
+  if (count("--one-shot") !== 1) return null;
+  if (count("--stage") > 1) fail("FINISH-USAGE", "--stage may be given at most once");
+  return { stage: count("--stage") === 1, rest: argv.filter((entry) => entry !== "--one-shot" && entry !== "--stage") };
+}
+
 function parseOneShot(argvWithStage) {
-  const stage = argvWithStage.length > 0 && argvWithStage.at(-1) === "--stage";
-  const argv = stage ? argvWithStage.slice(0, -1) : argvWithStage;
+  const split = splitOneShotArgv(["--one-shot", ...argvWithStage.filter((entry) => entry !== "--one-shot")]);
+  const stage = split.stage;
+  const argv = split.rest;
   const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks", "--sbom-override-proof"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
@@ -791,10 +802,11 @@ function parse(argv) {
   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], auditRequest: value["--audit-request"], criticVerifyLifecycle: value["--critic-verify-lifecycle"], continuityCloseRequest: value["--continuity-close-request"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "--one-shot") {
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes("--one-shot")) {
   // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
   try {
-    const parsed = parseOneShot(process.argv.slice(3));
+    if (process.argv.slice(2).filter((entry) => entry === "--one-shot").length !== 1) fail("FINISH-USAGE", "--one-shot may be given once");
+    const parsed = parseOneShot(process.argv.slice(2));
     const closed = oneShotClose(parsed);
     const result = parsed.stage ? stageOneShotCommit(realpathSync(resolve(parsed.rootDir)), closed) : closed;
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

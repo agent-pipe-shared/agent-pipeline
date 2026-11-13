@@ -1083,6 +1083,20 @@ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed re
     assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
     const help = spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }); // measured: a run asked --help and was never told of the one-shot entry
     assert.equal(help.status === 0, false); assert.match(help.stderr, /finish-feature\.mjs --one-shot --by/u);
+    // Candidate 29 (Codex run 3, T1): --one-shot and --stage are order-independent; the same close in another order
+    // reaches the same stop instead of FINISH-USAGE. A doubled --one-shot or --stage is still a usage refusal.
+    for (const argv of [["--root", f.root, "--one-shot", "--by", "PO", "--architecture-impact", "no-architecture-impact"],
+      ["--by", "PO", "--architecture-impact", "no-architecture-impact", "--root", f.root, "--one-shot"],
+      ["--stage", "--one-shot", "--root", f.root, "--by", "PO", "--architecture-impact", "no-architecture-impact"]]) {
+      const reordered = spawnSync(process.execPath, [script, ...argv], { encoding: "utf8" });
+      assert.equal(reordered.status, 2, argv.join(" "));
+      assert.doesNotMatch(reordered.stderr, /FINISH-USAGE/u, argv.join(" "));
+      assert.equal(JSON.parse(reordered.stdout).stop.code, "ONESHOT-NO-ACTIVE-FEATURE", argv.join(" "));
+    }
+    for (const argv of [["--one-shot", "--one-shot", "--root", f.root], ["--one-shot", "--stage", "--root", f.root, "--stage"]]) {
+      const doubled = spawnSync(process.execPath, [script, ...argv], { encoding: "utf8" });
+      assert.equal(doubled.status, 2); assert.match(doubled.stderr, /FINISH-USAGE/u, argv.join(" "));
+    }
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
