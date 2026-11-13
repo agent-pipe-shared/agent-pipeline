@@ -531,6 +531,11 @@ function classifySimple(words) {
       continue;
     }
     if (OPAQUE_RE.test(base)) {
+      // Candidate 29 (Codex greenfield run 3, C5): `node <script>.mjs ... --transport-reference gh` passes `gh` as a data value to a
+      // script file, it runs nothing. For node with a script file as its first argument (no -e/-p/--eval/--print or other option
+      // before it) the arguments are data, so only the fail-closed marker rule applies (a gh word followed by pr/api/release/...).
+      const scriptFile = base === "node" && typeof words[index + 1] === "string" && /^[^-].*\.(?:mjs|cjs|js)$/u.test(words[index + 1]);
+      if (scriptFile) return hasGhMarker(words.slice(index + 2)) ? unclassified("a gh word followed by a subcommand among a node script's arguments") : NONE;
       return words.slice(index + 1).some(hasGhWord) ? unclassified("a gh word handed to a shell, interpreter or launcher") : NONE;
     }
     if (DATA_PRINTERS.has(base)) return NONE;

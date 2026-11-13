@@ -124,6 +124,13 @@ const DESIGN_NOTE_CASES = [
   refused(UNCLASSIFIED, "gh pr $(echo merge) 1"),
   refused(UNCLASSIFIED, "gh pr `echo merge` 1"),
   refused(UNCLASSIFIED, "bash -c 'gh pr merge 1'"),
+  // Candidate 29 (Codex greenfield run 3, C5): a data value `gh` passed to a node script file runs nothing.
+  none("node /p/scripts/push-driver.mjs --root /r --transport-reference gh --remote origin"),
+  none("node scripts/x.mjs --transport-reference gh"),
+  refused(UNCLASSIFIED, "node scripts/x.mjs gh pr merge 1"),
+  refused(UNCLASSIFIED, "node -e 'x' gh"),
+  refused(UNCLASSIFIED, "node --eval x --transport-reference gh"),
+  refused(UNCLASSIFIED, "python3 x.py --transport-reference gh"),
 ];
 
 const ALL_CASES = [...BRIEFED_CASES, ...DESIGN_NOTE_CASES];
