@@ -367,6 +367,7 @@
 | pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.dual-channel-publication | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
+| pipeline.early-dispatches-are-layer-packages-not-vertical-slices | open | workflow-improvement | pipeline | alfred | 2026-11-13 | — | — |
 | pipeline.el-01-has-no-in-session-tripwire | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.elephant-direct-implementation-under-afk-authorization | closed | workflow-improvement | pipeline | — | 2026-07-23 | — | — |
@@ -890,6 +891,7 @@
 | pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | nova-b | 2026-08-28 | — | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
 | pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
 | pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
+| pipeline.scaffold-map-inventory-stays-design-pending-after-materialization | open | defect | pipeline | alfred | 2026-11-13 | — | — |
 | pipeline.scan-exception-commits-spend-the-critic-correction-budget | open | workflow-improvement | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scanner-diagnostics-keep-no-finding-provenance-before-suppression | open | defect | pipeline | none | 2026-10-21 | — | — |
@@ -1095,7 +1097,7 @@
 
 ## Counts
 
-- open: 398
+- open: 400
 - in_progress: 0
 - closed: 674
 - rejected: 3

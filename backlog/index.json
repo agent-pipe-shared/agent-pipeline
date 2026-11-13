@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "750d741ba8502d470a3b86c23ea7e5571ebee32168623f23e988becc7fef413b"
+    "transitionHead": "b1474d74bc9e0bc95ff08cf75259d21b0945df256c5ce937677c0ada63b0a93a"
   },
   "counts": {
-    "open": 398,
+    "open": 400,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -4447,6 +4447,16 @@
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": true,
       "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
+    },
+    {
+      "id": "pipeline.early-dispatches-are-layer-packages-not-vertical-slices",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-13",
+      "source": "Codex greenfield run 3 report, point C10 (P1); PO tile 2026-11-13 places it after candidate 29",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.el-01-has-no-in-session-tripwire",
@@ -11015,6 +11025,16 @@
       "owner": "pipeline",
       "created": "2026-11-11",
       "source": "Candidate 28c design; ADR-0091 decisions 2 and 4",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.scaffold-map-inventory-stays-design-pending-after-materialization",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-13",
+      "source": "Codex greenfield run 3 report, point C13 (P2); PO tile 2026-11-13 places it after candidate 29",
       "deferred": false,
       "sprint": "alfred"
     },
