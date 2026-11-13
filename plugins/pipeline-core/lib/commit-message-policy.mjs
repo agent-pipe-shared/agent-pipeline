@@ -178,7 +178,15 @@ export function finishedCommitMessageFindings(message, {
   if ((requireDispatch || enforceProvenance) && !checkpointPair) {
     const dispatches = trailers.filter((entry) => entry.key === DISPATCH_KEY);
     if (dispatches.length === 0) {
-      findings.push({ code: "GIT-03-DISPATCH-MISSING", detail: "no `Dispatch:` entry in the final Git trailer block" });
+      // Candidate 29 (AGY run 3, R8): `git commit -m <subject> -m <body> -m "AI-Assisted: true" -m "Dispatch: ..."` puts a blank line
+      // between the two trailers, so the Dispatch line exists but is not in the final block. Say so and name the form that works.
+      const splitAway = /^Dispatch:[ \t]*\S/mu.test(text);
+      findings.push({
+        code: "GIT-03-DISPATCH-MISSING",
+        detail: splitAway
+          ? "no `Dispatch:` entry in the final Git trailer block: a `Dispatch:` line is in the message but a blank line separates it from the last block (each `-m` flag starts a new paragraph); write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`, both trailers as the last lines with no blank line between them"
+          : "no `Dispatch:` entry in the final Git trailer block; end the message with `AI-Assisted: true` and one `Dispatch:` line (`Dispatch: <task-id> (goldfish)` or `Dispatch: stage-0 (elephant)`) as the last lines, written with `git commit -F scratch/<message-file>`",
+      });
     } else if (dispatches.length > 1) {
       findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
     } else if (!admittedDispatchValue(dispatches[0].value)) {

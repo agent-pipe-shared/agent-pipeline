@@ -167,6 +167,19 @@ check("CMP11d a blank line inside the trailer block is rejected", () => {
   assert.deepEqual(codes(run("git commit -F split.txt", { requireMarker: true, requireDispatch: true })), ["GIT-03-DISPATCH-MISSING"]);
 });
 
+// Candidate 29 (AGY run 3, R8): the refusal after split -m trailers names why and the -F form; an absent Dispatch line names the form.
+check("CMP11d2 a Dispatch line split away from the last block is named, with the git commit -F repair", () => {
+  const opts = { requireMarker: true, requireDispatch: true };
+  const split = finishedCommitMessageFindings("feat(x): do a thing\n\nDispatch: stage-0 (elephant)\n\nAI-Assisted: true\n", opts).findings
+    .find((finding) => finding.code === "GIT-03-DISPATCH-MISSING");
+  assert.match(split.detail, /a blank line separates it from the last block/u);
+  assert.match(split.detail, /git commit -F scratch\/<message-file>/u);
+  const absent = finishedCommitMessageFindings("feat(x): x\n\nAI-Assisted: true\n", opts).findings
+    .find((finding) => finding.code === "GIT-03-DISPATCH-MISSING");
+  assert.doesNotMatch(absent.detail, /blank line separates/u);
+  assert.match(absent.detail, /Dispatch: stage-0 \(elephant\)/u);
+});
+
 check("CMP11e absent, duplicate and malformed dispatch bindings are distinct findings", () => {
   const cases = [
     ["feat(x): x\n\nAI-Assisted: true\n", "GIT-03-DISPATCH-MISSING"],
