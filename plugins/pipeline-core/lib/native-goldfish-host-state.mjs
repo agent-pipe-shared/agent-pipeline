@@ -25,17 +25,21 @@ import { observeCurrentPlanApprovalForCalibration } from "../scripts/pipeline-st
 import { resolveV3DutyRoute } from "./critic-route-v3.mjs";
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
-import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
+import { isMaintenanceDelivery, itemDeliveryBindingKey, parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
+import { describeMaintenanceCheck, maintenanceAcknowledgementRepair, maintenanceCheckSha256, maintenanceCheckSpelling, maintenanceRedProof, maintenanceScopeRefusal, planApprovalCommit, readMaintenanceRedObservation } from "./maintenance-delivery.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
 import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
 import { sliceQueueLocation, readSliceQueueSource, readBoundedFile, writeWorkingQueue, restoreWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 import { isSafeTaskId } from "./dispatch-record.mjs";
 import { fileURLToPath } from "node:url";
+/** ADR-0097: what an item delivery is bound to -- its criterion locator, or its maintenance binding with the identity of the one red check (two maintenance deliveries of different checks never compare equal). Every comparator reads it through here. */
+const deliveryBinding=delivery=>isMaintenanceDelivery(delivery)?{maintenance:delivery.maintenance,checkSha256:maintenanceCheckSha256(delivery.checks?.[0])}:delivery?.criterionLocator;
 
 // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
 const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
 const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
+const MAINTENANCE_RED_CHECK_SCRIPT = fileURLToPath(new URL("../scripts/maintenance-red-check.mjs", import.meta.url));
 const CODEX_PREPARE_SCRIPT = fileURLToPath(new URL("../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
 /** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
  * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
@@ -308,7 +312,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     const named = parseDispatchSlice(fields.prompt);
     const item = deliveryQueue.normalized.slices.find(row => row.id === named.sliceId);
     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
-    if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
+    if((item.delivery.criterionLocator||isMaintenanceDelivery(item.delivery))&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
     if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd(),admissionDeadline,publishRetry:dependencies.publishRetry});
       if(readiness.status!=='observed')return integrationReadinessRefusal(readiness);
       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
@@ -724,7 +728,7 @@ function nativePendingQueueJoin(state,repository) {
   if(!state.binding.itemDelivery)return state; // retained basic legacy contract
   const original=state.binding.itemDelivery,approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
   if(item.delivery.itemId!==original.itemId||item.delivery.baseCommit!==state.binding.candidateCommit||approval.status!=='eligible'
-    ||item.delivery.approvalSha256!==approval.approvalSha256||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(original.criterionLocator)
+    ||item.delivery.approvalSha256!==approval.approvalSha256||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(original))
     ||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(original.checks))throw nativeManagedFault('native-item-original-queue-binding-drift');
   // Governed runtime metadata may gain another independent item. This Source
   // member/original-approval join authorizes only its current queue bytes;
@@ -803,7 +807,7 @@ export function readNativeReservedItemScopes({repository,boundary}={}) {
     if(released.has(operation.bindingSha256))continue;
     const state=effectiveNativePendingState(read,entry);
     if(settled.has(state.delivery?.sliceId))continue;
-    reservations.push({pendingSha256:entry.sourceFact.sha256,sliceId:state.delivery?.sliceId??null,itemId:state.delivery?.itemId??null,criterionSha256:state.binding.itemDelivery?nativeManagedDigest(state.binding.itemDelivery.criterionLocator):null,writeScope:state.delivery?.writeScope??state.binding.allowedPaths});
+    reservations.push({pendingSha256:entry.sourceFact.sha256,sliceId:state.delivery?.sliceId??null,itemId:state.delivery?.itemId??null,criterionSha256:state.binding.itemDelivery?nativeManagedDigest(deliveryBinding(state.binding.itemDelivery)):null,writeScope:state.delivery?.writeScope??state.binding.allowedPaths});
   }
   return {reservations};
 }
@@ -1464,7 +1468,8 @@ const CRITIC_DELIVERY_KEYS='baseCommit,criteria,itemId';
  * criteria of the slices it covers (the validator allows 1..64 unique safe ids). */
 function criticDeliveryCriteria(covered,known,fallback) {
   const ids=[];
-  for(const list of [...known,...covered.map(row=>row.delivery?.criteria)])
+  // ADR-0097: a maintenance slice has no criterion; it contributes its slice id, never a Spec criterion.
+  for(const list of [...known,...covered.map(row=>isMaintenanceDelivery(row.delivery)?[row.id]:row.delivery?.criteria)])
     for(const id of Array.isArray(list)?list:[])if(typeof id==='string'&&isSafeTaskId(id)&&!ids.includes(id))ids.push(id);
   return (ids.length?ids:fallback).slice(0,64);
 }
@@ -1528,14 +1533,32 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       if(paths.status!=='ready')throw nativeManagedFault('item-course-authority-unavailable');
       const stateBytes=readFileSync(join(physical,paths.state)),state=parseStrictJson(stateBytes);
       if(digest(stateBytes)!==approval.stateSha256||!state.activeFeature?.id||!state.planSubmission?.specPath)throw nativeManagedFault('item-course-state-drift');
-      const locator=itemDelivery.criterionLocator;
-      const source=approval.sourceRefs.find(ref=>ref.path===locator.sourcePath&&ref.sha256===locator.sourceSha256);
-      if(!source||locator.sourcePath!==state.planSubmission.specPath)throw nativeManagedFault('item-course-original-unbound');
-      const sourcePath=join(physical,source.path),sourceInfo=lstatSync(sourcePath);
-      if(sourceInfo.isSymbolicLink()||!sourceInfo.isFile()||realpathSync(sourcePath)!==sourcePath)throw nativeManagedFault('item-course-original-unsafe');
-      const sourceBytes=readFileSync(sourcePath);
-      const criterion=parseAcceptedCriticCriterion({sourceBytes,locator,packageContext:{featureId:state.activeFeature.id,sourceBindings:[{path:source.path,sha256:source.sha256,role:'spec'}]}});
-      if(!['explicit-actual-independent-pass','no-explicit-criterion'].includes(criterion.status))throw nativeManagedFault('item-course-criterion-unbound');
+      const maintenance=isMaintenanceDelivery(itemDelivery);
+      const locator=maintenance?null:itemDelivery.criterionLocator;
+      const bindingKey=itemDeliveryBindingKey(itemDelivery);
+      let source=null,redProof=null;
+      if(maintenance){
+        // ADR-0097 (D249): no criterion. The scope is narrow, the check was observed red at this candidate, and it was red before the feature
+        // (a pre-approval red Verify receipt, else the PO's acknowledgement). Every proof is derived here, never taken from the briefing.
+        const check=itemDelivery.checks[0];
+        const scope=maintenanceScopeRefusal(writeScope);
+        if(scope)return {status:'refused',code:scope.code,reason:scope.reason,repair:scope.repair};
+        const observation=readMaintenanceRedObservation({commonDir:repository.commonDir,check,candidate});
+        if(observation===null||!observation.red||observation.featureId!==state.activeFeature.id)return {status:'refused',code:'SQ-MAINTENANCE-RED-UNOBSERVED',
+          reason:`no red observation of ${describeMaintenanceCheck(check)} exists at candidate ${String(candidate.commit).slice(0,12)}`,repair:`observe the check at the clean HEAD first: node ${MAINTENANCE_RED_CHECK_SCRIPT} observe --root <repo> --check ${maintenanceCheckSpelling(check)} (it runs the check and records the result), then ${regenerate}`};
+        redProof=maintenanceRedProof({commonDir:repository.commonDir,root:physical,featureId:state.activeFeature.id,approvalSha256:approval.approvalSha256,
+          approvalCommit:planApprovalCommit({root:physical,state}),check});
+        if(redProof===null)return {status:'refused',code:'SQ-MAINTENANCE-RED-UNPROVEN',reason:`nothing proves that ${describeMaintenanceCheck(check)} was red before the feature`,repair:maintenanceAcknowledgementRepair()};
+        redProof=redProof.kind==='verify-receipt'?{kind:'verify-receipt',ref:redProof.ref}:{kind:'po-acknowledgement',ref:redProof.ref,mode:redProof.mode,label:redProof.label};
+      } else {
+        source=approval.sourceRefs.find(ref=>ref.path===locator.sourcePath&&ref.sha256===locator.sourceSha256);
+        if(!source||locator.sourcePath!==state.planSubmission.specPath)throw nativeManagedFault('item-course-original-unbound');
+        const sourcePath=join(physical,source.path),sourceInfo=lstatSync(sourcePath);
+        if(sourceInfo.isSymbolicLink()||!sourceInfo.isFile()||realpathSync(sourcePath)!==sourcePath)throw nativeManagedFault('item-course-original-unsafe');
+        const sourceBytes=readFileSync(sourcePath);
+        const criterion=parseAcceptedCriticCriterion({sourceBytes,locator,packageContext:{featureId:state.activeFeature.id,sourceBindings:[{path:source.path,sha256:source.sha256,role:'spec'}]}});
+        if(!['explicit-actual-independent-pass','no-explicit-criterion'].includes(criterion.status))throw nativeManagedFault('item-course-criterion-unbound');
+      }
       // AC-108: the queue is read and written at its working copy under the Git common directory (the handover copy is only read, byte-identical, while no working copy exists).
       const location=sliceQueueLocation({root:physical,planDir:dirname(state.activeFeature.planPath)}),path=location.workingPath;
       if(relative(physical,location.handoverAbs).startsWith('..')||realpathSync(dirname(location.handoverAbs))!==dirname(location.handoverAbs))throw nativeManagedFault('item-course-queue-path');
@@ -1556,19 +1579,22 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       }
       const existing=raw.slices.find(row=>row.id===itemDelivery.sliceId);
       if(itemDelivery.continuationOf!==undefined){const refusal=continuationPredecessorRefusal(itemDelivery.continuationOf,itemDelivery.sliceId,raw.slices);if(refusal)return refusal;}
-      const delivery={itemId:itemDelivery.itemId,criteria:[locator.criterionId],baseCommit:candidate.commit,
-        criterionLocator:locator,checks:itemDelivery.checks,approvalSha256:approval.approvalSha256};
-      const canRebindLegacy=existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator
+      const delivery=maintenance
+        ?{itemId:itemDelivery.itemId,baseCommit:candidate.commit,maintenance:{...itemDelivery.maintenance},checks:itemDelivery.checks,approvalSha256:approval.approvalSha256,redProof}
+        :{itemId:itemDelivery.itemId,criteria:[locator.criterionId],baseCommit:candidate.commit,
+          criterionLocator:locator,checks:itemDelivery.checks,approvalSha256:approval.approvalSha256};
+      const sameBinding=row=>itemDeliveryBindingKey(row?.delivery)===bindingKey;
+      const canRebindLegacy=!maintenance&&existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator&&!isMaintenanceDelivery(existing.delivery)
         &&existing.delivery.itemId===itemDelivery.itemId&&nativeManagedDigest(existing.delivery.criteria)===nativeManagedDigest([locator.criterionId])
         &&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
-      // A never-dispatched `ready` slice with the identical item, criterion and write scope rebinds to the current candidate.
+      // A never-dispatched `ready` slice with the identical item, criterion (or maintenance check) and write scope rebinds to the current candidate.
       const canRebindReady=existing&&existing.state==='ready'&&existing.delivery?.status!=='unbound-legacy'&&existing.delivery?.itemId===itemDelivery.itemId
-        &&nativeManagedDigest(existing.delivery?.criteria)===nativeManagedDigest([locator.criterionId])&&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
+        &&sameBinding(existing)&&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
       if(existing?.delivery?.status!=='unbound-legacy'&&existing&&!canRebindLegacy&&!canRebindReady){
         if(nativeManagedDigest(existing.delivery)!==nativeManagedDigest(delivery)||nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)){
           // PF-47: nothing was written; name the queue row the binding must match instead of a generic authority fault.
           const differs=[existing.state!=='ready'?`state ${existing.state}`:null,nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)?'write scope':null,
-            existing.delivery?.itemId!==itemDelivery.itemId?'item':null,nativeManagedDigest(existing.delivery?.criteria)!==nativeManagedDigest([locator.criterionId])?'criterion':null].filter(Boolean);
+            existing.delivery?.itemId!==itemDelivery.itemId?'item':null,!sameBinding(existing)?'criterion':null].filter(Boolean);
           return {status:'refused',code:'SQ-ITEM-BINDING-DRIFT',reason:`the binding for ${existing.id} differs from its queue row in ${differs.join(', ')||'its delivery binding'}`,
             repair:existing.state!=='ready'?`slice ${existing.id} is ${existing.state}; it cannot be rebound: choose a new slice id`
               :differs.includes('item')||differs.includes('criterion')?`slice ${existing.id} belongs to another item or criterion; choose a new slice id (--dispatch-id)`
@@ -1577,7 +1603,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
         return resolveGovernedItemQueue({root:physical});
       }
       if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];if(itemDelivery.continuationOf!==undefined)existing.continuationOf=itemDelivery.continuationOf;}
-      else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',...(itemDelivery.continuationOf!==undefined?{continuationOf:itemDelivery.continuationOf}:{}),dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
+      else raw.slices.push({id:itemDelivery.sliceId,title:maintenance?`maintenance of ${describeMaintenanceCheck(itemDelivery.checks[0])}`.slice(0,120):locator.criterionId,state:'ready',...(itemDelivery.continuationOf!==undefined?{continuationOf:itemDelivery.continuationOf}:{}),dependsOn:[],writeScope:[...writeScope],...(source?{readScope:[source.path]}:{}),tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
       orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId,candidate.commit);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
       // A held dependency refuses before the queue is written, so a refused dispatch leaves the tree as it was.
@@ -1860,6 +1886,12 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,b
     // test fails; the verdict of a check must not depend on the runner that happens to host this process.
     delete checkEnv.NODE_TEST_CONTEXT;
     for(const check of itemDelivery.checks) {
+      if(check.verify==='configured') {
+        // ADR-0097: the full configured Verify of a maintenance delivery can outlast a hook, so it is not run here. The row says so
+        // (deferredTo), and green is the feature's own close Verify, which the close requires anyway (configured-verify suite).
+        results.push({id:check.id,path:check.path,verify:'configured',deferredTo:'close-verify',status:0,signal:null,error:null,stdoutSha256:digest(Buffer.alloc(0)),stderrSha256:digest(Buffer.alloc(0))});
+        continue;
+      }
       if(check.document!==undefined) {
         // G20-65: verified above from the committed bytes; no process runs, the row records the document and its passing status.
         results.push({id:check.id,path:check.path,document:check.document,status:0,signal:null,error:null,stdoutSha256:digest(Buffer.alloc(0)),stderrSha256:digest(Buffer.alloc(0))});
@@ -1915,10 +1947,12 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
       const governed=resolveGovernedItemQueue({root:repository.primaryRoot}),approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
       const item=governed.status==='required'?governed.normalized.slices.find(row=>row.id===original.sliceId):null;
       if(!item||item.delivery.itemId!==original.itemId||approval.status!=='eligible'||item.delivery.approvalSha256!==approval.approvalSha256
-        ||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(original.criterionLocator)||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(checks))throw nativeManagedFault('native-item-scope-approved-course-unavailable');
+        ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(original))||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(checks))throw nativeManagedFault('native-item-scope-approved-course-unavailable');
       const amendments=nativeScopeAmendments(read,entry,operation),latest=amendments.at(-1),effective=effectiveNativePendingState(read,entry);
       const allowedPaths=[...new Set([...effective.binding.allowedPaths,...effective.delivery.writeScope,...input.additionalPaths])].sort(),writeScope=[...new Set([...effective.delivery.writeScope,...input.additionalPaths])].sort();
       if(allowedPaths.length>64||writeScope.length>64)throw nativeManagedFault('native-item-scope-record-bound');
+      // ADR-0097: an amendment never widens a maintenance delivery past its narrow scope.
+      if(isMaintenanceDelivery(item.delivery)){const refusal=maintenanceScopeRefusal(writeScope);if(refusal)throw Object.assign(nativeManagedFault(refusal.reason),{code:refusal.code,repair:refusal.repair});}
       const unchanged=nativeManagedDigest(allowedPaths)===nativeManagedDigest([...effective.binding.allowedPaths].sort());
       const raw=structuredClone(governed.queue),rawItem=raw.slices.find(row=>row.id===original.sliceId);
       if(!unchanged&&nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effective.delivery.writeScope))throw nativeManagedFault('native-item-scope-queue-recovery-required');
@@ -1983,7 +2017,7 @@ function nativeItemRecheckPlan({repository,boundary,pendingSha256}) {
   const item=governed.status==='required'?governed.normalized.slices.find(row=>row.id===pending.value.delivery.sliceId):null;
   const approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
   if(!item||item.delivery.itemId!==pending.value.delivery.itemId||approval.status!=='eligible'||item.delivery.approvalSha256!==approval.approvalSha256
-    ||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(pending.value.binding.itemDelivery.criterionLocator)
+    ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(pending.value.binding.itemDelivery))
     ||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(pending.value.binding.itemDelivery.checks))throw nativeManagedFault('native-item-recheck-approved-course-unavailable');
   const {original,amendments,latest}=nativeItemQualifications(read,pendingSha256);
   if(!original||!latest)throw nativeManagedFault('native-item-targeted-evidence-required');
@@ -2236,7 +2270,7 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
         if(!pending?.value.binding.itemDelivery||!item)continue;
         const briefing=pending.value.binding.itemDelivery;
         if(item.delivery.baseCommit!==pending.value.binding.candidateCommit||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effectiveNativePendingState(read,pending).delivery.writeScope)
-          ||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(briefing.criterionLocator)||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(briefing.checks))continue;
+          ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(briefing))||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(briefing.checks))continue;
         const current=itemCheckSnapshot(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate);
         if(nativeManagedDigest(current.files)!==nativeManagedDigest(row.value.files))continue;
         integrated.push(item.id);

@@ -2722,3 +2722,100 @@ test("G20-65: the happy-path guide states the document check rule in one sentenc
   const guide = readFileSync(join(HERE, "..", "skills", "pipeline-start", "references", "happy-path.md"), "utf8");
   assert.match(guide, /documentation-only module[^\n]*`document:<owned path>`/u);
 });
+
+// ADR-0097 (K-28): --maintenance binds a check that was red before the feature and that no Spec criterion covers. The generator only
+// reads the red observation (maintenance-red-check.mjs observe writes it) and the red-before proof; it runs no check.
+const M_CHECK = "tests/unit/links.test.mjs";
+const M_HELPER = "tests/helpers/links-fixture.mjs";
+const M_STATE = { activeFeature: { id: "feat-x" }, planApproval: { approvedBy: "fixture", approvedAt: "2026-11-13T10:00:00.000Z" } };
+async function maintenanceDeps(fx, { observation = "red", proof = { kind: "verify-receipt", ref: "c".repeat(64) }, over = {} } = {}) {
+  const { writeMaintenanceRedObservation, parseMaintenanceCheckSpelling } = await import("../lib/maintenance-delivery.mjs");
+  const common = join(fx.root, "common-fixture");
+  if (observation !== null) {
+    const check = parseMaintenanceCheckSpelling(over.spelling ?? M_CHECK);
+    const written = writeMaintenanceRedObservation({ commonDir: common, featureId: "feat-x", check, candidate: { commit: COMMIT, tree: TREE },
+      exitCode: observation === "red" ? 1 : 0, outputSha256: "d".repeat(64), observedAt: "2026-11-13T11:00:00.000Z" });
+    assert.equal(written.ok, true, JSON.stringify(written));
+  }
+  const { spelling, ...rest } = over;
+  void spelling;
+  return depsOf(fx, { projectState: () => M_STATE, gitCommonDir: () => common, maintenanceRedProof: () => proof, ...rest });
+}
+const maintenanceArgv = (fx, overrides = {}, extra = []) => argvOf(fx, { "--check": M_CHECK, "--path": M_HELPER, ...overrides }, ["--maintenance", ...extra]);
+
+test("ADR-0097 --maintenance builds a binding without a criterion: the closed maintenance object, the narrow scope, the derived item id", async () => {
+  const { runDispatchBriefing, assertBindingInvariants } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(maintenanceArgv(fx), await maintenanceDeps(fx));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 600));
+  const delivery = result.binding.itemDelivery;
+  assert.deepEqual(Object.keys(delivery).sort(), ["checks", "itemId", "maintenance", "schema", "sliceId"]);
+  assert.deepEqual(delivery.maintenance, { schema: "pipeline.maintenance-binding.v1" });
+  assert.equal(delivery.itemId, "feat-x.sample-slug");
+  assert.deepEqual(result.binding.allowedPaths, [M_HELPER, M_CHECK].sort());
+  assert.deepEqual(Object.keys(delivery.checks[0]).sort(), ["dependencies", "id", "path"]);
+  assert.doesNotThrow(() => assertBindingInvariants(result.binding));
+  assert.equal(validateItemDeliveryBriefing(delivery).ok, true);
+});
+
+test("ADR-0097 --maintenance refuses without a red observation at the candidate, on a green one, and without a red-before proof", async () => {
+  const { runDispatchBriefing } = await lib();
+  const unobserved = makeFixture();
+  const none = runDispatchBriefing(maintenanceArgv(unobserved), await maintenanceDeps(unobserved, { observation: null }));
+  assert.equal(none.code, "DBG-MAINTENANCE-RED-UNOBSERVED", none.message);
+  assert.match(none.message, new RegExp(`maintenance-red-check\\.mjs observe --root <repo> --check ${M_CHECK.replaceAll(".", "\\.")}`, "u"));
+  const greenFx = makeFixture();
+  const green = runDispatchBriefing(maintenanceArgv(greenFx), await maintenanceDeps(greenFx, { observation: "green" }));
+  assert.equal(green.code, "DBG-MAINTENANCE-GREEN", green.message);
+  const unprovenFx = makeFixture();
+  const unproven = runDispatchBriefing(maintenanceArgv(unprovenFx), await maintenanceDeps(unprovenFx, { proof: null }));
+  assert.equal(unproven.code, "DBG-MAINTENANCE-RED-UNPROVEN", unproven.message);
+  assert.match(unproven.message, /approve-maintenance-red-check --by/u);
+  const noFeatureFx = makeFixture();
+  const noFeature = runDispatchBriefing(maintenanceArgv(noFeatureFx), await maintenanceDeps(noFeatureFx, { over: { projectState: () => ({ activeFeature: { id: "feat-x" } }) } }));
+  assert.equal(noFeature.code, "DBG-MAINTENANCE-NO-APPROVAL", noFeature.message);
+});
+
+test("ADR-0097 verify:configured exists only with --maintenance and is bound, like a command, to the calibration it reads", async () => {
+  const { runDispatchBriefing, assertBindingInvariants } = await lib();
+  const fx = makeFixture();
+  const configured = () => ({ fullCommand: "pnpm verify:ci", baseline: [], areas: [] });
+  const plain = runDispatchBriefing(argvOf(fx, { "--check": "verify:configured" }), depsOf(fx, { readConsumerVerify: configured }));
+  assert.equal(plain.code, "DBG-CHECK-VERIFY-MAINTENANCE-ONLY", plain.message);
+  const result = runDispatchBriefing(maintenanceArgv(fx, { "--check": "verify:configured" }),
+    await maintenanceDeps(fx, { over: { spelling: "verify:configured", readConsumerVerify: configured, calibrationRelPath: () => "project/pipeline.json" } }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 600));
+  const [check] = result.binding.itemDelivery.checks;
+  assert.deepEqual(Object.keys(check).sort(), ["dependencies", "id", "path", "verify"]);
+  assert.equal(check.verify, "configured");
+  assert.equal(check.path, "project/pipeline.json");
+  assert.ok(check.dependencies.includes("project/pipeline.json"));
+  assert.deepEqual(result.binding.allowedPaths, [M_HELPER], "the calibration is never writable");
+  assert.doesNotThrow(() => assertBindingInvariants(result.binding));
+  const broken = structuredClone(result.binding);
+  broken.allowedPaths = [...broken.allowedPaths, "project/pipeline.json"].sort();
+  assert.throws(() => assertBindingInvariants(broken), (error) => error.code === "DBG-CHECK-COMMAND-PATH-WRITABLE");
+  const unconfiguredFx = makeFixture();
+  const unconfigured = runDispatchBriefing(maintenanceArgv(unconfiguredFx, { "--check": "verify:configured" }),
+    await maintenanceDeps(unconfiguredFx, { over: { spelling: "verify:configured", readConsumerVerify: () => ({ fullCommand: null, baseline: [], areas: [] }) } }));
+  assert.equal(unconfigured.code, "DBG-CHECK-VERIFY-UNCONFIGURED", unconfigured.message);
+});
+
+test("ADR-0097 --maintenance never takes a criterion, a document check, a non-test path, or a value", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const deps = await maintenanceDeps(fx);
+  const withCriterion = runDispatchBriefing(maintenanceArgv(fx, {}, ["--criterion", "AC-1"]), deps);
+  assert.equal(withCriterion.code, "DBG-MAINTENANCE-CRITERION", withCriterion.message);
+  const documentCheck = runDispatchBriefing(maintenanceArgv(fx, { "--check": "document:docs/guide.md", "--path": null }), deps);
+  assert.equal(documentCheck.code, "DBG-MAINTENANCE-DOCUMENT", documentCheck.message);
+  const productPath = runDispatchBriefing(maintenanceArgv(fx, { "--path": "src/app.mjs" }), deps);
+  assert.equal(productPath.code, "DBG-MAINTENANCE-SCOPE", productPath.message);
+  assert.match(productPath.message, /src\/app\.mjs/u);
+  const specPath = runDispatchBriefing(maintenanceArgv(fx, { "--path": "specs/feat-x/tests/a.test.mjs" }), deps);
+  assert.equal(specPath.code, "DBG-MAINTENANCE-SCOPE", specPath.message);
+  const valued = runDispatchBriefing([...argvOf(fx, { "--check": M_CHECK, "--path": M_HELPER }), "--maintenance=yes"], deps);
+  assert.equal(valued.code, "DBG-FLAG-VALUE", valued.message);
+  const twice = runDispatchBriefing(maintenanceArgv(fx, {}, ["--maintenance"]), deps);
+  assert.equal(twice.code, "DBG-FLAG-REPEATED", twice.message);
+});

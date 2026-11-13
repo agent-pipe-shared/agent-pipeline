@@ -389,3 +389,76 @@ test("(h) PF-58: the review unit binds every criterion id form the binding admit
   const many = Array.from({ length: 200 }, (_, index) => `AC-E1-1-${index + 1}`).join(" ");
   assert.equal(ids(many).length, 128, "the 128-id cap still holds");
 });
+
+// ADR-0097 (D249, K-28): a red check that no Spec criterion covers is repaired by a maintenance dispatch, with only shipped
+// commands and no injected approval or digest: observe the check red, the binding refuses without a red-before proof, the PO
+// acknowledges it (chat mode in this fixture: recorded at once, labelled unattested), the regenerated binding prepares a
+// maintenance slice whose red proof the host derived itself, a product path is refused, and the host-run check is green
+// after the repair. The acknowledgement step leaves HEAD and the tree as they were, so the observation still applies.
+test("(i) ADR-0097: observe, acknowledge, bind and admit a maintenance repair of a pre-existing red check", async () => {
+  const { main: observeMain } = await import("../../scripts/maintenance-red-check.mjs");
+  const fx = consumer();
+  const RED = "tests/links.test.mjs";
+  const HELPER = "tests/helpers/links.mjs";
+  fx.write(HELPER, "export const links = () => [\"javascript:alert(1)\"];\n");
+  fx.write(RED, "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\nimport { links } from \"./helpers/links.mjs\";\n\ntest(\"no script links\", () => { assert.ok(links().every((link) => !link.startsWith(\"javascript:\"))); });\n");
+  // The observation binds a clean HEAD: the fixture's materialize-architecture step left the map refreshed but uncommitted.
+  fx.gitOk("add", "--update");
+  fx.gitOk("add", "--", HELPER, RED);
+  fx.gitOk("commit", "-q", "-m", "an example check that is already red");
+  assert.equal(fx.gitOk("status", "--porcelain", "--untracked-files=no"), "");
+  const observe = () => {
+    let stdout = "", stderr = "";
+    const exitCode = observeMain(["observe", "--root", fx.root, "--check", RED], { stdout: { write: (text) => { stdout += text; } }, stderr: { write: (text) => { stderr += text; } } });
+    return { exitCode, stdout, stderr };
+  };
+  const observed = observe();
+  assert.equal(observed.exitCode, 0, observed.stderr);
+  assert.equal(JSON.parse(observed.stdout).status, "red");
+  const maintenanceBinding = (dispatchId, paths) => runDispatchBriefing(["binding", "--root", fx.root, "--dispatch-id", dispatchId, "--item", "links-check", "--maintenance",
+    "--agent-type", "goldfish-implementor", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", RED, ...paths.flatMap((path) => ["--path", path])],
+  { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "available", value: "a".repeat(64) }, selectedPlugin: { version: "pin" } }, pluginRoot: null }) });
+  const unproven = maintenanceBinding("PIN-MAINT-1", [HELPER]);
+  assert.equal(unproven.code, "DBG-MAINTENANCE-RED-UNPROVEN", JSON.stringify(unproven));
+  assert.match(unproven.message, /approve-maintenance-red-check --by/u);
+
+  const before = { head: fx.gitOk("rev-parse", "HEAD"), tree: fx.gitOk("rev-parse", "HEAD^{tree}"), status: fx.gitOk("status", "--porcelain", "--untracked-files=no") };
+  const logs = [];
+  const old = { log: console.log, error: console.error };
+  console.log = (...args) => { logs.push(args.map(String).join(" ")); };
+  console.error = (...args) => { logs.push(args.map(String).join(" ")); };
+  let acknowledged;
+  try { acknowledged = run(["approve-maintenance-red-check", "--by", "synthetic-po"], { dir: fx.root, now: () => AT }); } finally { Object.assign(console, old); }
+  assert.equal(acknowledged, 0, logs.join("\n"));
+  assert.match(logs.join("\n"), /chat-attributed-unattested/u);
+  assert.deepEqual({ head: fx.gitOk("rev-parse", "HEAD"), tree: fx.gitOk("rev-parse", "HEAD^{tree}"), status: fx.gitOk("status", "--porcelain", "--untracked-files=no") }, before,
+    "recording the acknowledgement moves neither HEAD nor the tree, so the red observation still names the candidate");
+
+  const product = maintenanceBinding("PIN-MAINT-2", [SOURCE]);
+  assert.equal(product.code, "DBG-MAINTENANCE-SCOPE", JSON.stringify(product));
+  const bound = maintenanceBinding("PIN-MAINT-1", [HELPER]);
+  assert.equal(bound.ok, true, JSON.stringify(bound));
+  assert.deepEqual(bound.binding.itemDelivery.maintenance, { schema: "pipeline.maintenance-binding.v1" });
+  assert.equal(bound.binding.itemDelivery.criterionLocator, undefined);
+  // A hand-widened delivery that passes the general item-scope rule (the product path is a dependency of the check) is still refused.
+  const [boundCheck] = bound.binding.itemDelivery.checks;
+  const widened = { ...bound.binding.itemDelivery, sliceId: "PIN-MAINT-3", checks: [{ ...boundCheck, dependencies: [...boundCheck.dependencies, SOURCE].sort() }] };
+  const productScope = prepareGovernedItemQueue({ root: fx.root, itemDelivery: widened, candidate: fx.candidate(), writeScope: [HELPER, SOURCE].sort() });
+  assert.equal(productScope.code, "SQ-MAINTENANCE-SCOPE", JSON.stringify(productScope));
+  const prepared = prepareGovernedItemQueue({ root: fx.root, itemDelivery: bound.binding.itemDelivery, candidate: fx.candidate(), writeScope: bound.binding.allowedPaths });
+  assert.notEqual(prepared.status, "refused", JSON.stringify(prepared));
+  const queue = JSON.parse(readSliceQueueSource(sliceQueueLocation({ root: fx.root, planDir: "specs/e2e" })).bytes.toString("utf8"));
+  const slice = queue.slices.find((row) => row.id === "PIN-MAINT-1");
+  assert.equal(slice.state, "ready");
+  assert.equal(slice.readScope, undefined, "a maintenance slice reads no Spec criterion");
+  assert.deepEqual(slice.delivery.maintenance, { schema: "pipeline.maintenance-binding.v1" });
+  assert.deepEqual([slice.delivery.redProof.kind, slice.delivery.redProof.mode, slice.delivery.redProof.label],
+    ["po-acknowledgement", "chat-attributed-unattested", "red before the feature acknowledged by the PO"], "the host derived the proof from the recorded acknowledgement");
+  assert.equal(slice.delivery.criteria, undefined, "no Spec criterion is claimed");
+
+  fx.write(HELPER, "export const links = () => [\"https://example.invalid/\"];\n");
+  fx.gitOk("add", "--", HELPER);
+  fx.gitOk("commit", "-q", "-m", "repair the example check");
+  const executed = executeGovernedItemDeliveryChecks({ root: fx.root, itemDelivery: bound.binding.itemDelivery, candidate: fx.candidate() });
+  assert.equal(executed.code, "SQ-TARGETED-CHECKS-PASSED", JSON.stringify(executed.evidence ?? executed));
+});

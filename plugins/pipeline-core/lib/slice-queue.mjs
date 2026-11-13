@@ -74,6 +74,14 @@ export function checkCancelClass(value) {
     repair: `give the class that says why the slice ends: ${CANCEL_CLASSES.map((name) => `${name} (${CANCEL_CLASS_HELP[name]})`).join("; ")}`,
   };
 }
+/** ADR-0097: the closed red-before proof of a maintenance delivery: a pre-approval red Verify receipt, or the PO's labelled acknowledgement. */
+export function validRedProof(value) {
+  if (!isObject(value) || typeof value.ref !== "string" || value.ref === "" || value.ref.length > 200) return false;
+  const keys = Object.keys(value).sort().join(",");
+  if (value.kind === "verify-receipt") return keys === "kind,ref" && /^[a-f0-9]{64}$/u.test(value.ref);
+  if (value.kind === "po-acknowledgement") return keys === "kind,label,mode,ref" && ["signature", "chat-attributed-unattested"].includes(value.mode) && typeof value.label === "string" && value.label !== "";
+  return false;
+}
 export const DEFAULT_MAX_ATTEMPTS = 2;
 /** Same value as fanout-ledger.mjs `DEFAULT_STALE_AFTER_MINUTES` (pinned by a test). */
 export const DEFAULT_STALE_AFTER_MINUTES = 20;
@@ -592,7 +600,12 @@ export function validateSliceQueue(input, options = {}) {
       const modern=keys==='approvalSha256,baseCommit,checks,criteria,criterionLocator,itemId';
       const selected=modern&&validateItemDeliveryBriefing({schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId:delivery.itemId,criterionLocator:delivery.criterionLocator,checks:delivery.checks}).ok
         &&/^[a-f0-9]{64}$/u.test(delivery.approvalSha256??'')&&delivery.criteria.length===1&&delivery.criteria[0]===delivery.criterionLocator.criterionId;
-      if(!legacy&&(!basic||modern&&!selected))err('SQ-DELIVERY',`slice ${id}: v2 delivery binding is invalid`,{sliceId:id});
+      // ADR-0097: a maintenance delivery binds one red check and the host-derived proof it was red before the feature; it carries no criterion.
+      const maintenance=keys==='approvalSha256,baseCommit,checks,itemId,maintenance,redProof'&&isSafeTaskId(delivery.itemId)
+        &&/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(delivery.baseCommit??'')&&/^[a-f0-9]{64}$/u.test(delivery.approvalSha256??'')
+        &&validateItemDeliveryBriefing({schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId:delivery.itemId,maintenance:delivery.maintenance,checks:delivery.checks}).ok
+        &&validRedProof(delivery.redProof);
+      if(!legacy&&!maintenance&&(!basic||modern&&!selected))err('SQ-DELIVERY',`slice ${id}: v2 delivery binding is invalid`,{sliceId:id});
     }
     if (!isLine(raw.title)) err("SQ-SCHEMA", `slice ${id}: title must be one non-empty line`, { sliceId: id });
     const state = SLICE_STATES.includes(raw.state) ? raw.state : null;

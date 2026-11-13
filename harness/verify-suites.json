@@ -4915,6 +4915,18 @@
       "file": "plugins/pipeline-core/lib/gate-definition-changes.test.mjs",
       "invariantPinned": "The close's gate-definition walk (ADR-0096) lists every add, change and deletion of a gate-definition file in the feature range against the first parent, skips an exempt-field-only pipeline.user.yaml edit, and derives each proof: first appearance, committed materialization of the fitness model, the labelled configure-verify record, a consumed override for its next change of the path only, or the PO acknowledgement naming that exact change; a re-creation after a deletion and an unacknowledged later change stay unproven",
       "nonOverlapNote": "Unique unit suite on real git histories for the walk and its proof derivation; pre-commit-hook-install.test.mjs pins the commit-time refusal of GS-16/GS-17"
+    },
+    {
+      "name": "maintenance-delivery-tests",
+      "file": "plugins/pipeline-core/lib/maintenance-delivery.test.mjs",
+      "invariantPinned": "A maintenance delivery (ADR-0097) binds one check by what runs (verify:configured, command:<id> or a .test file), never by its dispatch id; its scope is test- or tooling-shaped, never a gate-strength path or specs/; the first red observation at a commit stands; the red-before proof is a sealed red receipt at or before the plan-approval commit, else the PO's acknowledgement of this feature and plan approval",
+      "nonOverlapNote": "Unique unit suite on real git histories for the shared maintenance library; maintenance-red-check-tests runs the observing script, dispatch-briefing-binding-tests the --maintenance binding"
+    },
+    {
+      "name": "maintenance-red-check-tests",
+      "file": "plugins/pipeline-core/scripts/maintenance-red-check.test.mjs",
+      "invariantPinned": "maintenance-red-check.mjs observe runs one check on the clean HEAD of a real repository and records the first result at that commit; an untracked or non-test check, a dirty tree, no active feature, a timeout, a command the shell cannot run and a run that changes the tree are refused and record nothing",
+      "nonOverlapNote": "Unique script suite (ADR-0097, K-28); maintenance-delivery-tests pins the library it writes through"
     }
   ]
 }

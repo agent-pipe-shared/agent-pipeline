@@ -56,7 +56,7 @@ const cliArguments = process.argv.slice(2);
 const cliHelp = directInvocation && cliArguments.some(argument => argument === "--help" || argument === "-h");
 const USAGE = `Usage:
   node <plugin-root>/scripts/dispatch-briefing.mjs --help | -h
-  node <plugin-root>/scripts/dispatch-briefing.mjs binding --dispatch-id <id> --item <slug> --agent-type <type> --model-id <model> --check <test-path> [--path <path>]...
+  node <plugin-root>/scripts/dispatch-briefing.mjs binding --dispatch-id <id> --item <slug> --agent-type <type> --model-id <model> --check <test-path> [--path <path>]... [--maintenance]
   node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> [--out scratch/<briefing>.md] [--root <directory>]
   node <plugin-root>/scripts/dispatch-briefing.mjs probe --package <package.json> [--root <directory>]
 
@@ -82,6 +82,11 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
   --check document:<owned path> (G20-65) names one document a documentation-only module owns (every owned path a document); the host finalize
     verifies that the delivery changed it as a non-empty committed file. A code module keeps a test it owns or command:<id>.
   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
+  --maintenance (ADR-0097, no value, never with --criterion) binds a check that was red before the feature and that no Spec criterion
+    covers. --check is a .test file, command:<id> or verify:configured (the calibration's verify command); the write scope holds only
+    test- or tooling-shaped paths. First: maintenance-red-check.mjs observe --root <repo> --check <the same spelling> on the clean HEAD.
+    The proof that it was red before the feature is a red Verify receipt at or before the plan approval, else the PO's acknowledgement
+    (pipeline-state.mjs approve-maintenance-red-check --by <label>). This generator only reads both; it runs no check.
 
 build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
   Required strings: id, item, agentType, modelId, check, title, ac, goal.
@@ -153,6 +158,20 @@ const { deliversModuleSlice, moduleDispatchScope, readPrdModules } = cliHelp ? {
 const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
 const { inspectSpecJourneys } = cliHelp ? {} : await import("../lib/spec-journey-coverage.mjs");
 const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
+const {
+  CONFIGURED_VERIFY_CHECK,
+  MAINTENANCE_BINDING_SCHEMA,
+  describeMaintenanceCheck,
+  maintenanceAcknowledgementRepair,
+  maintenanceCheckSpelling,
+  maintenanceRedProof,
+  maintenanceScopeRefusal,
+  parseMaintenanceCheckSpelling,
+  planApprovalCommit,
+  readMaintenanceRedObservation,
+} = cliHelp ? {} : await import("../lib/maintenance-delivery.mjs");
+const { sha256CanonicalJson } = cliHelp ? {} : await import("../lib/plan-spec-state-v2.mjs");
+const MAINTENANCE_RED_CHECK_SCRIPT = fileURLToPath(new URL("./maintenance-red-check.mjs", import.meta.url));
 
 export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
 export const DISPATCH_REFUSAL_SCHEMA = "pipeline.dispatch-briefing.refusal.v1";
@@ -180,6 +199,8 @@ const DUTY_ROUTE_OF_AGENT = Object.freeze({
 // The environment keys through which `resolveActiveRunner` (pipeline-start-preflight.mjs) learns the runner of a process.
 const RUNNER_SIGNAL_KEYS = Object.freeze(["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT"]);
 const REPEATED_FLAGS = Object.freeze({ "--path": "paths" });
+// ADR-0097 (K-28): a flag without a value. `--maintenance` binds a red check that no Spec criterion covers instead of a criterion.
+const BOOLEAN_FLAGS = Object.freeze({ "--maintenance": "maintenance" });
 const REQUIRED_FLAGS = Object.freeze(["--dispatch-id", "--item", "--agent-type", "--model-id", "--check"]);
 const READ_ONLY_GIT = new Set(["rev-parse", "status"]);
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
@@ -306,6 +327,12 @@ export function parseBindingArgv(argv) {
     if (typeof token !== "string" || !token.startsWith("--")) refuse("DBG-ARGUMENT-UNEXPECTED", `unexpected argument ${JSON.stringify(token)}; every input is a --flag`);
     const equals = token.indexOf("=");
     const flag = equals === -1 ? token : token.slice(0, equals);
+    if (Object.hasOwn(BOOLEAN_FLAGS, flag)) {
+      if (equals !== -1) refuse("DBG-FLAG-VALUE", `flag ${flag} takes no value`);
+      if (Object.hasOwn(values, BOOLEAN_FLAGS[flag])) refuse("DBG-FLAG-REPEATED", `flag ${flag} may be given once`);
+      values[BOOLEAN_FLAGS[flag]] = true;
+      continue;
+    }
     const single = Object.hasOwn(SINGLE_FLAGS, flag);
     if (!single && !Object.hasOwn(REPEATED_FLAGS, flag)) refuse("DBG-FLAG-UNKNOWN", `unknown flag ${flag}`);
     let value;
@@ -495,13 +522,44 @@ function defaultSpecPathFromState(root) {
 }
 
 /** The active feature id the host parses the criterion with (K-25), or null when the project state names none. */
-function activeFeatureIdFromState(root) {
+function projectStateFromRoot(root) {
   try {
     const paths = resolveProjectAuthorityPaths({ rootDir: root });
     if (paths.status !== "ready" || typeof paths.state !== "string") return null;
-    const id = JSON.parse(readFileSync(resolve(root, paths.state), "utf8"))?.activeFeature?.id;
-    return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(id) ? id : null;
+    return JSON.parse(readFileSync(resolve(root, paths.state), "utf8"));
   } catch { return null; }
+}
+
+function activeFeatureIdFromState(root) {
+  const id = projectStateFromRoot(root)?.activeFeature?.id;
+  return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(id) ? id : null;
+}
+
+/**
+ * ADR-0097: read-only. The red observation of the maintenance check at the candidate and the proof that it was red before the
+ * feature, derived the way the host derives them. The generator never runs the check: maintenance-red-check.mjs observe does.
+ */
+function maintenanceReadiness(root, check, candidate, deps, soft) {
+  const spelling = maintenanceCheckSpelling(check);
+  const state = (deps.projectState ?? projectStateFromRoot)(root);
+  const featureId = state?.activeFeature?.id;
+  if (typeof featureId !== "string" || featureId === "" || state?.planApproval === null || typeof state?.planApproval !== "object") {
+    soft("DBG-MAINTENANCE-NO-APPROVAL", "a maintenance binding belongs to the active feature after its plan approval; the project State names no approved active feature");
+    return;
+  }
+  const commonDir = (deps.gitCommonDir ?? resolveGitCommonDir)(root);
+  const observation = commonDir === null ? null : readMaintenanceRedObservation({ commonDir, check, candidate });
+  if (observation === null || observation.featureId !== featureId) {
+    soft("DBG-MAINTENANCE-RED-UNOBSERVED", `no observation of ${describeMaintenanceCheck(check)} exists at the candidate ${candidate.commit.slice(0, 12)} for feature ${featureId}; repair: commit or restore the tracked changes, run node ${MAINTENANCE_RED_CHECK_SCRIPT} observe --root <repo> --check ${spelling} (it runs the check and records the result), then generate this binding again`);
+    return;
+  }
+  if (!observation.red) {
+    soft("DBG-MAINTENANCE-GREEN", `${describeMaintenanceCheck(check)} was observed green at the candidate ${candidate.commit.slice(0, 12)}: there is nothing to repair, so no maintenance dispatch is admitted`);
+    return;
+  }
+  const proof = (deps.maintenanceRedProof ?? maintenanceRedProof)({ commonDir, root, featureId, approvalSha256: sha256CanonicalJson(state.planApproval),
+    approvalCommit: planApprovalCommit({ root, state }), check });
+  if (proof === null) soft("DBG-MAINTENANCE-RED-UNPROVEN", `nothing proves that ${describeMaintenanceCheck(check)} was red before the feature; repair: ${maintenanceAcknowledgementRepair()}`);
 }
 
 /** A regular, non-symlinked file strictly inside the (already real) root, or null. */
@@ -708,10 +766,12 @@ export function assertBindingInvariants(binding) {
   const checks = binding?.itemDelivery?.checks;
   if (!Array.isArray(checks) || checks.length !== 1 || !Array.isArray(binding.allowedPaths)) refuse("DBG-BINDING-INVALID", "the binding must carry exactly one item-delivery check");
   const [check] = checks;
-  if (check.command !== undefined) {
+  if (check.command !== undefined || check.verify !== undefined) {
     // D195: the calibration the command is registered in is a dependency, never a write path (the command stays human-approved).
-    if (binding.allowedPaths.includes(check.path)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${check.path} that registers command ${check.command} must not be among the allowed paths`);
-    if (!check.dependencies.includes(check.path)) refuse("DBG-BINDING-INVALID", `the calibration ${check.path} must be a dependency of command check ${check.command}`);
+    // ADR-0097: the same for the calibration holding the verify command of a maintenance check.
+    const named = check.command !== undefined ? `command check ${check.command}` : `check ${CONFIGURED_VERIFY_CHECK}`;
+    if (binding.allowedPaths.includes(check.path)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${check.path} of ${named} must not be among the allowed paths`);
+    if (!check.dependencies.includes(check.path)) refuse("DBG-BINDING-INVALID", `the calibration ${check.path} must be a dependency of ${named}`);
   } else if (!binding.allowedPaths.includes(check.path) || !check.dependencies.includes(check.path)) {
     refuse("DBG-CHECK-NOT-IN-PATHS", `check ${check.path} is not among the allowed paths`);
   }
@@ -796,10 +856,18 @@ export function generateDispatchBinding(options, deps = {}) {
   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
   const commandId = check.startsWith(COMMAND_CHECK_PREFIX) ? check.slice(COMMAND_CHECK_PREFIX.length) : null;
+  // ADR-0097 (K-28): a maintenance binding names a check that was red before the feature instead of a Spec criterion. Its check may
+  // also be `verify:configured`, the calibration's top-level verify command (bound, like a command check, to the calibration file).
+  const maintenance = options.maintenance === true;
+  const configuredVerify = check === CONFIGURED_VERIFY_CHECK;
+  if (configuredVerify && !maintenance) refuse("DBG-CHECK-VERIFY-MAINTENANCE-ONLY", `check ${CONFIGURED_VERIFY_CHECK} exists only in a maintenance binding (--maintenance, ADR-0097); an item that delivers a Spec criterion names a .test file or command:<id>`);
+  if (maintenance && options.criterion !== undefined) refuse("DBG-MAINTENANCE-CRITERION", "a maintenance binding repairs a red check that no Spec criterion covers, so it names no --criterion; for work a criterion covers, drop --maintenance");
+  const calibrationBound = commandId !== null || configuredVerify;
   // G20-65: `document:<owned path>` names one document of a documentation-only module's write scope as the item check.
-  const documentPath = commandId === null && check.startsWith(DOCUMENT_CHECK_PREFIX) ? check.slice(DOCUMENT_CHECK_PREFIX.length) : null;
+  const documentPath = !calibrationBound && check.startsWith(DOCUMENT_CHECK_PREFIX) ? check.slice(DOCUMENT_CHECK_PREFIX.length) : null;
+  if (maintenance && documentPath !== null) refuse("DBG-MAINTENANCE-DOCUMENT", "a document check proves a document exists, never that a red check turned green; a maintenance binding names a .test file, command:<id> or verify:configured");
   const checkFile = documentPath ?? check;
-  for (const path of [...(commandId === null ? [checkFile] : []), ...options.paths]) {
+  for (const path of [...(calibrationBound ? [] : [checkFile]), ...options.paths]) {
     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
   }
   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
@@ -808,7 +876,7 @@ export function generateDispatchBinding(options, deps = {}) {
   if (documentPath !== null) {
     if (!DOCUMENT_CHECK_FILE.test(documentPath)) soft("DBG-CHECK-DOCUMENT-KIND", `check ${check} must name a document file (a path ending in .md, .mdx, .txt, .rst or .adoc); repair: name one of the documents of the documentation-only module, or use a .test file or command:<id>`);
     else if (options.documentationModule === undefined) soft("DBG-CHECK-DOCUMENT-MODULE", `check ${check} is the check of a documentation-only module (every owned path a document), and this dispatch names no such module; repair: dispatch through a briefing package that names "module" and "modulePlan" of a documentation-only module, or use a .test.mjs, .test.cjs or .test.js file or command:<id> of a command the project calibration registers under verifyImpact`);
-  } else if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) {
+  } else if (!calibrationBound && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) {
     // G20-65: the module is documentation-only (it owns only documents), so the repair names the document form.
     const documentRepair = options.documentationModule !== undefined && DOCUMENT_CHECK_FILE.test(check)
       ? `; module ${options.documentationModule} owns only documents. repair: name ${check} as the check in the document form ${DOCUMENT_CHECK_PREFIX}${check}` : "";
@@ -830,7 +898,7 @@ export function generateDispatchBinding(options, deps = {}) {
     directoryExpansions.push({ path, files: listed });
     expandedPaths.push(...listed);
   }
-  const allowedPaths = [...new Set([...(commandId === null ? [checkFile] : []), ...expandedPaths])].sort();
+  const allowedPaths = [...new Set([...(calibrationBound ? [] : [checkFile]), ...expandedPaths])].sort();
   if (allowedPaths.length > MAX_ALLOWED_PATHS) refuse("DBG-SCOPE-TOO-MANY-PATHS", `the write scope holds ${allowedPaths.length} exact files and the native host admits at most ${MAX_ALLOWED_PATHS}${directoryExpansions.length === 0 ? "" : ` (directories expanded: ${directoryExpansions.map((entry) => `${entry.path} -> ${entry.files.length}`).join(", ")})`}; split the work into several dispatches, each with its own exact files`);
   for (const entry of directoryExpansions) {
     warnings.push({ code: "DBG-DIRECTORY-EXPANDED", path: entry.path, files: entry.files, message: `${entry.path} is a directory: the write scope lists its ${entry.files.length} regular file(s) as they exist now. A file created there later is outside the scope; bind it with a new --path (a new binding), never by widening the match` });
@@ -850,6 +918,19 @@ export function generateDispatchBinding(options, deps = {}) {
       soft("DBG-CHECK-COMMAND-UNKNOWN", `command ${commandId} is not registered in the project calibration ${commandCheckPath}${why}. repair: register it as {"id": "${commandId}", "command": "<the real verify command>"} under verifyImpact.baseline in ${commandCheckPath} (schema pipeline.project-verify-impact.v1), commit that calibration so the candidate commit of this briefing carries it, and run this command again`);
     }
     if (allowedPaths.includes(commandCheckPath)) soft("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that registers command ${commandId} must not be a --path of the same dispatch (the command stays human-approved)`);
+  } else if (configuredVerify) {
+    commandCheckPath = (deps.calibrationRelPath ?? ((rootDir) => resolveAuthorityArtifactPath("calibration", { rootDir }).relPath))(root);
+    let fullCommand = null;
+    let why = "";
+    try { fullCommand = (deps.readConsumerVerify ?? readConsumerVerifyConfiguration)(root).fullCommand; }
+    catch (error) { why = ` (${String(error?.message ?? error).slice(0, 160)})`; }
+    if (fullCommand === null) soft("DBG-CHECK-VERIFY-UNCONFIGURED", `the project calibration ${commandCheckPath} has no verify command${why}; ${CONFIGURED_VERIFY_CHECK} names that command. repair: name the red check as a .test file or command:<id> instead`);
+    if (allowedPaths.includes(commandCheckPath)) soft("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that holds the verify command must not be a --path of the same dispatch (the command stays human-approved)`);
+  }
+  if (maintenance) {
+    // ADR-0097 Decision 2: test- or tooling-shaped paths only, never a gate-strength path, never under specs/. The host checks it again.
+    const scope = maintenanceScopeRefusal(allowedPaths);
+    if (scope !== null) soft("DBG-MAINTENANCE-SCOPE", `${scope.reason}; repair: ${scope.repair}`);
   }
 
   // Original acceptance: the criterion, its byte span, and (Alfred route only) the backlog item it names.
@@ -862,7 +943,11 @@ export function generateDispatchBinding(options, deps = {}) {
   if (!specBytes || specBytes.byteLength < 1) refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not a readable regular file under --root`);
   let locator;
   let itemId;
-  if (options.criterion !== undefined) {
+  if (maintenance) {
+    // No criterion: the item id is derived exactly as for a consumer criterion, <spec folder>.<item>.
+    itemId = `${specPath.split("/")[1]}.${item}`;
+    if (!ITEM_ID.test(itemId)) refuse("DBG-ITEM-ID", `derived item id ${JSON.stringify(itemId)} does not match ${ITEM_ID}`);
+  } else if (options.criterion !== undefined) {
     // Generic route: a consumer's own `AC-<n>`; the item id is derived, no backlog item is involved.
     let occurrences;
     try { occurrences = findCriterionOccurrences(specBytes, options.criterion); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
@@ -1164,6 +1249,11 @@ export function generateDispatchBinding(options, deps = {}) {
     candidateTree = String(git(root, ["rev-parse", "HEAD^{tree}"])).trim();
   } catch { refuse("DBG-GIT-HEAD", "git rev-parse HEAD failed under --root"); }
   if (!OID.test(candidateCommit) || !OID.test(candidateTree)) refuse("DBG-GIT-HEAD", "git returned a malformed commit or tree id");
+  if (maintenance) {
+    const identity = parseMaintenanceCheckSpelling(check);
+    if (identity === null) soft("DBG-MAINTENANCE-CHECK", `check ${check} is not a maintenance check: a .test file, command:<id> or ${CONFIGURED_VERIFY_CHECK}`);
+    else maintenanceReadiness(root, identity, { commit: candidateCommit, tree: candidateTree }, deps, soft);
+  }
   try {
     if (String(git(root, ["status", "--porcelain", "--", specPath])).trim() !== "") {
       warnings.push({ code: "DBG-SPEC-UNCOMMITTED", path: specPath, message: `${specPath} differs from HEAD; the locator hashes the working-tree bytes, not the candidate's` });
@@ -1208,10 +1298,10 @@ export function generateDispatchBinding(options, deps = {}) {
       schema: "pipeline.item-delivery-briefing.v1",
       sliceId: dispatchId,
       itemId,
-      criterionLocator: locator,
-      checks: [commandId === null
+      ...(maintenance ? { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA } } : { criterionLocator: locator }),
+      checks: [!calibrationBound
         ? { id: `${dispatchId.toLowerCase()}-check`, path: checkFile, ...(documentPath === null ? {} : { document: documentPath }), dependencies: [...allowedPaths] }
-        : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, command: commandId, dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
+        : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, ...(configuredVerify ? { verify: "configured" } : { command: commandId }), dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
     },
   };
   assertBindingInvariants(binding);

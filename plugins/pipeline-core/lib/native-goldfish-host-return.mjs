@@ -272,9 +272,14 @@ export const DOCUMENT_CHECK_PREFIX='document:';
 export const DOCUMENT_CHECK_FILE=/\.(?:md|mdx|txt|rst|adoc)$/u;
 /** D195: a check is the 3-key .test form, the additive 4-key command form (path = the calibration that registers the command) or, G20-65,
  * the 4-key document form (path = the owned document, `document` repeats it, so the check names exactly one file of the write scope). */
-function validCheckForm(check){
+function validCheckForm(check,{maintenance=false}={}){
+  // ADR-0097: the configured-verify form (path = the calibration that registers the top-level verify command) exists only in a maintenance binding.
+  if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'verify'))
+    return maintenance&&exact(check,['id','path','verify','dependencies'])&&check.verify==='configured'&&normalizedPath(check.path)
+      &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
+  // A document check proves a document exists, never that a red check turned green: it is not a maintenance check.
   if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'document'))
-    return exact(check,['id','path','document','dependencies'])&&check.document===check.path&&normalizedPath(check.path)&&DOCUMENT_CHECK_FILE.test(check.path)
+    return !maintenance&&exact(check,['id','path','document','dependencies'])&&check.document===check.path&&normalizedPath(check.path)&&DOCUMENT_CHECK_FILE.test(check.path)
       &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
   if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'command'))
     return exact(check,['id','path','command','dependencies'])&&typeof check.command==='string'&&COMMAND_ID.test(check.command)&&normalizedPath(check.path)
@@ -283,19 +288,38 @@ function validCheckForm(check){
 }
 /** Typed selection data; original approval and actual source bytes are checked
  * independently by the authenticated continuation writer. */
+/** ADR-0097: the closed maintenance binding (no criterion, no proof reference; the host derives the proof). */
+export const MAINTENANCE_BINDING_SCHEMA='pipeline.maintenance-binding.v1';
+/** True when an item delivery (briefing or queue delivery) is a maintenance delivery. */
+export function isMaintenanceDelivery(value){
+  return value!==null&&typeof value==='object'&&Object.hasOwn(value,'maintenance');
+}
+/** The one key the comparators bind a delivery to: its criterion id, or `maintenance:<what runs>` (never a Spec criterion). What runs is
+ * the check's identity without its dispatch-derived id: verify:configured, command:<id> or the .test path (maintenance-delivery.mjs). */
+export function itemDeliveryBindingKey(value){
+  if(isMaintenanceDelivery(value)){
+    const check=value.checks?.[0];
+    return `maintenance:${check?.verify==='configured'?'verify:configured':typeof check?.command==='string'?`command:${check.command}`:check?.path??''}`;
+  }
+  return value?.criterionLocator?.criterionId??(Array.isArray(value?.criteria)?value.criteria[0]:undefined);
+}
 export function validateItemDeliveryBriefing(value) {
+  const maintenance=isMaintenanceDelivery(value);
   const locator=value?.criterionLocator;
   const hasContinuation=value!==null&&typeof value==='object'&&Object.hasOwn(value,'continuationOf');
-  if(!exact(value,hasContinuation?['schema','sliceId','itemId','criterionLocator','checks','continuationOf']:['schema','sliceId','itemId','criterionLocator','checks'])
+  const bindingKey=maintenance?'maintenance':'criterionLocator';
+  if(!exact(value,hasContinuation?['schema','sliceId','itemId',bindingKey,'checks','continuationOf']:['schema','sliceId','itemId',bindingKey,'checks'])
     ||(hasContinuation&&(typeof value.continuationOf!=='string'||!ID.test(value.continuationOf)))||value.schema!=='pipeline.item-delivery-briefing.v1'
     ||!ID.test(value.sliceId??'')||!ID.test(value.itemId??'')
-    ||!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
-    ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
-    ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!isCriterionId(locator.criterionId)
-    ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096
+    ||(maintenance
+      ?!exact(value.maintenance,['schema'])||value.maintenance.schema!==MAINTENANCE_BINDING_SCHEMA||!Array.isArray(value.checks)||value.checks.length!==1
+      :!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
+        ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
+        ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!isCriterionId(locator.criterionId)
+        ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096)
     ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
     ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length
-    ||value.checks.some(check=>!validCheckForm(check)||!ID.test(check.id??'')||!normalizedPath(check.path)
+    ||value.checks.some(check=>!validCheckForm(check,{maintenance})||!ID.test(check.id??'')||!normalizedPath(check.path)
       ||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
       ||!check.dependencies.every(normalizedPath)||new Set(check.dependencies).size!==check.dependencies.length))return fail('NGHR-ITEM-DELIVERY-SHAPE');
   return {ok:true,code:'NGHR-ITEM-DELIVERY-VALID'};

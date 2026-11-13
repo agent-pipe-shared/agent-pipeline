@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, buildMaintenanceAcknowledgementSubject,
+import { CONFIGURED_VERIFY_CHECK, MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA, maintenanceCheckSpelling, parseMaintenanceCheckSpelling,MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, buildMaintenanceAcknowledgementSubject,
   describeMaintenanceCheck, maintenanceAcknowledgement, maintenanceCheckSha256, maintenanceChecksDigest, maintenanceReceiptSuite, maintenanceRedProof,
   maintenanceScopeRefusal, planApprovalCommit, preApprovalRedReceipt, readMaintenanceRedObservation, validMaintenanceBinding,
   writeMaintenanceRedObservation } from "./maintenance-delivery.mjs";
@@ -56,7 +56,24 @@ test("the kind is a critical action, the binding is closed and the receipt suite
   assert.equal(maintenanceReceiptSuite(configuredCheck), "configured-verify");
   assert.equal(maintenanceReceiptSuite({ id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }), null);
   assert.equal(describeMaintenanceCheck(configuredCheck), "the configured verify command");
-  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, dependencies: [...commandCheck.dependencies, "tests/x.test.mjs"] }));
+  // The identity is what runs: the dispatch id and the dependency list of a later binding never change it, so a check observed red
+  // before any binding exists is the same check the binding names. Another command, form or test file is another check.
+  assert.equal(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, id: "other", dependencies: [...commandCheck.dependencies, "tests/x.test.mjs"] }));
+  assert.equal(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ command: "docs" }));
+  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, command: "lint" }));
+  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256(configuredCheck));
+  assert.notEqual(maintenanceCheckSha256({ path: "tests/a.test.mjs" }), maintenanceCheckSha256({ path: "tests/b.test.mjs" }));
+  for (const notMaintenance of [{ id: "d", path: "docs/a.md", document: "docs/a.md", dependencies: ["docs/a.md"] }, { path: "src/app.ts" }, { verify: "other" }, null]) {
+    assert.equal(maintenanceCheckSha256(notMaintenance), null, JSON.stringify(notMaintenance));
+  }
+  assert.deepEqual([CONFIGURED_VERIFY_CHECK, "command:docs", "tests/a.test.mjs"].map(parseMaintenanceCheckSpelling),
+    [{ verify: "configured" }, { command: "docs" }, { path: "tests/a.test.mjs" }]);
+  for (const spelling of ["document:docs/a.md", "src/app.ts", "/abs/a.test.mjs", "../a.test.mjs", "a/./b.test.mjs", "command:", "verify:other", ""]) {
+    assert.equal(parseMaintenanceCheckSpelling(spelling), null, spelling);
+  }
+  for (const check of [commandCheck, configuredCheck, { id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }]) {
+    assert.equal(maintenanceCheckSha256(parseMaintenanceCheckSpelling(maintenanceCheckSpelling(check))), maintenanceCheckSha256(check), "the spelling round-trips");
+  }
 });
 
 test("the scope admits test and tooling paths only, never a gate-strength path or the approved specs", () => {

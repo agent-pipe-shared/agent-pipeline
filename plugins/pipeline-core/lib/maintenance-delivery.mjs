@@ -7,13 +7,14 @@
  *                                   derives the proof itself and never takes it from the briefing)
  *   maintenanceCheckSha256          the identity of the one red check (canonical JSON of the check object)
  *   maintenanceScopeRefusal         the narrow write scope: test- or tooling-shaped, never a gate-strength path, never under specs/
- *   red observation                 written by the binding generator after running the check on the clean HEAD of the real checkout,
- *                                   kept in private state under <git-common-dir>/agent-pipeline/maintenance/observations/
+ *   maintenanceCheckIdentity        what runs: { verify: "configured" }, { command } or { path } -- the key of the three records below
+ *   red observation                 written by maintenance-red-check.mjs observe after running the check on the clean HEAD of the real
+ *                                   checkout, kept in private state under <git-common-dir>/agent-pipeline/maintenance/observations/
  *   preApprovalRedReceipt           a sealed red Verify suite receipt at or before the plan-approval commit (the mechanical route)
  *   maintenanceAcknowledgement      the PO's acknowledgement (kind acknowledge-maintenance-red-check), the fallback route
  *   maintenanceRedProof             receipt first, then acknowledgement, else null
  *
- * Nothing here runs a check; the generator runs it and hands the result in.
+ * Nothing here runs a check; scripts/maintenance-red-check.mjs runs it and hands the result in.
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -59,8 +60,22 @@ export function isConfiguredVerifyCheck(check) {
   return object(check) && Object.hasOwn(check, "verify") && check.verify === "configured";
 }
 
+/**
+ * What runs when the check runs, without the dispatch-specific id and dependency list: `{ verify: "configured" }`, `{ command }` or
+ * `{ path }` (a .test file). The observation, the receipt route and the acknowledgement all key on it, so a check observed red before a
+ * binding exists is the same check the binding later names. A document check is never a maintenance check (null).
+ */
+export function maintenanceCheckIdentity(check) {
+  if (!object(check) || Object.hasOwn(check, "document")) return null;
+  if (isConfiguredVerifyCheck(check)) return { verify: "configured" };
+  if (typeof check.command === "string" && check.command !== "") return { command: check.command };
+  if (Object.hasOwn(check, "verify") || Object.hasOwn(check, "command")) return null;
+  return typeof check.path === "string" && CHECK_TEST_FILE.test(check.path) ? { path: check.path } : null;
+}
+
 export function maintenanceCheckSha256(check) {
-  return sha256(canonical(check));
+  const identity = maintenanceCheckIdentity(check);
+  return identity === null ? null : sha256(canonical(identity));
 }
 
 /** The Verify suite a check's red receipt is filed under, or null when the check form has no suite of its own. */
@@ -71,6 +86,8 @@ export function maintenanceReceiptSuite(check) {
 }
 
 const TEST_FILE = /(?:^|\/)[^/]+\.(?:test|spec)\.[A-Za-z0-9]+$/u;
+/** A .test file a check can name: the forms dispatch-briefing.mjs binds and `node --test` runs. */
+const CHECK_TEST_FILE = /\.test\.(?:mjs|cjs|js)$/u;
 const TOOLING_SEGMENTS = new Set(["test", "tests", "__tests__", "fixtures", "scripts", "tools"]);
 
 function gateStrengthRule(path) {
@@ -119,7 +136,8 @@ export function writeMaintenanceRedObservation({ commonDir, featureId, check, ca
     return { ok: false, code: "MAINTENANCE-OBSERVATION-INPUT" };
   }
   const checkSha256 = maintenanceCheckSha256(check);
-  const record = { schema: MAINTENANCE_RED_OBSERVATION_SCHEMA, featureId, check, checkSha256, candidate: { commit: candidate.commit, tree: candidate.tree },
+  if (checkSha256 === null) return { ok: false, code: "MAINTENANCE-OBSERVATION-CHECK" };
+  const record = { schema: MAINTENANCE_RED_OBSERVATION_SCHEMA, featureId, check: maintenanceCheckIdentity(check), checkSha256, candidate: { commit: candidate.commit, tree: candidate.tree },
     exitCode, signal: typeof signal === "string" ? signal : null, red: exitCode !== 0 || typeof signal === "string", outputSha256, observedAt };
   const directory = maintenanceObservationDirectory(commonDir);
   const path = join(directory, observationName(checkSha256, candidate.commit));
@@ -147,6 +165,7 @@ export function writeMaintenanceRedObservation({ commonDir, featureId, check, ca
 export function readMaintenanceRedObservation({ commonDir, check, candidate }) {
   if (typeof commonDir !== "string" || !object(check) || !object(candidate) || !OID.test(candidate.commit ?? "")) return null;
   const checkSha256 = maintenanceCheckSha256(check);
+  if (checkSha256 === null) return null;
   const path = join(maintenanceObservationDirectory(commonDir), observationName(checkSha256, candidate.commit));
   try {
     const info = lstatSync(path);
@@ -263,7 +282,7 @@ export function buildMaintenanceAcknowledgementSubject({ commonDir, root, featur
   const red = listMaintenanceRedObservations({ commonDir, featureId, candidate }).filter((record) => record.red);
   const open = red.filter((record) => maintenanceRedProof({ commonDir, root, featureId, approvalSha256, approvalCommit, check: record.check, runGit, ...(readApprovals ? { readApprovals } : {}) }) === null);
   if (open.length === 0) return { ok: false, code: "MRA-NOTHING-TO-ACKNOWLEDGE", detail: red.length === 0
-    ? "no red maintenance check is observed at the clean HEAD; generate the maintenance binding first (dispatch-briefing.mjs --maintenance), which runs and records the check"
+    ? "no red maintenance check is observed at the clean HEAD; observe it first (maintenance-red-check.mjs observe), which runs the check and records the result"
     : "every red maintenance check observed at the clean HEAD already has a proof" };
   const checks = open.map((record) => ({ checkSha256: record.checkSha256, check: record.check, observedExitCode: record.exitCode }))
     .sort((a, b) => (a.checkSha256 < b.checkSha256 ? -1 : a.checkSha256 > b.checkSha256 ? 1 : 0));
@@ -301,6 +320,7 @@ export function maintenanceAcknowledgementConfirmationLines(subject) {
     `feature: ${subject.featureId}`,
     ...subject.checks.slice(0, 16).map((entry) => `red check without a Spec criterion: ${describeMaintenanceCheck(entry.check)} (exit ${entry.observedExitCode ?? "signal"} at the clean HEAD)`),
     "this acknowledgement states that these checks were already red before the feature; a maintenance dispatch may then repair them in test or tooling paths only. It is recorded as \"red before the feature acknowledged by the PO\"; the Critic still reviews the fix.",
+    "scope: it holds for each listed check for the rest of this feature under this plan approval, also when the check turns red again later, so a later red of the same check needs no new acknowledgement; every repair still has to turn the check green (the configured verify at the feature close).",
   ];
 }
 
@@ -310,6 +330,23 @@ export function describeMaintenanceCheck(check) {
   if (object(check) && typeof check.command === "string") return `command:${check.command}`;
   if (object(check) && typeof check.document === "string") return `document:${check.document}`;
   return object(check) && typeof check.path === "string" ? check.path : "unknown check";
+}
+
+/** The --check spelling of a check (the one dispatch-briefing.mjs and maintenance-red-check.mjs take): verify:configured, command:<id> or the path. */
+export function maintenanceCheckSpelling(check) {
+  const identity = maintenanceCheckIdentity(check);
+  if (identity === null) return "<check>";
+  if (identity.verify === "configured") return CONFIGURED_VERIFY_CHECK;
+  return identity.command !== undefined ? `command:${identity.command}` : identity.path;
+}
+
+/** Parse a --check spelling into a check identity, or null. */
+export function parseMaintenanceCheckSpelling(spelling) {
+  if (typeof spelling !== "string" || spelling === "" || spelling.length > 1024) return null;
+  if (spelling === CONFIGURED_VERIFY_CHECK) return { verify: "configured" };
+  if (spelling.startsWith("command:")) return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(spelling.slice(8)) ? { command: spelling.slice(8) } : null;
+  if (spelling.includes(":") || spelling.startsWith("/") || spelling.includes("\\") || spelling.split("/").some((part) => part === "" || part === "." || part === "..")) return null;
+  return CHECK_TEST_FILE.test(spelling) ? { path: spelling } : null;
 }
 
 export function maintenanceAcknowledgementRepair({ stateWriter = "pipeline-state.mjs" } = {}) {
