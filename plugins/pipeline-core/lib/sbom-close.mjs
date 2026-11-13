@@ -6,7 +6,8 @@
  * and uses no network or package manager. It reads LOCKFILES (what is pinned), never resolves anything itself:
  *   npm (package-lock.json, npm-shrinkwrap.json), Python (poetry.lock, Pipfile.lock, pinned requirements.txt), Go (go.mod), Rust (Cargo.lock),
  *   and since candidate 28d (sbom-lockfile-readers.mjs) yarn, pnpm, bun, uv, Gradle, NuGet, Bundler, Composer, pub, SwiftPM, Mix, Conan,
- *   a committed CycloneDX file, and Maven pom.xml for its direct dependencies (partial unless a CycloneDX file of the build covers it).
+ *   a committed CycloneDX file, and Maven pom.xml for its direct dependencies (partial unless a CycloneDX file of the build covers it);
+ *   since candidate 28e the packages.config of a .NET Framework project.
  * A manifest without a lockfile, an unpinned requirement or a lockfile format this module has no reader for is NAMED as a finding of a typed
  * state (`partial`, `unsupported`, `invalid`, `stale`); every such finding BLOCKS the close, unless the PO's signed override for exactly those findings is recorded.
  * No component at all is an explicit `not-applicable` record with its reason, never an absent file.
@@ -17,7 +18,7 @@ import { generateNodeSbom, NODE_GRAPH_SCHEMA } from "./sbom-node-adapter.mjs";
 import { SBOM_LIFECYCLE_CODES } from "./sbom-manifest.mjs";
 import {
   mavenCoverage, parseBunLock, parseCargoLock, parseComposerLock, parseConanLock, parseCycloneDx, parseGemfileLock, parseGradleLockfile, parseMixLock,
-  parseNugetLock, parsePackageResolved, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock,
+  parseNugetLock, parsePackageResolved, parsePackagesConfig, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock,
 } from "./sbom-lockfile-readers.mjs";
 
 export const SBOM_CLOSE_RECORD_SCHEMA = "pipeline.sbom-close-record.v1";
@@ -31,7 +32,7 @@ const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex")
 // Paths holding fixtures, vendored code, generated output or the pipeline's own working files are not the project's dependencies.
 const IGNORED_SEGMENTS = new Set(["node_modules", "vendor", "third_party", "fixtures", "fixture", "__fixtures__", "testdata", "scratch", "specs", "docs", "examples", ".claude", ".git", "dist", "build", "target", ".venv", "venv"]);
 // Dependency inputs no reader exists for yet (candidate 28d moved every other name of the first list to a reader).
-const UNSUPPORTED_NAMES = new Set(["bun.lockb", "Podfile", "Podfile.lock", "build.sbt", "packages.config", "paket.lock", "pdm.lock", "pylock.toml", "vcpkg.json"]);
+const UNSUPPORTED_NAMES = new Set(["bun.lockb", "Podfile", "Podfile.lock", "build.sbt", "paket.lock", "pdm.lock", "pylock.toml", "vcpkg.json"]);
 
 const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
 const dirOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
@@ -126,6 +127,8 @@ export const SBOM_READERS = Object.freeze({
   "gradle.lockfile": parseGradleLockfile, "buildscript-gradle.lockfile": parseGradleLockfile, "packages.lock.json": parseNugetLock,
   "Gemfile.lock": parseGemfileLock, "gems.locked": parseGemfileLock, "composer.lock": parseComposerLock, "pubspec.lock": parsePubspecLock,
   "Package.resolved": parsePackageResolved, "mix.lock": parseMixLock, "conan.lock": parseConanLock, "pom.xml": parsePomXml, "bom.json": parseCycloneDx,
+  // Candidate 28e.
+  "packages.config": parsePackagesConfig,
 });
 // Readers chosen by a path pattern instead of an exact file name (a pattern row, still not a branch elsewhere).
 const SBOM_READER_PATTERNS = Object.freeze([[/\.cdx\.json$/u, parseCycloneDx, "CycloneDX"], [/(?:^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/u, parseGradleLockfile, "Gradle dependency-locks"]]);
@@ -239,7 +242,7 @@ export function sbomFindingHelp(item) {
     if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (the cyclonedx-maven-plugin, goal makeAggregateBom or makeBom, writes bom.json into target/ by default, which the close does not read: set outputDirectory to ${project.basedir}), commit it next to pom.xml or in a parent directory, make sure it lists every direct dependency of this pom outside the test scope, and run the close again. Otherwise the PO signs the override.";
     if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking for every project (allprojects { dependencyLocking { lockAllConfigurations() } }), write the locks of each project (gradle dependencies --write-locks runs for the root project only; run it per subproject or with a task that resolves all configurations), commit each project's gradle.lockfile next to its build file, and run the close again.";
     if (PROJECT_FILE.test(name)) return "Enable the NuGet lockfile (<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>), restore once, commit packages.lock.json next to the project file, and run the close again.";
-    return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
+    return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, packages.config, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
   }
   if (item.state === "stale") return "The recorded SBOM no longer matches the lockfiles. Remove the sbom directory named in the finding (the close writes a fresh one from the current lockfiles) and run the close again.";
   return "Repair or remove the named file, then run the close again.";

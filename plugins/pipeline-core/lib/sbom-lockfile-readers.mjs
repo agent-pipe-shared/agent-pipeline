@@ -321,6 +321,24 @@ export function parseNugetLock(text, path) {
   return { components: dedupe(out), issues: [] };
 }
 
+/**
+ * C28e (PO tile 2026-11-12): the packages.config of a .NET Framework project lists every package it restores, the transitive ones included,
+ * each with one exact version; `developmentDependency="true"` marks a package used only at build time. No entry carries a source URL.
+ */
+export function parsePackagesConfig(text) {
+  const body = text.replace(/<!--[\s\S]*?-->/gu, "");
+  if (!/<packages[\s/>]/u.test(body)) throw new Error("not a NuGet packages.config");
+  const out = [];
+  for (const match of body.matchAll(/<package\b([^>]*)>/gu)) {
+    const attr = (key) => new RegExp(`(?:^|\\s)${key}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "u").exec(match[1])?.slice(1).find((value) => value !== undefined);
+    const id = attr("id"); const version = attr("version");
+    if (!id || !version) throw new Error("a package without an id and a version");
+    if (!/^\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(version)) throw new Error(`${short(id)}: ${short(version)} is not an exact NuGet version`);
+    out.push(component("nuget", "nuget", id, version, attr("developmentDependency") === "true" ? "dev" : "required"));
+  }
+  return { components: dedupe(out), issues: [] };
+}
+
 export function parseGemfileLock(text, path) {
   const out = []; const issues = []; let section = null; let inSpecs = false; let sawSection = false;
   for (const line of text.split(/\r?\n/u)) {

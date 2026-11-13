@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   mavenCoverage, parseBunLock, parseCargoLock, parseComposerLock, parseConanLock, parseCycloneDx, parseGemfileLock, parseGradleLockfile, parseMixLock,
-  parseNugetLock, parsePackageResolved, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock, readPomDependencies,
+  parseNugetLock, parsePackageResolved, parsePackagesConfig, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock, readPomDependencies,
 } from "./sbom-lockfile-readers.mjs";
 import { SBOM_READERS, closeSbom, observeSbomInputs, sbomFindingHelp } from "./sbom-close.mjs";
 
@@ -392,6 +392,29 @@ test("packages.lock.json (NuGet): every target framework is read once, project r
   assert.throws(() => parseNugetLock(JSON.stringify({ version: 1, dependencies: { "net8.0": { X: { type: "Direct" } } } }), "packages.lock.json"), /without a resolved version/u);
 });
 
+const PACKAGES_CONFIG = `<?xml version="1.0" encoding="utf-8"?>
+<packages>
+  <!-- <package id="Commented.Out" version="1.0.0" targetFramework="net48" /> -->
+  <package id="Newtonsoft.Json" version="13.0.3" targetFramework="net48" />
+  <package targetFramework="net48" version='4.5.5' id='System.Memory' />
+  <package id="Microsoft.Net.Compilers" version="4.2.0" targetFramework="net48" developmentDependency="true" />
+  <package id="EntityFramework" version="6.4.4.1" targetFramework="net472" allowedVersions="[6,7)" />
+</packages>
+`;
+
+test("C28e: packages.config (.NET Framework) lists every package with one exact version; a development dependency is dev", () => {
+  const result = parsePackagesConfig(PACKAGES_CONFIG, "Legacy/packages.config");
+  assert.deepEqual(scoped(result), [["pkg:nuget/Newtonsoft.Json@13.0.3", "required"], ["pkg:nuget/System.Memory@4.5.5", "required"], ["pkg:nuget/Microsoft.Net.Compilers@4.2.0", "dev"], ["pkg:nuget/EntityFramework@6.4.4.1", "required"]]);
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(parsePackagesConfig("<packages />", "packages.config"), { components: [], issues: [] });
+  assert.throws(() => parsePackagesConfig('<packages><package id="X" version="[1.0,2.0)" /></packages>', "packages.config"), /not an exact NuGet version/u);
+  assert.throws(() => parsePackagesConfig('<packages><package id="X" /></packages>', "packages.config"), /without an id and a version/u);
+  assert.throws(() => parsePackagesConfig("<configuration />", "packages.config"), /not a NuGet packages.config/u);
+  const seen = observe({ "Legacy/packages.config": PACKAGES_CONFIG, "Legacy/Legacy.csproj": '<Project ToolsVersion="15.0"><ItemGroup><Reference Include="Newtonsoft.Json"><HintPath>..\\packages\\Newtonsoft.Json.13.0.3\\lib\\net45\\Newtonsoft.Json.dll</HintPath></Reference></ItemGroup></Project>' });
+  assert.deepEqual(seen.findings, [], "packages.config is read, no longer unsupported");
+  assert.equal(seen.components.length, 4);
+});
+
 const GEMFILE_LOCK = `GIT
   remote: https://secret@example.invalid/mine.git
   revision: abc
@@ -513,7 +536,7 @@ test("conan.lock: the 0.5 reference lists and the 0.4 graph, build requirements 
 });
 
 test("the close finds each reader by file name or path pattern, and a manifest with its lockfile is no finding", () => {
-  for (const name of ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "uv.lock", "gradle.lockfile", "packages.lock.json", "Gemfile.lock", "gems.locked", "composer.lock", "pubspec.lock", "Package.resolved", "mix.lock", "conan.lock", "pom.xml", "bom.json"]) assert.equal(typeof SBOM_READERS[name], "function", name);
+  for (const name of ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "uv.lock", "gradle.lockfile", "packages.lock.json", "packages.config", "Gemfile.lock", "gems.locked", "composer.lock", "pubspec.lock", "Package.resolved", "mix.lock", "conan.lock", "pom.xml", "bom.json"]) assert.equal(typeof SBOM_READERS[name], "function", name);
   const seen = observe({
     "package.json": JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }), "pnpm-lock.yaml": PNPM_9.replace(/\n {2}mine@[\s\S]*?version: 0\.0\.1\n/u, "\n"),
     "svc/Service.csproj": '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup></Project>', "svc/packages.lock.json": NUGET_LOCK,
@@ -593,7 +616,7 @@ test("C28e: a UTF-8 byte-order mark and CRLF line ends read exactly like the pla
     "Cargo.lock": CARGO_LOCK, "poetry.lock": POETRY_LOCK, "f/uv.lock": UV_LOCK, "gradle.lockfile": GRADLE_LOCK, "packages.lock.json": NUGET_LOCK, "Gemfile.lock": GEMFILE_LOCK,
     "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK, "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX,
     "g/conan.lock": JSON.stringify({ version: "0.5", requires: ["zlib/1.3#x"], build_requires: [], python_requires: [] }, null, 2),
-    "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
+    "j/packages.config": PACKAGES_CONFIG, "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
   const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `﻿${text.replace(/\r?\n/gu, "\r\n")}`]));
   const plain = observe(files); const crlf = observe(windows);
   assert.ok(plain.components.length >= 25);
