@@ -117,7 +117,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
   "",
   "Spec addendum route (ADR-0095; a Critic finding needs a Spec correction inside the approved criteria):",
-  "  1. Write specs/<feature>/spec-addendum-<NN>.md (header: Base Spec, Critic packet, Findings) and commit it alone.",
+  "  1. The round's lineage is registered and committed (route above). Then write specs/<feature>/spec-addendum-<NN>.md (header: Base Spec, Critic packet, Findings) and commit it alone.",
   "  2. The PO approves it: pipeline-state.mjs approve-spec-addendum --by <label the PO gives> --addendum <path> (signature mode prints the signing step first).",
   "  3. Register it: register-feature-package.mjs --root <root> --add-spec-addendum specs/<feature>/evidence/spec-addendum-approval-<sha256>.json",
   "  4. Commit the manifest and the record in one commit, then correct the code; the next Critic round is a delta round that covers the addendum.",
