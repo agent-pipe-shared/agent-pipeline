@@ -13025,6 +13025,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         // K128 (PO decision 2026-10-23, batch 12, row 41): a receipt produced on the typed fallback route is named here, so the
         // presented plan never passes a single-review fallback off as an independent native review.
         for (const entry of approvalReview.reviewReceipts) {
+          // D247 (PO tile 2026-11-13, label per runner): each round names how its reviewer model is known, before the PO signs.
+          // Read from the receipt itself; the binding summary never carries it, so the signed bytes are unchanged.
+          if (entry.fallback === undefined) {
+            const line = designReviewObservationLine(dir, entry.path);
+            if (line !== null) console.log(line);
+          }
           if (entry.fallback !== undefined) console.log(`Review route: ${entry.path} ran on the fallback-self-dispatch route (${entry.fallback.reasonCode}; requested ${entry.fallback.requestedRoute}, observed ${entry.fallback.observedIdentity}) -- a single-review fallback, not an independent native review.`);
         }
         console.log("Complete bounded design-workflow review (still pending PO approval):");
@@ -16348,4 +16354,22 @@ export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = 
       authoritySha256:sha256CanonicalJson(authority.value),approvalBasis,
       sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
   } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE", error?.windowsAuthorityCause); } // AC-140: keep the typed source failure
+}
+
+/**
+ * D247 (PO tile 2026-11-13, label per runner): the present-plan line that names how one review round's reviewer model is
+ * known -- observed by the host, or unobserved on a runner with no observation route. Read from the receipt file itself; an
+ * unreadable receipt prints nothing here (the entry gate has already refused anything that matters).
+ */
+function designReviewObservationLine(dir, receiptPath) {
+  try {
+    const parsed = parseDesignReviewReceipt(readFileSync(join(dir, receiptPath)));
+    if (!parsed.ok) return null;
+    const receipt = parsed.receipt;
+    const head = `Reviewer model: ${receiptPath} (round ${receipt.round}, ${receipt.reviewer.runner})`;
+    if (isHostObservedDesignReview(receipt)) return `${head}: ${receipt.reviewer.model}, ${receipt.reviewerObservation.assurance} -- observed by the host, not attested by the provider.`;
+    const why = DESIGN_REVIEW_OBSERVATION_RUNNERS.includes(receipt.reviewer.runner)
+      ? "not observed by the host" : `unobserved -- this runner has no host observation route; the receipt names ${receipt.reviewer.model}`;
+    return `${head}: ${why}.`;
+  } catch { return null; }
 }

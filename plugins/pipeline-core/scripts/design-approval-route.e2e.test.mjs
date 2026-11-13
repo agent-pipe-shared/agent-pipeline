@@ -164,6 +164,10 @@ const originalDesignCases = [
   {
     "id": "DABX017",
     "name": "D247: the named route completes: hook observation, export-report and create stamp the observed model, and present-plan hands over the signing step"
+  },
+  {
+    "id": "DABX018",
+    "name": "D247: a Codex review round is presented with its visible unobserved label, and the signed binding is unchanged"
   }
 ];
 const designCompletionCases = [];
@@ -447,7 +451,7 @@ function continuityRequest(authority) {
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
 const MOVED_DIR = "specs/e2e-moved";
-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false } = {}) {
+async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false, reviewerRunner = "claude" } = {}) {
   stateModule ??= await import(pathToFileURL(CLI).href);
   const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
@@ -555,13 +559,15 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
     featureId: FEATURE_ID,
     previous: null,
     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
-    reviewer: { runner: "claude", model: "claude-opus-4" },
+    reviewer: { runner: reviewerRunner, model: reviewerRunner === "claude" ? "claude-opus-4" : "unknown" },
     report: sourceFor(REPORT_PATH),
     openFindingIds,
     reviewedAt: "2026-10-09T09:00:00.000Z",
     ...(fallback === undefined ? {} : { fallback }),
     // D247: a native Claude review round carries the host's observation of its reviewer (export-report + create); `observed: false` is a round without one.
-    ...(fallback === undefined && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
+    // A runner without an observation route (`reviewerRunner: "codex"`) carries the visible `unobserved` label, as create writes it.
+    ...(fallback === undefined && reviewerRunner !== "claude" ? { reviewerObservation: { assurance: "unobserved", modelsUsed: [], resultSha256: null } } : {}),
+    ...(fallback === undefined && reviewerRunner === "claude" && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
   });
   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
   if (!hostRoute) writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
@@ -829,7 +835,20 @@ test("D247: the named route completes: hook observation, export-report and creat
   const presented = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
   assert.equal(presented.status, 0, `present-plan over an observed receipt must exit 0; stderr: ${presented.stderr}`);
   assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
+  assert.match(presented.stdout, /Reviewer model: \S+design-review-receipt-1\.json \(round 1, claude\): claude-opus-4, host-observed-child-transcript -- observed by the host, not attested by the provider\./u,
+    "the PO sees how the reviewer model is known before signing");
   // The binding never carries the observation: approval bytes are those of a receipt without it.
+  const requestPath = requestPathOf(posixSigningCommands(presented.stdout)[0]);
+  assert.equal("reviewerObservation" in JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0], false);
+});
+
+test("D247: a Codex review round is presented with its visible unobserved label, and the signed binding is unchanged", async () => {
+  const fx = await buildSubmittedFeature("route-codex-unobserved", { reviewerRunner: "codex" });
+  await bindRouteOwner(fx);
+  const presented = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+  assert.equal(presented.status, 0, `present-plan over a Codex receipt must exit 0; stderr: ${presented.stderr}`);
+  assert.match(presented.stdout, /Reviewer model: \S+design-review-receipt-1\.json \(round 1, codex\): unobserved -- this runner has no host observation route; the receipt names unknown\./u);
+  assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
   const requestPath = requestPathOf(posixSigningCommands(presented.stdout)[0]);
   assert.equal("reviewerObservation" in JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0], false);
 });
