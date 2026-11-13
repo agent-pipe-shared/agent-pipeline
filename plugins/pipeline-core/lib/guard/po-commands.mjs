@@ -63,6 +63,16 @@ export function isAgentPoPublicCommand(command, root) {
     && externalApprovalDirectory(args, root, 3)) {
     return args.length === 5 || (feature(5) && args.length === 7);
   }
+  // Candidate 29 (Codex greenfield run 3, C5): `verify-critical` is the public readback of a prepared critical-action
+  // request and its proof, exactly like `verify`; it writes nothing (only setup/prepare/approve write). It was refused
+  // as GUARD-CROSS-REPO-MUTATION with a signature override offered for a read. Same exact shape as `verify`, plus the
+  // one `--kind <word>` pair the script requires; the script itself validates the kind vocabulary.
+  if (args[0] === "verify-critical"
+    && args[1] === "--repo-root" && args[2] === root
+    && externalApprovalDirectory(args, root, 3)
+    && args[5] === "--kind" && /^[a-z][a-z-]{0,63}$/u.test(args[6] ?? "")) {
+    return args.length === 7;
+  }
   return false;
 }
 

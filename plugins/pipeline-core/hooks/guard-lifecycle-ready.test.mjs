@@ -43,6 +43,7 @@ import {
   evaluateLifecycleReadyGuard,
   gateStrengthShellNeedleFor,
   governanceMarkers,
+  isAgentPoPublicCommand,
   isClaudeSessionMemoryWritePath,
   isForbiddenCrossRepositoryMutation,
   isMachinePlaneWritePath,
@@ -1082,6 +1083,44 @@ test("po-approval-gate --help and --version are read-only, never a forbidden cro
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// Candidate 29 (Codex greenfield run 3, C5): `po-approval-gate.mjs verify-critical` is public readback of a prepared
+// critical-action request and its proof; it writes nothing. It was refused as GUARD-CROSS-REPO-MUTATION with a signature
+// override offered for a read. Only the exact verify shape plus one `--kind <word>` pair is admitted; prepare-critical,
+// an extra argument, a missing kind or an in-root directory still hit the blanket refusal.
+test("po-approval-gate verify-critical is agent readback, never a forbidden cross-repository mutation", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-verify-critical-"));
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind push`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind release-preflight`,
+    ]) {
+      assert.equal(isAgentPoPublicCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external}`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind push --extra x`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind --help`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${join(path, "scratch")} --kind push`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare-critical --repo-root ${path} --directory ${external} --kind push`,
+    ]) {
+      assert.equal(isAgentPoPublicCommand(command, path), false, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
 });
 
 test("cachebuster is source-root scoped while plugin installation remains operator-only", () => {
