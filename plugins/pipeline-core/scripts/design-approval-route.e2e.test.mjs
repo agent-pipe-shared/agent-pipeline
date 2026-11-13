@@ -144,6 +144,10 @@ const originalDesignCases = [
   {
     "id": "DABX012",
     "name": "rebind 4: a request created after the move is signed and approved by the real route"
+  },
+  {
+    "id": "DABX013",
+    "name": "C28e (Codex test run): present-plan names a trust policy that is not in the commit the request would bind, and writes no request"
   }
 ];
 const designCompletionCases = [];
@@ -155,7 +159,7 @@ function test(name, run) {
 
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
-import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -427,7 +431,7 @@ function continuityRequest(authority) {
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
 const MOVED_DIR = "specs/e2e-moved";
-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false } = {}) {
+async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false } = {}) {
   stateModule ??= await import(pathToFileURL(CLI).href);
   const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
@@ -528,7 +532,8 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
     trustAnchors: [{ keyReference: fx.signer.keyReference, publicKeySha256: sha256(publicKeyPem) }],
   }, null, 2)}\n`);
 
-  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, "project/critical-human-proof.json", "specs/e2e/acceptance.md", "specs/e2e/result.md");
+  // C28e (Codex test run): `proofUncommitted` leaves the trust policy in the working tree only, the state that cost a second signature.
+  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, ...(proofUncommitted ? [] : ["project/critical-human-proof.json"]), "specs/e2e/acceptance.md", "specs/e2e/result.md");
   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
   // Folder rebind (Phoenix Wanted 4, slice 3): the reviewed sources move to another registrar-valid feature folder; the review
   // receipt and report stay where they are (default pending PO). `changeByte` appends one byte to the PRD after the move.
@@ -549,6 +554,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
   // The real submit-plan refuses a governed root whose architecture is not ready (D165-S4): materialize the sanctioned design package.
   materializeArchitectureDesignFixture({ rootDir: dir, planPath, sourcePath: "src/index.mjs", decisionRef: "TEST-DAR-ROUTE", by: "Design route fixture PO" });
   git(dir, "add", "-A");
+  if (proofUncommitted) git(dir, "reset", "-q", "--", "project/critical-human-proof.json");
   git(dir, "commit", "-q", "-m", "fixture: architecture design package");
 
   const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", planPath]);
@@ -715,6 +721,24 @@ test("route 1: present-plan --review-receipt accepts finished sources and hands 
   const requestPath = requestPathOf(fallbackCommands[0]);
   assert.ok(requestPath !== null && existsSync(requestPath), "the fallback route hands over the same ready sign command");
   assert.deepEqual(JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0].fallback, fallback, "the PO's signed binding names the fallback");
+});
+
+// C28e (Codex test run): approve-plan read the trust policy from the signed commit, where it was missing; the refusal came only after
+// the signature (CAC-SOURCE-UNAVAILABLE, no path) and cost a second one. present-plan now names the file before a request exists.
+test("C28e (Codex test run): present-plan names a trust policy that is not in the commit the request would bind, and writes no request", async () => {
+  const fx = await buildSubmittedFeature("route-proof-uncommitted", { proofUncommitted: true });
+  await bindRouteOwner(fx);
+  const refused = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+  assert.equal(refused.status, 2, `present-plan must refuse; stdout: ${refused.stdout}; stderr: ${refused.stderr}`);
+  assert.match(refused.stderr, /DAB-CANDIDATE-FILE-MISSING/u);
+  assert.match(refused.stderr, /project\/critical-human-proof\.json/u);
+  assert.match(refused.stderr, /git add -- project\/critical-human-proof\.json/u);
+  assert.equal(posixSigningCommands(refused.stdout).length, 0, "no signing command is handed over");
+  const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
+  assert.deepEqual(requests, [], "no approval request is written");
+  // The repaired state (the same fixture with the policy committed) is route 1/2: present-plan hands over one signing step there. A
+  // commit inside this fixture would move the HEAD the route owner is bound to (SDC-ROOT repository-binding-changed), so it is not
+  // repeated here.
 });
 
 test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {

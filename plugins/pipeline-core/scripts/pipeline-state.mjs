@@ -10456,6 +10456,17 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
       if (Array.isArray(inputs.inconsistencies)) return inputs.inconsistencies.map(dcc);
       return { code: inputs.code, message: inputs.message ?? null, repair: entryGateRepair(inputs.code) };
     } },
+    // C28e (Codex test run): approve-plan later reads the approval policy, the PRD, the Spec, the companions and the review receipts
+    // from the commit the request binds. A file that exists only in the working tree surfaced only after the signature
+    // (CAC-SOURCE-UNAVAILABLE) and cost a second one; each such file is named here, before a request exists.
+    { id: "candidate-sources", run: () => {
+      const candidate = designWorkflowGitCandidate(dir, deps);
+      if (!candidate || !(deps.gitCandidateAt ?? acceptedCandidateAt)({ dir, candidate })?.ok) return null;
+      const policyPath = approvalMode?.mode === "chat" ? "pipeline.user.yaml" : "project/critical-human-proof.json";
+      const current = sources();
+      const paths = [policyPath, ...(current ? [current.prd.path, current.spec.path, ...current.companions.map((entry) => entry.path)] : []), ...reviewPaths];
+      return designCandidateSourceGaps(dir, candidate, [...new Set(paths)], deps);
+    } },
     { id: "decision-bindings", run: () => {
       if (sources() === null) return null;
       decisionDraft = inspectDesignDecisionBindingsDraft({ rootDir: dir, sources: sources() });
@@ -10534,6 +10545,28 @@ function acceptedCandidateFile({dir,candidate,path}) {
   const result = spawnSync("git",["show",candidate.commit + ":" + path],{cwd:dir,maxBuffer:1048576});
   if (result.status !== 0) throw Error("original source unavailable");
   return result.stdout;
+}
+/**
+ * The files the accepted delivery contract later reads from the request's commit, checked before the request exists: each one
+ * must be in that commit and byte-equal to the working tree. Returns null when all are, otherwise one entry per file
+ * (DAB-CANDIDATE-FILE-MISSING: not in the commit; DAB-CANDIDATE-FILE-DRIFT: committed bytes differ from the working tree).
+ */
+function designCandidateSourceGaps(dir, candidate, paths, deps = {}) {
+  const readCommitted = deps.readCandidateFile ?? acceptedCandidateFile;
+  const gaps = [];
+  for (const path of paths) {
+    let committed = null;
+    try { committed = Buffer.from(readCommitted({ dir, candidate, path })); } catch { committed = null; }
+    const physical = physicalRebindFile(dir, path);
+    if (committed === null) {
+      gaps.push({ code: "DAB-CANDIDATE-FILE-MISSING", path, message: `${path} is not in the commit the approval request binds (${candidate.commit.slice(0, 12)}); approve-plan reads it from there`,
+        repair: `Commit ${path} (git add -- ${path}, then git commit), then run present-plan again: the request binds HEAD.` });
+    } else if (!physical || !Buffer.from(physical.bytes).equals(committed)) {
+      gaps.push({ code: "DAB-CANDIDATE-FILE-DRIFT", path, message: `${path} in the working tree differs from the committed bytes approve-plan will read`,
+        repair: `Commit the current ${path} or restore the committed one, then run present-plan again.` });
+    }
+  }
+  return gaps.length > 0 ? gaps : null;
 }
 function acceptedCandidateAt({dir,candidate}) {
   const result = spawnSync("git",["rev-parse",candidate.commit,candidate.commit + "^{tree}"],{cwd:dir,encoding:"utf8"});
@@ -10636,9 +10669,11 @@ function persistAcceptedContractEnvelope({dir,path,sha256,envelope}) {
 function acceptedContractPolicyBinding(dir,request,mode) {
   const path = mode === "chat" ? "pipeline.user.yaml" : "project/critical-human-proof.json";
   const candidate = request.approvalIntent.value.candidate;
-  const bytes = acceptedCandidateFile({dir,candidate,path});
+  let bytes;
+  try { bytes = acceptedCandidateFile({dir,candidate,path}); }
+  catch { throw Object.assign(Error(`${path} is not in the signed candidate commit ${String(candidate?.commit).slice(0,12)}`),{candidatePath:path}); }
   const physical = physicalRebindFile(dir,path);
-  if (!physical || !Buffer.from(physical.bytes).equals(Buffer.from(bytes))) throw Error("approval policy drift");
+  if (!physical || !Buffer.from(physical.bytes).equals(Buffer.from(bytes))) throw Object.assign(Error(`${path} in the working tree differs from the signed candidate commit`),{candidatePath:path});
   return {path,blobOid:acceptedContractBlob(bytes,candidate.commit.length),sha256:sha256Bytes(bytes),mode};
 }
 
@@ -13143,7 +13178,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           return 2;
         }
       }
-      let sealRefusal = null;
+      let sealRefusal = null, contractRefusal = null;
       let designRead = null;
       if (advisorRequired) {
         if (approvalFlags["design-approval-request"] !== base.planPresentation.designApprovalRequestPath) { console.error("DAB-REQUEST-PATH: use present-plan --review-receipt"); return 2; }
@@ -13280,7 +13315,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
               acceptedCapture = prepareAcceptedContractCapture({state:observed,expectedStateSha256:sha256CanonicalJson(observed),approval:transition.approval,envelope:made.envelope});
               if (!acceptedCapture.ok) return acceptedCapture;
               transition.state = acceptedCapture.state; transition.approval = acceptedCapture.state.planApproval;
-            } catch { return {ok:false,code:"CAC-SOURCE-UNAVAILABLE"}; }
+            } catch (error) { if (typeof error?.candidatePath === "string") contractRefusal = error.message; return {ok:false,code:"CAC-SOURCE-UNAVAILABLE"}; }
           }
           return transition.ok
             ? {
@@ -13327,6 +13362,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       });
       if (!stateWriteSucceeded(written)) {
         if (sealRefusal !== null) { printSealRefusal("approve-plan", sealRefusal); console.error("No approval was recorded and nothing was sealed."); return 2; }
+        if (contractRefusal !== null) {
+          console.error(`Error: approve-plan failed before commit (${written.code}): ${contractRefusal}; no approval was recorded.`);
+          console.error("The signature binds that commit, so a new commit needs a new request: commit the file, run present-plan again, and the PO signs the new request. present-plan of this build checks this before a request exists.");
+          return 2;
+        }
         console.error(`Error: approve-plan authority or v2 transition failed before commit (${written.code}); no approval was recorded.`);
         return 2;
       }
