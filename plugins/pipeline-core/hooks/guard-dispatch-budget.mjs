@@ -583,6 +583,15 @@ function ownedCriticNotesPath(identity) {
   return CRITIC_NOTES_PATTERN.test(path) ? path : null;
 }
 
+/** P3-2: the notice a Critic gets on its first two counted calls, naming its one writable file; null for every other call or role. */
+export function criticNotesNotice(identity, count) {
+  if (!Number.isInteger(count) || count < 1 || count > 2) return null;
+  const notesPath = ownedCriticNotesPath(identity);
+  if (notesPath === null) return null;
+  return `CRITIC-NOTES-PATH: your one writable file is ${notesPath} (Write or Edit, that exact path; its directory is created on the first write). `
+    + "Every other path is read-only for you, and no other notes directory exists. Notes are optional: you may return the report as text.";
+}
+
 function isOwnedCriticNotesTarget(input, rootDir, identity, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   if (toolName !== "Write" && toolName !== "Edit") return false;
@@ -1480,7 +1489,11 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
     }
     // D75 B / PF-64 cause 2: the hook itself announces a verified recorded grant on the first three counted calls after it
     // (another hook's denial can drop one announcement, so it is not once-only).
-    const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), dependencies });
+    const grantNotice = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), dependencies });
+    // P3-2 (Claude run 3): a Critic guessed a notes directory (reads refused by its binding, writes confined) because its one
+    // writable path was only named in a refusal. The first two counted calls name it (another hook's denial can drop one).
+    const notesNotice = criticNotesNotice(identity, budget.nextCount);
+    const grantContext = [grantNotice, notesNotice].filter((text) => text !== null).join("\n") || null;
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
     const checkpoint = contract.applicable

@@ -2481,6 +2481,15 @@ test("CRITIC-CKPT-T3 (a): a Critic Write and a Critic Edit of scratch/dispatch/c
   }
 });
 
+test("P3-2: the Critic's first two counted calls name its one writable notes file; the third does not", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(3)]));
+  assert.ok(results.every((verdict) => verdict.exitCode === 0), "three working reads are admitted");
+  for (const index of [0, 1]) {
+    assert.match(results[index].stdout, /CRITIC-NOTES-PATH: your one writable file is scratch\/dispatch\/critic-abc123\/critic-notes\.md/u, `call ${index + 1}: ${results[index].stdout}`);
+  }
+  assert.doesNotMatch(results[2].stdout, /CRITIC-NOTES-PATH/u, "the third call carries no notes notice");
+});
+
 for (const [label, tool, call] of [["b", "Write", 1], ["c", "Write", 20], ["d", "Edit", 1], ["e", "Edit", 20]]) {
   test(`CRITIC-CKPT-T3 (${label}): a Critic ${tool} of any path but its notes file is refused with a typed code at call ${call}, before the cap`, () => {
     ckpt3AssertConfined(call, CKPT3_REFUSED_PATHS.map((path) => [tool, path]));
