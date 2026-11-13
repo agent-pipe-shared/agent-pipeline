@@ -608,6 +608,45 @@ test("16c the close commit and handover-only commits carry the Critic; any sourc
   const link = closeCommitAt("a symlink named like a document", () => symlinkSync("../src/app.js", join(root, "docs/linked.md")));
   assert.equal(courseAdmission.criticCloseCommit(root, link.commit, featureId), false, "a symlink is not a document");
   assert.equal(courseAdmission.criticCloseCommit(root, reviewed.commit, featureId), false, "the root commit has no single parent");
+
+  // Candidate 28e (Antigravity test run 2026-11-12): the one-shot close exports the missing Critic rounds itself, inside the one close
+  // commit (PO tile 2026-11-10). A receipt-bound export there carries; refusing it made the printed push-evidence command fail with
+  // VEP-CVL-CARRY-CONTENT-CHANGED. A forged, partial or extra export file in a close commit still ends the classification.
+  const dir = `specs/${featureId}/evidence/critic/${read.receipt.packetId}`;
+  const exportFiles = ({ receiptBytes = canonicalJson(read.receipt), report = "# Critic notes\n\nNo findings.\n", index = {}, skip = null, extra = null } = {}) => {
+    const files = {
+      "receipt.json": receiptBytes,
+      "report.md": report,
+      "index.json": canonicalJson({ schema: "pipeline.session-critic-evidence-index.v1", packetId: read.receipt.packetId,
+        candidate: { commit: reviewed.commit, tree: reviewed.tree }, receiptSha256: sha256(receiptBytes), reportSha256: sha256(report),
+        reviewPass: true, findingCount: 0, ...index }),
+    };
+    for (const [name, text] of Object.entries(files)) if (name !== skip) writeAt(`${dir}/${name}`, text);
+    if (extra) writeAt(`${dir}/${extra}`, "extra\n");
+  };
+  const oneShotClose = closeCommitAt("the one-shot close commit with its own Critic export", () => {
+    writeAt("docs/state.md", "# State\n\nClosed.\n");
+    writeAt(`audit-bundles/${featureId}/${reviewed.commit}/manifest.json`, "{}\n");
+    writeAt(`specs/${featureId}/evidence/verify-latest.json`, "{}\n");
+    writeAt(`specs/${featureId}/evidence/sbom/record.json`, "{}\n");
+    exportFiles();
+  });
+  assert.equal(courseAdmission.criticCloseCommit(root, oneShotClose.commit, featureId, deps.readConsumedCandidateReceiptFn), true,
+    "a receipt-bound export inside the close commit is close evidence");
+  assert.deepEqual(carry(oneShotClose).proof.evidenceOnlyCommits, [oneShotClose.commit], "the push carry-forward passes over the one-shot close commit");
+  assert.equal(courseAdmission.criticCloseCommit(root, oneShotClose.commit, featureId), false,
+    "without the consumed receipt in the packet store the export is not bound");
+  const forged = {
+    "an export whose receipt bytes are not the consumed receipt": () => exportFiles({ receiptBytes: canonicalJson({ ...read.receipt, findingCount: 7 }) }),
+    "an export without its index": () => exportFiles({ skip: "index.json" }),
+    "an export with an extra file": () => exportFiles({ extra: "notes.md" }),
+    "an export whose index claims a different pass": () => exportFiles({ index: { reviewPass: false } }),
+  };
+  for (const [name, edit] of Object.entries(forged)) {
+    const commit = closeCommitAt(name, () => { writeAt("docs/state.md", "# State\n\nClosed.\n"); edit(); });
+    assert.equal(courseAdmission.criticCloseCommit(root, commit.commit, featureId, deps.readConsumedCandidateReceiptFn), false, name);
+    assert.throws(() => carry(commit), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
+  }
 });
 
 // Candidate 17 (Toolbox close): the close accepts content commits after the last Critic-reviewed candidate, the push carry-forward does not.

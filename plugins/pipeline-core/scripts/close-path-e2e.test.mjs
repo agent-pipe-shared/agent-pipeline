@@ -261,7 +261,7 @@ const WALKS = Object.freeze([
 ]);
 
 // C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
-async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, decline = false, route = "push-then-release" }) {
+async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, decline = false, route = "push-then-release", selfExport = false }) {
   {
     const log = [];
     const fx = consumerFixture(log, identity);
@@ -386,6 +386,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
       assert.equal(finalized.independence, criticReturn === "none" ? "caller-authored-fallback" : "source-issued-origin", `${identity.runner}: ${criticReturn}`);
       assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
+      // Candidate 28e (Antigravity test run 2026-11-12): `selfExport` walks the one-shot close WITHOUT a prior export, so the close exports the
+      // round from the private journal itself, inside its one close commit (PO tile 2026-11-10), as a runner that never ran the export verb does.
+      if (!selfExport) {
       writeFileSync(join(fx.root, "evidence", "critic-report.md"), "# Critic report\n\nNo findings.\n");
       const exported = json(finalizer("export", {
         schema: "pipeline.session-critic-export-request.v1", packetId, reportPath: "evidence/critic-report.md", outDir: `specs/${FEATURE_ID}/evidence/critic/${packetId}`,
@@ -402,6 +405,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       // VEP-CVL-CARRY-CONTENT-CHANGED by the Critic-bound candidate Verify below).
       const exportCommit = commit(log, fx.root, "docs: exported Critic evidence and its registered lineage");
       assert.notEqual(exportCommit, candidate, "the exported evidence follows the reviewed candidate");
+      }
       const lifecycle = `close-${identity.runner}`;
       const coordinator = (verb, extra) => json(step(log, `${identity.runner}: close-coordinator ${verb}`, process.execPath,
         [script("close-coordinator.mjs"), verb, "--root", fx.root, "--lifecycle", lifecycle, ...extra], { cwd: fx.root }));
@@ -586,6 +590,16 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         for (const stage of ["verify-candidate-frozen", "security-scan", "final-verify-green", "cleanup-complete", "closed-local"]) assert.ok(last.result.stages.includes(stage), `${identity.runner}: the resumed close ran ${stage}: ${last.result.stages}`);
         assert.match(last.result.pushEvidence?.command ?? "", /--mode release --critic-packet-id/u, "the push boundary names the Critic-bound Verify, which the close never writes itself");
         assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
+        if (selfExport) {
+          const exportDir = `specs/${FEATURE_ID}/evidence/critic/${packetId}`;
+          assert.deepEqual(git(log, fx.root, ["ls-files", "--", exportDir]).split("\n").filter(Boolean).map((path) => path.slice(exportDir.length + 1)).sort(),
+            ["index.json", "receipt.json", "report.md"], `${identity.runner}: the close exported the round itself and committed it`);
+        }
+        // Candidate 28e (Antigravity test run 2026-11-12): the push-evidence command the close printed runs green on the closed candidate. It
+        // carries the Critic across the close commit, including a close commit that holds the close's own Critic export.
+        const pushVerify = spawnSync(process.execPath, last.result.pushEvidence.argv,
+          { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 300_000, maxBuffer: 1 << 26 });
+        assert.equal(pushVerify.status, 0, `${identity.runner}: the printed push-evidence command: ${pushVerify.stdout.slice(-1500)}\n${pushVerify.stderr.slice(-1500)}`);
         return;
       }
       const bound = JSON.parse(readFileSync(statePath, "utf8"));
@@ -870,6 +884,10 @@ test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixtu
   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
 });
 
+test("C28e (Antigravity test run): a one-shot close without a prior export exports the Critic round itself in its close commit, and the push-evidence command it prints runs green", { timeout: 600_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, selfExport: true });
+});
+
 test("C28 AC-108: a declined acceptance returns the feature to a correction round: a non-yes answer records nothing, the decline retires the bound Result, and the second close binds a Result again, asks again for the new candidate, and closes on a yes", { timeout: 900_000 }, async () => {
   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, decline: true });
 });
@@ -880,4 +898,33 @@ test("C28 AC-108: the same declined-acceptance chain in a project with a session
 
 test("C23 F25: in a project with a catalogue from the start the one-shot close binds the Result on the owner route and closes without a detour", { timeout: 600_000 }, async () => {
   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, catalogue: true });
+});
+
+// C28e (Claude test run, PO 2026-11-13): the real approve -> materialize -> set-phase route, then every planned surface written and
+// committed: a second implementation entry (the one a re-approved design asks for) met class 9 profile-drift "unavailable" on every
+// design-package project, and the greenfield-pending allowance no longer applied. Class 9 is now reported as unmeasured, not blocking.
+test("C28e (Claude test run): a design-package project re-enters implementation after every planned surface is written; class 9 is reported, not blocking", { timeout: 300_000 }, async () => {
+  const fx = consumerFixture([], RUNNER_IDENTITIES[0]);
+  walkEnv = runnerEnv(RUNNER_IDENTITIES[0].runner, fx.root);
+  try {
+    fx.write("src/index.mjs", "export const ready = true;\n");
+    fx.write("tests/unit.test.mjs", "import { ready } from \"../src/index.mjs\";\nif (ready !== true) throw new Error(\"not ready\");\n");
+    fx.gitOk("add", "--", "src/index.mjs", "tests/unit.test.mjs");
+    fx.gitOk("commit", "-q", "-m", "implementation surfaces");
+    const { evaluateArchitectureFitness } = await import("./architecture-fitness.mjs");
+    const { architectureFitnessAuthorityVerdict } = await import("../lib/guard/entry-gates.mjs");
+    const { PIPELINE_STATE_SCRIPT } = await import("../lib/guard/constants.mjs");
+    const seen = [];
+    const verdict = architectureFitnessAuthorityVerdict(fx.root, `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`,
+      { evaluateArchitectureFitnessFn: (input) => { const result = evaluateArchitectureFitness(input); seen.push(result); return result; } });
+    assert.equal(seen.length, 1, "the guard evaluated planning fitness once");
+    const class9 = seen[0].outcomes.find((outcome) => outcome.classId === 9);
+    assert.equal(class9.outcome, "unavailable", JSON.stringify(class9));
+    assert.equal(class9.evidence?.source, "approved-design-package", "the unmeasured class 9 names the design package as its source");
+    assert.deepEqual(seen[0].outcomes.filter((outcome) => outcome.classId !== 9 && outcome.classId !== 10 && outcome.outcome !== "pass").map((outcome) => outcome.propertyId), [],
+      "every other blocking class passes with all planned surfaces written");
+    assert.equal(verdict, null, verdict === null ? "" : verdict.stderr);
+  } finally {
+    rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
+  }
 });

@@ -285,6 +285,26 @@ export function deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCo
 const CRITIC_EXPORT_FILES = ["index.json", "receipt.json", "report.md"];
 const CRITIC_EXPORT_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
 /**
+ * The receipt binding of added Critic export directories (`exports`: dir -> { packetId, files }), shared by the export-only commit and
+ * the close commit: each directory holds exactly the three export files, its index binds the receipt and report digests, and the receipt
+ * bytes are the canonical consumed receipt of that packet in this repository's private packet store. Throws on a read failure.
+ */
+function criticExportDirectoriesBound(root, commit, exports, readReceipt) {
+  const commonDir = gitBytes(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "CCA-RANGE-READ").toString("utf8").trim();
+  for (const [dir, { packetId, files }] of exports) {
+    if (files.length !== CRITIC_EXPORT_FILES.length || !CRITIC_EXPORT_FILES.every((name) => files.includes(name))) return false;
+    const blob = (name) => { regularBlobAt(root, commit, `${dir}/${name}`); return gitBytes(root, ["show", `${commit}:${dir}/${name}`], "CCA-EVIDENCE-READ"); };
+    const receiptBytes = blob("receipt.json"), report = blob("report.md"), index = JSON.parse(blob("index.json").toString("utf8"));
+    const { receipt } = readReceipt({ controlRoot: join(commonDir, "agent-pipeline", "critic-packets"), packetId });
+    if (!object(index) || index.schema !== CRITIC_EXPORT_INDEX_SCHEMA || index.packetId !== packetId || report.length === 0
+      || index.receiptSha256 !== digest(receiptBytes) || index.reportSha256 !== digest(report)
+      || !receiptBytes.equals(Buffer.from(packetCanonicalJson(receipt), "utf8")) || receipt.packetId !== packetId
+      || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
+      || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
+  }
+  return true;
+}
+/**
  * A commit that only adds exports of consumed Critic reviews is evidence, not unreviewed content (consumer finding N23,
  * 2026-10-30: the export commit after a passed round broke the carry-forward and the lineage transport). Every changed
  * path is a new export file of a feature in `featureIds`; each export directory holds exactly the three files; its index
@@ -313,18 +333,7 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
       if (!exports.has(key)) exports.set(key, { packetId: match[2], files: [] });
       exports.get(key).files.push(match[3]);
     }
-    const commonDir = gitBytes(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "CCA-RANGE-READ").toString("utf8").trim();
-    for (const [dir, { packetId, files }] of exports) {
-      if (files.length !== CRITIC_EXPORT_FILES.length || !CRITIC_EXPORT_FILES.every((name) => files.includes(name))) return false;
-      const blob = (name) => { regularBlobAt(root, commit, `${dir}/${name}`); return gitBytes(root, ["show", `${commit}:${dir}/${name}`], "CCA-EVIDENCE-READ"); };
-      const receiptBytes = blob("receipt.json"), report = blob("report.md"), index = JSON.parse(blob("index.json").toString("utf8"));
-      const { receipt } = readReceipt({ controlRoot: join(commonDir, "agent-pipeline", "critic-packets"), packetId });
-      if (!object(index) || index.schema !== CRITIC_EXPORT_INDEX_SCHEMA || index.packetId !== packetId || report.length === 0
-        || index.receiptSha256 !== digest(receiptBytes) || index.reportSha256 !== digest(report)
-        || !receiptBytes.equals(Buffer.from(packetCanonicalJson(receipt), "utf8")) || receipt.packetId !== packetId
-        || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
-        || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
-    }
+    if (!criticExportDirectoriesBound(root, commit, exports, readReceipt)) return false;
     if (lineage.length === 0 && manifestPath === null) return true;
     // The extended form: lineage files and the manifest change come together, one feature, every lineage file named by its own digest and
     // naming one of the exports of this commit, and the manifest after the commit equals the manifest before plus exactly those entries.
@@ -433,7 +442,7 @@ const CLOSE_DOC_PATH = /^(?:docs|backlog)\/(?:[^/]+\/)*[^/]+\.md$/u;
  * file. Added and modified files must be regular, non-executable blobs (no symlink, no mode change). Any other path -- source, tests,
  * configuration, agent or skill prompts, another feature's directory -- ends the classification and the commit stays a correction.
  */
-export function criticCloseCommit(root, commit, featureId) {
+export function criticCloseCommit(root, commit, featureId, readReceipt = readConsumedCandidateReceipt) {
   try {
     const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
     if (parents.length !== 2 || typeof featureId !== "string" || featureId === "") return false;
@@ -441,20 +450,35 @@ export function criticCloseCommit(root, commit, featureId) {
     if (fields.length === 0 || fields.length % 2 !== 0) return false;
     const specs = `specs/${featureId}/`;
     const bundles = `audit-bundles/${featureId}/`;
+    const exports = new Map();
     for (let index = 0; index < fields.length; index += 2) {
       const meta = /^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ ([AMD])$/u.exec(fields[index]);
       const path = fields[index + 1];
       if (!meta) return false;
-      // The export subtree of a consumed Critic review has its own receipt-bound classifier (`criticExportOnlyCommit`); a close commit
-      // must not become a second, weaker way in for forged or extended exports.
-      if (path.startsWith(`${specs}evidence/critic/`)) return false;
+      // The export subtree of a consumed Critic review is admitted only through the same receipt-bound check as an export-only commit
+      // (`criticExportDirectoriesBound`), never by path alone: only added files, exactly the three export files of a packet whose
+      // canonical consumed receipt they carry. The one-shot close exports the missing rounds itself, inside the one close commit
+      // (PO tile 2026-11-10); refusing every such path made that close commit a correction and blocked the push of every one-shot
+      // close (VEP-CVL-CARRY-CONTENT-CHANGED, Antigravity test run 2026-11-12).
+      if (path.startsWith(`${specs}evidence/critic/`)) {
+        const match = /^specs\/[^/]+\/evidence\/critic\/([a-f0-9]{32})\/([^/]+)$/u.exec(path);
+        if (meta[3] !== "A" || meta[2] !== "100644" || !match || !CRITIC_EXPORT_FILES.includes(match[2])) return false;
+        const key = `${specs}evidence/critic/${match[1]}`;
+        if (!exports.has(key)) exports.set(key, { packetId: match[1], files: [] });
+        exports.get(key).files.push(match[2]);
+        continue;
+      }
       const inside = path.startsWith(specs) || path.startsWith(bundles);
       if (!(inside || CLOSE_DOC_PATH.test(path) || CLOSE_STATE_FILES.has(path))) return false;
       if (path.split("/").some((part) => part === "" || part === "." || part === "..")) return false;
       if (meta[3] !== "D" && meta[2] !== "100644") return false;
       if (meta[3] === "M" && meta[1] !== "100644") return false;
     }
-    return true;
+    if (exports.size === 0) return true;
+    // Lineage files of a review are bound to their export only by the export classifier's extended form (digest-named, manifest delta
+    // recomputed); a close commit that carries an export must not become a way around that binding.
+    const lineageAlongside = fields.some((field, index) => index % 2 === 1 && /^specs\/[^/]+\/evidence\/critic-lineage-[^/]+$/u.test(field));
+    return !lineageAlongside && criticExportDirectoriesBound(root, commit, exports, readReceipt);
   } catch { return false; }
 }
 
@@ -568,7 +592,7 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   for (const commit of source.rangeCommits) {
     const registered = evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
       || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
-        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)));
+        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId, readConsumedCandidateReceiptFn)));
     // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
     const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
     if (passedOver && !registered) administration.push(commit);
