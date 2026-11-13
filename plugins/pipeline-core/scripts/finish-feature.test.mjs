@@ -435,12 +435,25 @@ test("C29 L1: a passing round with an earlier blocker/major marked fixed without
   try {
     const stopped = oneShotClose(f.input, { runCommand: f.runner });
     assert.equal(stopped.stage, "critic-standing"); assert.equal(stopped.stop.code, "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN");
-    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\); blocker CRF-${origin}-2`, "u"));
+    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\), marked fixed by a round that changed only the Spec text, evidence or administration; blocker CRF-${origin}-2`, "u"));
     assert.match(stopped.stop.reason, /A statement in chat is not an acceptance/u);
     assert.match(stopped.stop.repair, /A blocker can never be accepted[\s\S]*approve-residual-acceptance --by <name> --critic-packet c{32} --reason-class uncorrectable-past-authorship/u);
     assert.doesNotMatch(stopped.stop.repair, / node pipeline-state\.mjs /u, "the state writer is named by its path");
     assert.deepEqual(f.calls, [], "nothing runs before the stop");
     assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C29 L1: a failed round the PO accepted for its own minors does not carry an earlier major past the close", () => {
+  const origin = "c".repeat(32);
+  const earlierOpen = [{ findingId: `CRF-${origin}-1`, severity: "major", originPacketId: origin, evidenceSha256: "d".repeat(64), state: "still-open", reviewId: "r2" }];
+  const f = oneShotFixture({ continuity: true, resultBound: false, residualOnRecord: true, criticStanding: { status: "failed", blockers: 0, majors: 0, minors: 1, earlierOpen, earlierRepair: "correct the named findings ... A blocker can never be accepted." } });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stop.code, "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN", JSON.stringify(stopped).slice(0, 400));
+    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\), still open`, "u"));
+    assert.match(stopped.stop.repair, /A blocker can never be accepted/u);
+    assert.deepEqual(f.calls, [], "nothing runs before the stop");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

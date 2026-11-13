@@ -34,14 +34,14 @@ export function isEvidencePath(path, featureId) {
 }
 
 /**
- * C29 (Claude greenfield run 3, L1): a path of the product's code or tests, narrower than a "product" commit path: the feature's
- * Spec and design text, docs, architecture, project calibration and agent configuration are not code, and a Critic round that
- * changed only those cannot have corrected a finding in the code. Used by the Critic lineage to decide whether a passing later
- * round may mark an earlier blocker or major as fixed.
+ * C29 (Claude greenfield run 3, L1; PO tile 2026-11-13: "a product path, not only evidence/administration"): a path whose change can
+ * correct a Critic finding. Not an evidence or administration path (above), and not under specs/: the Spec and design text of a
+ * package are corrected only through an approved Spec addendum (ADR-0095), which the lapsed-findings reader counts on its own. The run
+ * this closes passed a round that changed only the Spec, and its two earlier majors then read as fixed.
  */
-export function isProductCodePath(path, featureId) {
+export function isCorrectionPath(path, featureId) {
   if (typeof path !== "string" || path === "" || isEvidencePath(path, featureId)) return false;
-  return !/^(?:specs|docs|architecture|project|backlog|governance|telemetry|\.claude|\.codex|\.agents|\.gemini)\//u.test(path);
+  return !path.startsWith("specs/");
 }
 
 /** "evidence" or "product" for the paths one commit touches. */

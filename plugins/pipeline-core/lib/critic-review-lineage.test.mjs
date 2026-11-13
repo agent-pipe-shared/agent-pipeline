@@ -1001,47 +1001,61 @@ console.log(`${n20Passed}/5 N20 checks passed.`);
   console.log("PASS C27 lane origin");
 }
 
-// C29 (Claude greenfield run 3, L1): an earlier blocker/major marked fixed by a passing round that changed no product code or tests is lapsed.
+// C29 (Claude greenfield run 3, L1): an earlier blocker/major marked fixed by a passing round that changed only the Spec text, evidence or administration is lapsed.
 {
-  const { isProductCodePath } = await import("./close-commit-split.mjs");
+  const { isCorrectionPath, isEvidencePath } = await import("./close-commit-split.mjs");
   const { lapsedCriticFindings, lapsedFindingSettled, readLapsedCriticFindings } = await import("./critic-lapsed-findings.mjs");
   const feature = "feature-abc";
-  assert.equal(isProductCodePath("src/app.js", feature), true);
-  assert.equal(isProductCodePath("tests/app.test.js", feature), true);
-  for (const path of [`specs/${feature}/spec.md`, `specs/${feature}/evidence/x.json`, "docs/guide.md", "architecture/map.md", "project/calibration.json", ".claude/settings.json", "audit-bundles/x/README.md", ""]) {
-    assert.equal(isProductCodePath(path, feature), false, path);
+  for (const path of ["src/app.js", "tests/app.test.js", "docs/guide.md", "package.json"]) assert.equal(isCorrectionPath(path, feature), !isEvidencePath(path, feature), path);
+  assert.equal(isCorrectionPath("src/app.js", feature), true);
+  for (const path of [`specs/${feature}/spec.md`, `specs/${feature}/design/unit.json`, `specs/${feature}/evidence/x.json`, "audit-bundles/x/README.md", ""]) {
+    assert.equal(isCorrectionPath(path, feature), false, path);
   }
   const origin = "a".repeat(32);
   const id = (n) => `CRF-${origin}-${n}`;
   const round = (reviewId, status, changedPaths, findings) => ({ reviewId, verdict: { status }, diff: { changedPaths }, findings });
-  const r1 = round("r1", "findings", ["src/app.js"], [
-    { id: id(1), priorFindingId: null, severity: "high", status: "open", evidenceSha256: H("1") },
-    { id: id(2), priorFindingId: null, severity: "critical", status: "open", evidenceSha256: H("2") },
-    { id: id(3), priorFindingId: null, severity: "medium", status: "open", evidenceSha256: H("3") },
-  ]);
+  const raws = ["major", "blocker", "minor"].map((severity) => ({ gap: `gap ${severity}`, risk: "r", severity, evidence: "src/app.js:1", spec_ref: "AC-1" }));
+  const { projectConsumedCriticFindings } = await import("./critic-verify-lifecycle.mjs");
+  const r1 = round("r1", "findings", ["src/app.js"], projectConsumedCriticFindings({ packetId: origin, findings: raws }).map((f) => ({ ...f })));
+  const [e1, e2] = r1.findings.map((f) => f.evidenceSha256);
   const fixedAll = (reviewId, changedPaths, status = "no-findings") => round(reviewId, status, changedPaths, r1.findings.map((f) => ({ ...f, priorFindingId: f.id, status: "fixed" })));
   // The Claude run's shape: round 2 changed only the Spec and passed; both earlier findings read as fixed.
   const specOnly = lapsedCriticFindings({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])], featureId: feature });
-  assert.deepEqual(specOnly.map((f) => [f.findingId, f.severity, f.originPacketId, f.markedFixedInReviewId]), [[id(1), "major", origin, "r2"], [id(2), "blocker", origin, "r2"]], "a minor never lapses");
+  assert.deepEqual(specOnly.map((f) => [f.findingId, f.severity, f.originPacketId, f.reviewId, f.state, f.evidenceSha256]), [[id(1), "major", origin, "r2", "marked-fixed-without-code", e1], [id(2), "blocker", origin, "r2", "marked-fixed-without-code", e2]], "a minor never lapses");
+  // ADR-0095: an applied Spec addendum naming the finding is its sanctioned correction.
+  assert.deepEqual(lapsedCriticFindings({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])], featureId: feature, dispositioned: [id(1)] }).map((f) => f.findingId), [id(2)]);
+  // A later round that failed only on its own minor (accepted by the PO) still carries the earlier major open: it is named too.
+  const carriedOpen = round("r2", "findings", ["src/app.js"], [...r1.findings.map((f) => ({ ...f, priorFindingId: f.id })), { id: `CRF-${"b".repeat(32)}-1`, priorFindingId: null, severity: "medium", status: "open", evidenceSha256: H("4") }]);
+  assert.deepEqual(lapsedCriticFindings({ history: [r1, carriedOpen], featureId: feature }).map((f) => [f.findingId, f.state]), [[id(1), "still-open"], [id(2), "still-open"]], "the round's own minor is its own acceptance's business");
   assert.deepEqual(lapsedCriticFindings({ history: [r1, fixedAll("r2", ["src/app.js"])], featureId: feature }), [], "a passing round over code corrects");
-  const r2 = fixedAll("r2", ["docs/guide.md"]);
+  assert.deepEqual(lapsedCriticFindings({ history: [r1, fixedAll("r2", ["config/app.yaml"])], featureId: feature }), [], "a product configuration change is a correction (PO tile: not only evidence/administration)");
+  assert.equal(lapsedCriticFindings({ history: [r1, fixedAll("r2", ["docs/guide.md"])], featureId: feature }).length, isEvidencePath("docs/guide.md", feature) ? 2 : 0, "docs follow the shared administration/documentation set");
+  const r2 = fixedAll("r2", [`specs/${feature}/evidence/x.json`]);
   const r3 = round("r3", "no-findings", ["tests/app.test.js"], r2.findings.map((f) => structuredClone(f)));
   assert.deepEqual(lapsedCriticFindings({ history: [r1, r2, r3], featureId: feature }), [], "a later reviewed code round counts");
   const failed = round("r3", "failed", ["src/app.js"], r2.findings.map((f) => structuredClone(f)));
   assert.equal(lapsedCriticFindings({ history: [r1, r2, failed], featureId: feature }).length, 2, "a failed round reviewed nothing");
   assert.deepEqual(lapsedCriticFindings({ history: [r1], featureId: feature }), []);
-  // Settling: only a major, only with the reason class, only for its own evidence digest.
+  // Settling: only a major, only with the reason class, only for its own raw finding, only when the record verifies.
+  // The residual acceptance hashes the raw finding with another canonical form than the lineage, so the join goes through the raw finding.
+  const { residualFindingId } = await import("./review-admission-read.mjs");
+  const [majorId, blockerId] = raws.map((raw) => residualFindingId(raw));
+  assert.notEqual(majorId, e1, "the two digests differ; a direct comparison would never settle anything");
   const [major, blocker] = specOnly;
-  const loadWith = (residualAcceptance) => () => (residualAcceptance === null ? null : { residualAcceptance });
+  const rawFn = () => raws;
+  const loadWith = (residualAcceptance, authorized = true) => () => (residualAcceptance === null ? null : { residualAcceptance, verifyResidualAcceptanceFn: () => ({ authorized, mode: "signature" }) });
   const reason = "uncorrectable-past-authorship";
-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("1"), severity: "major" }] }) }), true);
-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith({ findings: [{ id: H("1"), severity: "major" }] }) }), false, "the reason class is needed");
-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("9"), severity: "major" }] }) }), false);
-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith(null) }), false);
-  assert.equal(lapsedFindingSettled(blocker, { gitCommonDir: "/x", loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("2"), severity: "major" }] }) }), false, "a blocker is never settled");
+  const settle = (finding, acceptance, extra = {}) => lapsedFindingSettled(finding, { gitCommonDir: "/x", readRawFindingsFn: rawFn, loadFn: loadWith(acceptance, extra.authorized ?? true), ...(extra.readRawFindingsFn ? { readRawFindingsFn: extra.readRawFindingsFn } : {}) });
+  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }), true);
+  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }, { authorized: false }), false, "an acceptance that does not verify settles nothing");
+  assert.equal(settle(major, { findings: [{ id: majorId, severity: "major" }] }), false, "the reason class is needed");
+  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: e1, severity: "major" }] }), false, "the lineage digest is not the residual id");
+  assert.equal(settle(major, null), false);
+  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }, { readRawFindingsFn: () => [raws[2]] }), false, "a raw finding whose digest is not the lineage's settles nothing");
+  assert.equal(settle(blocker, { reasonClass: reason, findings: [{ id: blockerId, severity: "blocker" }] }), false, "a blocker is never settled");
   const read = readLapsedCriticFindings({ repoRoot: "/x", featureId: feature, candidateCommit: O("2"), gitCommonDir: "/x",
-    resolveFn: () => ({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])] }),
-    loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("1"), severity: "major" }] }) });
+    resolveFn: () => ({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])] }), dispositionedFn: () => [], readRawFindingsFn: rawFn,
+    loadFn: loadWith({ reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }) });
   assert.equal(read.status, "open"); assert.deepEqual(read.open.map((f) => f.findingId), [id(2)]); assert.deepEqual(read.settled.map((f) => f.findingId), [id(1)]);
   const unreadable = readLapsedCriticFindings({ repoRoot: "/x", featureId: feature, candidateCommit: O("2"), gitCommonDir: "/x", resolveFn: () => { throw new Error("CCA-HISTORY"); } });
   assert.equal(unreadable.status, "unavailable"); assert.deepEqual(unreadable.open, []);

@@ -1724,6 +1724,43 @@ function parentLineageFixture({ afterRound = null } = {}) {
   const c4 = correct("fix4"); const d4 = parentRegisterDiagnostic(root, featureId, c4, "r4");
   return { root, featureId, specPath, genesis, c1, c2, c3, c4, evidence4: d4.diagnosticPath, head: d4.registration };
 }
+test("C29 L1 on a real retained course: a passing round that changed only the Spec leaves the earlier majors unresolved; a later reviewed code round resolves them", async () => {
+  const { readLapsedCriticFindings } = await import("../lib/critic-lapsed-findings.mjs");
+  const fx = parentLineageFixture({ afterRound: 2 });
+  try {
+    const head = () => git(fx.root, ["rev-parse", "HEAD"]);
+    const lapsedAt = (commit) => readLapsedCriticFindings({ repoRoot: fx.root, featureId: fx.featureId, candidateCommit: commit, gitCommonDir: join(fx.root, ".git"), projectDir: fx.root });
+    // Before round 3 the course ends in the failed round 2, which carries round 1's major open (the close refuses a failed round anyway).
+    const before = lapsedAt(head());
+    assert.equal(before.status, "open", JSON.stringify(before));
+    assert.deepEqual(before.open.map((f) => [f.findingId, f.state, f.severity]), [[`CRF-${"9a".repeat(16)}-1`, "still-open", "major"]]);
+    // Round 3: only the Spec changes, and the round passes.
+    const manifestPath = `specs/${fx.featureId}/lifecycle.json`;
+    writeFileSync(join(fx.root, fx.specPath), `${readFileSync(join(fx.root, fx.specPath), "utf8")}Clarified wording only.\n`);
+    const manifest = JSON.parse(readFileSync(join(fx.root, manifestPath), "utf8"));
+    manifest.artifacts.find((a) => a.class === "spec").sha256 = sha256(readFileSync(join(fx.root, fx.specPath)));
+    writeFileSync(join(fx.root, manifestPath), JSON.stringify(manifest));
+    // Only these two paths: a sweeping `git add -A` would also take the fixture's root-level delta input, which counts as possible code.
+    const c3 = parentCommitPaths(fx.root, [fx.specPath, manifestPath], "clarify the spec");
+    const d3 = parentRegisterDiagnostic(fx.root, fx.featureId, c3, "r3"); const q3 = parentDeltaRequest(fx.root, ["clarify"]);
+    const f3 = parentRound(fx.root, { featureId: fx.featureId, taskId: "parent-task-3", packetId: "9c".repeat(16), base: fx.c2, candidate: c3, registrationCommit: q3.registration, deltaRequestPath: q3.added.deltaRequestPath, diagnosticPath: d3.diagnosticPath, verdict: PARENT_PASS });
+    parentCommitPaths(fx.root, parentWrittenLineage(fx.root, "9c".repeat(16), f3).commitPaths, "register lineage of round 3");
+    const afterSpecOnly = lapsedAt(head());
+    const boundTo = (packet) => readLapsedCriticFindings({ repoRoot: fx.root, featureId: fx.featureId, candidateCommit: head(), gitCommonDir: join(fx.root, ".git"), boundPacketId: packet }).status;
+    assert.equal(boundTo("9c".repeat(16)), "open", "a pre-check bound to the last registered round judges the course");
+    assert.equal(boundTo("9d".repeat(16)), "unavailable", "a pre-check bound to a round not registered yet leaves it to the close's own check");
+    assert.equal(afterSpecOnly.status, "open", JSON.stringify(afterSpecOnly));
+    assert.deepEqual(afterSpecOnly.open.map((f) => [f.findingId, f.state]).sort(), [[`CRF-${"9a".repeat(16)}-1`, "marked-fixed-without-code"], [`CRF-${"9b".repeat(16)}-1`, "marked-fixed-without-code"]]);
+    // Round 4 corrects the code and passes: the earlier majors are resolved.
+    const c4 = fx.correct("fix4");
+    const d4 = parentRegisterDiagnostic(fx.root, fx.featureId, c4, "r4"); const q4 = parentDeltaRequest(fx.root, ["fix-four"]);
+    const f4 = parentRound(fx.root, { featureId: fx.featureId, taskId: "parent-task-4", packetId: "9d".repeat(16), base: c3, candidate: c4, registrationCommit: q4.registration, deltaRequestPath: q4.added.deltaRequestPath, diagnosticPath: d4.diagnosticPath, verdict: PARENT_PASS });
+    parentCommitPaths(fx.root, parentWrittenLineage(fx.root, "9d".repeat(16), f4).commitPaths, "register lineage of round 4");
+    const afterCode = lapsedAt(head());
+    assert.equal(afterCode.status, "clear", JSON.stringify(afterCode));
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("K-30 a package under the feature id binding an approved Spec in its earlier dated folder admits the first course round, with the course flags and without", () => {
   const featureId = "held-feature", prefix = `specs/${featureId}`, specPath = "specs/2026-01-01-held-feature/spec.md", manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
   const root = mkdtempSync(join(tmpdir(), "cdp-k30-"));

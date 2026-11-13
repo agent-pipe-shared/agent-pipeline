@@ -747,7 +747,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     if (!addendumGate.ok) fail("CLOSE-SPEC-ADDENDUM-UNCOVERED", `feature close preparation is blocked by the Spec addenda: ${addendumGate.findings.slice(0, 5).join("; ")}${addendumGate.findings.length > 5 ? `; and ${addendumGate.findings.length - 5} more` : ""}`);
     // C29 (Claude greenfield run 3, L1): an earlier blocker/major that a later round marked fixed with no reviewed code change since stays open for the close.
     const lapsed = readLapsedCriticFindings({ repoRoot: root, featureId: observed.feature.id, candidateCommit: git(root, ["rev-parse", "HEAD"]), gitCommonDir: common, projectDir: root });
-    if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: a later Critic round marked ${lapsed.open.length} earlier finding(s) fixed, but no reviewed round since changed product code or tests: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
+    if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: ${lapsed.open.length} blocker/major finding(s) of an earlier Critic round were never corrected in a reviewed round: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
     // A missing slice queue says nothing about whether the whole candidate
     // received independent review. Resolve the State and package contracts.
     // The audit route below reads the consumed Critic packet and exact Verify
@@ -1420,16 +1420,18 @@ try {
     const controlRoot = join(standingCommon, "agent-pipeline", "critic-packets");
     try {
       const { receipt } = readConsumedCandidateReceipt({ controlRoot, packetId: parsed.values.packet });
+      // C29 (L1): a blocker/major of an earlier round that no reviewed round corrected stays open, whatever the bound round's own verdict.
+      let lapsed = null;
+      try { lapsed = readLapsedCriticFindings({ repoRoot: standingRoot, featureId: activeFeature(stateSnapshot(standingRoot).state).id, candidateCommit: git(standingRoot, ["rev-parse", "HEAD"]), gitCommonDir: standingCommon, projectDir: standingRoot, boundPacketId: parsed.values.packet }); } catch { lapsed = null; }
+      const earlier = lapsed?.status === "open" ? { earlierOpen: lapsed.open, earlierRepair: lapsedFindingsRepair({ open: lapsed.open }) } : {};
+      const settled = lapsed?.settled?.length > 0 ? { settled: lapsed.settled } : {};
       if (receipt?.reviewPass === true) {
-        // C29 (L1): the bound round passed; an earlier blocker/major it (or a round before it) marked fixed without a reviewed code change is still open.
-        let lapsed = null;
-        try { lapsed = readLapsedCriticFindings({ repoRoot: standingRoot, featureId: activeFeature(stateSnapshot(standingRoot).state).id, candidateCommit: git(standingRoot, ["rev-parse", "HEAD"]), gitCommonDir: standingCommon, projectDir: standingRoot }); } catch { lapsed = null; }
-        if (lapsed?.status === "open") emit({ schema: "pipeline.close-critic-standing.v1", status: "earlier-findings-open", open: lapsed.open, settled: lapsed.settled, repair: lapsedFindingsRepair({ open: lapsed.open }) });
-        else emit({ schema: "pipeline.close-critic-standing.v1", status: "passed", ...(lapsed?.settled?.length > 0 ? { settled: lapsed.settled } : {}) });
+        if (lapsed?.status === "open") emit({ schema: "pipeline.close-critic-standing.v1", status: "earlier-findings-open", open: lapsed.open, ...settled, repair: earlier.earlierRepair });
+        else emit({ schema: "pipeline.close-critic-standing.v1", status: "passed", ...settled });
       } else {
         const { findings } = readConsumedCandidateResult({ controlRoot, packetId: parsed.values.packet }).result.verdict;
         const count = (severity) => findings.filter((finding) => finding?.severity === severity).length;
-        emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor") });
+        emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor"), ...earlier, ...settled });
       }
     } catch { emit({ schema: "pipeline.close-critic-standing.v1", status: "unknown" }); }
   } else if (command === "critic-addenda") {
