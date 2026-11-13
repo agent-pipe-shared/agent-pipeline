@@ -51,8 +51,9 @@ That backstop has three gaps:
    - `GS-16`, `GS-17`.
 
    Plugin source (`GS-8`/`GS-9`) and onboarding staging (`GS-15`) have their own routes and are not part of it.
-3. **The close walks every gate-definition change of the feature range.** It looks at every non-merge commit in the range, not only stage-0 commits, that adds, modifies or deletes a path of the set. For each change (commit, path, blob) it derives a proof, durable evidence first:
-   - **first appearance:** no ancestor of the commit names the path;
+3. **The close walks every gate-definition change of the feature range.** It walks the first-parent history of the range, not only stage-0 commits, each commit against its first parent, so a merge counts with what it brings in. The range is the feature's own (from the first commit of its `specs/<feature-id>/` folder); a consumer whose approved Spec lives in a dated folder (`specs/<date>-<slug>/`) gets the range from the first commit of that folder. A change of `pipeline.user.yaml` that touches only fields the write guard exempts is no gate change. For each change (commit, path, blob) it derives a proof, durable evidence first:
+   - **first appearance:** no first-parent ancestor of the commit names the path;
+   - **trust-anchor bootstrap:** for `GS-2`, the exact no-anchor to one-anchor upgrade the pre-commit hook admits;
    - **materialization:** for `GS-17`, the committed `architecture/design-materialization.json` in that commit's tree names the path with the blob's sha256;
    - **configure-verify:** for `GS-10`/`GS-11`, the private configure-verify transition record of that commit. It is labelled "confirmed via runner prompt, not signed", as the PO chose;
    - **human-guard override:** a consumed capability for the path, re-verified against its MAC and its candidate binding, never trusted by a kind string;
@@ -67,8 +68,8 @@ That backstop has three gaps:
    - The record is labelled "acknowledged after the fact".
 
    This route also covers device-local records that are missing on the other machine and commits that bypassed the hook.
-5. **Seen early, not only at the close.** `pipeline-state.mjs inspect` and the pre-close readback list the unproven changes with the exact repair command, before the close refuses.
-6. **The Critic and the bundle see every gate change.** The audit bundle and the Critic input carry the derived list: each change with its proof kind and reference, and its label where it is not a signature. The acknowledgement's public proof object travels like the other critical proofs.
+5. **Seen early, not only at the close.** A read-only `close-coordinator.mjs gate-changes --root <root>` lists the unproven changes with the exact repair command; the one-shot close (`finish-feature.mjs`) asks it before Verify and stops there, so nothing is written and no Verify is spent before the acknowledgement.
+6. **The Critic and the bundle see every gate change.** The audit bundle carries the derived list (evidence item `gate-changes`): each change with its proof kind and reference, and its label where it is not a signature; the item is coded `GATE-CHANGE-LABELLED` when any proof carries a label. The acknowledgement's public proof object travels like the other critical proofs. The Critic sees every change in the diff of its range, which it constructs itself; the proof list is not handed to it, because a list handed to the Critic would be a hunt list its contract forbids (ADR-0014).
 
 ## Consequences
 
@@ -82,7 +83,8 @@ The price:
 Known limits:
 
 - The configure-verify transition and the human-guard-override capability are private to the device that recorded them. A close on the other machine does not find them and falls back to the acknowledgement.
-- Merge commits are not walked; the change commits they bring in are.
+- A merge is walked as one change against its first parent: the commits of the merged branch are not walked one by one, and a file the branch created and then changed counts as a first appearance at the merge.
+- The acknowledgement record is kept in the private approval store of the device that recorded it, like the other critical approvals; its public proof object travels in the audit bundle.
 - The acknowledgement proves that the PO saw the list, not that each change is sound. The Critic still reviews the content.
 - Under `chat` the acknowledgement is an attributed record, not a proof, as for the other critical kinds in that mode.
 - Not run on native Windows.
