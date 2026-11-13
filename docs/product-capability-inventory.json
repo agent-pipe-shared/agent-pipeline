@@ -1154,6 +1154,8 @@
         "verify-phase:harness/scripts/verify.mjs:slice-queue-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:slice-queue-tests",
         "verify-phase:harness/scripts/verify.mjs:source-observation-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-addendum-registration-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-addendum-tests",
         "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
