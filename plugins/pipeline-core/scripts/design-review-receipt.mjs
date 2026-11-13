@@ -35,7 +35,7 @@ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFile
 import { dirname, join, sep } from "node:path";
 
 import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
-import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
+import { consumeDesignReviewObservation, listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 
@@ -273,17 +273,18 @@ export function createReceiptFromDisk(input, deps = {}) {
   // runner without a built observation route, the receipt says `unobserved`.
   let reviewerObservation;
   let observedModel = null;
+  let commonDir = null;
+  const replayRoute = "One observed review dispatch stamps one review: dispatch pipeline-core:readiness-reviewer again for this round, write its report with export-report, and pass the earlier receipt with --previous. A receipt made by mistake and not yet committed may be deleted and made again over the same PRD and Spec";
   if (fallbackReasonCode === null) {
     const returnedSha256 = originalSha256 ?? sha256Of(reportRead.bytes);
     let record = null;
     if (runner === "claude") {
-      let commonDir = null;
       try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
       record = commonDir === null ? null : readDesignReviewObservation({ commonDir, resultSha256: returnedSha256 });
     }
     const claimed = record === null ? null : receiptClaimingObservation(repoReal, request.outPath, previous, returnedSha256);
     if (claimed !== null) {
-      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${returnedSha256.slice(0, 12)}...) already stamps ${claimed}. One observed review dispatch stamps one round: dispatch pipeline-core:readiness-reviewer again for this round, write its report with export-report, and pass the earlier receipt with --previous`);
+      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${returnedSha256.slice(0, 12)}...) already stamps ${claimed}. ${replayRoute}`);
     }
     if (record === null) reviewerObservation = { assurance: DESIGN_REVIEW_UNOBSERVED_ASSURANCE, modelsUsed: [], resultSha256: null };
     else {
@@ -327,6 +328,15 @@ export function createReceiptFromDisk(input, deps = {}) {
       return refuse(created.code, `design review receipt refused: DRR-SHAPE: --feature ${JSON.stringify(request.featureId.slice(0, 80))} is not a valid feature id (a lowercase letter, then up to 63 lowercase letters, digits or hyphens; ^[a-z][a-z0-9-]{0,63}$). Use the id the State's activeFeature carries; an id that starts with a digit is refused from candidate 28e on already by set-feature.`);
     }
     return refuse(created.code, `design review receipt refused: ${created.code}`);
+  }
+
+  // D247: the observation is bound to the PRD and Spec of its first receipt, so it cannot stamp a review of other bytes in any folder.
+  if (reviewerObservation !== undefined && reviewerObservation.resultSha256 !== null) {
+    const consumed = consumeDesignReviewObservation({ commonDir, resultSha256: reviewerObservation.resultSha256, prdSha256: sources.prd.sha256, specSha256: sources.spec.sha256 });
+    if (!consumed.ok && consumed.code === "DRO-CONSUMED-ELSEWHERE") {
+      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${reviewerObservation.resultSha256.slice(0, 12)}...) already stamps a receipt over other PRD or Spec bytes. ${replayRoute}`);
+    }
+    if (!consumed.ok) return refuse("DRC-OBSERVATION-STORE", "the host observation could not be bound to this receipt in the private control area; nothing was written");
   }
 
   try {

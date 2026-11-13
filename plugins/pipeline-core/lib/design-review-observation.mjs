@@ -17,8 +17,11 @@
  * `design-review-receipt.mjs export-report` writes the observed text as the report file, so the report bytes are the
  * host's and their digest finds the observation again; `create` reads the observation by that digest and stamps it into
  * the receipt. What this does not prove: that the reviewer read the sources the receipt names (the receipt binds them at
- * create time, as before), or which model a provider actually served beyond what the host reports. Codex and Antigravity
- * have no built route here; their receipts say `unobserved` (D247).
+ * create time, as before), or which model a provider actually served beyond what the host reports. The store is refused to an
+ * agent's own Write/Edit and shell writes (guard-gate-strength, GUARD-CONTROLPLANE-WRITE); a writer outside the hooked tool
+ * calls (another process, a runner whose child tool calls are not hooked) is not covered -- host sandboxing is that boundary.
+ * One observation stamps one review: `create` binds it to the PRD and Spec of its first receipt (`<digest>.consumed`).
+ * Codex and Antigravity have no built route here; their receipts say `unobserved` (D247).
  */
 import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
@@ -204,6 +207,25 @@ export function listUnexportedDesignReviewObservations({ commonDir }) {
     if (record !== null) out.push(record);
   }
   return out.sort((left, right) => right.observedAtMs - left.observedAtMs || (left.resultSha256 < right.resultSha256 ? -1 : 1));
+}
+
+/**
+ * One observed review stamps the receipts of ONE review: the first `create` that stamps an observation binds it to the PRD and
+ * Spec digests it was made for (`<digest>.consumed`, exclusive create). A later stamp over the same digests (a receipt made
+ * again after a mistaken flag) is admitted; over other bytes it is a replay, wherever its receipt would be written.
+ * @returns {{ ok: true } | { ok: false, code: "DRO-CONSUMED-ELSEWHERE" | "DRO-CONSUME-UNAVAILABLE" }}
+ */
+export function consumeDesignReviewObservation({ commonDir, resultSha256, prdSha256, specSha256 }) {
+  try {
+    if (![resultSha256, prdSha256, specSha256].every((value) => typeof value === "string" && SHA256.test(value))) return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" };
+    const file = join(designReviewObservationDir(commonDir), `${resultSha256}.consumed`);
+    const body = `${JSON.stringify({ prdSha256, specSha256 })}\n`;
+    try { writeFileSync(file, body, { flag: "wx", mode: 0o600 }); return { ok: true }; }
+    catch (error) { if (error?.code !== "EEXIST") return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" }; }
+    if (lstatSync(file).isSymbolicLink()) return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" };
+    const bound = JSON.parse(readFileSync(file, "utf8"));
+    return bound?.prdSha256 === prdSha256 && bound?.specSha256 === specSha256 ? { ok: true } : { ok: false, code: "DRO-CONSUMED-ELSEWHERE" };
+  } catch { return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" }; }
 }
 
 /** Mark one observation exported; a second export of the same observation is refused by the caller. */

@@ -575,6 +575,19 @@ test("D247: export-report writes the observed text, and create stamps the observ
     assert.match(replayed.json.message, /design-review-1\.receipt\.json/u);
     assert.equal(existsSync(join(repo, RECEIPT2)), false);
   }
+  // In another folder, over one changed Spec byte and without --previous, it is still a replay (bound in the private store).
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
+  mkdirSync(join(repo, "evidence"), { recursive: true });
+  const elsewhere = runMain(baseArgv(repo, { report: out, out: "evidence/receipt-elsewhere.json" }), CLAUDE, world.deps);
+  assert.equal(elsewhere.json.code, "DRC-OBSERVATION-REPLAYED");
+  assert.match(elsewhere.json.message, /other PRD or Spec bytes/u);
+  assert.equal(existsSync(join(repo, "evidence/receipt-elsewhere.json")), false);
+  // A receipt made by mistake and deleted before commit is made again over the same PRD and Spec.
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v1\n");
+  rmSync(join(repo, RECEIPT1));
+  const again = runMain(baseArgv(repo, { report: out }), CLAUDE, world.deps);
+  assert.equal(again.code, 0, again.stderr);
+  assert.equal(again.json.reviewerObservation.assurance, "host-observed-child-transcript");
 }));
 
 test("D247: a sanitized report binds the observation through its unpublished original", withRepo(async (repo, t) => {
