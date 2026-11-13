@@ -342,7 +342,7 @@ test("usage-ledger --timeline --json emits pipeline.usage-timeline.v1 with the s
     const data = JSON.parse(result.stdout);
     assert.equal(data.schema, "pipeline.usage-timeline.v1");
     assert.equal(data.runner, "claude");
-    assert.deepEqual(data.totals, { grossMs: 90000, humanWaitMs: 60000, netMs: 30000, refusals: 1, humanTurns: 2 });
+    assert.deepEqual(data.totals, { grossMs: 90000, humanWaitMs: 60000, signatureWaitMs: 0, netMs: 30000, refusals: 1, humanTurns: 2 });
     assert.deepEqual(data.refusals, { "GUARD-READ-SCOPE-OUTSIDE-ROOT": 1 });
     assert.equal(data.humanTurns.length, 2);
     assert.equal(data.humanTurns[0].chars, HUMAN_TEXT.length);
@@ -377,7 +377,31 @@ test("usage-ledger --timeline (claude) skips compact summaries and system notifi
     assert.equal(data.humanTurns.length, 3, "the compact summary and the task notification are not human turns");
     assert.equal(data.humanTurns[0].durationMs, 50000, "the first turn runs through the system rows to its last answer");
     assert.equal(data.humanTurns[1].humanWaitAfterMs, 0, "a message written before any answer leaves no wait");
-    assert.deepEqual(data.totals, { grossMs: 121000, humanWaitMs: 60000, netMs: 61000, refusals: 0, humanTurns: 3 });
+    assert.deepEqual(data.totals, { grossMs: 121000, humanWaitMs: 60000, signatureWaitMs: 0, netMs: 61000, refusals: 0, humanTurns: 3 });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// C29 (Codex run 3, C9): the agent waited on a human signature inside its own turn; proof-wait labels that time po-wait, and the
+// timeline counts it as human wait (and names it) instead of active run time. A timeout result (is_error) and a present result both count.
+test("C29-C9 usage-ledger --timeline counts a proof-wait result's waited time as human wait, not as run time", () => {
+  const wait = (seconds, status) => JSON.stringify({ schema: "pipeline.signed-proof-wait.v1", status, proofPath: "scratch/p.json", waitedSeconds: seconds, waitClass: "po-wait" });
+  const { dir, file } = timelineFile([
+    claudeUser("2026-08-19T10:00:00.000Z", "push please"),
+    claudeAssistant("2026-08-19T10:00:05.000Z", "msg_a", { input_tokens: 1, output_tokens: 1 }),
+    claudeUser("2026-08-19T10:09:35.000Z", [{ type: "tool_result", tool_use_id: "toolu_w1", is_error: true, content: `Exit code 2\n${wait(570, "refused")}` }]),
+    claudeUser("2026-08-19T10:09:45.000Z", [{ type: "tool_result", tool_use_id: "toolu_w2", content: wait(10, "proof-present") }]),
+    claudeUser("2026-08-19T10:09:46.000Z", [{ type: "tool_result", tool_use_id: "toolu_x", content: "a document quoting pipeline.signed-proof-wait.v1 in prose" }]),
+    claudeAssistant("2026-08-19T10:10:00.000Z", "msg_b", { input_tokens: 1, output_tokens: 1 }),
+  ]);
+  try {
+    const result = run(["--timeline", file, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout);
+    assert.deepEqual(data.totals, { grossMs: 600000, humanWaitMs: 580000, signatureWaitMs: 580000, netMs: 20000, refusals: 0, humanTurns: 1 });
+    const text = run(["--timeline", file]);
+    assert.match(text.stdout, /human wait 580\.0 s \(of it signature wait 580\.0 s\) \| run time net 20\.0 s/u);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -418,7 +442,7 @@ test("usage-ledger --timeline (codex rollout) counts provenance-user messages as
     const data = JSON.parse(result.stdout);
     assert.equal(data.humanTurns.length, 2, "the harness insert is not a human turn");
     assert.equal(data.humanTurns[0].chars, 5);
-    assert.deepEqual(data.totals, { grossMs: 30000, humanWaitMs: 20000, netMs: 10000, refusals: 0, humanTurns: 2 });
+    assert.deepEqual(data.totals, { grossMs: 30000, humanWaitMs: 20000, signatureWaitMs: 0, netMs: 10000, refusals: 0, humanTurns: 2 });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

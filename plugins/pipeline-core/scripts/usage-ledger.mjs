@@ -222,7 +222,20 @@ function detectTimelineFormat(records) {
   return null;
 }
 
-// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code}.
+// C29 (Codex run 3, C9): a proof-wait.mjs result in a tool output carries the time it waited on a human signature, labelled po-wait.
+// That time sits inside an agent turn, so without this it would count as active run time. Only the closed schema line counts.
+function timelineProofWaitMs(text) {
+  if (typeof text !== "string" || !text.includes("pipeline.signed-proof-wait.v1")) return null;
+  for (const line of text.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    let value; try { value = JSON.parse(trimmed); } catch { continue; }
+    if (isTimelineObject(value) && value.schema === "pipeline.signed-proof-wait.v1" && value.waitClass === "po-wait" && Number.isSafeInteger(value.waitedSeconds) && value.waitedSeconds >= 0) return value.waitedSeconds * 1000;
+  }
+  return null;
+}
+
+// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code} | {kind:"po-wait", ms} (ms = the duration waited).
 // `listed` = the response is printed in the per-response usage list; a time-only response just ends a turn.
 function claudeTimelineEvents(records) {
   const events = [];
@@ -258,6 +271,8 @@ function claudeTimelineEvents(records) {
           events.push({ kind: "human", ms, chars });
         }
         for (const block of results) {
+          const waitedMs = timelineProofWaitMs(timelineResultText(block.content));
+          if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
           if (block.is_error !== true) continue;
           const code = timelineRefusal(timelineResultText(block.content), false);
           if (code) events.push({ kind: "refusal", code });
@@ -299,6 +314,8 @@ function codexTimelineEvents(records) {
     } else if (record.type === "response_item") {
       if (payload.type === "message" && payload.role === "assistant") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
       else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
+        const waitedMs = timelineProofWaitMs(timelineResultText(payload.output));
+        if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
         const code = timelineRefusal(timelineResultText(payload.output), true);
         if (code) events.push({ kind: "refusal", code });
       }
@@ -335,6 +352,8 @@ function antigravityStepTimelineEvents(records) {
       events.push({ kind: "response", ms, listed: true, model: null, usage });
     } else if (record.type === "GENERIC") {
       const text = [record.error, record.content].filter((value) => typeof value === "string").join("\n");
+      const waitedMs = text === "" ? null : timelineProofWaitMs(text);
+      if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
       const code = text === "" ? null : timelineRefusal(text, true);
       if (code) events.push({ kind: "refusal", code });
     }
@@ -369,7 +388,9 @@ function buildTimeline(format, records, actor, malformed) {
     }
     return { ordinal: ordinal + 1, at: human.ms === null ? null : new Date(human.ms).toISOString(), chars: human.chars, durationMs, humanWaitAfterMs: waitAfterMs, last: !next };
   });
-  const humanWaitMs = observed && waitKnown ? waitTotal : null;
+  // C29 (C9): a wait on a human signature inside an agent turn is PO wait too; it is added to the human wait and shown on its own.
+  const signatureWaitMs = events.filter((event) => event.kind === "po-wait").reduce((sum, event) => sum + event.ms, 0);
+  const humanWaitMs = observed && waitKnown ? waitTotal + signatureWaitMs : null;
   const refusals = {};
   for (const event of events) if (event.kind === "refusal") refusals[event.code] = (refusals[event.code] ?? 0) + 1;
   const refusalCount = Object.values(refusals).reduce((sum, count) => sum + count, 0);
@@ -381,7 +402,7 @@ function buildTimeline(format, records, actor, malformed) {
     schema: TIMELINE_SCHEMA, runner, malformedLines: malformed,
     humanTurns: observed ? humanTurns : null, responses, refusals: observed ? refusals : null,
     totals: {
-      grossMs, humanWaitMs,
+      grossMs, humanWaitMs, signatureWaitMs: observed ? signatureWaitMs : null,
       netMs: grossMs !== null && humanWaitMs !== null ? grossMs - humanWaitMs : null,
       refusals: observed ? refusalCount : null, humanTurns: observed ? humanTurns.length : null,
     },
@@ -411,7 +432,7 @@ function renderTimeline(timeline) {
   else for (const [code, count] of Object.entries(timeline.refusals).sort()) lines.push(`- ${code}: ${count}`);
   if (timeline.malformedLines > 0) lines.push("", `Malformed lines skipped: ${timeline.malformedLines}`);
   const totals = timeline.totals;
-  lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
+  lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)}${totals.signatureWaitMs ? ` (of it signature wait ${secs(totals.signatureWaitMs)})` : ""} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
   return lines.join("\n");
 }
 

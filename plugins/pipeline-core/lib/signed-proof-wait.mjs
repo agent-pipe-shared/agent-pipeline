@@ -23,6 +23,8 @@ export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
 // Greenfields 2026-11-08: 120 s ended every wait before a human had signed (8 and 39 minutes measured). Below the 600 s cap of a foreground shell call.
 export const PROOF_WAIT_DEFAULT_SECONDS = 570;
 export const PROOF_WAIT_MAX_SECONDS = 600;
+/** C29 (C9): the label every wait result carries; the time waited for a human signature is PO wait, never active agent time. */
+export const PROOF_WAIT_CLASS = "po-wait";
 export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../scripts/proof-wait.mjs", import.meta.url));
 const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
@@ -129,7 +131,7 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
     },
-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again. Tell the PO which command to run, never that it happens automatically.`
+    afterSigning: `Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
   };
 }
@@ -153,24 +155,32 @@ export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DE
   if (subjectSha256 !== null && !isProofSubjectSha256(subjectSha256)) {
     return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--subject must be 64 lowercase hex characters", repair: "pass the subject sha256 the signing step printed, unchanged, or leave --subject out" };
   }
-  const deadline = now() + timeoutSeconds * 1000;
+  const started = now();
+  const deadline = started + timeoutSeconds * 1000;
+  // C29 (Codex run 3, C9; PO tile 2026-11-13 "bounded wait, silent"): every result labels the time it waited as PO wait, so a timeline or
+  // report nets it out of agent time instead of counting it as active work.
+  const waited = () => ({ waitedSeconds: Math.max(0, Math.round((now() - started) / 1000)), waitClass: PROOF_WAIT_CLASS });
   let last;
   for (;;) {
     last = observe(root, proof, subjectSha256);
-    if (last.state === "present") return { status: "proof-present", proofPath: proof };
+    if (last.state === "present") return { status: "proof-present", proofPath: proof, ...waited() };
     if (now() >= deadline) break;
     pause(Math.min(500, Math.max(1, deadline - now())));
   }
   const sign = signCommandForProof(root, proof);
   const again = text(proofWaitCommand(root, proof, timeoutSeconds, subjectSha256));
   const critical = isCriticalMirrorProof(proof) ? `ask the PO once to run ${CRITICAL_SIGNING_STEP}` : null;
+  if (last.state !== "stale" && last.state !== "invalid") {
+    // C29 (C9): a timeout is not news. The signing command was handed over once before the wait; repeating it or posting a status
+    // message on every timeout is the toil the run showed (570 s of active waiting with repeated messages).
+    const handed = isCriticalMirrorProof(proof) ? CRITICAL_SIGNING_STEP : (sign === null ? "the signing step" : text(sign));
+    return { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, ...waited(), reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s; signing is a human step and the time waited is PO wait`,
+      repair: `the PO already has the one signing command (${handed}); do not repeat it and post no status message; wait silently again: ${again}` };
+  }
   if (last.state === "stale") {
-    return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
+    return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, ...waited(), reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
       repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${critical ?? (sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
   }
-  return last.state === "invalid"
-    ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
-      repair: `${critical ?? (sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`)}; then run ${again}` }
-    : { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s`,
-      repair: `${critical ?? (sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
+  return { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, ...waited(), reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
+    repair: `${critical ?? (sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`)}; then run ${again}` };
 }

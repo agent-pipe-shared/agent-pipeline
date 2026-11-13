@@ -35,7 +35,7 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
 import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
-import { awaitSignatureFields, commandText } from "../signed-proof-wait.mjs";
+import { awaitSignatureFields, commandText, PROOF_WAIT_CLASS, waitForSignedProof } from "../signed-proof-wait.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
@@ -403,7 +403,8 @@ test("G20-30: the design approval's signing step names the exact proof path and 
   const waited = waitForProofCli(f.root, proofRel, 1);
   assert.equal(waited.status, 2, waited.stderr);
   assert.equal(waited.out.code, "PROOF-WAIT-TIMEOUT");
-  assert.match(waited.out.repair, /sign-intent/u, "the one recovery is the signing command itself, then the same wait again");
+  assert.equal(waited.out.waitClass, "po-wait", "C29-C9: the CLI result agents and timelines read carries the PO-wait label"); assert.ok(Number.isSafeInteger(waited.out.waitedSeconds) && waited.out.waitedSeconds >= 0);
+  assert.match(waited.out.repair, /sign-intent/u, "the one recovery names the signing command the PO already has, then the same wait again");
   assert.match(waited.out.repair, /proof-wait\.mjs/u);
   const refusedPath = waitForProofCli(f.root, "../outside.json", 1);
   assert.equal(refusedPath.status, 2);
@@ -866,6 +867,23 @@ test("G20-76: awaitSignatureFields adds --subject after --timeout only when it i
   assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "570", "--subject", subject]);
   assert.match(bound.afterSigning, /only for the expected subject/u);
   assert.throws(() => awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: "nope" }), /subject/iu);
+});
+
+test("C29-C9: the signature wait is silent and its time is PO wait: a timeout does not ask again, every result carries waitedSeconds and the po-wait label", () => {
+  // Codex run 3 (C9): 570 s of active waiting with repeated status messages. PO tile 2026-11-13: bounded wait, silent, labelled PO wait.
+  let clock = 1_000_000;
+  const now = () => clock; const pause = (ms) => { clock += ms; };
+  const proof = "scratch/critical-push-proof-0123456789ab.json";
+  const timeout = waitForSignedProof({ root: "/p", proof, timeoutSeconds: 3, now, pause, observe: () => ({ state: "absent" }) });
+  assert.equal(timeout.code, "PROOF-WAIT-TIMEOUT"); assert.equal(timeout.waitClass, PROOF_WAIT_CLASS); assert.equal(PROOF_WAIT_CLASS, "po-wait"); assert.equal(timeout.waitedSeconds, 3);
+  assert.match(timeout.repair, /already has the one signing command[\s\S]*do not repeat it and post no status message[\s\S]*proof-wait\.mjs/u);
+  assert.doesNotMatch(timeout.repair, /ask the PO/u, "a timeout never asks the PO again");
+  let seen = 0; clock = 2_000_000;
+  const present = waitForSignedProof({ root: "/p", proof, timeoutSeconds: 10, now, pause, observe: () => (++seen > 4 ? { state: "present" } : { state: "absent" }) });
+  assert.equal(present.status, "proof-present"); assert.equal(present.waitClass, "po-wait"); assert.equal(present.waitedSeconds, 2);
+  const fields = awaitSignatureFields({ root: "/p", proofPath: proof });
+  assert.match(fields.afterSigning, /silently: no status message and no repeated signing command between waits/u);
+  assert.match(fields.afterSigning, /is PO wait, never active agent time/u);
 });
 
 test("G20-76: the shell grammar admits the proof wait with --subject only as a 64 hex value after --timeout", async () => {
