@@ -414,6 +414,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         return stopResult("critic-standing", "ONESHOT-CRITIC-NOT-PASSED", `The Critic round ${packet} did not pass (${standing.blockers} blocker, ${standing.majors} major, ${standing.minors} minor) and no PO residual acceptance is on record, so this candidate cannot close. A statement in chat is not an acceptance.`,
           `nothing was written; correct the findings through a dispatch, run a Critic delta round on the new candidate, then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <new-packet-id>. ${acceptance}`);
       }
+      // C29 (Claude greenfield run 3, L1): the bound round passed, but an earlier blocker/major was marked fixed by a round that changed no product code or tests.
+      if (standing?.status === "earlier-findings-open" && Array.isArray(standing.open) && standing.open.length > 0) {
+        const named = standing.open.map((finding) => `${finding.severity} ${finding.findingId}${finding.originPacketId ? ` (raised in Critic round ${finding.originPacketId})` : ""}`).join("; ");
+        return stopResult("critic-standing", "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN", `The Critic round ${packet} passed, but ${standing.open.length} finding(s) of an earlier round were marked fixed by a round that changed no product code or tests, so they are still open: ${named}. A statement in chat is not an acceptance.`,
+          `nothing was written; ${String(standing.repair ?? "correct the named findings through a dispatch and run a Critic delta round over the change").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <the new round's packet id, or ${packet} after a PO acceptance>.`);
+      }
       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
       if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
         if (ownerRouteRequired) {
@@ -531,10 +537,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           `nothing was written. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
       }
       const recorded = readAcceptanceRecord(root, featureId);
+      // C29 (L1): an earlier major the PO accepted as uncorrectable stays uncorrected; the question names it, so the human accepts knowing it.
+      const earlierAccepted = (Array.isArray(standing?.settled) ? standing.settled : []).map((finding) => `earlier Critic ${finding.severity} ${finding.findingId}${finding.originPacketId ? ` (round ${finding.originPacketId})` : ""} is not corrected; the PO accepted it as uncorrectable`);
+      const askedChecks = openChecksOf([...earlierAccepted, ...(openChecks ?? [])]);
       if (recorded !== null && recorded.candidate === candidateHead) accepted = { candidate: candidateHead, answer: recorded.answer, openChecks: recorded.openChecks };
-      else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: openChecksOf(openChecks) };
+      else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: askedChecks };
       else {
-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks), form: yesForm }),
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: askedChecks, form: yesForm }),
           `nothing was written. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then ${bothWays} If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
       }
       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward

@@ -33,6 +33,17 @@ export function isEvidencePath(path, featureId) {
     || path.startsWith("evidence/") || path.startsWith("backlog/evidence/");
 }
 
+/**
+ * C29 (Claude greenfield run 3, L1): a path of the product's code or tests, narrower than a "product" commit path: the feature's
+ * Spec and design text, docs, architecture, project calibration and agent configuration are not code, and a Critic round that
+ * changed only those cannot have corrected a finding in the code. Used by the Critic lineage to decide whether a passing later
+ * round may mark an earlier blocker or major as fixed.
+ */
+export function isProductCodePath(path, featureId) {
+  if (typeof path !== "string" || path === "" || isEvidencePath(path, featureId)) return false;
+  return !/^(?:specs|docs|architecture|project|backlog|governance|telemetry|\.claude|\.codex|\.agents|\.gemini)\//u.test(path);
+}
+
 /** "evidence" or "product" for the paths one commit touches. */
 export function classifyCommitPaths(paths, featureId) {
   return paths.every((path) => isEvidencePath(path, featureId)) ? "evidence" : "product";

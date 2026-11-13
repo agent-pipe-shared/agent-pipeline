@@ -427,6 +427,33 @@ test("C24: a Critic round that did not pass stops before the Result bootstrap an
   assert.equal(stoppedFor({ status: "unknown" }).result.stop.code, "ONESHOT-RESULT-NOT-BOUND", "an unreadable standing leaves the close's own check in charge");
 });
 
+test("C29 L1: a passing round with an earlier blocker/major marked fixed without a reviewed code change stops before anything runs and names the finding, its round and the routes", () => {
+  const origin = "c".repeat(32);
+  const open = [{ findingId: `CRF-${origin}-1`, severity: "major", originPacketId: origin, evidenceSha256: "d".repeat(64), markedFixedInReviewId: "r2" },
+    { findingId: `CRF-${origin}-2`, severity: "blocker", originPacketId: origin, evidenceSha256: "e".repeat(64), markedFixedInReviewId: "r2" }];
+  const f = oneShotFixture({ continuity: true, resultBound: false, criticStanding: { status: "earlier-findings-open", open, settled: [], repair: `correct the named findings ... A blocker can never be accepted. A major ... node pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet ${origin} --reason-class uncorrectable-past-authorship.` } });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stage, "critic-standing"); assert.equal(stopped.stop.code, "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN");
+    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\); blocker CRF-${origin}-2`, "u"));
+    assert.match(stopped.stop.reason, /A statement in chat is not an acceptance/u);
+    assert.match(stopped.stop.repair, /A blocker can never be accepted[\s\S]*approve-residual-acceptance --by <name> --critic-packet c{32} --reason-class uncorrectable-past-authorship/u);
+    assert.doesNotMatch(stopped.stop.repair, / node pipeline-state\.mjs /u, "the state writer is named by its path");
+    assert.deepEqual(f.calls, [], "nothing runs before the stop");
+    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C29 L1: an earlier major the PO accepted as uncorrectable is named in the acceptance question", () => {
+  const origin = "c".repeat(32);
+  const f = oneShotFixture({ acceptance: false, criticStanding: { status: "passed", settled: [{ findingId: `CRF-${origin}-1`, severity: "major", originPacketId: origin, evidenceSha256: "d".repeat(64), markedFixedInReviewId: "r2" }] } });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(stopped).slice(0, 400));
+    assert.match(stopped.stop.reason, new RegExp(`earlier Critic major CRF-${origin}-1 \\(round ${origin}\\) is not corrected; the PO accepted it as uncorrectable`, "u"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("C21C: a missing PO acknowledgement of a caller-authored Critic stops before Verify and writes nothing", () => {
   const f = oneShotFixture({ acknowledgementMissing: true });
   try {

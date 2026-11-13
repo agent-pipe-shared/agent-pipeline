@@ -38,6 +38,7 @@ import {
 } from "../lib/private-boundary.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+import { describeLapsedFinding, lapsedFindingsRepair, readLapsedCriticFindings } from "../lib/critic-lapsed-findings.mjs";
 import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
@@ -744,6 +745,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     // candidate is unapproved or unregistered.
     const addendumGate = specAddendumCloseFindings({ root, candidateCommit: git(root, ["rev-parse", "HEAD"]) });
     if (!addendumGate.ok) fail("CLOSE-SPEC-ADDENDUM-UNCOVERED", `feature close preparation is blocked by the Spec addenda: ${addendumGate.findings.slice(0, 5).join("; ")}${addendumGate.findings.length > 5 ? `; and ${addendumGate.findings.length - 5} more` : ""}`);
+    // C29 (Claude greenfield run 3, L1): an earlier blocker/major that a later round marked fixed with no reviewed code change since stays open for the close.
+    const lapsed = readLapsedCriticFindings({ repoRoot: root, featureId: observed.feature.id, candidateCommit: git(root, ["rev-parse", "HEAD"]), gitCommonDir: common, projectDir: root });
+    if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: a later Critic round marked ${lapsed.open.length} earlier finding(s) fixed, but no reviewed round since changed product code or tests: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
     // A missing slice queue says nothing about whether the whole candidate
     // received independent review. Resolve the State and package contracts.
     // The audit route below reads the consumed Critic packet and exact Verify
@@ -1411,11 +1415,18 @@ try {
     // C24 (Claude greenfield): read-only, so the one-shot close can say BEFORE anything is written that this round did not pass. The close keeps its own check.
     const parsed = exactArgs(argv, new Set(["root", "packet"]));
     if (!parsed || !parsed.values.root || !/^[a-f0-9]{32}$/u.test(parsed.values.packet ?? "")) fail("CLOSE-ARGS", "critic-standing arguments invalid");
-    const controlRoot = join(gitCommonDir(physicalRoot(parsed.values.root)), "agent-pipeline", "critic-packets");
+    const standingRoot = physicalRoot(parsed.values.root);
+    const standingCommon = gitCommonDir(standingRoot);
+    const controlRoot = join(standingCommon, "agent-pipeline", "critic-packets");
     try {
       const { receipt } = readConsumedCandidateReceipt({ controlRoot, packetId: parsed.values.packet });
-      if (receipt?.reviewPass === true) emit({ schema: "pipeline.close-critic-standing.v1", status: "passed" });
-      else {
+      if (receipt?.reviewPass === true) {
+        // C29 (L1): the bound round passed; an earlier blocker/major it (or a round before it) marked fixed without a reviewed code change is still open.
+        let lapsed = null;
+        try { lapsed = readLapsedCriticFindings({ repoRoot: standingRoot, featureId: activeFeature(stateSnapshot(standingRoot).state).id, candidateCommit: git(standingRoot, ["rev-parse", "HEAD"]), gitCommonDir: standingCommon, projectDir: standingRoot }); } catch { lapsed = null; }
+        if (lapsed?.status === "open") emit({ schema: "pipeline.close-critic-standing.v1", status: "earlier-findings-open", open: lapsed.open, settled: lapsed.settled, repair: lapsedFindingsRepair({ open: lapsed.open }) });
+        else emit({ schema: "pipeline.close-critic-standing.v1", status: "passed", ...(lapsed?.settled?.length > 0 ? { settled: lapsed.settled } : {}) });
+      } else {
         const { findings } = readConsumedCandidateResult({ controlRoot, packetId: parsed.values.packet }).result.verdict;
         const count = (severity) => findings.filter((finding) => finding?.severity === severity).length;
         emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor") });
