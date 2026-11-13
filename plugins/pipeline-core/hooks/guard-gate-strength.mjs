@@ -184,6 +184,18 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
     path: "project/.onboarding-staging/*",
     reason: "onboarding staging artifacts are coordinator-managed and must not be modified directly during implementation.",
   }),
+  // GS-16/GS-17 (ADR-0096, D248, Claude test run 3 finding L4): the architecture gate definitions. A stage-0 commit changed them
+  // without a proof and neither the Critic nor the PO saw it. First creation stays free (first appearance in history).
+  Object.freeze({
+    id: "GS-16",
+    path: "architecture/boundary-policy.json",
+    reason: "the boundary policy decides which module dependencies the architecture boundary check accepts; only its first creation by architecture-boundary-check.mjs --write-policy is free, every later change weakens or tightens that gate and needs a human-guard override (ADR-0096).",
+  }),
+  Object.freeze({
+    id: "GS-17",
+    path: "architecture/fitness-model.json",
+    reason: "the fitness model decides which architecture fitness checks run; its only writer is pipeline-state.mjs materialize-architecture from the PO-approved design, which arms its own commit (ADR-0096).",
+  }),
 ]);
 
 // ---------------------------------------------------------------------------------
