@@ -43,4 +43,4 @@ Known limits:
 
 ## Affected contracts
 
-ADR-0091 (the close's SBOM) and the close-commit split share the feature-range definition. The Semgrep rule pack of candidate 28e, which makes the severe classes blocking, is a separate decision.
+ADR-0091 (the close's SBOM) and the close-commit split share the feature-range definition. The Semgrep rule pack of candidate 28e, which makes the severe classes blocking, is a separate decision (ADR-0094).
