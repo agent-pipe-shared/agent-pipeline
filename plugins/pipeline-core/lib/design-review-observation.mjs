@@ -131,9 +131,10 @@ export function recordDesignReviewObservation({ commonDir, runner, input, nowMs 
   try {
     if (runner !== "claude") return { status: "not-applicable" };
     const seen = observeClaudeDesignReview(input, { readHandbackFn, readModelsFn });
+    if (seen.status === "unobserved") { noteUnobserved(commonDir, seen.code, nowMs); return seen; }
     if (seen.status !== "observed") return seen;
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
-    if (Buffer.byteLength(seen.text, "utf8") > MAX_TEXT_BYTES) return { status: "unobserved", code: "DRO-TEXT-TOO-LARGE" };
+    if (Buffer.byteLength(seen.text, "utf8") > MAX_TEXT_BYTES) { noteUnobserved(commonDir, "DRO-TEXT-TOO-LARGE", nowMs); return { status: "unobserved", code: "DRO-TEXT-TOO-LARGE" }; }
     const modelsUsed = seen.modelsUsed.slice(-MAX_MODELS);
     const resultSha256 = sha256(seen.text);
     const record = { schema: DESIGN_REVIEW_OBSERVATION_SCHEMA, runner, assurance: seen.assurance, modelsUsed, resultSha256, observedAtMs: nowMs, text: seen.text };
@@ -144,6 +145,31 @@ export function recordDesignReviewObservation({ commonDir, runner, input, nowMs 
     catch (error) { if (error?.code === "EEXIST") return { status: "already-recorded", resultSha256, model, assurance: seen.assurance }; throw error; }
     return { status: "recorded", resultSha256, model, assurance: seen.assurance };
   } catch { return { status: "unavailable" }; }
+}
+
+// A background stop's notice goes to the stderr of a hook that exits 0 and is easily lost; the latest reason a reviewer stop was
+// not observed is kept beside the records (code and time only, overwritten each time) so export-report can say why it found none.
+const LAST_UNOBSERVED = "last-unobserved.json";
+const DRO_CODE = /^DRO-[A-Z0-9-]{1,48}$/u;
+function noteUnobserved(commonDir, code, nowMs) {
+  try {
+    if (typeof commonDir !== "string" || commonDir === "" || !DRO_CODE.test(code)) return;
+    const dir = designReviewObservationDir(commonDir);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const file = join(dir, LAST_UNOBSERVED);
+    if (existsSync(file) && lstatSync(file).isSymbolicLink()) return;
+    writeFileSync(file, `${JSON.stringify({ code, observedAtMs: nowMs })}\n`, { mode: 0o600 });
+  } catch { /* diagnostic only */ }
+}
+
+/** The latest reason a Claude reviewer stop was not observed on this device, or null. */
+export function readLastUnobservedDesignReview({ commonDir }) {
+  try {
+    const file = join(designReviewObservationDir(commonDir), LAST_UNOBSERVED);
+    if (!existsSync(file) || lstatSync(file).isSymbolicLink()) return null;
+    const value = JSON.parse(readFileSync(file, "utf8"));
+    return DRO_CODE.test(value?.code) && Number.isSafeInteger(value?.observedAtMs) ? { code: value.code, observedAtMs: value.observedAtMs } : null;
+  } catch { return null; }
 }
 
 function validRecord(record, sha) {

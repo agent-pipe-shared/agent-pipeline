@@ -35,7 +35,7 @@ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFile
 import { dirname, join, sep } from "node:path";
 
 import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
-import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation } from "../lib/design-review-observation.mjs";
+import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 
@@ -375,7 +375,11 @@ export function exportReportFromObservation(input, deps = {}) {
     if (record === null) return refuse("DRC-OBSERVATION-MISSING", `no design review observation ${request.observation} is recorded on this device`);
   } else {
     const open = listUnexportedDesignReviewObservations({ commonDir });
-    if (open.length === 0) return refuse("DRC-OBSERVATION-MISSING", "no unexported design review observation is recorded on this device. Only a Claude dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded records one (after an install or hook refresh: restart the session first); dispatch the review again");
+    if (open.length === 0) {
+      const last = readLastUnobservedDesignReview({ commonDir });
+      const why = last === null ? "" : ` The latest reviewer stop on this device was not observed: ${last.code} at ${new Date(last.observedAtMs).toISOString()}.`;
+      return refuse("DRC-OBSERVATION-MISSING", `no unexported design review observation is recorded on this device.${why} Only a Claude dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded records one (after an install or hook refresh: restart the session first); dispatch the review again`);
+    }
     if (open.length > 1) {
       return refuse("DRC-OBSERVATION-AMBIGUOUS", `${open.length} design review observations are unexported; name one with --observation: ${open.slice(0, 8).map((entry) => `${entry.resultSha256} (${entry.modelsUsed[entry.modelsUsed.length - 1]}, ${new Date(entry.observedAtMs).toISOString()}, ${Buffer.byteLength(entry.text, "utf8")} bytes)`).join("; ")}`);
     }

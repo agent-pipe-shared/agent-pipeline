@@ -523,6 +523,17 @@ test("D247: a child transcript that is a symlink or holds no model is refused, n
   assert.deepEqual(observeClaudeDesignReview(linked.stop("r")), { status: "unobserved", code: "DRO-TRANSCRIPT-UNSAFE" });
 });
 
+test("D247: an unobserved reviewer stop leaves its reason, and export-report names it when it finds no observation", withRepo(async (repo, t) => {
+  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t, []);
+  assert.deepEqual(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# r\n"), nowMs: Date.parse("2026-11-13T10:00:00.000Z") }),
+    { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" });
+  const missing = runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/none.md"], CLAUDE, world.deps);
+  assert.equal(missing.json.code, "DRC-OBSERVATION-MISSING");
+  assert.match(missing.json.message, /The latest reviewer stop on this device was not observed: DRO-NO-TRANSCRIPT-MODEL at 2026-11-13T10:00:00\.000Z\./u);
+  assert.equal(existsSync(join(repo, "specs/feat-x/review/none.md")), false);
+}));
+
 test("D247: a background reviewer's SubagentHandback is the observed text, never later trailing prose (PF-61/PF-70)", async (t) => {
   const { observeClaudeDesignReview } = await import("../lib/design-review-observation.mjs");
   const { readSubagentHandbackMessage } = await import("../lib/native-goldfish-host-finalizer.mjs");
