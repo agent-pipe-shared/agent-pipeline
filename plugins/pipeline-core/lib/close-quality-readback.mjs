@@ -17,7 +17,7 @@
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
 import { createHash } from "node:crypto";
-import { SCANNER_EXCEPTIONS_PATH, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
+import { SCANNER_EXCEPTIONS_PATH, closeSecurityScopeNote, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
 import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
 import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
 
@@ -60,7 +60,10 @@ function securityRow(readers) {
       const critical = isCriticalStakes(stakesOf("project/pipeline.json") ?? stakesOf(".claude/pipeline.json"));
       const exceptions = critical ? parseScannerExceptions(text(SCANNER_EXCEPTIONS_PATH)) : null;
       const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners, { critical, exceptions })).map((line) => line.split(" -- ")[0]);
-      return row(id, "present", `${SECURITY_ENVELOPE_PATH} (${states.join("; ")})`);
+      // C29 (Codex run 3, C3): an empty or unreadable v2 capability plan travels beside the scanner states, so "present" never reads like every control passed.
+      let verdictDocument = null; try { verdictDocument = JSON.parse(text(SECURITY_VERDICT_PATH)); } catch { verdictDocument = null; }
+      const note = closeSecurityScopeNote(verdictDocument);
+      return row(id, "present", `${SECURITY_ENVELOPE_PATH} (${[...states, ...(note === null ? [] : [note])].join("; ")})`);
     } catch { /* unreadable scan result: fall through to the bare path */ }
   }
   return row(id, "present", SECURITY_ENVELOPE_PATH);

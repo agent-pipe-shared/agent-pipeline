@@ -322,12 +322,24 @@ export function closeSecurityScope(doc) {
   };
 }
 
-/** One sentence for a close report; "" when the scope is unavailable (the structured field then says why). */
+/**
+ * One sentence for a close report. C29 (Codex run 3, C3; PO tile 2026-11-13 "only honest display"): an unreadable scope and an empty
+ * capability plan are said out loud as open, never left out, so a close report cannot read like every security control passed.
+ */
 export function describeCloseSecurityScope(scope) {
-  if (scope?.status !== "read") return "";
+  if (scope?.status !== "read") return `Security scope: unavailable (${scope?.reason ?? "no v2 security verdict"}); no security control is shown as passed.`;
   const plan = scope.capabilityPlan.empty ? "empty" : `${scope.capabilityPlan.required} required, ${scope.capabilityPlan.optional} optional`;
   const notRun = scope.checksNotRun.length === 0 ? "none" : scope.checksNotRun.map(({ check, outcome }) => `${check} (${outcome})`).join(", ");
-  return `Security scope: the exit is decided by ${scope.exitAuthority}${scope.v2VerdictReportingOnly ? ", the v2 policy verdict is reporting only" : ""}${scope.v2VerdictBlocking ? " and names a blocking capability" : ""}; capability plan: ${plan}; checks that ran: ${scope.checksRan.length === 0 ? "none" : scope.checksRan.join(", ")}; did not run: ${notRun}.`;
+  const open = scope.capabilityPlan.empty ? " The v2 capability plan is empty, so no capability control counts as passed; it stays open." : "";
+  return `Security scope: the exit is decided by ${scope.exitAuthority}${scope.v2VerdictReportingOnly ? ", the v2 policy verdict is reporting only" : ""}${scope.v2VerdictBlocking ? " and names a blocking capability" : ""}; capability plan: ${plan}; checks that ran: ${scope.checksRan.length === 0 ? "none" : scope.checksRan.join(", ")}; did not run: ${notRun}.${open}`;
+}
+
+/** C29 (C3): the short scope note the close quality readback adds to its security row, read from the v2 verdict document. */
+export function closeSecurityScopeNote(doc) {
+  const scope = closeSecurityScope(doc);
+  if (scope.status !== "read") return "v2 scope unavailable: no security control shown as passed";
+  if (scope.capabilityPlan.empty) return `v2 capability plan empty${scope.v2VerdictReportingOnly ? ", reporting only" : ""}: no capability control passed, open`;
+  return scope.v2VerdictReportingOnly ? "v2 verdict reporting only, exit by v1" : null;
 }
 
 /**

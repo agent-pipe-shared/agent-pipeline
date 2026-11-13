@@ -1182,7 +1182,7 @@ test("R8: closed-local states what the security result covers, read from the v2 
     const none = oneShotClose(f.resumed, { runCommand: f.runner });
     assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
     assert.equal(none.securityScope.status, "unavailable");
-    assert.doesNotMatch(none.message, /Security scope:/u);
+    assert.match(none.message, /Security scope: unavailable \(the v2 security verdict could not be read\); no security control is shown as passed\./u); // C29 (C3): said, not left out.
     mkdirSync(join(f.root, "evidence"), { recursive: true });
     // The shape a real scan writes: scanners under capabilityOutcomes, only the checks without a capability under controls.
     writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: ["cap.sast", "cap.secrets"], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
@@ -1194,6 +1194,12 @@ test("R8: closed-local states what the security result covers, read from the v2 
     assert.deepEqual(done.securityScope.checksRan, ["cap.secrets", "cap.sast", "license-check"]);
     assert.deepEqual(done.securityScope.checksNotRun, [{ check: "cap.sca", outcome: "not-applicable", required: false }]);
     assert.match(done.message, /Security scope: the exit is decided by v1-blocking-logic, the v2 policy verdict is reporting only; capability plan: 2 required, 0 optional; checks that ran: cap\.secrets, cap\.sast, license-check; did not run: cap\.sca \(not-applicable\)\./u);
+    assert.doesNotMatch(done.message, /plan is empty/u);
+    // C29 (C3, Codex run 3): an empty, reporting-only plan is said as open, never as a passed control.
+    writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: [], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] }, capabilityOutcomes: {}, controls: [] }));
+    const empty = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(empty.securityScope.capabilityPlan.empty, true);
+    assert.match(empty.message, /capability plan: empty; checks that ran: none; did not run: none\. The v2 capability plan is empty, so no capability control counts as passed; it stays open\./u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

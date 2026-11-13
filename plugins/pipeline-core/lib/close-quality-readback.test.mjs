@@ -72,6 +72,17 @@ test("G20-25 security-scan: a readable scan result puts the four-state reading i
   assert.equal(rows(full({ readBytes: () => Buffer.from("not json") }))["security-scan"].evidence, SEC); // unreadable result: the bare path
 });
 
+test("C29-C3 security-scan: an empty or unreadable v2 capability plan is named open beside the scanner states, never left to read as passed", () => {
+  // Codex run 3 (C3, PO tile 2026-11-13 "only honest display"): the v2 plan was empty and reporting only while the row said present.
+  const scan = JSON.stringify({ scanners: [{ tool: "semgrep", status: "PASS", classification: "success" }] });
+  const verdict = (plan) => JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan, verdict: { blocking: false }, capabilityOutcomes: {}, controls: [] });
+  const withVerdict = (text) => rows(full({ readBytes: (p) => { if (p === "evidence/security-latest.json") return Buffer.from(scan); if (p === SEC_VERDICT && text !== null) return Buffer.from(text); throw new Error("absent"); } }))["security-scan"];
+  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; v2 capability plan empty, reporting only: no capability control passed, open\)$/u);
+  assert.match(withVerdict(null).evidence, /v2 scope unavailable: no security control shown as passed\)$/u);
+  const planned = withVerdict(verdict({ required: ["cap.sast"], optional: [] })).evidence;
+  assert.match(planned, /v2 verdict reporting only, exit by v1\)$/u); assert.doesNotMatch(planned, /plan empty|unavailable/u);
+});
+
 test("AC-239 adr-decision: present, not-applicable when no decision qualifies, missing when claimed but absent, unknown without a signal", () => {
   assert.equal(rows(full())["adr-decision"].status, "present");
   assert.equal(rows(full({ architectureImpact: () => "no-architecture-impact" }))["adr-decision"].status, "not-applicable");
