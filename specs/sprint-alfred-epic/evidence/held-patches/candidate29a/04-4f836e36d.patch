@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs b/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs
+index 7296c860faa06dc323a886749d98bcb6921ac26d..99dedfdc08dbcea563fd0a0dc34b21ff53a0b2ab 100644
+--- a/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs
+@@ -56,6 +56,8 @@ test("missing evaluator evidence stays unavailable with all ten open properties"
+ });
+ 
+ test("actual State close producer persists the nonblocking unavailable fitness disposition", () => {
++  // scratch/ is untracked: a fresh clone (scripts/run-parallel.mjs workers, Verify clones) has none until something creates it.
++  mkdirSync(join(root, "scratch"), { recursive: true });
+   const fixture = mkdtempSync(join(root, "scratch/g26-close-producer-"));
+   try {
+     execFileSync("git", ["init", "-q", fixture]);

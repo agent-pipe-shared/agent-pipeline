@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 29a: 2 held patches exported from the build clone chain 7e09ffab5..3bed48190
+# PO apply script for candidate 29a: 4 held patches exported from the build clone chain 7e09ffab5..4f836e36d
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -16,6 +16,8 @@ step() {
 }
 step 01-225bd9713 'fix(critic-carry): carry the push threat model and evidence-only gitleaks appends after the close'
 step 02-3bed48190 'fix(architecture-fitness): resolve a module'"'"'s own declared entry points and contracts in class 1'
+step 03-9388feb4e 'fix(guard-maintenance-window): list the three leaf modules candidate 28e added to kernel imports'
+step 04-4f836e36d 'test(architecture-close-disposition): create scratch/ before the ACD003 fixture'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
