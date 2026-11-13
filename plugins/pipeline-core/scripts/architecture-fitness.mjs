@@ -752,9 +752,14 @@ export function evaluateProfileDrift({ rootDir, now = new Date(), profileDrift =
   const violations = [];
   let evidence;
   let unavailable = null;
+  let designPackage = false;
   try {
     if (!rootDir) throw new Error("Repository root is required for accepted-reference readback");
     const accepted = resolveAdoptionState(rootDir, now);
+    // C28e (Claude test run, PO 2026-11-13): an approved design package is adopted without an adoption authority subject, so there
+    // is no accepted snapshot to measure against. The outcome stays unavailable, marked with its source so the planning projection
+    // reports it instead of blocking every re-entry into implementation.
+    designPackage = accepted?.state === "approved-scoped" && typeof accepted.decisionRef === "string" && accepted.decisionRef.startsWith("approved-design-package:");
     if (accepted.state !== "approved-scoped" || !accepted.authority?.request?.subject) throw new Error("Valid approved-scoped authority is unavailable");
     const subject = accepted.authority.request.subject;
     const scope = subject.scope.map(s => s.replace(/\/$/u, ""));
@@ -789,7 +794,7 @@ export function evaluateProfileDrift({ rootDir, now = new Date(), profileDrift =
   }
 
   if (unavailable) return { classId: 9, propertyId: "profile-drift", outcome: OUTCOME_UNAVAILABLE,
-    details: unavailable, violations: [], evidence: { status: "unavailable" } };
+    details: unavailable, violations: [], evidence: designPackage ? { status: "unavailable", source: "approved-design-package", measured: false } : { status: "unavailable" } };
 
   return {
     classId: 9,

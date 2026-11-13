@@ -213,6 +213,17 @@ function inspectCheckpointDebt(root, map, deps) {
   return { status: "clear", openCount: 0, targets: [] };
 }
 
+/**
+ * C28e (Claude test run, PO 2026-11-13): class 9 cannot be measured for a repository adopted through an approved design package
+ * (no adoption authority subject, so no accepted snapshot). It is report-only there, the same rule the greenfield-pending allowance
+ * already applied at the first entry; every other unavailable class 9 still blocks.
+ */
+function isDesignPackageProfileDriftUnmeasured(outcome) {
+  return outcome?.classId === 9 && outcome.propertyId === "profile-drift" && outcome.outcome === "unavailable"
+    && outcome.details === "Valid approved-scoped authority is unavailable"
+    && outcome.evidence?.status === "unavailable" && outcome.evidence?.source === "approved-design-package";
+}
+
 function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
   const outcomes = Array.isArray(fitness?.outcomes) ? fitness.outcomes : [];
   const expectedClasses = new Set(Array.from({ length: 10 }, (_, index) => index + 1));
@@ -234,7 +245,7 @@ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
       && Array.isArray(outcome.evidence?.required)
       && outcome.evidence.required.includes("measured-calibration")
       && outcome.evidence.required.includes("explicit-threshold-promotion")
-  ));
+  ) || isDesignPackageProfileDriftUnmeasured(outcome));
   const blocking = outcomes.filter((outcome) => !reportOnly.includes(outcome));
   let blockingOverallStatus = "pass";
   if (blocking.some((outcome) => outcome.outcome === "finding")) blockingOverallStatus = "blocked";

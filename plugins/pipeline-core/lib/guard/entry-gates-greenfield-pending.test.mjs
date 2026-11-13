@@ -238,6 +238,17 @@ test("Claude Windows report: a ready readiness names only the allowance code, no
   assert.doesNotMatch(verdict.stderr, /Entry readiness is/u);
 });
 
+// C28e (Claude test run, PO 2026-11-13): class 9 is unmeasurable for a design-package adoption; it is report-only there, and only there.
+const C28E_CLASS9 = (evidence) => ({ classId: 9, propertyId: D1_CLASSES[8], outcome: "unavailable", violations: [],
+  details: "Valid approved-scoped authority is unavailable", evidence });
+test("C28e (Claude test run) class 9 unmeasured for an approved design package is admitted beside the uncalibrated class 10", () => {
+  assert.equal(d1Verdict(d1Fitness([D1_UNCALIBRATED, C28E_CLASS9({ status: "unavailable", source: "approved-design-package", measured: false })])), null);
+});
+test("C28e (Claude test run) class 9 unavailable without the design-package source is still denied", () => {
+  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, C28E_CLASS9({ status: "unavailable" })])), "class 9, no design package");
+  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, { ...C28E_CLASS9({ status: "unavailable", source: "approved-design-package" }), details: "Accepted reference does not cover profile, routing and module map" }])), "class 9, other cause");
+});
+
 test("D165-D1 (d) a malformed nine-outcome set is denied", () => {
   const fitness = d1Fitness([D1_UNCALIBRATED]);
   fitness.outcomes = fitness.outcomes.slice(0, 9);
