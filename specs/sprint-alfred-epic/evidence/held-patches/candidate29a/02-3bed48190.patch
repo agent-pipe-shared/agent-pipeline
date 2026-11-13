@@ -1,0 +1,59 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.mjs b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+index 2b449314cf25a27b08cad3a82596049d0850144c..59bed8863b82ef7ba8fa34526966d3c8fa732b97 100755
+--- a/plugins/pipeline-core/scripts/architecture-fitness.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+@@ -185,6 +185,19 @@ export function extractJsImports(sourceCode) {
+   return imports;
+ }
+ 
++/**
++ * Candidate 29 (Glossover K-23): a module that names a path among its own verificationEntryPoints or publicContracts declares that surface,
++ * even when its ownedPaths do not cover it (an integration test or a browser spec beside the unit tests the module owns). Exactly one
++ * declaring module resolves the path; none or several leave it unresolved.
++ */
++function moduleDeclaringSurface(path, inventory) {
++  const moduleList = Array.isArray(inventory) ? inventory : (inventory?.modules || []);
++  const normalized = String(path).replace(/\\/g, "/").replace(/^\.\//u, "");
++  const declaring = moduleList.filter((mod) => [...(mod.verificationEntryPoints || []), ...(mod.publicContracts || [])]
++    .some((surface) => typeof surface === "string" && surface.replace(/\\/g, "/").replace(/^\.\//u, "") === normalized));
++  return declaring.length === 1 ? declaring[0] : null;
++}
++
+ /**
+  * Class 1: Module Identity & Ownership
+  */
+@@ -195,7 +208,7 @@ export function evaluateModuleIdentityOwnership({ rootDir, inventory, candidateP
+   for (const p of candidatePaths) {
+     if (p.startsWith("scratch/") || p.startsWith(".git/") || p.endsWith(".md")) continue;
+     checked.push(p);
+-    const mod = resolveModuleForPath(p, inventory);
++    const mod = resolveModuleForPath(p, inventory) ?? moduleDeclaringSurface(p, inventory);
+     if (!mod) {
+       violations.push({
+         ruleId: "unresolved-module-path",
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+index e000bf1769833301b5cc48ecf4233ad837290cb8..d392b5c69be15974cfa83a688e3623b3889c64ff 100644
+--- a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+@@ -232,6 +232,21 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
+       assert.equal(invalid.violations[0].ruleId, "unresolved-module-path");
+     });
+ 
++    it("Class 1: a module's own declared entry point or contract resolves to it outside its ownedPaths; several declarers do not (Glossover K-23)", () => {
++      const declared = [
++        { id: "assistant", ownedPaths: ["tests/unit/assistant/**"], verificationEntryPoints: ["tests/integration/assistant-routes.test.ts", "./tests/e2e-browser/assistant.spec.ts"], publicContracts: [] },
++        { id: "identity", ownedPaths: ["tests/unit/identity.test.ts"], verificationEntryPoints: ["tests/integration/shared.test.ts"], publicContracts: ["docs/contracts/identity.json"] },
++        { id: "other", ownedPaths: ["src/other/**"], verificationEntryPoints: ["tests/integration/shared.test.ts"], publicContracts: [] },
++      ];
++      const resolved = evaluateModuleIdentityOwnership({ rootDir: REPO_ROOT, inventory: declared,
++        candidatePaths: ["tests/integration/assistant-routes.test.ts", "tests/e2e-browser/assistant.spec.ts", "docs/contracts/identity.json", "tests/unit/assistant/a.test.ts"] });
++      assert.equal(resolved.outcome, OUTCOME_PASS, JSON.stringify(resolved.violations));
++      const unresolved = evaluateModuleIdentityOwnership({ rootDir: REPO_ROOT, inventory: declared,
++        candidatePaths: ["tests/integration/shared.test.ts", "tests/integration/undeclared.test.ts"] });
++      assert.equal(unresolved.outcome, OUTCOME_FINDING);
++      assert.deepEqual(unresolved.violations.map((v) => v.target), ["tests/integration/shared.test.ts", "tests/integration/undeclared.test.ts"]);
++    });
++
+     it("Class 2: contract-presence-freshness verifies public contracts and detects missing/stale files", () => {
+       const valid = evaluateContractPresenceFreshness({
+         rootDir: REPO_ROOT,
