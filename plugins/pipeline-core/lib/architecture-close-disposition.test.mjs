@@ -56,6 +56,8 @@ test("missing evaluator evidence stays unavailable with all ten open properties"
 });
 
 test("actual State close producer persists the nonblocking unavailable fitness disposition", () => {
+  // scratch/ is untracked: a fresh clone (scripts/run-parallel.mjs workers, Verify clones) has none until something creates it.
+  mkdirSync(join(root, "scratch"), { recursive: true });
   const fixture = mkdtempSync(join(root, "scratch/g26-close-producer-"));
   try {
     execFileSync("git", ["init", "-q", fixture]);
