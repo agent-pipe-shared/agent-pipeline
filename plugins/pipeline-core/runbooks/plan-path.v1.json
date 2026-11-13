@@ -150,7 +150,8 @@
       "who": "agent",
       "command": "node <plugin-root>/scripts/design-review-receipt.mjs create --repo <root> --feature <feature-id> --report <review-report-path> --prd <prd-path> --spec <spec-path> --out <review-receipt-path>",
       "needs": [
-        "the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)"
+        "the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)",
+        "on Claude, its report written by design-review-receipt.mjs export-report --repo <root> --out <review-report-path>, so the receipt records the host-observed reviewer model (present-plan refuses an unobserved Claude review)"
       ],
       "evidenceSchema": null,
       "producer": "the tracked design review receipt present-plan and prepare-seal name; never written by hand",

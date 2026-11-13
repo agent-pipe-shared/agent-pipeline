@@ -847,6 +847,52 @@ test("U2-18: summarize passes the parse refusal code through", () => {
 
 // ------------------------------------------------------------------ U2-19
 
+// D247 (L3 part 3): the optional, closed reviewer observation.
+const OBSERVED = { assurance: "host-observed-tool-use", modelsUsed: ["claude-sonnet-4", REVIEWER.model], resultSha256: REPORT_1.sha256 };
+const UNOBSERVED = { assurance: "unobserved", modelsUsed: [], resultSha256: null };
+
+test("D247: an observed and an unobserved receipt round-trip; a receipt without the field is byte-unchanged", async () => {
+  const { isHostObservedDesignReview } = await import("./design-review-receipt.mjs");
+  const observed = create({ reviewerObservation: clone(OBSERVED) });
+  assert.equal(observed.ok, true, JSON.stringify(observed));
+  assert.deepEqual(parse(Buffer.from(observed.bytes)).receipt.reviewerObservation, OBSERVED);
+  assert.equal(isHostObservedDesignReview(observed.receipt), true);
+  const unobserved = create({ reviewerObservation: clone(UNOBSERVED) });
+  assert.equal(unobserved.ok, true);
+  assert.equal(isHostObservedDesignReview(unobserved.receipt), false);
+  assert.equal(isHostObservedDesignReview(create().receipt), false, "a receipt made before the observation route is not observed");
+  assert.deepEqual(Buffer.from(create().bytes), bytesOf(initialObject()), "without the field the bytes are the hand-built v1 receipt");
+});
+
+test("D247: the observation must bind the bound report and name the reviewer model last (DRR-OBSERVATION)", () => {
+  assert.deepEqual(create({ reviewerObservation: { ...OBSERVED, resultSha256: REPORT_2.sha256 } }), refuse("DRR-OBSERVATION"));
+  assert.deepEqual(create({ reviewerObservation: { ...OBSERVED, modelsUsed: [REVIEWER.model, "claude-sonnet-4"] } }), refuse("DRR-OBSERVATION"));
+  assert.deepEqual(parse(initialObject({ reviewerObservation: { ...OBSERVED, resultSha256: REPORT_2.sha256 } })), refuse("DRR-OBSERVATION"));
+  // A sanitized report: the observation is the unpublished original's digest.
+  const sanitized = { ...REPORT_1, originalSha256: sha("original-1") };
+  assert.equal(create({ report: sanitized, reviewerObservation: { ...OBSERVED, resultSha256: sha("original-1") } }).ok, true);
+  assert.deepEqual(create({ report: sanitized, reviewerObservation: clone(OBSERVED) }), refuse("DRR-OBSERVATION"));
+});
+
+test("D247: the observation is closed and well-formed, else DRR-SHAPE", () => {
+  for (const bad of [
+    { ...OBSERVED, extra: 1 }, { assurance: OBSERVED.assurance, modelsUsed: OBSERVED.modelsUsed },
+    { ...OBSERVED, assurance: "self-asserted" }, { ...OBSERVED, modelsUsed: [] }, { ...OBSERVED, modelsUsed: [REVIEWER.model, REVIEWER.model] },
+    { ...OBSERVED, modelsUsed: ["unknown"] }, { ...OBSERVED, resultSha256: null }, { ...UNOBSERVED, modelsUsed: [REVIEWER.model] },
+    { ...UNOBSERVED, resultSha256: REPORT_1.sha256 }, { ...OBSERVED, modelsUsed: Array.from({ length: 9 }, (_, i) => `m-${i}`) }, null,
+  ]) {
+    assert.deepEqual(create({ reviewerObservation: bad }), refuse("DRR-SHAPE"), JSON.stringify(bad));
+    assert.deepEqual(parse(initialObject({ reviewerObservation: bad })), refuse("DRR-SHAPE"), JSON.stringify(bad));
+  }
+});
+
+test("D247: the binding summary never carries the observation", () => {
+  const summary = summaryOf(initialObject({ reviewerObservation: clone(OBSERVED) }));
+  assert.equal("reviewerObservation" in summary, false);
+  const plain = summaryOf(initialObject());
+  assert.deepEqual(Object.keys(summary).sort(), Object.keys(plain).sort());
+});
+
 test("U2-19: the module imports only node:crypto and canonical from po-approval-proof (import rule of the contract header)", () => {
   const source = readFileSync(new URL("./design-review-receipt.mjs", import.meta.url), "utf8");
   const specifiers = [...source.matchAll(/\bfrom\s*["']([^"']+)["']/gu)].map((match) => match[1]);

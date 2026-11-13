@@ -79,7 +79,8 @@ function planSteps() {
     scriptStep({
       id: "design-review-receipt", script: "design-review-receipt.mjs", verb: "create",
       argv: ["create", "--repo", "<root>", "--feature", "<feature-id>", "--report", "<review-report-path>", "--prd", "<prd-path>", "--spec", "<spec-path>", "--out", "<review-receipt-path>"],
-      needs: ["the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)"],
+      needs: ["the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)",
+        "on Claude, its report written by design-review-receipt.mjs export-report --repo <root> --out <review-report-path>, so the receipt records the host-observed reviewer model (present-plan refuses an unobserved Claude review)"],
       producer: "the tracked design review receipt present-plan and prepare-seal name; never written by hand", commit: "commit the receipt with the design", next: ["submit-plan"],
     }),
     scriptStep({

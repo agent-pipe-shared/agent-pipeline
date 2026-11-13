@@ -54,11 +54,21 @@ was needed; capability evidence is not an Advisor answer.
    as `DRR-FINDING-IDS` and the refusal names the id). It reads the
    sources and the report from disk and stamps the review time, runner and
    reviewer model itself. Never write or edit a receipt by hand: a hand-written
-   receipt is not admissible evidence. Omit `--requested-route` and
-   `--observed-identity` unless a source-owned dispatch observation exists: a
-   self-asserted value is refused with `DRC-OBSERVATION-UNATTESTED` and the
-   identity is then recorded as `unknown` (only the typed fallback record,
-   `--fallback-reason-code`, may carry a route).
+   receipt is not admissible evidence. Never pass `--requested-route` or
+   `--observed-identity`: a self-asserted value is refused with
+   `DRC-OBSERVATION-UNATTESTED` (only the typed fallback record,
+   `--fallback-reason-code`, may carry a route). On Claude the plugin hooks
+   record the end of each `readiness-reviewer` dispatch with the host's model;
+   write the report with `node <plugin-root>/scripts/design-review-receipt.mjs
+   export-report --repo <root> --out <report path>` (it writes the returned
+   text as returned and prints one line; a sanitized publication goes in
+   `--report`, the exported text in `--original-report`), and `create` stamps
+   the observed model into the receipt itself. A Claude round without that
+   observation (a report written by hand, a session started before the hooks
+   were loaded) says `unobserved`, and `present-plan` refuses it
+   (`PLAN-DESIGN-REVIEW-UNOBSERVED`): dispatch the review again and start a new
+   initial receipt. On Codex and Antigravity there is no observation route yet;
+   their receipts say `unobserved` visibly and are presented.
    Dispatching the design review: the `critic-review` skill is for implementation
    batches (diff range, batch preflight) and does not fit uncommitted design
    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.

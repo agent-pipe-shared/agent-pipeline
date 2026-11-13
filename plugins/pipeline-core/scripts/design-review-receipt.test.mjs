@@ -468,3 +468,147 @@ test("the script carries the shebang and SPDX header and importing it runs nothi
   assert.ok(source.startsWith("#!/usr/bin/env node\n// SPDX-License-Identifier: SUL-1.0\n"));
   assert.equal(typeof main, "function");
 });
+
+// ----------------------------------------------------------------------------- D247: host-observed reviewer model (L3 part 3)
+
+/** A private control area and a fake background child transcript, both outside the repository. */
+function observationWorld(t, models = ["claude-opus-4"]) {
+  const base = mkdtempSync(join(tmpdir(), "drc-obs-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const commonDir = join(base, "common");
+  mkdirSync(join(base, "session", "subagents"), { recursive: true });
+  writeFileSync(join(base, "session.jsonl"), "");
+  const lines = models.map((model) => JSON.stringify({ type: "assistant", message: { role: "assistant", model, content: [{ type: "text", text: "x" }] } }));
+  lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", model: "<synthetic>", content: [] } }));
+  writeFileSync(join(base, "session", "subagents", "agent-a1.jsonl"), `${lines.join("\n")}\n`);
+  const stop = (text) => ({ hook_event_name: "SubagentStop", agent_type: "pipeline-core:readiness-reviewer", agent_id: "a1", transcript_path: join(base, "session.jsonl"), last_assistant_message: text });
+  return { commonDir, stop, deps: { commonDirFn: () => commonDir } };
+}
+
+test("D247: a background reviewer stop is recorded with the child transcript's models, and an unrelated stop is not", async (t) => {
+  const { recordDesignReviewObservation, readDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t, ["claude-sonnet-4", "claude-opus-4"]);
+  const recorded = recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Review\n\nVerdict: PASS\n"), nowMs: 1 });
+  assert.equal(recorded.status, "recorded");
+  assert.equal(recorded.model, "claude-opus-4");
+  assert.equal(recorded.assurance, "host-observed-child-transcript");
+  const record = readDesignReviewObservation({ commonDir: world.commonDir, resultSha256: sha("# Review\n\nVerdict: PASS\n") });
+  assert.deepEqual(record.modelsUsed, ["claude-sonnet-4", "claude-opus-4"], "first-use order, the host's synthetic placeholder is no model");
+  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Review\n\nVerdict: PASS\n") }).status, "already-recorded");
+  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: { ...world.stop("x"), agent_type: "pipeline-core:critic" } }).status, "not-applicable");
+  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "codex", input: world.stop("x") }).status, "not-applicable", "no Codex route is built");
+});
+
+test("D247: a foreground reviewer result is recorded with its resolved model; a background launch is left to the stop", async (t) => {
+  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t);
+  const post = (response) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:readiness-reviewer" }, tool_response: response });
+  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: post({ status: "async_launched" }) }).status, "not-applicable");
+  assert.deepEqual(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: post({ status: "completed", content: [{ type: "text", text: "r" }] }) }), { status: "unobserved", code: "DRO-NO-RESOLVED-MODEL" });
+  const recorded = recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude",
+    input: post({ status: "completed", resolvedModel: "claude-opus-4-1", modelsUsed: ["claude-opus-4-1"], content: [{ type: "text", text: "report" }] }) });
+  assert.equal(recorded.status, "recorded");
+  assert.equal(recorded.assurance, "host-observed-tool-use");
+  assert.equal(recorded.model, "claude-opus-4-1");
+});
+
+test("D247: a child transcript that is a symlink or holds no model is refused, never read through", async (t) => {
+  const { observeClaudeDesignReview } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t, []);
+  assert.deepEqual(observeClaudeDesignReview(world.stop("r")), { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" });
+  const linked = observationWorld(t);
+  const file = join(linked.stop("r").transcript_path.slice(0, -".jsonl".length), "subagents", "agent-a1.jsonl");
+  rmSync(file);
+  symlinkSync(join(tmpdir(), "nowhere.jsonl"), file);
+  assert.deepEqual(observeClaudeDesignReview(linked.stop("r")), { status: "unobserved", code: "DRO-TRANSCRIPT-UNSAFE" });
+});
+
+test("D247: export-report writes the observed text, and create stamps the observation and the observed model", withRepo(async (repo, t) => {
+  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t);
+  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Observed review\n\nVerdict: PASS\n") });
+  const out = "specs/feat-x/review/design-review-observed.md";
+  const exported = runMain(["export-report", "--repo", repo, "--out", out], CLAUDE, world.deps);
+  assert.equal(exported.code, 0, exported.stderr);
+  assert.equal(exported.json.status, "exported");
+  assert.equal(readFileSync(join(repo, out), "utf8"), "# Observed review\n\nVerdict: PASS\n", "the text as returned");
+  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/again.md"], CLAUDE, world.deps).json.code, "DRC-OBSERVATION-MISSING", "an exported observation is not chosen again by default");
+  const created = runMain(baseArgv(repo, { report: out }), CLAUDE, world.deps);
+  assert.equal(created.code, 0, created.stderr);
+  assert.deepEqual(created.json.reviewerObservation, { assurance: "host-observed-child-transcript", model: "claude-opus-4" });
+  assert.equal("notice" in created.json, false);
+  const receipt = parseDesignReviewReceipt(readFileSync(join(repo, RECEIPT1))).receipt;
+  assert.equal(receipt.reviewer.model, "claude-opus-4");
+  assert.deepEqual(receipt.reviewerObservation, { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sha("# Observed review\n\nVerdict: PASS\n") });
+  assert.equal("reviewerObservation" in summarizeDesignReviewReceipt({ path: RECEIPT1, bytes: readFileSync(join(repo, RECEIPT1)) }).summary, false, "the binding summary never carries it");
+}));
+
+test("D247: a sanitized report binds the observation through its unpublished original", withRepo(async (repo, t) => {
+  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t);
+  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Original\n") });
+  const original = "specs/feat-x/review/original.md";
+  assert.equal(runMain(["export-report", "--repo", repo, "--out", original], CLAUDE, world.deps).code, 0);
+  const created = runMain([...baseArgv(repo), "--original-report", original], CLAUDE, world.deps);
+  assert.equal(created.code, 0, created.stderr);
+  assert.equal(created.json.reviewerObservation.assurance, "host-observed-child-transcript");
+}));
+
+test("D247: without an observation a Claude receipt says unobserved and names the route; Codex and Antigravity say unobserved without a notice", withRepo((repo, t) => {
+  const world = observationWorld(t);
+  const claude = runMain(baseArgv(repo), CLAUDE, world.deps);
+  assert.equal(claude.code, 0, claude.stderr);
+  assert.deepEqual(claude.json.reviewerObservation, { assurance: "unobserved", model: "unknown" });
+  assert.match(claude.json.notice, /PLAN-DESIGN-REVIEW-UNOBSERVED/u);
+  assert.match(claude.json.notice, /export-report/u);
+  for (const [env, out] of [[{ CODEX_SESSION_ID: "s" }, "specs/feat-x/review/codex.receipt.json"], [{ ANTIGRAVITY_AGENT: "1" }, "specs/feat-x/review/agy.receipt.json"]]) {
+    const run = runMain(baseArgv(repo, { report: REPORT2, out }), env, world.deps);
+    assert.equal(run.code, 0, run.stderr);
+    assert.deepEqual(run.json.reviewerObservation, { assurance: "unobserved", model: "unknown" });
+    assert.equal("notice" in run.json, false);
+  }
+}));
+
+test("D247: export-report refuses an ambiguous choice with a compact list, an unknown digest and a second write", withRepo(async (repo, t) => {
+  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+  const world = observationWorld(t);
+  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("one"), nowMs: 1 });
+  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("two"), nowMs: 2 });
+  const ambiguous = runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md"], CLAUDE, world.deps);
+  assert.equal(ambiguous.json.code, "DRC-OBSERVATION-AMBIGUOUS");
+  assert.ok(ambiguous.json.message.includes(sha("one")) && ambiguous.json.message.includes(sha("two")));
+  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md", "--observation", "a".repeat(64)], CLAUDE, world.deps).json.code, "DRC-OBSERVATION-MISSING");
+  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md", "--observation", sha("two")], CLAUDE, world.deps).code, 0);
+  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md", "--observation", sha("one")], CLAUDE, world.deps).json.code, "DRC-OUT-EXISTS");
+}));
+
+test("D247: the installed hook records a reviewer's foreground result and background stop, says one line, and never blocks", withRepo((repo, t) => {
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: repo }).status, 0);
+  // The hook acts only in a governed project (an ungoverned one exits at once); the onboarding consent marker governs this fixture.
+  mkdirSync(join(repo, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(repo, ".agent-pipeline", "onboarding-consent.json"), `${JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: CLOCK })}\n`);
+  const hook = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
+  const runHook = (input) => spawnSync(process.execPath, [hook, "--runner", "claude"], { cwd: repo, input: JSON.stringify({ cwd: repo, session_id: "s-1", ...input }),
+    encoding: "utf8", env: { ...strippedEnv(), CLAUDECODE: "1", CLAUDE_PROJECT_DIR: repo } });
+  const store = join(repo, ".git", "agent-pipeline", "design-review-observations");
+  const foreground = runHook({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_use_id: "tu-1", tool_input: { subagent_type: "pipeline-core:readiness-reviewer" },
+    tool_response: { status: "completed", resolvedModel: "claude-opus-4", content: [{ type: "text", text: "# Foreground review\n" }] } });
+  assert.equal(foreground.status, 0, foreground.stderr);
+  assert.notEqual(foreground.stdout, "", `the foreground hook says one line; stderr: ${foreground.stderr}`);
+  const context = JSON.parse(foreground.stdout).hookSpecificOutput.additionalContext;
+  assert.match(context, /^Design review observed: reviewer model claude-opus-4 \(host-observed-tool-use\)\. /u);
+  assert.equal(context.includes("Foreground review"), false, "the returned text never reaches the agent's context through the hook");
+  assert.ok(existsSync(join(store, `${sha("# Foreground review\n")}.json`)));
+  const world = observationWorld(t);
+  const background = runHook(world.stop("# Background review\n"));
+  assert.equal(background.status, 0, background.stderr);
+  assert.equal(background.stdout, "", "a stop is never blocked");
+  assert.ok(existsSync(join(store, `${sha("# Background review\n")}.json`)));
+}));
+
+test("D247: a self-asserted identity stays refused next to the observation route (W7)", withRepo((repo, t) => {
+  const world = observationWorld(t);
+  const run = runMain([...baseArgv(repo), "--observed-identity", "claude-opus-4"], CLAUDE, world.deps);
+  assert.equal(run.json.code, "DRC-OBSERVATION-UNATTESTED");
+  assert.equal(existsSync(join(repo, RECEIPT1)), false);
+}));

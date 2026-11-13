@@ -321,6 +321,9 @@ async function walkSteps(f, { actualGuard }) {
   const reportPath = `specs/${f.featureId}/review/design-review-1.md`;
   const receiptPath = `specs/${f.featureId}/review/design-review-receipt-1.json`;
   writeFileSync(join(f.root, reportPath), '# Critic report\n\nVerdict: PASS\n');
+  // D247: the observed review text becomes the report through export-report, admitted in the same state (with and without a named observation).
+  check('design-review report export', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'export-report', '--repo', f.root, '--out', `specs/${f.featureId}/review/design-review-observed.md`));
+  check('design-review report export (named observation)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'export-report', '--repo', f.root, '--out', `specs/${f.featureId}/review/design-review-observed.md`, '--observation', 'a'.repeat(64)));
   const create = walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
     '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', receiptPath);
   const createAdmitted = check('design-review receipt (initial)', create);

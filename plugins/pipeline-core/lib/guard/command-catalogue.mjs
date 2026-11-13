@@ -252,8 +252,16 @@ function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
 }
 
+// D247: the observed review text becomes the report under the same design-course paths a receipt's inputs use.
+const EXPORTED_REPORT_OUT = /^(?:specs|evidence|docs)\/[A-Za-z0-9._/-]{1,200}\.(?:md|txt)$/u;
 function sanctionedDesignReviewReceiptArgs(args, root) {
   try {
+    if (args[0] === "export-report") {
+      return matchFlagSpec(args.slice(1), {
+        requiredValue: { "--repo": (value) => value === root, "--out": (value) => EXPORTED_REPORT_OUT.test(value) && physicalDesignCoursePath(root, value) },
+        optionalValue: { "--observation": (value) => /^[a-f0-9]{64}$/u.test(value) },
+      });
+    }
     if (args[0] !== "create") return false;
     const companions = [], findings = [], remainder = [];
     for (let index = 1; index < args.length; index += 1) {

@@ -133,6 +133,37 @@ above ("at most one delta follow-up") is replaced; everything else stands.
    After an initial round alone the same drift stays a review-chain refusal.
 4. **Reviewer model:** the PO also chose that the receipt's reviewer model is
    host-observed from the review dispatch; that part is built separately and is
-   not decided by this amendment.
+   decided by the amendment below (D247).
 
 Bindings over one or two receipts are byte-identical to before.
+
+## Amendment 2026-11-13: the reviewer model is host-observed where a route exists (D247)
+
+Accepted by PO tiles of 2026-11-13 (item 4 of the amendment above). A self-asserted
+reviewer identity stays refused (W7); the model comes from the host's own record of
+the review dispatch, labelled per runner:
+
+1. **Claude, observed.** The plugin's PostToolUse (foreground: `resolvedModel` and
+   the returned text) and SubagentStop (background: the models of the child's own
+   host-written transcript and its returned text) hooks record each
+   `readiness-reviewer` dispatch in the device-local private control area, keyed by
+   the digest of the returned text. The hook reads the transcript itself and keeps
+   only the model ids and the text; nothing of it enters the agent's context (PO).
+   `design-review-receipt.mjs export-report` writes that text as the report;
+   `create` finds the observation by the report's digest (the original's when
+   sanitized) and stamps the optional closed field `reviewerObservation`
+   (`assurance`, `modelsUsed`, `resultSha256`) and `reviewer.model`.
+2. **Labelled where no route exists.** Codex and Antigravity have no built route; their
+   receipts say `unobserved`, visibly weaker, like the Critic's `declared-unobserved`
+   record (PO tile 2026-11-01), until a live measurement builds one.
+3. **Presentation gate only.** `present-plan` refuses `PLAN-DESIGN-REVIEW-UNOBSERVED`
+   when any Claude round of the chain lacks an observation (including receipts made
+   before this amendment); the repair is a fresh dispatch and a new initial receipt.
+   A typed fallback receipt names its own route and is passed. The binding summary
+   never carries the field, so approval bytes and every stored-approval reader stay
+   unchanged, and an approval already signed keeps verifying. No refusal is added for
+   an observed model that differs from the requested one; it is recorded.
+4. **What it does not prove.** That the reviewer read the sources the receipt names
+   (the receipt binds them at `create`, as before), or which model a provider served
+   beyond what the host reports. The store is device-local, so `create` runs on the
+   machine that dispatched the review; the committed receipt carries the result.

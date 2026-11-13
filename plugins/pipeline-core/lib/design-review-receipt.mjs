@@ -54,6 +54,19 @@ const FALLBACK_ROUTE = "fallback-self-dispatch";
 const FALLBACK_KEYS = ["observedIdentity", "reasonCode", "requestedRoute", "route"];
 const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
 const FALLBACK_REQUESTED_ROUTE = /^[\x21-\x7e]{1,128}$/u;
+// L3 part 3 (PO tiles 2026-11-13, D247): one OPTIONAL, closed field. It says where the reviewer's model came from: the host's
+// own record of the review dispatch (Claude: the foreground tool result's resolved model, or the background child's
+// host-written transcript), or `unobserved` on a runner without a built observation route (labelled, visibly weaker, like the
+// Critic's declared-unobserved record). An observation names the digest of the returned text, which must be the digest of the
+// report the receipt binds (its unpublished original when sanitized). A receipt without it is valid and byte-unchanged; the
+// binding summary never carries it, so approval bytes stay as they were.
+const OBSERVATION_KEY = "reviewerObservation";
+const OBSERVATION_KEYS = ["assurance", "modelsUsed", "resultSha256"];
+export const DESIGN_REVIEW_OBSERVED_ASSURANCES = Object.freeze(["host-observed-tool-use", "host-observed-child-transcript"]);
+export const DESIGN_REVIEW_UNOBSERVED_ASSURANCE = "unobserved";
+/** The runners with a built observation route (lib/design-review-observation.mjs); present-plan requires the observation only there. */
+export const DESIGN_REVIEW_OBSERVATION_RUNNERS = Object.freeze(["claude"]);
+const MAX_MODELS_USED = 8;
 
 // Strict decoding: invalid UTF-8 is not a receipt. `ignoreBOM: true` keeps a leading BOM in the
 // text, so a BOM-prefixed file fails JSON parsing instead of being silently normalised.
@@ -126,6 +139,24 @@ export const isDesignReviewFallback = (value) => isObject(value) && hasExactKeys
   && isString(value.reasonCode) && FALLBACK_REASON_CODE.test(value.reasonCode)
   && isString(value.requestedRoute) && FALLBACK_REQUESTED_ROUTE.test(value.requestedRoute)
   && isString(value.observedIdentity) && MODEL.test(value.observedIdentity);
+/** The closed observation record (D247). Observed: 1-8 distinct model ids and the returned text's digest. Unobserved: none of either. */
+export const isDesignReviewObservation = (value) => {
+  if (!isObject(value) || !hasExactKeys(value, OBSERVATION_KEYS) || !Array.isArray(value.modelsUsed)) return false;
+  if (value.assurance === DESIGN_REVIEW_UNOBSERVED_ASSURANCE) return value.modelsUsed.length === 0 && value.resultSha256 === null;
+  return DESIGN_REVIEW_OBSERVED_ASSURANCES.includes(value.assurance) && isSha256(value.resultSha256)
+    && value.modelsUsed.length >= 1 && value.modelsUsed.length <= MAX_MODELS_USED
+    && allOf(value.modelsUsed, (model) => isString(model) && MODEL.test(model) && model !== "unknown")
+    && new Set(value.modelsUsed).size === value.modelsUsed.length;
+};
+/** An observation fits its receipt: the returned text is the bound report (its original when sanitized) and the recorded model is the last one used. */
+const observationFitsReceipt = (observation, reviewer, report) => observation.assurance === DESIGN_REVIEW_UNOBSERVED_ASSURANCE
+  || (observation.resultSha256 === (Object.hasOwn(report, "originalSha256") ? report.originalSha256 : report.sha256)
+    && reviewer.model === observation.modelsUsed[observation.modelsUsed.length - 1]);
+/** True when the receipt carries a host observation of its reviewer (D247); false for unobserved and for receipts without the field. */
+export function isHostObservedDesignReview(receipt) {
+  return isObject(receipt) && Object.hasOwn(receipt, OBSERVATION_KEY) && isDesignReviewObservation(receipt[OBSERVATION_KEY])
+    && DESIGN_REVIEW_OBSERVED_ASSURANCES.includes(receipt[OBSERVATION_KEY].assurance);
+}
 const isPreviousInput = (value) => isObject(value) && hasExactKeys(value, ["bytes", "path"]) && isString(value.path) && value.bytes instanceof Uint8Array;
 
 // ----------------------------------------------------------------------------- semantic checks
@@ -178,7 +209,9 @@ export function describeDesignReviewFindingIdRefusal(ids) {
 function receiptRefusal(receipt) {
   const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");
   const hasWithdrawn = isObject(receipt) && Object.hasOwn(receipt, WITHDRAWN_KEY);
-  if (!isObject(receipt) || !hasExactKeys(receipt, [...RECEIPT_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : [])])) return "DRR-SHAPE";
+  const hasObservation = isObject(receipt) && Object.hasOwn(receipt, OBSERVATION_KEY);
+  if (!isObject(receipt) || !hasExactKeys(receipt, [...RECEIPT_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : []), ...(hasObservation ? [OBSERVATION_KEY] : [])])) return "DRR-SHAPE";
+  if (hasObservation && !isDesignReviewObservation(receipt[OBSERVATION_KEY])) return "DRR-SHAPE";
   const { sources, report, previousReceiptPath, previousReceiptSha256 } = receipt;
   if (hasWithdrawn && (receipt.kind !== "delta" || !isStringList(receipt[WITHDRAWN_KEY]) || receipt[WITHDRAWN_KEY].length === 0)) return "DRR-SHAPE";
   const shapeOk = receipt.schema === DESIGN_REVIEW_RECEIPT_SCHEMA
@@ -196,6 +229,7 @@ function receiptRefusal(receipt) {
     && isReviewedAt(receipt.reviewedAt);
   if (!shapeOk) return "DRR-SHAPE";
   if (!reportPairIsValid(report)) return "DRR-REPORT-PAIR";
+  if (hasObservation && !observationFitsReceipt(receipt[OBSERVATION_KEY], receipt.reviewer, report)) return "DRR-OBSERVATION";
   const companionPaths = sources.companions.map((companion) => companion.path);
   if (!pathsAreAcceptable(report.path, sources.prd.path, sources.spec.path, companionPaths, previousReceiptPath)) return "DRR-PATH";
   if (!sourcesAreAcceptable(sources.prd.path, sources.spec.path, companionPaths)) return "DRR-SOURCES";
@@ -344,8 +378,11 @@ export function createDesignReviewReceipt(input) {
   const { featureId, previous, sources, reviewer, report, openFindingIds, reviewedAt } = input;
   // `fallback` is optional; present (even null) it must be the closed fallback record.
   const hasFallback = input.fallback !== undefined;
+  // D247: `reviewerObservation` is optional; present it must be the closed observation record and fit the reviewer and report.
+  const hasObservation = input.reviewerObservation !== undefined;
   const shapeOk = isFeatureId(featureId)
     && (!hasFallback || isDesignReviewFallback(input.fallback))
+    && (!hasObservation || isDesignReviewObservation(input.reviewerObservation))
     && (previous === null || isPreviousInput(previous))
     && isSourcesShape(sources)
     && isReviewer(reviewer)
@@ -354,6 +391,7 @@ export function createDesignReviewReceipt(input) {
     && isReviewedAt(reviewedAt);
   if (!shapeOk) return refuse("DRR-SHAPE");
   if (!reportPairIsValid(report)) return refuse("DRR-REPORT-PAIR");
+  if (hasObservation && !observationFitsReceipt(input.reviewerObservation, reviewer, report)) return refuse("DRR-OBSERVATION");
 
   const companions = sources.companions.map(({ path, sha256 }) => ({ path, sha256 })).sort((a, b) => compareUnits(a.path, b.path));
   const normalized = {
@@ -416,6 +454,7 @@ export function createDesignReviewReceipt(input) {
     reviewedAt,
     ...(withdrawnFindingIds === null ? {} : { [WITHDRAWN_KEY]: withdrawnFindingIds }),
     ...(hasFallback ? { fallback: Object.fromEntries(FALLBACK_KEYS.map((key) => [key, input.fallback[key]])) } : {}),
+    ...(hasObservation ? { [OBSERVATION_KEY]: { assurance: input.reviewerObservation.assurance, modelsUsed: [...input.reviewerObservation.modelsUsed], resultSha256: input.reviewerObservation.resultSha256 } } : {}),
   };
   const bytes = ENCODER.encode(`${canonical(receipt)}\n`);
   // Self-check: what is returned is exactly what parse accepts from these bytes.

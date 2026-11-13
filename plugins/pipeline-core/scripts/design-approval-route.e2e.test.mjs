@@ -156,6 +156,14 @@ const originalDesignCases = [
   {
     "id": "DABX015",
     "name": "L3 (Claude run 3): present-plan refuses a review chain whose last round leaves findings open, names them and the delta route, and writes no request"
+  },
+  {
+    "id": "DABX016",
+    "name": "D247: present-plan refuses a Claude review round without a host observation of its reviewer, names the round and the route, and writes no request"
+  },
+  {
+    "id": "DABX017",
+    "name": "D247: the named route completes: hook observation, export-report and create stamp the observed model, and present-plan hands over the signing step"
   }
 ];
 const designCompletionCases = [];
@@ -439,7 +447,7 @@ function continuityRequest(authority) {
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
 const MOVED_DIR = "specs/e2e-moved";
-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [] } = {}) {
+async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false } = {}) {
   stateModule ??= await import(pathToFileURL(CLI).href);
   const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
@@ -491,7 +499,9 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
   writeFileIn(dir, PLAN_PATH, prdText);
   writeFileIn(dir, COMPANION_PATHS[0], "# Design\n");
   writeFileIn(dir, COMPANION_PATHS[1], "| ID | Evidence |\n| --- | --- |\n");
-  writeFileIn(dir, REPORT_PATH, "# Design review 1\nVerdict: pass.\n");
+  // D247 `hostRoute`: the report is not written here; the hook's observation becomes the report through export-report below.
+  if (!hostRoute) writeFileIn(dir, REPORT_PATH, "# Design review 1\nVerdict: pass.\n");
+  else mkdirSync(join(dir, ...dirname(REPORT_PATH).split("/")), { recursive: true });
   writeFileIn(dir, "specs/e2e/acceptance.md", "# Controlled route acceptance\n");
   writeFileIn(dir, "specs/e2e/result.md", "# Controlled route result\n");
 
@@ -517,7 +527,31 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
 
   // Review receipt over the finished sources (contract section 5 fixture F), tracked and clean.
   const sourceFor = (path) => ({ path, sha256: sha256(readFileSync(join(dir, ...path.split("/")))) });
-  const created = receiptLib.createDesignReviewReceipt({
+  if (hostRoute) {
+    // D247, the whole Claude route: the plugin hook records a background readiness-reviewer stop (its models from the child's own
+    // transcript), export-report writes the returned text as the report, and create (the CLI, on the Claude runner signal) stamps the
+    // observation into the receipt itself. Nothing here supplies a model.
+    const sessionBase = mkdtempSync(join(dirname(dir), "design-route-transcript-"));
+    mkdirSync(join(sessionBase, "session", "subagents"), { recursive: true });
+    writeFileSync(join(sessionBase, "session.jsonl"), "");
+    writeFileSync(join(sessionBase, "session", "subagents", "agent-a1.jsonl"),
+      `${JSON.stringify({ type: "assistant", message: { role: "assistant", model: "claude-opus-4", content: [{ type: "text", text: "reading" }] } })}\n`);
+    const observationLib = await loadLib("design-review-observation.mjs");
+    const recorded = observationLib.recordDesignReviewObservation({ commonDir: gitCommonDir, runner: "claude", input: {
+      hook_event_name: "SubagentStop", agent_type: "pipeline-core:readiness-reviewer", agent_id: "a1",
+      transcript_path: join(sessionBase, "session.jsonl"), last_assistant_message: "# Design review 1\nVerdict: pass.\n" } });
+    if (recorded.status !== "recorded") throw new Error(`fixture observation not recorded: ${JSON.stringify(recorded)}`);
+    const receiptCli = await import(pathToFileURL(join(HERE, "design-review-receipt.mjs")).href);
+    const out = [];
+    const exported = receiptCli.main(["export-report", "--repo", dir, "--out", REPORT_PATH], {}, { writeFn: (text) => out.push(text), errorFn: () => {} });
+    if (exported !== 0) throw new Error(`fixture export-report refused: ${out.join("")}`);
+    const createdCli = receiptCli.main(["create", "--repo", dir, "--feature", FEATURE_ID, "--report", REPORT_PATH, "--prd", PLAN_PATH, "--spec", SPEC_PATH,
+      ...COMPANION_PATHS.flatMap((path) => ["--companion", path]), "--out", RECEIPT_PATH], { CLAUDECODE: "1" },
+      { writeFn: (text) => out.push(text), errorFn: () => {}, now: () => new Date("2026-10-09T09:00:00.000Z") });
+    if (createdCli !== 0) throw new Error(`fixture create refused: ${out.join("")}`);
+    fx.cliOutput = out.join("");
+  }
+  const created = hostRoute ? { ok: true, bytes: readFileSync(join(dir, ...RECEIPT_PATH.split("/"))) } : receiptLib.createDesignReviewReceipt({
     featureId: FEATURE_ID,
     previous: null,
     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
@@ -526,9 +560,11 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
     openFindingIds,
     reviewedAt: "2026-10-09T09:00:00.000Z",
     ...(fallback === undefined ? {} : { fallback }),
+    // D247: a native Claude review round carries the host's observation of its reviewer (export-report + create); `observed: false` is a round without one.
+    ...(fallback === undefined && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
   });
   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
-  writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
+  if (!hostRoute) writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
   fx.receiptPath = RECEIPT_PATH;
 
   // Trust anchor for approve-plan (A10): project/critical-human-proof.json, schema v3, committed.
@@ -763,6 +799,39 @@ test("L3 (Claude run 3): present-plan refuses a review chain whose last round le
   const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
   assert.deepEqual(requests, [], "no approval request is written");
   assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
+});
+
+// D247 (PO tiles 2026-11-13): on Claude the reviewer model is host-observed; a round without the observation (made by hand, in a
+// session without the hooks, or before this amendment) is not presented. A fallback receipt is passed (route 1 covers it).
+test("D247: present-plan refuses a Claude review round without a host observation of its reviewer, names the round and the route, and writes no request", async () => {
+  const fx = await buildSubmittedFeature("route-unobserved", { observed: false });
+  await bindRouteOwner(fx);
+  const refused = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+  assert.equal(refused.status, 2, `present-plan must refuse; stdout: ${refused.stdout}; stderr: ${refused.stderr}`);
+  assert.match(refused.stderr, /PLAN-DESIGN-REVIEW-UNOBSERVED/u);
+  assert.match(refused.stderr, /design-review-receipt-1\.json \(round 1, made before reviewer observation\)/u);
+  assert.match(refused.stderr, /export-report/u);
+  assert.match(refused.stderr, /restart the session/u);
+  assert.equal(posixSigningCommands(refused.stdout).length, 0, "no signing command is handed over");
+  const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
+  assert.deepEqual(requests, [], "no approval request is written");
+  assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
+});
+
+test("D247: the named route completes: hook observation, export-report and create stamp the observed model, and present-plan hands over the signing step", async () => {
+  const fx = await buildSubmittedFeature("route-host-observed", { hostRoute: true });
+  const receipt = JSON.parse(readFileSync(join(fx.dir, ...fx.receiptPath.split("/")), "utf8"));
+  assert.deepEqual(receipt.reviewerObservation, { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: receipt.report.sha256 });
+  assert.equal(receipt.reviewer.model, "claude-opus-4", "the receipt's reviewer model is the observed one");
+  assert.match(fx.cliOutput, /"status":"exported"/u);
+  assert.equal(/"notice"/u.test(fx.cliOutput), false, "an observed Claude receipt carries no unobserved notice");
+  await bindRouteOwner(fx);
+  const presented = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+  assert.equal(presented.status, 0, `present-plan over an observed receipt must exit 0; stderr: ${presented.stderr}`);
+  assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
+  // The binding never carries the observation: approval bytes are those of a receipt without it.
+  const requestPath = requestPathOf(posixSigningCommands(presented.stdout)[0]);
+  assert.equal("reviewerObservation" in JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0], false);
 });
 
 test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {

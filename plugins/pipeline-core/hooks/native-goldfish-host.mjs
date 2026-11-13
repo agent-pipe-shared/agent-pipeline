@@ -9,6 +9,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { checkSubagentHandbackBeforeStop, finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
 import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
+import { designReviewObservationNotice, recordDesignReviewObservation } from "../lib/design-review-observation.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -309,6 +310,23 @@ if (isDirectInvocation(import.meta.url)) {
     } catch { refusal = null; }
     if (refusal) { process.stderr.write(`${refusal}\n`); process.exit(2); }
     process.exit(0);
+  }
+  // D247 (L3 part 3): the end of a Claude design review dispatch (readiness-reviewer; foreground PostToolUse or background
+  // SubagentStop) is recorded with the host's model and the returned text's digest. The hook reads the child transcript itself
+  // and says one line; it never blocks. Every other call, and any fault, continues below exactly as before.
+  if (runner === "claude" && ["PostToolUse", "SubagentStop"].includes(input.hook_event_name)) {
+    let observed = { status: "not-applicable" };
+    try {
+      observed = recordDesignReviewObservation({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), runner, input,
+        readHandbackFn: readSubagentHandbackMessage });
+    } catch { observed = { status: "not-applicable" }; }
+    if (observed.status !== "not-applicable") {
+      const notice = designReviewObservationNotice(observed);
+      if (notice !== null && input.hook_event_name === "PostToolUse") {
+        process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: notice } })}\n`);
+      } else if (notice !== null) process.stderr.write(`${notice}\n`);
+      process.exit(0);
+    }
   }
   // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
   // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.

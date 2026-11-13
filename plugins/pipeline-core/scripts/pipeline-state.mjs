@@ -393,7 +393,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, reso
 import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 import { spawnSync } from "node:child_process";
 import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
-import { DESIGN_REVIEW_MAX_ROUNDS, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { DESIGN_REVIEW_MAX_ROUNDS, DESIGN_REVIEW_OBSERVATION_RUNNERS, isHostObservedDesignReview, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
 import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
@@ -10555,6 +10555,24 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
       return { code: "PLAN-DESIGN-REVIEW-OPEN", path: latest.summary.path,
         message: `round ${latest.summary.round} of the readiness review leaves ${latest.summary.openFindingIds.length} finding(s) open: ${latest.summary.openFindingIds.join(", ")}`,
         repair: entryGateRepair("PLAN-DESIGN-REVIEW-OPEN") };
+    } },
+    // D247 (L3 part 3, PO tiles 2026-11-13): on a runner with a built observation route (Claude) every review round of the chain is
+    // presented only with the host's observation of its reviewer. A typed fallback receipt names its own route and is passed; a
+    // runner without a route (Codex, Antigravity) passes with its receipt's visible `unobserved` label. Presentation gate only.
+    { id: "design-review-unobserved", run: () => {
+      if (!inputs?.ok || !Array.isArray(inputs.receipts)) return null;
+      const unobserved = [];
+      for (const entry of inputs.receipts) {
+        const parsed = parseDesignReviewReceipt(entry.bytes);
+        if (!parsed.ok) continue;
+        const receipt = parsed.receipt;
+        if (!DESIGN_REVIEW_OBSERVATION_RUNNERS.includes(receipt.reviewer.runner) || Object.hasOwn(receipt, "fallback") || isHostObservedDesignReview(receipt)) continue;
+        unobserved.push(`${entry.path} (round ${receipt.round}, ${Object.hasOwn(receipt, "reviewerObservation") ? receipt.reviewerObservation.assurance : "made before reviewer observation"})`);
+      }
+      if (unobserved.length === 0) return null;
+      return { code: "PLAN-DESIGN-REVIEW-UNOBSERVED", path: inputs.receipts.at(-1).path,
+        message: `the reviewer model of ${unobserved.length} review round(s) was not observed by the host: ${unobserved.join("; ")}`,
+        repair: entryGateRepair("PLAN-DESIGN-REVIEW-UNOBSERVED") };
     } },
     // C28e (Codex test run): approve-plan later reads the approval policy, the PRD, the Spec, the companions and the review receipts
     // from the commit the request binds. A file that exists only in the working tree surfaced only after the signature

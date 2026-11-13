@@ -11,10 +11,10 @@
  *   reviewedAt       the clock, at production time (injectable only through the exported API)
  *   reviewer.runner  the runtime signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT or
  *                    AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); no signal refuses
- *   reviewer.model   the OBSERVED execution identity the caller supplies, else `unknown`. It is never read
- *                    from an agent profile: a profile's `model:` line is a request, not an observation.
- *                    The result and the CLI report additionally carry the reviewer role (`critic`) and the
- *                    requested route, as the caller supplies it, kept apart from the observation.
+ *   reviewer.model   D247: on Claude the model the host recorded for the readiness-reviewer dispatch whose
+ *                    returned text is this report (lib/design-review-observation.mjs; `export-report` writes
+ *                    that text), stamped with `reviewerObservation`; otherwise `unknown` and `unobserved`.
+ *                    It is never read from an agent profile or supplied by the caller (W7).
  *   every sha256     the bytes of the file on disk
  * There is deliberately no flag for a timestamp, a hash, a runner or a model: such a flag is refused
  * as DRC-FORBIDDEN-FLAG. The bytes are the library's own canonical output (createDesignReviewReceipt)
@@ -23,7 +23,8 @@
  * Refusals are typed. Library codes (DRR-*) pass through unchanged; this command adds DRC-USAGE,
  * DRC-UNKNOWN-FLAG, DRC-FORBIDDEN-FLAG, DRC-PATH-UNSAFE, DRC-OUT-EXISTS, DRC-OUT-PARENT-MISSING,
  * DRC-FILE-MISSING, DRC-FILE-UNSAFE, DRC-NO-RUNNER, DRC-CLOCK,
- * DRC-REPO-INVALID, DRC-WRITE-FAILED and DRC-INTERNAL.
+ * DRC-REPO-INVALID, DRC-WRITE-FAILED and DRC-INTERNAL; `export-report` adds DRC-OBSERVATION-STORE,
+ * DRC-OBSERVATION-MISSING and DRC-OBSERVATION-AMBIGUOUS.
  *
  * Its pure counterpart is lib/design-review-receipt-write-guard.mjs, which recognises a receipt that
  * was written by hand instead.
@@ -33,15 +34,19 @@ import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
-import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal } from "../lib/design-review-receipt.mjs";
+import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
+import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation } from "../lib/design-review-observation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 
 export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
 
 const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
   + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
-  + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
-  + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
+  + "       design-review-receipt.mjs export-report --repo <repo-root> --out <report> [--observation <sha256>]\n"
+  + "Every path is repo-relative. The review time, runner, reviewer model and all digests are derived, never supplied. On Claude the "
+  + "reviewer model is read from the host's record of the readiness-reviewer dispatch, found by the report's digest (export-report "
+  + "writes the returned text as the report); without one, and on another runner, the receipt says unobserved.";
 
 export const OBSERVED_IDENTITY_UNKNOWN = "unknown";
 export const REVIEWER_ROLE = "critic";
@@ -179,10 +184,11 @@ export function createReceiptFromDisk(input, deps = {}) {
     }
     if (requestedRoute === null) return refuse("DRC-USAGE", "a fallback names the route that was requested: supply --requested-route with --fallback-reason-code");
   }
-  // W7 attestation: no verifiable source-owned dispatch observation route exists yet, so a self-asserted requested route
-  // or observed identity is unattested. Only the typed fallback record (which says it is not an independent review) may carry them.
+  // W7 attestation: a self-asserted requested route or observed identity is unattested and stays refused. The observed model
+  // comes only from the host's own record of the review dispatch (D247), which this command reads itself below. Only the typed
+  // fallback record (which says it is not an independent review) may carry a supplied route and identity.
   if ((requestedRoute !== null || observedIdentity !== null) && fallbackReasonCode === null) {
-    return refuse("DRC-OBSERVATION-UNATTESTED", "a requested route or observed identity cannot be recorded: no verifiable source-owned dispatch observation exists, so a self-asserted value is unattested; omit it (the identity is recorded as unknown)");
+    return refuse("DRC-OBSERVATION-UNATTESTED", "a requested route or observed identity cannot be supplied: a self-asserted value is unattested; omit it. On Claude the reviewer's model is read from the host's record of the readiness-reviewer dispatch (write the report with export-report); on another runner the receipt says unobserved");
   }
 
   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
@@ -243,8 +249,28 @@ export function createReceiptFromDisk(input, deps = {}) {
 
   const runner = detectRunner(env);
   if (runner === null) return refuse("DRC-NO-RUNNER", "no runner signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); the reviewer runner is never supplied by hand");
+  // D247: the reviewer observation. A fallback receipt names its own route and carries none (no dispatch was observed). On
+  // Claude the host's record of the readiness-reviewer dispatch is found by the digest of the returned text, which is the
+  // report (its unpublished original when sanitized); found, it is stamped in and gives `reviewer.model`. Otherwise, and on a
+  // runner without a built observation route, the receipt says `unobserved`.
+  let reviewerObservation;
+  let observedModel = null;
+  if (fallbackReasonCode === null) {
+    const returnedSha256 = originalSha256 ?? sha256Of(reportRead.bytes);
+    let record = null;
+    if (runner === "claude") {
+      let commonDir = null;
+      try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
+      record = commonDir === null ? null : readDesignReviewObservation({ commonDir, resultSha256: returnedSha256 });
+    }
+    if (record === null) reviewerObservation = { assurance: DESIGN_REVIEW_UNOBSERVED_ASSURANCE, modelsUsed: [], resultSha256: null };
+    else {
+      reviewerObservation = { assurance: record.assurance, modelsUsed: record.modelsUsed, resultSha256: returnedSha256 };
+      observedModel = record.modelsUsed[record.modelsUsed.length - 1];
+    }
+  }
   // The old `reviewer.model` field is kept for existing readers and carries the honest value: the observation, else unknown.
-  const model = observedIdentity ?? OBSERVED_IDENTITY_UNKNOWN;
+  const model = observedModel ?? observedIdentity ?? OBSERVED_IDENTITY_UNKNOWN;
   const clock = now();
   if (!(clock instanceof Date) || Number.isNaN(clock.getTime())) return refuse("DRC-CLOCK", "the clock did not yield a valid time");
 
@@ -258,6 +284,7 @@ export function createReceiptFromDisk(input, deps = {}) {
     reviewedAt: clock.toISOString(),
     specBytes,
     ...(fallbackReasonCode === null ? {} : { fallback: { route: FALLBACK_ROUTE, reasonCode: fallbackReasonCode, requestedRoute, observedIdentity: model } }),
+    ...(reviewerObservation === undefined ? {} : { reviewerObservation }),
   });
   if (!created.ok) {
     // AC-155: a PASS is refused while a declared foundational Spec decision has no ADR/register reference and no
@@ -291,12 +318,60 @@ export function createReceiptFromDisk(input, deps = {}) {
     ok: true, path: request.outPath, sha256: created.sha256, receipt: created.receipt,
     reviewerRole: REVIEWER_ROLE, requestedRoute, observedIdentity: model,
     ...(created.receipt.fallback === undefined ? {} : { fallback: created.receipt.fallback }),
+    ...(reviewerObservation === undefined ? {} : { reviewerObservation: { assurance: reviewerObservation.assurance, model } }),
+    ...(reviewerObservation?.assurance === DESIGN_REVIEW_UNOBSERVED_ASSURANCE && runner === "claude"
+      ? { notice: UNOBSERVED_CLAUDE_NOTICE } : {}),
   };
+}
+
+/** D247: the one route to an observed Claude review, said where the receipt came out unobserved. */
+export const UNOBSERVED_CLAUDE_NOTICE = "this receipt says unobserved, and present-plan refuses an unobserved Claude review (PLAN-DESIGN-REVIEW-UNOBSERVED). "
+  + "Dispatch pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded (after an install or hook refresh: restart the session first), "
+  + "write its returned text as the report with design-review-receipt.mjs export-report --repo <root> --out <report path>, and create a new receipt with that --report "
+  + "(the report reads, as returned; a sanitized publication goes in --report and the exported text in --original-report).";
+
+/**
+ * D247: write the text a host-observed Claude design review returned as the report file, exclusive create. The digest of
+ * those bytes is what `create` finds the observation by. Without --observation exactly one observation may be unexported.
+ * @returns {{ ok: true, path: string, resultSha256: string, model: string, assurance: string } | { ok: false, code: string, message: string }}
+ */
+export function exportReportFromObservation(input, deps = {}) {
+  const request = input ?? {};
+  if (typeof request.repo !== "string" || request.repo === "" || !isSafePath(request.outPath)) return refuse("DRC-USAGE", "export-report needs --repo and a safe repo-relative --out");
+  if (request.observation !== null && !(typeof request.observation === "string" && /^[a-f0-9]{64}$/u.test(request.observation))) return refuse("DRC-USAGE", "--observation is the 64-hex digest an earlier refusal listed");
+  let repoReal;
+  try { repoReal = realpathSync(request.repo); if (!statSync(repoReal).isDirectory()) throw new Error("not a directory"); }
+  catch { return refuse("DRC-REPO-INVALID", "the repository root is not an existing directory"); }
+  const output = resolveOutput(repoReal, request.outPath);
+  if (!output.ok) return output;
+  let commonDir = null;
+  try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
+  if (commonDir === null) return refuse("DRC-OBSERVATION-STORE", "the private control area of this repository could not be resolved");
+  let record;
+  if (request.observation !== null) {
+    record = readDesignReviewObservation({ commonDir, resultSha256: request.observation });
+    if (record === null) return refuse("DRC-OBSERVATION-MISSING", `no design review observation ${request.observation} is recorded on this device`);
+  } else {
+    const open = listUnexportedDesignReviewObservations({ commonDir });
+    if (open.length === 0) return refuse("DRC-OBSERVATION-MISSING", "no unexported design review observation is recorded on this device. Only a Claude dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded records one (after an install or hook refresh: restart the session first); dispatch the review again");
+    if (open.length > 1) {
+      return refuse("DRC-OBSERVATION-AMBIGUOUS", `${open.length} design review observations are unexported; name one with --observation: ${open.slice(0, 8).map((entry) => `${entry.resultSha256} (${entry.modelsUsed[entry.modelsUsed.length - 1]}, ${new Date(entry.observedAtMs).toISOString()}, ${Buffer.byteLength(entry.text, "utf8")} bytes)`).join("; ")}`);
+    }
+    record = open[0];
+  }
+  try { writeFileSync(output.absolute, record.text, { flag: "wx" }); }
+  catch (error) {
+    if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}`);
+    return refuse("DRC-WRITE-FAILED", `the report could not be written: ${request.outPath}`);
+  }
+  try { markDesignReviewObservationExported({ commonDir, resultSha256: record.resultSha256 }); } catch { /* an exported marker only narrows the next default choice */ }
+  return { ok: true, path: request.outPath, resultSha256: record.resultSha256, model: record.modelsUsed[record.modelsUsed.length - 1], assurance: record.assurance };
 }
 
 function parseArgv(argv) {
   const [command, ...rest] = argv;
-  if (command !== "create") return refuse("DRC-USAGE", `expected the subcommand \`create\`\n${USAGE}`);
+  if (command === "export-report") return parseExportArgv(rest);
+  if (command !== "create") return refuse("DRC-USAGE", `expected the subcommand \`create\` or \`export-report\`\n${USAGE}`);
   const single = new Map();
   const repeated = { companionPaths: [], openFindingIds: [] };
   let index = 0;
@@ -327,7 +402,23 @@ function parseArgv(argv) {
   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
   const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
-  return { ok: true, request };
+  return { ok: true, command: "create", request };
+}
+
+const EXPORT_FLAGS = new Map([["repo", "repo"], ["out", "outPath"], ["observation", "observation"]]);
+function parseExportArgv(rest) {
+  const request = { repo: null, outPath: null, observation: null };
+  for (let index = 0; index < rest.length; index += 2) {
+    const token = rest[index];
+    const name = typeof token === "string" && token.startsWith("--") ? token.slice(2) : null;
+    if (name === null || !EXPORT_FLAGS.has(name)) return refuse(name === null ? "DRC-USAGE" : "DRC-UNKNOWN-FLAG", `unexpected argument ${JSON.stringify(token)}\n${USAGE}`);
+    const value = rest[index + 1];
+    if (value === undefined || value.startsWith("--")) return refuse("DRC-USAGE", `--${name} needs a value\n${USAGE}`);
+    if (request[EXPORT_FLAGS.get(name)] !== null) return refuse("DRC-USAGE", `--${name} was given more than once\n${USAGE}`);
+    request[EXPORT_FLAGS.get(name)] = value;
+  }
+  if (request.repo === null || request.outPath === null) return refuse("DRC-USAGE", `export-report needs --repo and --out\n${USAGE}`);
+  return { ok: true, command: "export-report", request };
 }
 
 export function main(argv = process.argv.slice(2), env = process.env, deps = {}) {
@@ -346,7 +437,13 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
   try {
     const parsed = parseArgv(argv);
     if (!parsed.ok) return refused(parsed);
-    const result = createReceiptFromDisk(parsed.request, { env, now: deps.now });
+    if (parsed.command === "export-report") {
+      const exported = exportReportFromObservation(parsed.request, { commonDirFn: deps.commonDirFn });
+      if (!exported.ok) return refused(exported);
+      write(`${JSON.stringify({ schema: DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA, status: "exported", path: exported.path, resultSha256: exported.resultSha256, model: exported.model, assurance: exported.assurance })}\n`);
+      return 0;
+    }
+    const result = createReceiptFromDisk(parsed.request, { env, now: deps.now, commonDirFn: deps.commonDirFn });
     if (!result.ok) return refused(result);
     write(`${JSON.stringify({
       schema: DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA,
@@ -361,6 +458,8 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
       requestedRoute: result.requestedRoute,
       observedIdentity: result.observedIdentity,
       ...(result.fallback === undefined ? {} : { fallback: result.fallback }),
+      ...(result.reviewerObservation === undefined ? {} : { reviewerObservation: result.reviewerObservation }),
+      ...(result.notice === undefined ? {} : { notice: result.notice }),
     })}\n`);
     return 0;
   } catch (error) {
