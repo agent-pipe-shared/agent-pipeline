@@ -706,11 +706,19 @@ export function evaluateReviewAdmissionCore(options = {}, historicalEntries = []
       usedAddenda.add(path);
     }
     if (disposition === "required") {
+      // An addendum resolves the round it was written for. For the requested task at another review candidate it is an
+      // EARLIER round's resolution: it is still validated, but it must not shadow this round's exact/descendant admission
+      // (AGY run 3, R2: a second round of the same task was refused with no admitted record).
+      const earlierRoundAddendum = addendum !== undefined && record.taskId === taskId
+        && addendum.addendum?.reviewCandidateCommit !== candidateCommit;
       if (addendum) {
         usedAddenda.add(path);
         const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
         if (addendumFinding) findings.push(addendumFinding);
-        else coveredRecordCount += 1;
+        else if (!earlierRoundAddendum) coveredRecordCount += 1;
+      }
+      if (addendum && !earlierRoundAddendum) {
+        // resolved for exactly this review candidate
       } else if (record.taskId === taskId && record.candidateCommit === candidateCommit && isV4
         && !["authored-commit", "orchestrator-attested"].includes(record.outcomeClassification.kind)) {
         targetRecordCandidateCommit = record.candidateCommit;

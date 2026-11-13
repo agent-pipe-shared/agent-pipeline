@@ -232,6 +232,20 @@ test("immutable authored Agy v4 record can be resolved by the same independently
   assert.equal(verifyCriticDispositionAddendumForRecord({ root, taskId, record: authored,
     recordBytes: Buffer.from(recordBytes), options: boundReview(recordBytes) }).code,
   "critic-addendum-bound");
+  // AGY run 3, R2: the addendum resolved round 1 at its review candidate. Round 2 of the SAME task at a later candidate descends
+  // from the delivered record and is admitted by descendant; the earlier round's addendum is still validated and does not shadow it.
+  const laterCandidate = "f".repeat(40);
+  const secondRound = evaluateReviewAdmission({ root, taskId, candidateCommit: laterCandidate, readChangedPaths: () => [], ...boundReview(recordBytes) });
+  assert.equal(secondRound.ok, true, secondRound.readFindings.join("\n"));
+  assert.equal(secondRound.admittedCount, 1);
+  assert.equal(secondRound.admittedByDescendant, true);
+  assert.equal(secondRound.coveredRecordCount, 0, "the earlier round's addendum does not count the record as covered for this round");
+  const sameRound = evaluateReviewAdmission({ root, taskId, candidateCommit: reviewCandidateCommit, readChangedPaths: () => [], ...boundReview(recordBytes) });
+  assert.equal(sameRound.admittedCount, 0, "at the addendum's own review candidate the record stays resolved, not re-admitted");
+  assert.equal(sameRound.coveredRecordCount, 1);
+  const unboundSecond = evaluateReviewAdmission({ root, taskId, candidateCommit: laterCandidate, readChangedPaths: () => [], gitRead: boundReview(recordBytes).gitRead });
+  assert.equal(unboundSecond.ok, false, "an earlier round's addendum that does not bind still refuses");
+  assert.match(unboundSecond.readFindings.join("\n"), /consumed Critic receipt is unavailable/u);
   writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`),
     json({ ...authored, commits: [] }));
   assert.match(evaluate(root, ["src.txt"], boundReview(recordBytes)).readFindings.join("\n"),
