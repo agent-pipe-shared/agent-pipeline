@@ -60,12 +60,13 @@ import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
  * guard is a safety net, not a prison. It fails CLOSED only on the thing it exists for
  * — a write to a listed path.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { designReviewReceiptWriteRefusal } from "../lib/design-review-receipt-write-guard.mjs";
+import { privateStateWriteRefusal } from "../lib/private-state-write-guard.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
@@ -552,6 +553,22 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
       matchedLivePluginRoot = roots.find((root) => insideLivePlugin(absolute, [root])) ?? null;
     }
   } catch { /* fall through to the path rules */ }
+
+  // D247 follow-up: an agent's own write never lands in the pipeline-owned private state (.git/agent-pipeline/**), where the
+  // host records what it observed (a design review's model, readiness receipts). Judged on the lexical target and on the real
+  // location of its deepest existing ancestor, so a symlink from an ordinary folder into .git does not hide it. No override.
+  try {
+    const target = absolute ?? resolve(projectDir, filePath);
+    let realTarget = null;
+    try {
+      let probe = target;
+      const rest = [];
+      while (!existsSync(probe) && dirname(probe) !== probe) { rest.unshift(relative(dirname(probe), probe)); probe = dirname(probe); }
+      realTarget = join(realpathSync(probe), ...rest);
+    } catch { realTarget = null; }
+    const refusal = privateStateWriteRefusal({ target, realTarget });
+    if (refusal) { process.stderr.write(`BLOCKED (guard-gate-strength): ${refusal.code}: ${refusal.message}\n`); process.exit(2); }
+  } catch { /* fail open, as the receipt check below */ }
 
   // ALF-G4C: a design review receipt is produced by scripts/design-review-receipt.mjs and never written by hand. Decided on the
   // RESULTING content (lib/design-review-receipt-write-guard.mjs), so it holds for any target path or extension. It sits before

@@ -63,6 +63,12 @@ test("a receipt-schema object with extra fields is refused (hand-written receipt
   assert.equal(refusalOf(JSON.stringify(extra, null, 2))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
 });
 
+test("D247: a hand-made receipt claiming a host observation is refused like any other receipt", () => {
+  const forged = { ...producedReceipt().receipt, reviewerObservation: { assurance: "host-observed-tool-use", modelsUsed: ["claude-opus-4"], resultSha256: sha("report") } };
+  assert.equal(refusalOf(canonical(forged))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
+  assert.equal(refusalOf(JSON.stringify({ ...forged, reviewerObservation: { ...forged.reviewerObservation, assurance: "host-observed-child-transcript" } }, null, 2))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
+});
+
 test("an object that carries only the schema is refused: the schema value alone decides", () => {
   assert.equal(refusalOf(JSON.stringify({ schema: DESIGN_REVIEW_RECEIPT_SCHEMA }))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
 });

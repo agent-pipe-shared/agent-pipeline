@@ -4903,6 +4903,12 @@
       "file": "plugins/pipeline-core/lib/spec-addendum-registration.test.mjs",
       "invariantPinned": "register-feature-package.mjs --add-spec-addendum adds an approved Spec addendum and its approval record to the package only after checking the record path and digest name, the recomputed subject digest, the approval commit (its tree, an ancestor of HEAD), the addendum bytes at that commit and in the working tree, and a matching private approval; every refusal restores the manifest; the Goldfish briefing names each applied addendum as a context line and stops on an addendum that does not read back",
       "nonOverlapNote": "Unique cases: the registration checks, the manifest restore and the briefing lines; spec-addendum.test.mjs pins the reader, critic-course-consumer-chain-walk.test.mjs the end-to-end course"
+    },
+    {
+      "name": "guard-gate-strength-private-state-tests",
+      "file": "plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs",
+      "invariantPinned": "The gate-strength guard refuses an agent's own Write or Edit into the pipeline-owned private state (.git/agent-pipeline/**), by the lexical target and by the real location behind a symlink, plans no override and lets ordinary paths through, including a folder named agent-pipeline outside .git",
+      "nonOverlapNote": "Unique hook-level suite (D247 follow-up) for the private-state write refusal; guard-gate-strength-review-receipt.test.mjs keeps the content-based receipt refusal"
     }
   ]
 }
