@@ -118,24 +118,38 @@ test("the public-value class is closed: untracked, missing, differing or malform
 // tracked source holds it verbatim inside quotes; a copy in the Pipeline's own records (specs/, evidence, audit bundles) proves nothing.
 const IDENTIFIER = "sampleapp.results.v1";
 const RECORD_PATH = "specs/f/evidence/dispatch-projection.json";
-const identifierFixture = ({ source = "tracked", rule = RULE } = {}) => {
+const identifierFixture = ({ source = "tracked", rule = RULE, recordPath = RECORD_PATH } = {}) => {
   const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-public-identifier-"));
   gitIn(rootDir, "init", "-q");
   mkdirSync(join(rootDir, "src/platform"), { recursive: true });
-  mkdirSync(join(rootDir, "specs/f/evidence"), { recursive: true });
-  writeFileSync(join(rootDir, RECORD_PATH), `{"text":"storageKey = '${IDENTIFIER}'."}\n`);
-  gitIn(rootDir, "add", RECORD_PATH);
+  mkdirSync(join(rootDir, recordPath, ".."), { recursive: true });
+  writeFileSync(join(rootDir, recordPath), `{"text":"storageKey = '${IDENTIFIER}'."}\n`);
+  gitIn(rootDir, "add", recordPath);
   if (source !== "none") writeFileSync(join(rootDir, "src/platform/results.js"), `var resultsNamespace = '${IDENTIFIER}';\n`);
   if (source === "tracked") gitIn(rootDir, "add", "src/platform/results.js");
   const binaryPath = join(rootDir, "scanner-binary");
   writeFileSync(binaryPath, "synthetic binary identity");
   const spawnFn = (_command, args) => {
-    const report = [{ File: join(rootDir, RECORD_PATH), RuleID: rule, StartLine: 1, StartColumn: 10, Secret: IDENTIFIER, Description: "Generic API Key" }];
+    const report = [{ File: join(rootDir, recordPath), RuleID: rule, StartLine: 1, StartColumn: 10, Secret: IDENTIFIER, Description: "Generic API Key" }];
     writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(report));
     return { status: 0, stdout: "", stderr: "", error: null };
   };
-  return { rootDir, binaryPath, spawnFn, path: RECORD_PATH, rule, line: 1, column: 10, reviewedValue: IDENTIFIER };
+  return { rootDir, binaryPath, spawnFn, path: recordPath, rule, line: 1, column: 10, reviewedValue: IDENTIFIER };
 };
+
+test("C29-C4 (Codex run 3): the public identifier is reviewable in the close's audit-bundle copy too, the second place the run flagged it", async () => {
+  // The run flagged the same identifier in the generated briefing (feature evidence) and in the audit copy; both needed an exception.
+  const AUDIT_PATH = "audit-bundles/f/dispatch-records/briefing-copy.json";
+  const f = identifierFixture({ recordPath: AUDIT_PATH });
+  try {
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, AUDIT_PATH), "public-identifier");
+    const result = await reproduceReviewedFinding(f);
+    assert.equal(result.ok, true, result.reason);
+    assert.equal((await verifyReproductionGate({ ...f, gate: result.gate })).ok, true);
+  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+  const none = identifierFixture({ recordPath: AUDIT_PATH, source: "none" });
+  try { assert.equal((await reproduceReviewedFinding(none)).ok, false, "an audit copy alone proves nothing"); } finally { rmSync(none.rootDir, { recursive: true, force: true }); }
+});
 
 test("C28e (Codex test run): a public identifier the tracked source holds verbatim is reviewable for generic-api-key and the gate verifies", async () => {
   const f = identifierFixture();
