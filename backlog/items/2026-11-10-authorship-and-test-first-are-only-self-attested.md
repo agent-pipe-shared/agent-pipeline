@@ -18,6 +18,8 @@ The records name who wrote a change and state that a test failed before it passe
 
 The Codex report adds a related gap: tests are derived by the same agent that writes the code. A test derivation by a separate agent, from the specification alone, belongs to the same decision.
 
+Further evidence (Codex greenfield run 3, 2026-11-13, point C11): the final tests were green, but the TDD order was mostly self-attested or missing in the dispatch records. Showing RED before the edit needs host observation, which is the same capability.
+
 ## Decision
 
 PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope.
