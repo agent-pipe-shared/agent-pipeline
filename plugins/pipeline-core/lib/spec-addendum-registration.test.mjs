@@ -18,6 +18,7 @@ import { writeCriticalApproval } from "./critical-action-authorization.mjs";
 import { addSpecAddendum } from "./feature-package-registration.mjs";
 import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, readSpecAddenda, specAddendumApprovalBytes, specAddendumApprovalPath } from "./spec-addendum.mjs";
 import { REGISTER_FEATURE_PACKAGE_HELP } from "../scripts/register-feature-package.mjs";
+import { specAddendumContextLines } from "../scripts/dispatch-briefing.mjs";
 
 const ID = "sa-pkg";
 const PACKET = "e".repeat(32);
@@ -144,6 +145,20 @@ test("SAR-07 an approved commit that is not an ancestor of HEAD is refused", () 
     gitIn(f.root, ["checkout", "-q", "--detach", "HEAD~1"]);
     const refused = addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath });
     assert.equal(refused.code, "FPR-SPEC-ADDENDUM-CANDIDATE", JSON.stringify(refused));
+  } finally { f.cleanup(); }
+});
+
+test("SAR-09 the Goldfish briefing names a registered addendum next to the Spec, and a changed one as a stop", () => {
+  const f = fixture();
+  try {
+    assert.deepEqual(specAddendumContextLines(f.root, `specs/${ID}/spec.md`), [], "an approved but unregistered addendum is not yet context");
+    assert.equal(addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath }).status, "spec-addendum-added");
+    const lines = specAddendumContextLines(f.root, `specs/${ID}/spec.md`);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], new RegExp(`\`${ADDENDUM}\` \\(sha256 \`${f.subject.addendumSha256}\`\\) corrects \`CRF-${PACKET}-1\`; where it and \`specs/${ID}/spec.md\` differ, the addendum wins`, "u"));
+    writeFileSync(join(f.root, ADDENDUM), "changed\n");
+    assert.match(specAddendumContextLines(f.root, `specs/${ID}/spec.md`)[0], /do not read back .*SPEC-ADDENDUM-DIGEST.*stop and report it/u);
+    assert.deepEqual(specAddendumContextLines(f.root, "specs/no-package/spec.md"), []);
   } finally { f.cleanup(); }
 });
 

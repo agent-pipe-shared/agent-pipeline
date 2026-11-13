@@ -48,6 +48,7 @@ import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
 import { readSettledPendingPreview } from "../lib/routine-repair.mjs";
+import { readSpecAddenda } from "../lib/spec-addendum.mjs";
 
 const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const cliArguments = process.argv.slice(2);
@@ -705,6 +706,21 @@ export function architectureContextLines(root, paths, loadMap = loadMapBundle) {
   return lines;
 }
 
+/**
+ * ADR-0095: the approved Spec addenda of the Spec's feature package, one line each, so a correction is read together with the Spec it
+ * corrects. Prose only, like the architecture lines: no addendum is an empty list, a package the reader refuses is named, never a refusal.
+ */
+export function specAddendumContextLines(root, specPath) {
+  const featureId = typeof specPath === "string" ? specPath.split("/")[1] : null;
+  const manifestPath = featureId ? resolve(root, "specs", featureId, "lifecycle.json") : null;
+  if (manifestPath === null || !existsSync(manifestPath)) return [];
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(manifestPath, "utf8")); } catch { return [`- Spec addenda: \`specs/${featureId}/lifecycle.json\` is not JSON; ask the Coordinator before relying on \`${specPath}\` alone.`]; }
+  const read = readSpecAddenda({ root, featureId, manifest });
+  if (!read.ok) return [`- Spec addenda: the registered addenda of \`specs/${featureId}\` do not read back (${read.findings.slice(0, 2).join("; ")}); stop and report it, do not implement against the Spec alone.`];
+  return read.applied.map((addendum) => `- Spec addendum (ADR-0095, PO-approved, part of the Spec): \`${addendum.path}\` (sha256 \`${addendum.sha256}\`) corrects ${addendum.findingIds.map((id) => `\`${id}\``).join(", ")}; where it and \`${specPath}\` differ, the addendum wins.`);
+}
+
 /** Build the binding, its block and the skeleton from parsed options. Throws BriefingRefusal. */
 export function generateDispatchBinding(options, deps = {}) {
   const git = deps.git ?? defaultGit;
@@ -1172,7 +1188,7 @@ export function generateDispatchBinding(options, deps = {}) {
     block, "", NATIVE_GOLDFISH_HOST_DIRECTIVE, "",
     `## Briefing ${dispatchId}: {{TITLE}}`, "",
     "### 1. Goal", "", "{{GOAL}}", "",
-    "### 2. Context files", "", ...architectureContextLines(root, allowedPaths, deps.loadMapBundle), "", "{{CONTEXT_FILES}}", "",
+    "### 2. Context files", "", ...architectureContextLines(root, allowedPaths, deps.loadMapBundle), ...specAddendumContextLines(root, specPath), "", "{{CONTEXT_FILES}}", "",
     "### 3. DoD checks", "", "{{DOD_CHECKS}}", "",
     "### 4. Forbidden", "", "{{FORBIDDEN}}", "",
     "### 5. Stop conditions", "", "{{STOP_CONDITIONS}}", "",
