@@ -63,7 +63,7 @@ function planSteps() {
       id: "record-decisions", command: "call the architecture-decision skill once for each decision the design lists under decisions to record, and write the ADR at the path the design names",
       needs: ["the design package names its decisions to record (title, trigger, ADR path) in the module adrReferences"],
       producer: "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
-      commit: "commit the ADRs with the design", next: ["create-adr", "design-review-receipt", "submit-plan"],
+      commit: "commit the ADRs with the design", next: ["create-adr", "design-review-export-report", "design-review-receipt", "submit-plan"],
     }),
     scriptStep({
       id: "create-adr", script: "create-adr.mjs", verb: "--slug", argv: ["--root", "<root>", "--slug", "<slug>", "--title", "<title>"],
@@ -74,7 +74,14 @@ function planSteps() {
       id: "bind-adr-proposals", script: "bind-adr-proposals.mjs", verb: "--carrier",
       argv: ["--root", "<root>", "--feature", "<feature-id>", "--carrier", "<design.md>", "--selection", "<po-selection.json>", "--draft", "<slug>"],
       needs: ["the proposals from create-adr", "the PO's selection file"],
-      producer: "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry", next: ["design-review-receipt"],
+      producer: "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry", next: ["design-review-export-report", "design-review-receipt"],
+    }),
+    scriptStep({
+      id: "design-review-export-report", script: "design-review-receipt.mjs", verb: "export-report",
+      argv: ["export-report", "--repo", "<root>", "--out", "<review-report-path>"],
+      needs: ["on Claude: a finished dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded (the hook records the host-observed reviewer model, D247); Codex and Antigravity skip this step and write the report from the returned text"],
+      producer: "the review report, byte for byte the text the reviewer returned, so create finds the host observation by its digest; --observation <sha256> names one when several are unexported",
+      next: ["design-review-receipt"],
     }),
     scriptStep({
       id: "design-review-receipt", script: "design-review-receipt.mjs", verb: "create",

@@ -30,8 +30,10 @@ The acceptance question of the one-shot close is asked in the project's human-fa
 ## 1. Design
 
 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.
-2. Review receipt and design course (agent): `design-review-receipt.mjs create` with `--repo --feature --report --prd --spec --out`; dispatch the
-   read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
+2. Review receipt and design course (agent): dispatch the read-only `pipeline-core:readiness-reviewer`, not the Critic; on Claude write its
+   returned text as the report with `design-review-receipt.mjs export-report --repo <root> --out <report>` (the host-observed reviewer model,
+   D247); then `design-review-receipt.mjs create` with `--repo --feature --report --prd --spec --out`. Owner: `references/design-course.md`.
+   Never write a receipt or a report of the review by hand.
    Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
    `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
    A decision the PO must accept with this design is a proposal first: `create-adr.mjs --root <root> --slug <slug> --title <title>` writes it (`--refresh` after an edit of the Markdown), then
