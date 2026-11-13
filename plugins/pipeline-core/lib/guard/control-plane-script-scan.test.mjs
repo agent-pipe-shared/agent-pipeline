@@ -87,3 +87,42 @@ test("the refusal applies after a chained cd and names the script and the matche
   assert.match(result.stderr, /'\.git', 'agent-pipeline'/u);
   assert.match(result.stderr, /command-line argument/u);
 });
+
+// D247 follow-up (live probe 2026-11-13: cp, mv and rm into .git/agent-pipeline/ were admitted).
+const WRITE_CODE = "GUARD-CONTROLPLANE-WRITE";
+const writeRefused = (result) => result.exitCode === 2 && result.stderr.includes(WRITE_CODE);
+
+test("a shell command that would change .git/agent-pipeline is refused, in every spelling", () => {
+  mkdirSync(join(root, ".git", "agent-pipeline", "design-review-observations"), { recursive: true });
+  put("scratch/forged.json", "{}\n");
+  for (const command of [
+    "cp scratch/forged.json .git/agent-pipeline/design-review-observations/a.json",
+    "mv scratch/forged.json .git/agent-pipeline/x.json",
+    "rm .git/agent-pipeline/x.json",
+    "mkdir -p .git/agent-pipeline/new",
+    "touch .git/agent-pipeline/x",
+    "echo {} > .git/agent-pipeline/x.json",
+    "echo {} >.git/agent-pipeline/x.json",
+    "cat scratch/forged.json >> .git/agent-pipeline/x.json",
+    "sed -i s/a/b/ .git/agent-pipeline/x.json",
+    "find .git/agent-pipeline -name x -delete",
+    `cp scratch/forged.json ${join(root, ".git", "agent-pipeline", "x.json")}`,
+    "echo ok && cp scratch/forged.json .git/agent-pipeline/x.json",
+    "cd .git/agent-pipeline",
+  ]) assert.ok(writeRefused(run(command)), command);
+  symlinkSync(join(root, ".git"), join(root, "scratch", "g"));
+  assert.ok(writeRefused(run("cp scratch/forged.json scratch/g/agent-pipeline/x.json")), "a symlink into .git");
+  assert.match(run("rm .git/agent-pipeline/x.json").stderr, /Reading that directory stays admitted/u);
+});
+
+test("reading .git/agent-pipeline and writing elsewhere are not this refusal", () => {
+  for (const command of [
+    "ls -la .git/agent-pipeline",
+    "cat .git/agent-pipeline/x.json",
+    "rg -n needle .git/agent-pipeline 2>/dev/null",
+    "find .git/agent-pipeline -name x",
+    "sed -n 1,5p .git/agent-pipeline/x.json",
+    "cp scratch/forged.json scratch/agent-pipeline-copy.json",
+    "mkdir -p scratch/agent-pipeline",
+  ]) assert.equal(writeRefused(run(command)), false, command);
+});

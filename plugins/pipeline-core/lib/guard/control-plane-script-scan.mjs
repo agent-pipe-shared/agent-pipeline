@@ -7,6 +7,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { verdict } from "./verdict.mjs";
 
 export const CONTROLPLANE_SCRIPT_DENIAL_CODE = "GUARD-CONTROLPLANE-SCRIPT";
+export const CONTROLPLANE_SHELL_WRITE_DENIAL_CODE = "GUARD-CONTROLPLANE-WRITE";
 export const MAX_SCANNED_SCRIPT_BYTES = 256 * 1024;
 const SCRIPT_EXTENSION = /\.(?:mjs|cjs|js)$/u;
 const EXEMPT_PREFIX = "plugins/pipeline-core/";
@@ -72,6 +73,60 @@ export function controlPlaneScriptHit(command, root) {
     if (spelling !== null) return { script: script.rel, spelling };
   }
   return null;
+}
+
+// D247 follow-up (live probe 2026-11-13: cp, mv and rm into .git/agent-pipeline/ were all admitted). A shell segment that names
+// the control-plane directory -- literally, or through a path whose real location lies in it -- is refused unless its command
+// only reads and the segment carries no redirect. The plugin's own scripts write there with the file system and never name it.
+const READ_ONLY_COMMANDS = new Set(["rg", "grep", "cat", "head", "tail", "wc", "stat", "file", "ls", "git"]);
+const REDIRECT = />/u;
+const DISCARD_REDIRECT = /\d?>{1,2}\s*\/dev\/null/gu;
+const CONTROL_PLANE = /(?:^|[^A-Za-z0-9_.-])\.git[\\/]+agent-pipeline(?:[\\/]|$|['"`])/u;
+
+function namesControlPlane(word, root) {
+  if (typeof word !== "string" || word === "") return false;
+  if (CONTROL_PLANE.test(word)) return true;
+  if (word.startsWith("-")) return false;
+  const plain = word.replace(/^[^=]*=(?=[./\\])/u, "").replace(/^\d?>{1,2}/u, "");
+  if (plain === "") return false;
+  try {
+    let probe = resolve(root, plain);
+    const rest = [];
+    while (true) {
+      try { lstatSync(probe); break; } catch { /* keep walking up */ }
+      const parent = resolve(probe, "..");
+      if (parent === probe) return false;
+      rest.unshift(basename(probe));
+      probe = parent;
+    }
+    return CONTROL_PLANE.test(join(realpathSync(probe), ...rest));
+  } catch { return false; }
+}
+
+/** Returns { segment } for the first shell segment that would write the control-plane directory, else null. */
+export function controlPlaneShellWriteHit(command, root) {
+  if (typeof command !== "string") return null;
+  for (const segment of command.split(/[;&|\n]+|&&|\|\|/u)) {
+    const parts = words(segment);
+    if (parts.length === 0 || !parts.some((word) => namesControlPlane(word, root))) continue;
+    const executable = basename(String(parts[0]).replaceAll("\\", "/"));
+    const sedInPlace = executable === "sed" && parts.some((word) => /^-[a-zA-Z]*i/u.test(word) || word.startsWith("--in-place"));
+    const findMutates = executable === "find" && parts.some((word) => ["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf", "-fls"].includes(word));
+    const readOnly = (READ_ONLY_COMMANDS.has(executable) || (executable === "sed" && !sedInPlace) || (executable === "find" && !findMutates))
+      && !REDIRECT.test(segment.replace(DISCARD_REDIRECT, ""));
+    if (!readOnly) return { segment: segment.trim().slice(0, 200) };
+  }
+  return null;
+}
+
+export function controlPlaneShellWriteBlocked(hit) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${CONTROLPLANE_SHELL_WRITE_DENIAL_CODE}: this command would change the Pipeline control-plane directory .git/agent-pipeline/ (${hit.segment}). `
+      + "Only the plugin's hooks and sanctioned scripts write there; a record an agent could write would prove nothing.\n"
+      + "Use scratch/ for notes and evidence, and the sanctioned Pipeline command for anything the pipeline records. Reading that directory stays admitted.\n",
+  );
 }
 
 export function controlPlaneScriptBlocked(hit) {
