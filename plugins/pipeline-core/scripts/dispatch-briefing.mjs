@@ -493,6 +493,16 @@ function defaultSpecPathFromState(root) {
   } catch { return null; }
 }
 
+/** The active feature id the host parses the criterion with (K-25), or null when the project state names none. */
+function activeFeatureIdFromState(root) {
+  try {
+    const paths = resolveProjectAuthorityPaths({ rootDir: root });
+    if (paths.status !== "ready" || typeof paths.state !== "string") return null;
+    const id = JSON.parse(readFileSync(resolve(root, paths.state), "utf8"))?.activeFeature?.id;
+    return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(id) ? id : null;
+  } catch { return null; }
+}
+
 /** A regular, non-symlinked file strictly inside the (already real) root, or null. */
 function readRepoFile(root, rel) {
   try {
@@ -638,11 +648,15 @@ function findCriterionOccurrences(sourceBytes, id) {
 }
 
 /** The host's own parser must accept the criterion text exactly as the existing Alfred route requires. */
-function requireAcceptedCriterion(specBytes, specPath, locator, describe) {
+// Candidate 29 (Glossover K-25): the host (lib/native-goldfish-host-state.mjs prepareGovernedItemQueue) parses the
+// criterion with the ACTIVE feature id, not the spec's folder name. This check took the folder name, so build and
+// probe reported ready for an approved Spec in an earlier dated folder while the dispatch itself was refused. Both now
+// pass the same feature id; the folder name is only the fallback when no project state names an active feature.
+function requireAcceptedCriterion(specBytes, specPath, locator, describe, featureId = specPath.split("/")[1]) {
   const criterion = parseAcceptedCriticCriterion({
     sourceBytes: new Uint8Array(specBytes),
     locator,
-    packageContext: { featureId: specPath.split("/")[1], sourceBindings: [{ path: specPath, sha256: locator.sourceSha256, role: "spec" }] },
+    packageContext: { featureId, sourceBindings: [{ path: specPath, sha256: locator.sourceSha256, role: "spec" }] },
   });
   if (!ACCEPTED_CRITERION_STATUSES.includes(criterion.status)) {
     refuse("DBG-CRITERION-REFUSED", `the host criterion parser reports ${criterion.status} (${criterion.code}) for ${describe}`);
@@ -839,7 +853,7 @@ export function generateDispatchBinding(options, deps = {}) {
       endByte: only.endByte,
       excerptSha256: sha256(specBytes.subarray(only.startByte, only.endByte)),
     };
-    requireAcceptedCriterion(specBytes, specPath, locator, `${options.criterion} of item ${item}`);
+    requireAcceptedCriterion(specBytes, specPath, locator, `${options.criterion} of item ${item}`, activeFeatureIdFromState(root) ?? undefined);
     itemId = `${specPath.split("/")[1]}.${item}`;
     if (!ITEM_ID.test(itemId)) refuse("DBG-ITEM-ID", `derived item id ${JSON.stringify(itemId)} does not match ${ITEM_ID}`);
   } else {
@@ -859,7 +873,7 @@ export function generateDispatchBinding(options, deps = {}) {
       endByte: criterionCell.endByte,
       excerptSha256: sha256(specBytes.subarray(criterionCell.startByte, criterionCell.endByte)),
     };
-    requireAcceptedCriterion(specBytes, specPath, locator, `${idCell.value} of item ${item}`);
+    requireAcceptedCriterion(specBytes, specPath, locator, `${idCell.value} of item ${item}`, activeFeatureIdFromState(root) ?? undefined);
     const itemPath = /backlog\/items\/[A-Za-z0-9][A-Za-z0-9._-]*\.md/u.exec(evidenceCell.value)?.[0];
     if (!itemPath) refuse("DBG-ITEM-EVIDENCE-MISSING", `the Evidence cell of ${idCell.value} names no backlog/items/*.md file (item ${item}); repair: put the item's backlog/items/<file>.md path in that row's Evidence cell, or file the item first (backlog/README.md) and name it there`);
     const itemBytes = readRepoFile(root, itemPath);

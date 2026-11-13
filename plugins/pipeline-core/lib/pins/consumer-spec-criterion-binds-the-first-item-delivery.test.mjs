@@ -542,3 +542,39 @@ test("the host-return id grammar is the contract's grammar: equal source strings
   }
   assert.equal(ids.filter((id) => contract.isCriterionId(id)).length, 5);
 });
+
+// F. Candidate 29 (Glossover K-25): the feature id changed after the design, so the approved Spec stayed in the earlier
+// dated specs/ folder (28e carries it there, lib/feature-package-topology.mjs). The host parses the criterion with the
+// ACTIVE feature id, and the parser demanded specs/<featureId>/ for every binding, so the first item dispatch was refused
+// item-course-criterion-unbound although build and probe were ready. The approved PRD/Spec binding is now admitted at
+// its approved path; a companion outside specs/<featureId>/ and a locator naming no binding stay CAC-CRITERION-BINDING.
+
+test("K-25: an approved Spec in an earlier dated folder binds its criterion under the active feature id", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, "AC-1"), depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const locator = result.binding.itemDelivery.criterionLocator;
+  const specBinding = { path: SPEC, sha256: sha(fx.specBytes), role: "spec" };
+  const parse = (featureId, sourceBindings, at = locator) => parseAcceptedCriticCriterion({
+    sourceBytes: new Uint8Array(fx.specBytes), locator: at, packageContext: { featureId, sourceBindings },
+  });
+  const ADMITTED = ["explicit-actual-independent-pass", "no-explicit-criterion"];
+  // The active feature is "shop-checkout"; the approved Spec sits in specs/shop-app/ (the earlier folder).
+  for (const bindings of [[specBinding], [{ path: "specs/shop-app/prd.md", sha256: "a".repeat(64), role: "prd" }, specBinding]]) {
+    const parsed = parse("shop-checkout", bindings);
+    assert.ok(ADMITTED.includes(parsed.status), JSON.stringify(parsed));
+  }
+  assert.ok(ADMITTED.includes(parse("shop-app", [specBinding]).status), "the unchanged same-folder case");
+  // A companion is not a carried artifact: outside specs/<featureId>/ it still refuses the whole binding.
+  const companion = parse("shop-checkout", [specBinding, { path: "specs/shop-app/notes.md", sha256: "b".repeat(64), role: "companion" }]);
+  assert.equal(companion.code, "CAC-CRITERION-BINDING", JSON.stringify(companion));
+  // The locator must still name exactly one binding, by path and digest.
+  const unbound = parse("shop-checkout", [{ ...specBinding, sha256: "c".repeat(64) }]);
+  assert.equal(unbound.code, "CAC-CRITERION-BINDING", JSON.stringify(unbound));
+  // The path grammar is unchanged: no traversal and nothing outside specs/.
+  for (const path of ["specs/shop-app/../shop-app/spec.md", "docs/spec.md"]) {
+    const refused = parse("shop-checkout", [{ ...specBinding, path }], { ...locator, sourcePath: path });
+    assert.equal(refused.code, "CAC-CRITERION-BINDING", path);
+  }
+});

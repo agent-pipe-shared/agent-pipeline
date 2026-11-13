@@ -367,16 +367,22 @@ export function parseAcceptedCriticCriterion(input) {
     const context = input.packageContext;
     if (!own(context, ['featureId','sourceBindings']) || typeof context.featureId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(context.featureId)
       || !Array.isArray(context.sourceBindings) || context.sourceBindings.length < 1 || context.sourceBindings.length > 16) return binding();
+    // Candidate 29 (Glossover K-25): the approved PRD and Spec may stay in the earlier (dated) specs/ folder after the
+    // feature id changed -- the same one exception lib/feature-package-topology.mjs featurePackageArtifactPath() grants
+    // the package (28e). The bindings handed in here are the approved ones (plan approval sourceRefs, or the signed
+    // envelope's request binding), so a prd/spec binding is admitted under any canonical specs/<folder>/ path; a
+    // companion still has to sit inside specs/<featureId>/.
     const prefix = `specs/${context.featureId}/`, seen = new Set();
+    const placed = entry => entry.path.startsWith(prefix) || entry.role === 'prd' || entry.role === 'spec';
     for (const entry of context.sourceBindings) {
-      if (!own(entry, ['path','sha256','role']) || typeof entry.path !== 'string' || !entry.path.startsWith(prefix)
+      if (!own(entry, ['path','sha256','role']) || typeof entry.path !== 'string' || !placed(entry)
         || !/^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(entry.path)
         || entry.path.split('/').some(part => part === '.' || part === '..' || part === '')
         || typeof entry.sha256 !== 'string' || !SHA.test(entry.sha256) || !['prd','spec','companion'].includes(entry.role) || seen.has(entry.path)) return binding();
       seen.add(entry.path);
     }
     const matched = context.sourceBindings.filter(entry => entry.path === locator.sourcePath && entry.sha256 === locator.sourceSha256);
-    if (matched.length !== 1 || !locator.sourcePath.startsWith(prefix)) return binding();
+    if (matched.length !== 1 || !placed(matched[0])) return binding();
     const bytes = Buffer.from(input.sourceBytes), byteHash = value => createHash('sha256').update(value).digest('hex');
     if (byteHash(bytes) !== locator.sourceSha256) return binding();
     const decoder = new TextDecoder('utf-8', {fatal:true,ignoreBOM:true});
@@ -443,7 +449,7 @@ export function readAcceptedCriticCriterion(input) {
     locator = structuredClone(value);
     const verified = readAcceptedDeliveryContract({dir:input.repoRoot,envelopePath:input.envelopePath});
     if (!verified.ok) return fail(verified.code);
-    if (verified.featureId !== input.featureId || !locator.sourcePath.startsWith(`specs/${input.featureId}/`)) return fail('CAC-CRITERION-BINDING');
+    if (verified.featureId !== input.featureId) return fail('CAC-CRITERION-BINDING');
     const root = realpathSync(resolve(input.repoRoot));
     const physical = path => {
       let target = root;
@@ -463,7 +469,10 @@ export function readAcceptedCriticCriterion(input) {
     const sources = envelope.request.binding.sources;
     const sourceBindings = [{...sources.prd,role:'prd'},{...sources.spec,role:'spec'},...sources.companions.map(entry=>({...entry,role:'companion'}))];
     const bound = sourceBindings.find(entry=>entry.path === locator.sourcePath);
-    if (!bound || bound.sha256 !== locator.sourceSha256) return fail('CAC-CRITERION-BINDING');
+    // Candidate 29 (Glossover K-25): the locator must name one of the signed bindings; inside specs/<featureId>/ as
+    // before, or the approved PRD/Spec at its approved path (the 28e package exception), never a companion elsewhere.
+    if (!bound || bound.sha256 !== locator.sourceSha256
+      || (!bound.path.startsWith(`specs/${input.featureId}/`) && bound.role !== 'prd' && bound.role !== 'spec')) return fail('CAC-CRITERION-BINDING');
     const invoke = argv => {
       const result = spawnSync('git',argv,{cwd:root,maxBuffer:2097152});
       if (!isSuccessfulSpawn(result) || !Buffer.isBuffer(result.stdout)) throw Error('original Git observation unavailable');
