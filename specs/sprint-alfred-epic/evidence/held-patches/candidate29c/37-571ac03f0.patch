@@ -1,0 +1,871 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 5cef23dbb1c982dfa654d8951dd005f81b7a854d..0150081d91bf24033ec04592f90fbe5a7f86858f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4909,6 +4909,12 @@
+       "file": "plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs",
+       "invariantPinned": "The gate-strength guard refuses an agent's own Write or Edit into the pipeline-owned private state (.git/agent-pipeline/**), by the lexical target and by the real location behind a symlink, plans no override and lets ordinary paths through, including a folder named agent-pipeline outside .git",
+       "nonOverlapNote": "Unique hook-level suite (D247 follow-up) for the private-state write refusal; guard-gate-strength-review-receipt.test.mjs keeps the content-based receipt refusal"
++    },
++    {
++      "name": "gate-definition-changes-tests",
++      "file": "plugins/pipeline-core/lib/gate-definition-changes.test.mjs",
++      "invariantPinned": "The close's gate-definition walk (ADR-0096) lists every add, change and deletion of a gate-definition file in the feature range against the first parent, skips an exempt-field-only pipeline.user.yaml edit, and derives each proof: first appearance, committed materialization of the fitness model, the labelled configure-verify record, a consumed override for its next change of the path only, or the PO acknowledgement naming that exact change; a re-creation after a deletion and an unacknowledged later change stay unproven",
++      "nonOverlapNote": "Unique unit suite on real git histories for the walk and its proof derivation; pre-commit-hook-install.test.mjs pins the commit-time refusal of GS-16/GS-17"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 6adcb0ad91b2f96f8460414c339ceaaeb392cac0..70a2b83a10519c9577eab73f571d531ca28c91f6 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -22,7 +22,7 @@ function evidenceSection(manifest) {
+   if (!Object.hasOwn(manifest, "evidence")) return "";
+   const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
+   // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
+-  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection" && !entry.item.startsWith("sbom")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
++  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection" && !entry.item.startsWith("sbom") && entry.item !== "gate-changes"); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
+   // C28: the dispatch projection is its own section, printed after the reports.
+   const projections = manifest.evidence.items.filter((entry) => entry.item === "dispatch-projection");
+   const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
+@@ -31,7 +31,10 @@ function evidenceSection(manifest) {
+   const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (JavaScript, Python, Go, Rust, JVM, .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++ and committed CycloneDX files) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means the PO signed an override of a blocked state; the record names every finding it covered and the signing key, and the signed request and proof travel in the bundle (\`AB-SBOM-OVERRIDE\` is the verifier's finding when the signature or its binding does not hold; whether the key is the project's is decided at the close, so compare the key reference with the project's policy): the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
+   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
+   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
+-  return `${approvalText}${reportText}${projectionText}${sbomText}`;
++  // ADR-0096: the gate-definition changes of the feature range, each with the proof that admitted it.
++  const gates = manifest.evidence.items.filter((entry) => entry.item === "gate-changes");
++  const gateText = gates.length === 0 ? "" : `\n## Gate-definition changes\n\nEvery change of a file that decides how strong a gate is (verify command, calibration, manifest, guard and boundary policy, fitness model, push-approval mode, trust anchors) in this feature's range, with the proof that admitted it. \`GATE-CHANGE-LABELLED\` means at least one proof is not a signature: \`confirmed via runner prompt, not signed\` (configure-verify) or \`acknowledged after the fact\` (the PO's acknowledgement). The record lists each one; the Critic reviews the content of each change.\n\n${gates.map(line).join("\n")}\n`;
++  return `${approvalText}${reportText}${projectionText}${sbomText}${gateText}`;
+ }
+ // C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
+ // The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
+@@ -200,8 +203,18 @@ function followUpFindings(root, manifest) {
+   return findings;
+ }
+ function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document", "sbom-override"]);
+-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override" });
++const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document", "sbom-override", "gate-changes"]);
++const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override", gateChanges: "gate-changes" });
++// ADR-0096: the close's list of every gate-definition change of the feature range with the proof that admitted it (lib/gate-definition-changes.mjs).
++const GATE_CHANGES_SCHEMA = "pipeline.gate-definition-changes.v1";
++const GATE_PROOF_KINDS = new Set(["first-appearance", "trust-anchor-bootstrap", "materialization", "configure-verify", "human-guard-override", "po-acknowledgement"]);
++function gateChangesRecordHolds(record) {
++  return record !== null && typeof record === "object" && record.schema === GATE_CHANGES_SCHEMA && record.status === "proven" && Array.isArray(record.changes) && Array.isArray(record.unproven) && record.unproven.length === 0
++    && record.changes.every((change) => change !== null && typeof change === "object" && OID.test(change.commit ?? "") && typeof change.path === "string" && /^[AMD]$/u.test(change.change ?? "")
++      && change.proof !== null && typeof change.proof === "object" && GATE_PROOF_KINDS.has(change.proof.kind));
++}
++/** The item code of a carried gate-change list: null when every proof is a signature or a structural fact, GATE-CHANGE-LABELLED when one carries a label. */
++const gateChangesCode = (record) => (record.changes.some((change) => typeof change.proof.label === "string" && change.proof.label !== "") ? "GATE-CHANGE-LABELLED" : null);
+ // C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
+ // and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
+ // C28e (Codex test run, PO 2026-11-13): a close now writes `digest-only` (no text, the source digest only); bundles with carried or redacted texts still verify.
+@@ -242,7 +255,7 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
+  */
+ function collectEvidence(root, candidate, evidence, firstIndex) {
+   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
+-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath"]);
++  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath", "gateChangesRecordPath"]);
+   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
+   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
+   const reports = evidence.criticReports;
+@@ -257,7 +270,8 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+   if (evidence.dispatchProjectionPath !== undefined && typeof evidence.dispatchProjectionPath !== "string") fail("AB-EVIDENCE-INPUT");
+   // C28c: the same for the SBOM record the close names.
+   if (evidence.sbomRecordPath !== undefined && typeof evidence.sbomRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
+-  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined)) {
++  if (evidence.gateChangesRecordPath !== undefined && typeof evidence.gateChangesRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
++  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined && evidence.gateChangesRecordPath === undefined)) {
+   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
+   else {
+     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
+@@ -326,6 +340,12 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+       }
+     }
+   }
++  if (evidence.gateChangesRecordPath !== undefined) {
++    const file = readEvidenceFile(root, evidence.gateChangesRecordPath); const record = file && jsonOrNull(file.bytes);
++    if (file === null || !gateChangesRecordHolds(record)) gap("gate-changes", "UNREADABLE");
++    else if (record.head !== candidate.commit) gap("gate-changes", "OTHER-CANDIDATE");
++    else items.push({ item: "gate-changes", status: "carried", code: gateChangesCode(record), bundlePath: carry(EVIDENCE_CLASSES.gateChanges, evidence.gateChangesRecordPath, file.sha256) });
++  }
+   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index 94e9eab3ecbe963344e257ec77620c336c4fe4a3..54576eb3fa3cf02757e1ba8f600c7d65b1800cb3 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -291,6 +291,27 @@ test("C28 the bundle carries the dispatch projection as one evidence item, verif
+   const unreadable = planWith(fixture(), { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/absent.json" } });
+   assert.deepEqual(unreadable.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:gap:UNREADABLE"]);
+ });
++// ADR-0096 (D248): the close's list of gate-definition changes is its own bundle section, carried only when every change is proven and the list ends at the candidate.
++function gateChangesBundle(input, record) {
++  mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/gate-changes.json"), `${JSON.stringify(record)}\n`);
++  return planWith(input, { candidate: CANDIDATE, evidence: { gateChangesRecordPath: "evidence/gate-changes.json" } });
++}
++test("ADR-0096 the bundle carries the gate-definition change list, codes a labelled proof, and refuses an unproven or foreign list", async () => {
++  const change = (proof) => ({ commit: "a".repeat(40), parent: "b".repeat(40), path: "project/pipeline.json", change: "M", blobSha256: "c".repeat(64), ruleId: "GS-11", proof });
++  const record = (changes, extra = {}) => ({ schema: "pipeline.gate-definition-changes.v1", status: "proven", base: null, head: CANDIDATE.commit, changes, unproven: [], ...extra });
++  const input = fixture();
++  const signed = gateChangesBundle(input, record([change({ kind: "human-guard-override", ref: "e".repeat(64), label: null })]));
++  assert.deepEqual(signed.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:carried:null"], "only the named item: no approval item is invented");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan: signed });
++  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /## Gate-definition changes/u);
++  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
++  const labelled = gateChangesBundle(fixture(), record([change({ kind: "po-acknowledgement", ref: "f".repeat(64), label: "acknowledged after the fact" })]));
++  assert.deepEqual(labelled.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:carried:GATE-CHANGE-LABELLED"]);
++  const unproven = gateChangesBundle(fixture(), record([change(null)], { status: "unproven", unproven: [change(null)] }));
++  assert.deepEqual(unproven.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:gap:UNREADABLE"], "an unproven list never reaches a bundle as carried");
++  const foreign = gateChangesBundle(fixture(), record([], { head: "9".repeat(40) }));
++  assert.deepEqual(foreign.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:gap:OTHER-CANDIDATE"]);
++});
+ // C28c (PO decision 2026-11-11): the SBOM the close records is its own bundle section: the record, then the two documents it names, bound by digest and re-checked offline.
+ const LOCK = JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/left-pad": { version: "1.3.0" } } });
+ function sbomBundle(input, files, mutate = (value) => value) {
+diff --git a/plugins/pipeline-core/lib/audit-proof-collection.mjs b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+index 93cda3ad59fe090ed732e2e923eedab75ab49a01..a251f381b1d9deb6523fd9a479fe07b35d983c8d 100644
+--- a/plugins/pipeline-core/lib/audit-proof-collection.mjs
++++ b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+@@ -6,7 +6,8 @@
+  *
+  * Sources, in the order the human-approval trace enumerates them:
+  *   - the plan approval's signed design approval, kept in the State;
+- *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit.
++ *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit;
++ *   - the PO's acknowledgement of gate-definition changes (ADR-0096) of the active feature.
+  * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is an
+  * envelope whose proof is not a verifiable public proof object. A gap never blocks the close.
+  *
+@@ -23,6 +24,7 @@ import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+ 
+ const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
+ const CRITIC_ACKNOWLEDGEMENT_KIND = "acknowledge-caller-authored-critic"; // spelled here: importing lib/critic-acknowledgement.mjs closes an import cycle through the State writer
++const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes"; // spelled here for the same reason (lib/gate-definition-changes.mjs)
+ const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; } };
+ 
+@@ -38,8 +40,11 @@ export function collectAuditProofs({ common, candidate, state, criticPacketId =
+   if (object(design) && design.mode === "signature") take("plan-approval", design.proof, "state:planApproval");
+   if (typeof common === "string" && common !== "" && object(candidate)) {
+     // C21E: the PO acknowledgement of a caller-authored Critic signs the REVIEWED candidate, which the close candidate has moved past, so it is found by its packet.
+-    const belongs = (kind, approval) => (kind === CRITIC_ACKNOWLEDGEMENT_KIND ? approval.packetId === criticPacketId : approval.forCommit === candidate.commit);
+-    for (const kind of criticPacketId === null ? STORE_KINDS : [...STORE_KINDS, CRITIC_ACKNOWLEDGEMENT_KIND]) {
++    // ADR-0096: the PO's acknowledgement of gate-definition changes signs the HEAD of its day; the close candidate may have moved past it, so it is found by its feature.
++    const featureId = typeof state?.activeFeature?.id === "string" ? state.activeFeature.id : null;
++    const belongs = (kind, approval) => (kind === CRITIC_ACKNOWLEDGEMENT_KIND ? approval.packetId === criticPacketId
++      : kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND ? featureId !== null && approval.featureId === featureId : approval.forCommit === candidate.commit);
++    for (const kind of [...STORE_KINDS, ...(criticPacketId === null ? [] : [CRITIC_ACKNOWLEDGEMENT_KIND]), ...(featureId === null ? [] : [GATE_CHANGE_ACKNOWLEDGEMENT_KIND])]) {
+       const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); let names = [];
+       try { names = readdirSync(directory).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort().slice(0, 256); } catch { names = []; }
+       for (const name of names) {
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+index 70fd425d7fc878fad3708a2a7369dbe1ac47678d..0d195214520c485170c1ea421c9c80fd06ce7b3e 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+@@ -20,11 +20,16 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
+ // keys off its own, separate `CRITICAL_COMMAND_KINDS` in po-human-approval.mjs) --
+ // membership here only makes it a valid `kind` for `criticalActionSubjectSha256`/
+ // `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
++// ADR-0096: defined in this leaf module because lib/gate-definition-changes.mjs and the two scripts that import it form an import
++// cycle; a module-level kind list must not read a binding the cycle has not initialised yet.
++export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
+ export const CRITICAL_ACTION_KINDS = Object.freeze([
+   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
+   "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
+   // ADR-0095: the PO's approval of one Spec addendum; its subject comes from lib/spec-addendum.mjs only.
+   "spec-addendum",
++  // ADR-0096: the PO's acknowledgement of the unproven gate-definition changes of a feature range (lib/gate-definition-changes.mjs).
++  "acknowledge-gate-definition-changes",
+ ]);
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+index 8f9fc2b0008ea76c24ab28a6009a01772a0137ef..db50d6987b4fb493fa8f45147db7b586f9d70756 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+@@ -47,7 +47,8 @@ check("subject digest changes with target", () => assert.notEqual(subjectSha256,
+ check("CRITICAL_ACTION_KINDS holds the documented seven members in order", () => {
+   // G20-39 (PO 2026-11-07): acknowledge-caller-authored-critic is a deliberate new kind (the close-gate bridge); restated in place (QG-04).
+   // ADR-0095 (PO tiles 2026-11-13): spec-addendum is a deliberate new kind (the Spec correction inside implementation); restated in place (QG-04).
+-  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "spec-addendum"]);
++  // ADR-0096 (PO tile L4 2026-11-13): acknowledge-gate-definition-changes is a deliberate new kind (the after-the-fact gate-change acknowledgement); restated in place (QG-04).
++  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "spec-addendum", "acknowledge-gate-definition-changes"]);
+ });
+ check("a release-preflight request round-trips end to end, and cross-kind substitution stays refused", () => {
+   const rpSubject = { schema: "pipeline.release-preflight-consent-subject.v1", version: "1.2.3", base: { commit: "c".repeat(40), tree: "d".repeat(40) }, lifecycle: { featureId: "cyb-4", manifestPath: "lifecycle.json", manifestSha256: "e".repeat(64) }, retentionPolicySha256: "f".repeat(64) };
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index 62cc5d5a1e12eb143d55ffb8b505c39b22d40545..c85915926bdc8a38f548f1bb67bb6e5925ec1e04 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -201,6 +201,8 @@ const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-p
+   "acknowledge-caller-authored-critic": "criticAcknowledgement",
+   // ADR-0095: the PO approval of one Spec addendum (lib/spec-addendum.mjs); read per addendum, not through the slot overlay.
+   "spec-addendum": "specAddendumApproval",
++  // ADR-0096: the PO acknowledgement of a range's unproven gate-definition changes; read per feature by the close walk.
++  "acknowledge-gate-definition-changes": "gateChangeAcknowledgement",
+   // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
+   "release-preflight": "releasePreflightApproval" });
+ 
+diff --git a/plugins/pipeline-core/lib/gate-definition-changes.mjs b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+index 8591aecea51b3a32f473592b16716578ec4b20db..5dc7b3d272deb8b328d8eb10df4ade707ce28f2d 100644
+--- a/plugins/pipeline-core/lib/gate-definition-changes.mjs
++++ b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+@@ -28,15 +28,17 @@
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { readdirSync, readFileSync } from "node:fs";
++import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
+ import { join } from "node:path";
+ import { GATE_STRENGTH_FIELD_EXEMPTIONS, GATE_STRENGTH_PATHS, changedGateStrengthDottedPaths } from "../hooks/guard-gate-strength.mjs";
+ import { featureRangeBase } from "./close-commit-split.mjs";
++import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
+ import { readPrivateApprovals } from "./critical-action-authorization.mjs";
+ import { readConsumedOverrideCapabilities } from "./human-guard-override.mjs";
+ import { parseYaml } from "./yaml-lite.mjs";
+ 
+ export const GATE_DEFINITION_CHANGES_SCHEMA = "pipeline.gate-definition-changes.v1";
+-export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
++export { GATE_CHANGE_ACKNOWLEDGEMENT_KIND };
+ export const GATE_DEFINITION_IDS = Object.freeze(["GS-1", "GS-2", "GS-3", "GS-4", "GS-5", "GS-7", "GS-10", "GS-11", "GS-12", "GS-13", "GS-14", "GS-16", "GS-17"]);
+ export const CONFIGURE_VERIFY_LABEL = "confirmed via runner prompt, not signed";
+ export const ACKNOWLEDGEMENT_LABEL = "acknowledged after the fact";
+@@ -44,13 +46,16 @@ const MAX_CHANGES = 4096;
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+-const RULES = GATE_STRENGTH_PATHS.filter((rule) => GATE_DEFINITION_IDS.includes(rule.id) && !rule.path.endsWith("/*"));
++// Built on first use: hooks/guard-gate-strength.mjs reaches this module back through an import cycle, so its table may not be
++// initialised while this module evaluates.
++let rules = null;
++const gateDefinitionRules = () => (rules ??= GATE_STRENGTH_PATHS.filter((rule) => GATE_DEFINITION_IDS.includes(rule.id) && !rule.path.endsWith("/*")));
+ 
+ /** The gate-definition rule of a repository-relative path, or null (same case-insensitive match as the write guard). */
+ export function gateDefinitionRuleFor(path) {
+   if (typeof path !== "string" || path === "") return null;
+   const normalized = path.toLowerCase();
+-  return RULES.find((rule) => rule.path.toLowerCase() === normalized) ?? null;
++  return gateDefinitionRules().find((rule) => rule.path.toLowerCase() === normalized) ?? null;
+ }
+ 
+ function gitRunner(rootDir) {
+@@ -76,9 +81,19 @@ function onlyExemptFields(git, rule, parent, commit, path) {
+  * Every gate-definition change of the feature range. `{ status: "listed", base, head, changes: [{ commit, parent, path, change, blobSha256,
+  * ruleId }] }` or `{ status: "unavailable", reason }`. `change` is A, M or D; a deleted file has `blobSha256: null`.
+  */
+-export function listGateDefinitionChanges({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
++export function listGateDefinitionChanges({ rootDir, featureId, head = "HEAD", runGit = null, specDirectory = null } = {}) {
+   const git = runGit ?? gitRunner(rootDir);
+-  const range = featureRangeBase({ rootDir, featureId, head, runGit: (args) => git(args) });
++  let range = featureRangeBase({ rootDir, featureId, head, runGit: (args) => git(args) });
++  // K-25/K-30 consumers keep an approved Spec in a dated folder (specs/<date>-<slug>/): the range then starts at the first commit of
++  // that folder, the same first-parent rule applied to the directory the approved Spec lives in.
++  if (range.status !== "found" && typeof specDirectory === "string" && /^specs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(specDirectory)) {
++    const first = git(["log", "--first-parent", "--reverse", "--format=%H", head, "--", specDirectory]);
++    const oid = ok(first) ? String(first.stdout).split("\n").map((line) => line.trim()).find((line) => OID.test(line)) : undefined;
++    if (oid !== undefined) {
++      const parent = git(["rev-parse", "--verify", "--quiet", `${oid}^`]);
++      range = { status: "found", first: oid, base: ok(parent) && OID.test(String(parent.stdout).trim()) ? String(parent.stdout).trim() : null };
++    }
++  }
+   if (range.status !== "found") return Object.freeze({ status: "unavailable", reason: range.reason });
+   const headCommit = git(["rev-parse", "--verify", "--quiet", `${head}^{commit}`]);
+   if (!ok(headCommit) || !OID.test(String(headCommit.stdout).trim())) return Object.freeze({ status: "unavailable", reason: "HEAD could not be read" });
+@@ -107,6 +122,23 @@ export function listGateDefinitionChanges({ rootDir, featureId, head = "HEAD", r
+   return Object.freeze({ status: "listed", base: range.base, head: String(headCommit.stdout).trim(), changes });
+ }
+ 
++/** The `specs/<folder>` directory of an approved Spec path (the range fallback for a dated Spec folder), or null. */
++export function specDirectoryOf(specPath) {
++  const match = typeof specPath === "string" ? /^(specs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127})\/[^/]+$/u.exec(specPath) : null;
++  return match ? match[1] : null;
++}
++
++/**
++ * The Spec directory of the active feature from the project's pipeline state (approved Spec path first, then the continuity
++ * authority's), or null. The close, the recording step and the signing terminal all fall back to it, so they read the same range.
++ */
++export function specDirectoryFromState(root) {
++  try {
++    const state = JSON.parse(readFileSync(resolveAuthorityArtifactPath("state", { rootDir: root }).path, "utf8"));
++    return specDirectoryOf(state?.planApproval?.poGateAuthority?.specPath ?? state?.continuity?.authority?.spec?.path);
++  } catch { return null; }
++}
++
+ /** The acknowledgement's sorted change list and its digest; the one canonical form the subject, the record and the walk compare. */
+ export function gateChangeListDigest(changes) {
+   const list = changes.map(({ commit, path, change, blobSha256 }) => ({ commit, path, change, blobSha256 }))
+@@ -202,10 +234,10 @@ function readAcknowledgements(commonDir, featureId) {
+  * The readback the close, inspect, the bundle and the Critic input share. `{ schema, status: "proven"|"unproven"|"unavailable", base,
+  * head, changes: [{ ...change, proof }], unproven: [change] }`. `excludeAcknowledgements` builds the list an acknowledgement must name.
+  */
+-export function gateDefinitionChangeReadback({ rootDir, featureId, commonDir, head = "HEAD", runGit = null, excludeAcknowledgements = false,
++export function gateDefinitionChangeReadback({ rootDir, featureId, commonDir, head = "HEAD", runGit = null, excludeAcknowledgements = false, specDirectory = null,
+   readOverrides = readConsumedOverrideCapabilities, readConfigureVerify = readConfigureVerifyReady, readAcks = readAcknowledgements } = {}) {
+   const git = runGit ?? gitRunner(rootDir);
+-  const listed = listGateDefinitionChanges({ rootDir, featureId, head, runGit: git });
++  const listed = listGateDefinitionChanges({ rootDir, featureId, head, runGit: git, specDirectory });
+   if (listed.status !== "listed") return Object.freeze({ schema: GATE_DEFINITION_CHANGES_SCHEMA, status: "unavailable", reason: listed.reason, changes: [], unproven: [] });
+   const context = { git, overrides: listed.changes.length === 0 ? [] : readOverrides({ commonDir }),
+     configureVerify: listed.changes.length === 0 ? [] : readConfigureVerify(commonDir),
+@@ -215,6 +247,38 @@ export function gateDefinitionChangeReadback({ rootDir, featureId, commonDir, he
+   return Object.freeze({ schema: GATE_DEFINITION_CHANGES_SCHEMA, status: unproven.length === 0 ? "proven" : "unproven", base: listed.base, head: listed.head, changes, unproven });
+ }
+ 
++/**
++ * The one subject builder of the PO's acknowledgement: the recording step (`pipeline-state.mjs approve-gate-change-acknowledgement`)
++ * and the signing terminal (`po-human-approval.mjs authorize-critical --kind acknowledge-gate-definition-changes`) both call it, so
++ * they cannot disagree about the list. The list is every change of the range without another proof (an earlier acknowledgement is
++ * ignored, so a new one names everything still needing one); the candidate is HEAD. `{ ok: true, subject, candidate }` or
++ * `{ ok: false, code, detail }`.
++ */
++export function buildGateChangeAcknowledgementSubject({ root, featureId, commonDir, runGit = null, readOverrides, readConfigureVerify, specDirectory = null } = {}) {
++  const git = runGit ?? gitRunner(root);
++  const readback = gateDefinitionChangeReadback({ rootDir: root, featureId, commonDir, runGit: git, excludeAcknowledgements: true,
++    specDirectory: specDirectory ?? specDirectoryFromState(root),
++    ...(readOverrides ? { readOverrides } : {}), ...(readConfigureVerify ? { readConfigureVerify } : {}) });
++  if (readback.status === "unavailable") return { ok: false, code: "GCA-RANGE-UNAVAILABLE", detail: `the feature range could not be read (${readback.reason})` };
++  if (readback.unproven.length === 0) return { ok: false, code: "GCA-NOTHING-TO-ACKNOWLEDGE", detail: "every gate-definition change of the range already has a proof" };
++  const tree = git(["rev-parse", "--verify", "--quiet", `${readback.head}^{tree}`]);
++  if (!ok(tree) || !OID.test(String(tree.stdout).trim())) return { ok: false, code: "GCA-RANGE-UNAVAILABLE", detail: "the tree of HEAD could not be read" };
++  const { list, sha256: changesSha256 } = gateChangeListDigest(readback.unproven);
++  return { ok: true, candidate: { commit: readback.head, tree: String(tree.stdout).trim() },
++    subject: { schema: "pipeline.gate-change-acknowledgement-subject.v1", featureId, rangeBase: readback.base, changesSha256, changes: list } };
++}
++
++/** The lines the signing terminal shows the PO before the signature. */
++export function gateChangeAcknowledgementConfirmationLines(subject) {
++  if (!object(subject) || !Array.isArray(subject.changes)) return [];
++  return [
++    `feature: ${subject.featureId}, range from ${subject.rangeBase === null ? "the start of history" : String(subject.rangeBase).slice(0, 12)}`,
++    ...subject.changes.slice(0, 40).map((change) => `gate-definition change without a proof: ${change.path} ${change.change === "D" ? "deleted" : change.change === "A" ? "added" : "changed"} in ${change.commit.slice(0, 12)}`),
++    ...(subject.changes.length > 40 ? [`and ${subject.changes.length - 40} more (changes digest ${subject.changesSha256})`] : []),
++    "this acknowledgement states that you have seen exactly these changes of how strong a gate is; it is recorded as acknowledged after the fact, it does not judge whether each change is sound, and a later change needs a new acknowledgement.",
++  ];
++}
++
+ /** One line per change for a refusal, the inspect readback and the Critic input. */
+ export function describeGateDefinitionChange(change) {
+   const what = `${change.ruleId} ${change.path} ${change.change === "D" ? "deleted" : change.change === "A" ? "added" : "changed"} in ${change.commit.slice(0, 12)}`;
+diff --git a/plugins/pipeline-core/lib/gate-definition-changes.test.mjs b/plugins/pipeline-core/lib/gate-definition-changes.test.mjs
+index 843e30807fad3c7389a60c8fd7bdbea6d52f9d66..8194b6c4aacc0ce2e472acff8cfdf3dd635104df 100644
+--- a/plugins/pipeline-core/lib/gate-definition-changes.test.mjs
++++ b/plugins/pipeline-core/lib/gate-definition-changes.test.mjs
+@@ -7,8 +7,8 @@ import { createHash } from "node:crypto";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, describeGateDefinitionChange, gateChangeListDigest, gateDefinitionChangeReadback,
+-  gateDefinitionRuleFor } from "./gate-definition-changes.mjs";
++import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, buildGateChangeAcknowledgementSubject, describeGateDefinitionChange,
++  gateChangeAcknowledgementConfirmationLines, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
+ 
+ const roots = [];
+ after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+@@ -127,3 +127,38 @@ test("no range is a typed unavailable readback, never a pass", () => {
+   const result = gateDefinitionChangeReadback({ rootDir: r.dir, featureId: "other", commonDir: join(r.dir, ".git"), ...none });
+   assert.equal(result.status, "unavailable");
+ });
++
++test("a dated Spec folder sets the range from its first commit; the folder of a Spec path is read strictly", () => {
++  assert.equal(specDirectoryOf("specs/2026-11-01-shop-epic/spec.md"), "specs/2026-11-01-shop-epic");
++  for (const path of ["specs/spec.md", "../specs/a/spec.md", "specs/a/b/spec.md", "docs/a/spec.md", null]) assert.equal(specDirectoryOf(path), null, String(path));
++  const r = repo();
++  r.put("architecture/boundary-policy.json", "{\"allow\":[]}\n"); r.commit("feat: baseline before the epic", ["architecture/boundary-policy.json"]);
++  r.put("specs/2026-11-01-shop-epic/spec.md", "spec\n"); r.commit("docs: dated epic spec", ["specs/2026-11-01-shop-epic/spec.md"]);
++  r.put("architecture/boundary-policy.json", "{\"allow\":[\"*\"]}\n"); const widened = r.commit("chore: widen inside the epic", ["architecture/boundary-policy.json"]);
++  const plain = gateDefinitionChangeReadback({ rootDir: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), ...none });
++  assert.equal(plain.status, "unavailable", "the feature id names no folder");
++  const dated = gateDefinitionChangeReadback({ rootDir: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), specDirectory: "specs/2026-11-01-shop-epic", ...none });
++  assert.deepEqual(dated.unproven.map((change) => change.commit), [widened], "the baseline before the folder is outside the range");
++});
++
++test("the acknowledgement subject names the unproven changes at the clean HEAD and reads the Spec folder from the State", () => {
++  const r = repo();
++  const quiet = { readOverrides: () => [], readConfigureVerify: () => [] };
++  r.put("specs/2026-11-01-shop-epic/spec.md", "spec\n");
++  r.put("project/pipeline-state.json", JSON.stringify({ schema: "pipeline.state.v0", planApproval: { poGateAuthority: { specPath: "specs/2026-11-01-shop-epic/spec.md" } } }));
++  r.commit("docs: dated epic spec", ["specs/2026-11-01-shop-epic/spec.md", "project/pipeline-state.json"]);
++  const nothing = buildGateChangeAcknowledgementSubject({ root: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), ...quiet });
++  assert.deepEqual([nothing.ok, nothing.code], [false, "GCA-NOTHING-TO-ACKNOWLEDGE"]);
++  r.put("project/pipeline.yaml", "gates: {}\n"); r.commit("chore: manifest", ["project/pipeline.yaml"]);
++  r.put("project/pipeline.yaml", "gates:\n  push:\n    approval: none\n"); const weakened = r.commit("chore: weaken", ["project/pipeline.yaml"]);
++  const built = buildGateChangeAcknowledgementSubject({ root: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), ...quiet });
++  assert.equal(built.ok, true, built.detail);
++  assert.deepEqual(built.candidate, { commit: weakened, tree: r.git("rev-parse", "HEAD^{tree}") });
++  assert.equal(built.subject.schema, "pipeline.gate-change-acknowledgement-subject.v1");
++  assert.deepEqual(built.subject.changes.map((change) => change.commit), [weakened]);
++  assert.equal(built.subject.changesSha256, gateChangeListDigest(built.subject.changes).sha256);
++  assert.equal(GATE_CHANGE_ACKNOWLEDGEMENT_KIND, "acknowledge-gate-definition-changes");
++  const lines = gateChangeAcknowledgementConfirmationLines(built.subject);
++  assert.match(lines.join("\n"), /project\/pipeline\.yaml changed in [a-f0-9]{12}/u);
++  assert.match(lines.at(-1), /acknowledged after the fact/u);
++});
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index de8a51404af402e94a543e542c0545801037407f..02c0d9c90cc4ac9717e270e47fe8bfd2fcebae14 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -100,13 +100,15 @@ const INVENTORY = Object.freeze([
+ // `approve-spec-addendum` (28e, ADR-0095) records the PO's signed approval of a Spec addendum: a design change made AFTER the
+ // plan approval. A feature course that keeps its approved design never meets it, so it is a design-change act off the happy
+ // path, not a third per-feature decision (candidate 29: 28e added the verb without classifying it here).
++// `approve-gate-change-acknowledgement` (29c, ADR-0096) records the PO's acknowledgement of gate-definition changes that carry no
++// other proof. A feature course that changes no gate definition, or changes one through its own route, never meets it.
+ // G20-42 (honest accounting, no case changed): a consumer project's release (the version tag after close and push) takes ONE PO release approval
+ // per RELEASE, not per feature: it is the existing `release-preflight` critical kind recorded by `release-preflight-cli.mjs` (chat run, or the PO's
+ // signature of the printed `authorize-critical --kind release-preflight` line). It adds no pipeline-state verb, so nothing here classifies it, and
+ // the per-feature count of the feature course stays two (plan approval, push approval); the release is a separate, last, per-release interaction.
+ const OFF_HAPPY_PATH_VERBS = Object.freeze([
+   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
+-  "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum",
++  "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement",
+   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
+   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
+   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 14fa1791fbd0749046674673945cf2f5bfa2148d..ea6104aa673287c99f7807f53be7f709c1d1cbc1 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -39,6 +39,7 @@ import {
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+ import { describeLapsedFinding, lapsedFindingsRepair, readLapsedCriticFindings } from "../lib/critic-lapsed-findings.mjs";
++import { describeGateDefinitionChange, gateChangeAcknowledgementRepair, gateDefinitionChangeReadback, specDirectoryOf } from "../lib/gate-definition-changes.mjs";
+ import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
+ import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
+ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+@@ -747,6 +748,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+     if (!addendumGate.ok) fail("CLOSE-SPEC-ADDENDUM-UNCOVERED", `feature close preparation is blocked by the Spec addenda: ${addendumGate.findings.slice(0, 5).join("; ")}${addendumGate.findings.length > 5 ? `; and ${addendumGate.findings.length - 5} more` : ""}`);
+     // C29 (Claude greenfield run 3, L1): an earlier blocker/major that a later round marked fixed with no reviewed code change since stays open for the close.
+     const lapsed = readLapsedCriticFindings({ repoRoot: root, featureId: observed.feature.id, candidateCommit: git(root, ["rev-parse", "HEAD"]), gitCommonDir: common, projectDir: root });
++    // ADR-0096 (D248, Claude test run 3 L4): every gate-definition change of the range carries a proof; no cut-off (PO tile).
++    const gateChanges = gateDefinitionChangeReadback({ rootDir: root, featureId: observed.feature.id, commonDir: common,
++      specDirectory: specDirectoryOf(snapshot.state.planApproval?.poGateAuthority?.specPath ?? snapshot.state.continuity?.authority?.spec?.path) });
++    if (gateChanges.status === "unproven") fail("CLOSE-GATE-CHANGE-UNPROVEN", `feature close preparation is blocked: ${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${gateChanges.unproven.slice(0, 5).map(describeGateDefinitionChange).join("; ")}${gateChanges.unproven.length > 5 ? `; and ${gateChanges.unproven.length - 5} more` : ""}. Repair: ${gateChangeAcknowledgementRepair()}`);
++    if (gateChanges.status === "unavailable") fail("CLOSE-GATE-CHANGE-UNREADABLE", `feature close preparation is blocked: the gate-definition changes of this feature's range could not be read (${gateChanges.reason}); a close never passes an unread range`);
+     if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: ${lapsed.open.length} blocker/major finding(s) of an earlier Critic round were never corrected in a reviewed round: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
+     // A missing slice queue says nothing about whether the whole candidate
+     // received independent review. Resolve the State and package contracts.
+@@ -1434,6 +1440,19 @@ try {
+         emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor"), ...earlier, ...settled });
+       }
+     } catch { emit({ schema: "pipeline.close-critic-standing.v1", status: "unknown" }); }
++  } else if (command === "gate-changes") {
++    // ADR-0096: read-only, so the one-shot close names an unproven gate-definition change and the acknowledgement BEFORE it spends a Verify. The close keeps its own check.
++    const parsed = exactArgs(argv, new Set(["root"]));
++    if (!parsed || !parsed.values.root) fail("CLOSE-ARGS", "gate-changes arguments invalid");
++    const gateRoot = physicalRoot(parsed.values.root);
++    try {
++      const state = stateSnapshot(gateRoot).state;
++      const readback = gateDefinitionChangeReadback({ rootDir: gateRoot, featureId: activeFeature(state).id, commonDir: gitCommonDir(gateRoot),
++        specDirectory: specDirectoryOf(state.planApproval?.poGateAuthority?.specPath ?? state.continuity?.authority?.spec?.path) });
++      if (readback.status === "unproven") emit({ schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: readback.unproven.map(describeGateDefinitionChange), repair: gateChangeAcknowledgementRepair() });
++      // A proven list carries the record itself: the one-shot close writes it into the feature's evidence, and the bundle carries it (ADR-0096 Decision 6).
++      else emit({ schema: "pipeline.close-gate-changes.v1", status: readback.status, ...(readback.status === "unavailable" ? { reason: readback.reason } : { changes: readback.changes.length, record: readback }) });
++    } catch { emit({ schema: "pipeline.close-gate-changes.v1", status: "unknown" }); }
+   } else if (command === "critic-addenda") {
+     // C21E: the Critic addenda a close derives anyway, written BEFORE the one-shot close spends a Verify: their commit moves HEAD, so writing them inside the close made the candidate stale.
+     const parsed = exactArgs(argv, new Set(["root"]));
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index c6b1a470e9e9de75776d44aff8e6e75e6a948228..44a2a095ebb8a2f16da31f2dc2e583780994c799 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -195,7 +195,10 @@ function consumerFixture(log, identity) {
+   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", current().planPresentation.designApprovalRequestPath]);
+   assert.equal(current().planApproval.schema, "pipeline.plan-approval.v9");
+   // G20-51 (candidate 20b): materialize-architecture registers the feature package itself and names its files in the commit step.
+-  const materialized = JSON.parse(lifecycle(["materialize-architecture"]).at(-1));
++  // ADR-0096: the writer now also names the commit it armed (the fitness model, GS-17) after its JSON readback.
++  const materializeLines = lifecycle(["materialize-architecture"]);
++  assert.ok(materializeLines.some((line) => /writer commit capability/u.test(line)), "materialize-architecture arms the commit of what it wrote");
++  const materialized = JSON.parse(materializeLines.findLast((line) => line.startsWith("{")));
+   assert.equal(materialized.featurePackage?.status, "registered", `materialize-architecture registers the package: ${JSON.stringify(materialized).slice(0, 600)}`);
+   const setPhaseLogs = lifecycle(["set-phase", "--phase", "implementation"]).join("\n");
+   // G20-54 (candidate 20b): set-phase names the package step, and points at the verification tiers "below" only when they follow.
+diff --git a/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs b/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
+index 6e4ffc5d2fc0b17e0424b8d32d7ea3da0d72180c..3d50e5489df7b94778ba0a33a3b600181ef3a485 100644
+--- a/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
++++ b/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
+@@ -38,6 +38,7 @@ import { AUTHORIZE_CRITICAL_COMMAND_KINDS, prepareAuthorizeCriticalLine, runHuma
+ import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+ import { criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
++import { buildGateChangeAcknowledgementSubject, gateDefinitionChangeReadback } from "../lib/gate-definition-changes.mjs";
+ import { addSpecAddendum } from "../lib/feature-package-registration.mjs";
+ import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
+ import { PO_APPROVAL_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
+@@ -157,9 +158,10 @@ function verifyWritten({ result, expectedCandidate, expectedAction, trustPolicy,
+ 
+ test("the critical action kind list this suite is parametrized over is the closed set the product exports", () => {
+   assert.deepEqual([...CRITICAL_ACTION_KINDS].sort(), [
+-    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "deploy", "feature-package-reconcile",
++    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "deploy", "feature-package-reconcile",
+     "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "spec-addendum",
+   ], "a new kind must add its round trip here (and a note on which leg proves it), not slip in unproven");
++  // acknowledge-gate-definition-changes (ADR-0096): the library, printed and verb legs below, plus its consumer leg (approve-gate-change-acknowledgement).
+ });
+ 
+ for (const kind of CRITICAL_ACTION_KINDS) {
+@@ -320,6 +322,11 @@ function emitterInput(kind) {
+     const fixture = specAddendumRepository();
+     return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: { addendum: SPEC_ADDENDUM_PATH }, observed: fixture.head, dependencies: fixture.readers };
+   }
++  if (kind === "acknowledge-gate-definition-changes") {
++    // ADR-0096: the verb rebuilds the list from the real feature range at the clean HEAD (one weakened manifest after its first appearance).
++    const fixture = gateChangeRepository();
++    return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: {}, observed: fixture.head, dependencies: {} };
++  }
+   return { candidate: { ...CANDIDATE }, subject: { label: `verb ${kind}` }, extra: {}, observed: { ...CANDIDATE }, dependencies: {} };
+ }
+ 
+@@ -349,6 +356,18 @@ function specAddendumRepository() {
+   return { root, head, subject: built.subject, readers };
+ }
+ 
++/** A consumer repository whose feature range holds one gate-definition change without a proof: the manifest weakened after its first appearance. */
++function gateChangeRepository() {
++  const root = fixtureRepository(consumerFiles({ "project/pipeline.yaml": "gates: {}\n" }));
++  commitFiles(root, { "project/pipeline.yaml": "gates:\n  push:\n    approval: none\n" }, "chore: weaken the push gate");
++  const head = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
++  const built = buildGateChangeAcknowledgementSubject({ root, featureId: FEATURE_ID, commonDir: join(root, ".git") });
++  assert.equal(built.ok, true, JSON.stringify(built));
++  assert.deepEqual(built.candidate, head);
++  assert.deepEqual(built.subject.changes.map((change) => `${change.path}:${change.change}`), ["project/pipeline.yaml:M"]);
++  return { root, head, subject: built.subject };
++}
++
+ for (const kind of PRINTED_KINDS) {
+   test(`C22B verb leg: the printed ${kind} line runs unchanged through authorize-critical and the proof it writes verifies`, () => {
+     const input = emitterInput(kind);
+@@ -520,6 +539,38 @@ test("ADR-0095 consumer leg: spec-addendum -- the line approve-spec-addendum pri
+   assert.equal(registered.status, "spec-addendum-added", JSON.stringify(registered));
+ });
+ 
++test("ADR-0096 consumer leg: acknowledge-gate-definition-changes -- the line approve-gate-change-acknowledgement prints is signed by the verb, the follow-up records it once, and the close's readback then counts it", () => {
++  const fixture = gateChangeRepository();
++  const keys = keyDirectory();
++  const home = fixtureDir("home");
++  const common = join(fixture.root, ".git");
++  assert.equal(gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: FEATURE_ID, commonDir: common }).status, "unproven", "before: the weakened manifest has no proof");
++  const verb = ["approve-gate-change-acknowledgement", "--by", "PO"];
++
++  const first = runPipelineStateVerb(verb, { dir: fixture.root, home, keys });
++  assert.equal(first.code, 2, describeRun(first));
++  const printed = JSON.parse(first.lines.at(-1));
++  assert.equal(printed.status, "signature-required");
++  assert.deepEqual(printed.signatureCommand.subject, fixture.subject, "the printed subject is the one builder's list");
++  assert.match(first.stderr, /project\/pipeline\.yaml changed in [a-f0-9]{12}/u, "the agent shows the PO the list before the signing line");
++
++  const prompts = [];
++  const signed = runPrintedArgv({ argv: printed.signatureCommand.argv.slice(1), keys, home, dependencies: { observeCandidate: () => fixture.head, readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } } });
++  assert.equal(signed.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
++  assert.deepEqual(signed.candidate, fixture.head, "the signed candidate is the clean HEAD of the range");
++  assert.match(prompts.join("\n"), /gate-definition change without a proof: project\/pipeline\.yaml changed/u, "the terminal shows the PO the same list");
++
++  const follow = printed.recordCommand.argv;
++  const recorded = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys });
++  assert.equal(recorded.code, 0, describeRun(recorded));
++  assert.match(recorded.stdout, /Gate-definition changes acknowledged by "PO" \(signature\) for 1 change\(s\)/u);
++  const after = gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: FEATURE_ID, commonDir: common });
++  assert.equal(after.status, "proven", JSON.stringify(after.unproven));
++  assert.deepEqual([after.changes.at(-1).proof.kind, after.changes.at(-1).proof.label], ["po-acknowledgement", "acknowledged after the fact"]);
++  const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys });
++  assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
++});
++
+ test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {
+   const keys = keyDirectory();
+   const home = fixtureDir("home");
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index c4cbff422e65af2a1e45512856039e9ac389ed4c..834b27114809e6387dc9a3b1264dc117b8c44f91 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -448,6 +448,14 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         const dirtyNote = dirty.length === 0 ? "" : `first commit the ${dirty.length} uncommitted path(s) or move them out of the work tree, because the signing command refuses a dirty tree (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}); `;
+         return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${dirtyNote}record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
+       }
++      // ADR-0096 (Claude test run 3, L4): a gate-definition change without a proof is named before Verify; its PO acknowledgement also needs a clean tree and the current HEAD.
++      let gateChanges = null;
++      try { gateChanges = command(runner, process.execPath, [COORDINATOR, "gate-changes", "--root", root], "ONESHOT-GATE-CHANGES"); } catch { gateChanges = null; /* the close keeps its own check */ }
++      if (gateChanges?.status === "unproven" && Array.isArray(gateChanges.unproven)) {
++        const listed = gateChanges.unproven.slice(0, 8).join("; ");
++        return stopResult("gate-changes", "CLOSE-GATE-CHANGE-UNPROVEN", `${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${listed}${gateChanges.unproven.length > 8 ? "; ..." : ""}.`,
++          `nothing was written; ${String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then rerun the identical command: ${rerun(again)}`);
++      }
+       // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
+       let addenda = null;
+       try { addenda = command(runner, process.execPath, [COORDINATOR, "critic-addenda", "--root", root], "ONESHOT-CRITIC-ADDENDA"); } catch { addenda = null; /* the close keeps its own check */ }
+@@ -624,8 +632,19 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       stages.push("sbom");
+       for (const file of sbom.files) { mkdirSync(dirname(resolve(root, file.path)), { recursive: true }); writeFileSync(resolve(root, file.path), file.text); }
+       const sbomRecordPath = sbom.recordPath;
++      // ADR-0096 (Decision 6): the proven list of gate-definition changes, read again at the candidate the bundle names, travels in the one close commit.
++      // A list that cannot be read here is left out; the close's own check still refuses an unproven or unreadable range.
++      let gateChangesRecordPath = null;
++      try {
++        const listed = command(runner, process.execPath, [COORDINATOR, "gate-changes", "--root", root], "ONESHOT-GATE-CHANGES");
++        if (listed?.status === "proven" && listed.record?.schema === "pipeline.gate-definition-changes.v1") {
++          const target = `${evidenceDir}/gate-changes.json`;
++          mkdirSync(dirname(resolve(root, target)), { recursive: true }); writeFileSync(resolve(root, target), `${JSON.stringify(listed.record, null, 2)}\n`);
++          gateChangesRecordPath = target; stages.push("gate-changes");
++        }
++      } catch { gateChangesRecordPath = null; }
+       stages.push("audit-request");
+-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }), sbomRecordPath } });
++      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }), sbomRecordPath, ...(gateChangesRecordPath === null ? {} : { gateChangesRecordPath }) } });
+       if (state.continuity !== null && typeof state.continuity === "object") {
+         let current = state;
+         if (state.continuity.queueHead?.nextAction !== "close") {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 4df8f2b17b90d110f75f1d76147ab0b8a1941c3e..e7582844130103d81280c1026921c1d81aba1230 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -276,8 +276,8 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+ // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
+ // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
+ // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
+-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false } = {}) {
+-  const independenceChecks = []; let retired = false;
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false } = {}) {
++  const independenceChecks = []; const gateChangeChecks = []; let retired = false;
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+@@ -302,6 +302,10 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
+     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
+     if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
++    // ADR-0096: the read-only gate-change readback; a proven range carries its record, which the close writes into the evidence.
++    if (script === "close-coordinator.mjs" && sub === "gate-changes") { gateChangeChecks.push(flag(argv, "--root")); return json(gateChangesUnproven
++      ? { schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: ["GS-1 pipeline.user.yaml changed in 0123456789ab: no proof"], repair: "the PO acknowledges the unproven gate-definition changes once for this range: run node pipeline-state.mjs approve-gate-change-acknowledgement --by <the label the PO gives for this command>, which prints the PO's signing command" }
++      : { schema: "pipeline.close-gate-changes.v1", status: "proven", changes: 0, record: { schema: "pipeline.gate-definition-changes.v1", status: "proven", base: null, head: git("rev-parse", "HEAD").trim(), changes: [], unproven: [] } }); }
+     if (script === "security-scan.mjs" && argv.includes("--close-postimages")) { calls.push("security-scan.mjs --close-postimages"); return postimageBlocking ? POSTIMAGE_BLOCK : POSTIMAGE_PASS; }
+     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
+     if (script === "verify-evidence-producer.mjs") {
+@@ -340,7 +344,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     }
+     throw new Error(`unexpected ${script} ${sub}`);
+   };
+-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
++  return { root, git, calls, independenceChecks, gateChangeChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
+ }
+ const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
+ 
+@@ -479,6 +483,26 @@ test("C21C: a missing PO acknowledgement of a caller-authored Critic stops befor
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("ADR-0096: an unproven gate-definition change stops the one-shot before Verify with the acknowledgement as its repair; a proven range travels in the audit request", () => {
++  const f = oneShotFixture({ gateChangesUnproven: true });
++  try {
++    const stopped = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
++    assert.equal(stopped.stage, "gate-changes"); assert.equal(stopped.stop.code, "CLOSE-GATE-CHANGE-UNPROVEN");
++    assert.match(stopped.stop.reason, /pipeline\.user\.yaml changed in 0123456789ab/u);
++    assert.match(stopped.stop.repair, /approve-gate-change-acknowledgement --by/u);
++    assert.match(stopped.stop.repair, /rerun the identical command/u);
++    assert.deepEqual(f.gateChangeChecks, [f.root]); assert.deepEqual(f.calls, [], "no Verify, package or close stage ran");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++  const g = oneShotFixture();
++  try {
++    oneShotClose(g.input, { runCommand: g.runner });
++    const request = JSON.parse(readFileSync(join(g.root, "specs/feature-abc/evidence/audit-request.json"), "utf8"));
++    assert.equal(request.evidence.gateChangesRecordPath, "specs/feature-abc/evidence/gate-changes.json");
++    assert.equal(JSON.parse(readFileSync(join(g.root, request.evidence.gateChangesRecordPath), "utf8")).schema, "pipeline.gate-definition-changes.v1");
++  } finally { rmSync(g.root, { recursive: true, force: true }); }
++});
++
+ test("C21E: the acknowledgement stop names the uncommitted paths before the PO is asked to sign, and says nothing on a clean tree", () => {
+   const f = oneShotFixture({ acknowledgementMissing: true });
+   try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 47d2019f1a05ad6bcbde7ff4039ed69621053435..90f00ad9e163a16e7527f50e94fac1cbbd6fb122 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -457,6 +457,8 @@ import {
+ import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
+ import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, specAddendumApprovalBytes, specAddendumApprovalPath } from "../lib/spec-addendum.mjs";
++import { buildGateChangeAcknowledgementSubject } from "../lib/gate-definition-changes.mjs";
++import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+@@ -809,7 +811,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "inspect", "update-public-handover", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "recapture-design-input", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+-  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum",
++  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement",
+   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
+   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
+   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
+@@ -4890,7 +4892,7 @@ function externalPublicJson(dir, value) {
+ // kind, rejects symlinks and hard links, and pins its authority to this repository's
+ // private key-directory pointer before cryptographic verification.  It is therefore not
+ // a general in-repository-proof escape hatch, and every other kind remains external-only.
+-const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND]);
++const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
+ function localPushScratchJson(dir, value, expectedPath) {
+   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
+     return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
+@@ -4951,7 +4953,7 @@ function localMirrorScratchArtifacts(dir, flags, kind) {
+  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
+  * behaviour is byte-identical to before this addition.
+  */
+-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND]);
++const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
+ 
+ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
+   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
+@@ -10305,6 +10307,73 @@ function runApproveSpecAddendum({ dir, rest, base, now, deps }) {
+   return 0;
+ }
+ 
++/**
++ * ADR-0096 (D248): the PO's acknowledgement of the gate-definition changes of the active feature's range that carry no other proof,
++ * in the `gates.human_approval` mode (signature proof, or a chat-attributed record with the label the PO gave). The list is derived
++ * from the range at the clean HEAD by the one builder the signing terminal uses too; the private approval store keeps it and the
++ * close walk reads it, labelled "acknowledged after the fact".
++ */
++function runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps }) {
++  const kind = GATE_CHANGE_ACKNOWLEDGEMENT_KIND;
++  const refuse = (code, detail = "") => { console.error(`Error: approve-gate-change-acknowledgement refused (${code}).${detail ? ` ${detail}` : ""}${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
++  const configured = criticalProofWaiverFor(dir, kind);
++  if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
++  const waived = configured.waived === true;
++  const proofOmitted = !["--proof-request", "--proof-authority", "--proof"].some((flag) => rest.includes(flag));
++  const parsed = parseExactFlags(rest, new Set(waived || proofOmitted ? ["by"] : ["by", "proof-request", "proof-authority", "proof"]));
++  const flags = parsed.value ?? {};
++  if (!parsed.ok || isBlank(flags.by)) {
++    console.error("Error: approve-gate-change-acknowledgement requires --by (the label the PO gave for this command) and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
++    return 2;
++  }
++  const featureId = base.activeFeature?.id;
++  if (typeof featureId !== "string" || featureId === "") return refuse("GCA-NO-FEATURE", "the acknowledgement covers the range of the active feature; there is none");
++  const common = resolveCriticalApprovalCommonDir(dir);
++  if (common === null) return refuse("CRITICAL-APPROVAL-STORE-UNAVAILABLE");
++  let root;
++  try { root = realpathSync(resolve(dir)); } catch { return refuse("GCA-REPOSITORY"); }
++  const built = (deps.buildGateChangeAcknowledgementSubjectFn ?? buildGateChangeAcknowledgementSubject)({ root, featureId, commonDir: common });
++  if (!built.ok) return refuse(built.code, built.detail);
++  const { subject, candidate } = built;
++  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
++  console.error(["PO ACKNOWLEDGEMENT OF GATE-DEFINITION CHANGES -- these changes of how strong a gate is carry no other proof:",
++    ...subject.changes.slice(0, 40).map((change) => `  ${change.path} ${change.change === "D" ? "deleted" : change.change === "A" ? "added" : "changed"} in ${change.commit.slice(0, 12)}`),
++    ...(subject.changes.length > 40 ? [`  and ${subject.changes.length - 40} more`] : []),
++    `  candidate: ${candidate.commit}`, "  the record says acknowledged after the fact; the Critic still reviews the content, and a later change needs a new acknowledgement."].join("\n"));
++  const approvedAt = now();
++  if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
++    try {
++      const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
++      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
++      const mirrorCommon = defaultGitCommonDir(dir);
++      const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
++      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
++      console.log(JSON.stringify({ schema: "pipeline.gate-change-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
++        signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
++        ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged and the identical close command again")}` }),
++        recordCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-gate-change-acknowledgement", "--by", flags.by, "--proof-request", mirror?.request ?? "<proof-request>", "--proof-authority", mirror?.authority ?? "<proof-authority>", "--proof", mirror?.proof ?? "<proof>"],
++          note: mirror === null ? "run after the PO signed; the three proof paths are printed by the signing step" : "run unchanged once the proof is there; the three paths are the repository mirror the signing step writes" } }));
++    } catch { /* the refusal below still names the missing flags */ }
++    return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
++  }
++  const verified = verifyCriticalHumanProof({ dir, state: base, kind, candidate, subject, flags, now: approvedAt, required: true });
++  if (!verified.ok) return refuse(verified.code);
++  const priorConsumption = base.criticalProofConsumption;
++  if (priorConsumption !== undefined && (!Array.isArray(priorConsumption) || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) return refuse("CRITICAL-PROOF-CONSUMPTION-INVALID");
++  if (verified.proof !== null && ((Array.isArray(priorConsumption) ? priorConsumption : []).some((entry) => entry.proofSha256 === verified.proof.proofSha256)
++    || isCriticalProofConsumedPrivately(common, verified.proof.proofSha256))) return refuse("CRITICAL-PROOF-REPLAY");
++  const approval = { approvedBy: flags.by, approvedAt, forCommit: candidate.commit, forTree: candidate.tree, featureId, rangeBase: subject.rangeBase,
++    changesSha256: subject.changesSha256, changes: subject.changes, subjectSha256, label: "acknowledged after the fact", criticalProof: verified.proof };
++  if (waived) {
++    approval.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
++    approval.humanApproval = chatAttributionRecord({ kind, by: flags.by });
++  } else if (verified.waived !== undefined) approval.criticalProofWaiver = verified.waived;
++  const stored = writeCriticalApproval({ gitCommonDir: common, kind, approval, consumedAt: approvedAt });
++  if (!stored.ok) return refuse(stored.code);
++  console.log(`Gate-definition changes acknowledged by "${flags.by}" (${verified.proof === null ? "chat-attributed-unattested" : "signature"}) for ${subject.changes.length} change(s) of feature ${featureId} up to commit ${candidate.commit}; run the identical close command again.`);
++  return 0;
++}
++
+ function runFeaturePackageWriteCommand(sub, argv, deps) {
+   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
+   if (sub === "feature-package-reconcile") {
+@@ -14731,6 +14800,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       return runApproveCriticAcknowledgement({ dir, rest, base, now, deps });
+     case "approve-spec-addendum":
+       return runApproveSpecAddendum({ dir, rest, base, now, deps });
++    case "approve-gate-change-acknowledgement":
++      return runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps });
+ 
+     case "approve-deploy": {
+       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 48bede6a460452404f81ff8407aeb97e1f14f7bd..6a7251696fba3026f89d54a5bc118c1c0dd39d7b 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -35,6 +35,8 @@ import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRe
+ import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
++import { buildGateChangeAcknowledgementSubject, gateChangeAcknowledgementConfirmationLines } from "../lib/gate-definition-changes.mjs";
++import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
+ import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
+ import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+ import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
+@@ -1102,7 +1104,7 @@ function suggestSubcommand(input, candidates) {
+  * governance-fork-disposition-style verification bypass concern either.
+  */
+ const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
+-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND]);
++const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
+ const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+ const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+ 
+@@ -1193,6 +1195,10 @@ export function parseHumanArgs(argv, dependencies = {}) {
+     if (values.subject !== undefined) return { error: `${USAGE}\n${SPEC_ADDENDUM_KIND} takes no --subject: the subject is derived from the addendum named by --addendum.` };
+     if (!/^specs\/[a-z0-9][a-z0-9._-]{0,62}\/spec-addendum-(0[1-9]|[1-9][0-9])\.md$/u.test(values.addendum ?? "")) return { error: `${USAGE}\n${SPEC_ADDENDUM_KIND} requires --addendum specs/<feature>/spec-addendum-<NN>.md.` };
+   }
++  // ADR-0096: the gate-change acknowledgement's subject is derived from the feature range at HEAD, never typed.
++  if (values.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND && (command === "prepare-critical" || command === "authorize-critical") && values.subject !== undefined) {
++    return { error: `${USAGE}\n${GATE_CHANGE_ACKNOWLEDGEMENT_KIND} takes no --subject: the list is derived from the feature range at the clean HEAD.` };
++  }
+   // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
+   if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
+   if (values.kind === RESIDUAL_ACCEPTANCE_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
+@@ -2012,6 +2018,15 @@ function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, de
+     if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the addendum (expected ${computed})`);
+     args.subjectSha256 = computed;
+     subjectPreimage = built.subject;
++  } else if (args.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND) {
++    // ADR-0096: the one builder the recording step uses too; the candidate is the clean HEAD of the feature range.
++    const built = (dependencies.buildGateChangeAcknowledgementSubjectFn ?? buildGateChangeAcknowledgementSubject)({ root: repository, featureId, commonDir: gitCommonDir });
++    if (!built.ok) fail(`critical approval request is invalid (${built.code}): ${built.detail}`);
++    if (built.candidate.commit !== candidate.commit || built.candidate.tree !== candidate.tree) fail("critical approval request is invalid (GCA-CANDIDATE): the acknowledged range does not end at the clean HEAD");
++    const computed = criticalActionSubjectSha256({ kind: GATE_CHANGE_ACKNOWLEDGEMENT_KIND, candidate, subject: built.subject });
++    if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the feature range (expected ${computed})`);
++    args.subjectSha256 = computed;
++    subjectPreimage = built.subject;
+   } else {
+     subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
+   }
+@@ -2170,7 +2185,7 @@ export function authorizeCriticalPushCommand({
+  * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
+  * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
+  */
+-export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND]);
++export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
+ 
+ /**
+  * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
+@@ -2728,6 +2743,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+       ...residualAcceptanceConfirmationLines(request.action.kind, subjectPreimage),
+       ...criticAcknowledgementConfirmationLines(request.action.kind, subjectPreimage),
+       ...specAddendumConfirmationLines(request.action.kind, subjectPreimage),
++      ...(request.action.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND ? gateChangeAcknowledgementConfirmationLines(subjectPreimage) : []),
+       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
+     ], dependencies, humanFacingLanguage);
+     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });

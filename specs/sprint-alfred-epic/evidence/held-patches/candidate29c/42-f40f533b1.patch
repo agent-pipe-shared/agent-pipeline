@@ -1,0 +1,97 @@
+diff --git a/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md b/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..dd8aa221a6dc2a7becb50a3e61c6598f5152e693
+--- /dev/null
++++ b/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
+@@ -0,0 +1,67 @@
++# ADR-0097: A pre-existing red check is repaired by a maintenance dispatch
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-13
++
++**Status:** accepted (2026-11-13, PO tiles, register D249). Built in candidate 29c. Not yet run on a real consumer repository.
++
++**Context source (PO tiles, 2026-11-13, consumer finding K-28):** the PO chose:
++
++- "Maintenance dispatch route" for a red check that no criterion of the approved Spec covers;
++- "Allow both" for the proof that the check was red before the feature: a red Verify run receipt where one exists, otherwise a signed PO acknowledgement (against the recommendation of the acknowledgement alone).
++
++## Context
++
++A consumer feature had to get its Verify gate green before its Critic round. Two tests were already red before the feature's code. One of them, a link check over `specs/` and `docs/`, failed on an example inside the approved Spec itself.
++
++Every governed Goldfish dispatch binds to one criterion of the approved Spec: the host parses the criterion and refuses anything else. ADR-0095 forbids adding a criterion through an addendum, and `reopen-design` reopens the whole design for a test fix. The only workaround was a placeholder criterion. That would make the Critic count a test fix as Spec coverage.
++
++## Decision
++
++1. **A second binding kind.** A Goldfish item binding names exactly one of:
++   - `criterionLocator`: today's criterion binding;
++   - `maintenance` (`pipeline.maintenance-binding.v1`): a maintenance binding with no criterion.
++
++   A maintenance binding has exactly one check, the red one. Any of the existing check forms may be used: a `.test` file, `command:<id>` (D195) or `document:<path>`. Its item id is `<spec folder>.maintenance`. `dispatch-briefing.mjs --maintenance --check <form>` generates it. A placeholder criterion is never used.
++2. **The write scope is narrow.** Each allowed path must meet all of these, or the host refuses with `SQ-MAINTENANCE-SCOPE`:
++   - it is a dependency of the check;
++   - it is not a gate-strength path (GS-1 to GS-17, which includes the ADR-0096 gate-definition set);
++   - it is not the approved PRD, Spec or a Spec addendum;
++   - it is test- or tooling-shaped. That means a `*.test.*` or `*.spec.*` file, or a path with a `test`, `tests`, `__tests__`, `fixtures`, `scripts` or `tools` segment.
++
++   Configuration files and `package.json` are excluded, because a verify command can live there. Widening the set is a PO decision.
++3. **Red before the feature, proven one of two ways.** The host derives the proof at admission and never takes it from the briefing.
++   - **Verify receipt.** A sealed Verify suite receipt `project-<id>` for a `command:<id>` check shows a non-zero exit. Its candidate commit must be the plan-approval candidate commit or an ancestor of it.
++   - **PO acknowledgement.** Otherwise the PO acknowledges the red check once, as the critical-action kind `acknowledge-maintenance-red-check`, in the `gates.human_approval` mode (fail-closed to `signature`).
++     - The agent runs `pipeline-state.mjs approve-maintenance-red-check --check <form> --by <label>`. `--by` is only a label the PO gave for this command (EL-36).
++     - The subject binds the feature, the plan approval and the check.
++     - The record is labelled "red before the feature acknowledged by the PO".
++
++   With neither, the dispatch is refused with `SQ-MAINTENANCE-RED-UNPROVEN`, and the refusal names both routes.
++4. **Red before, green after, in the real checkout.** `maintenance-red-check.mjs observe --root <root> --check <form>` runs the check on the clean HEAD of the real checkout, where the dependencies are installed. It records the result in private state: check, HEAD, tree, exit code and output digest. Admission requires a red observation at the dispatch's candidate commit (`SQ-MAINTENANCE-RED-UNOBSERVED`). After the delivery, the same check is the item check the host already runs, and it must be green for integration.
++
++   A run at an old commit in a fresh worktree is never used. Without installed dependencies it is red for the wrong reason, and that proves nothing.
++5. **Its own kind for the Critic and in the queue.** The queue row carries `delivery.maintenance` and no criterion. The Critic's shared slice adds the slice id, not a criterion id. The Critic packet names each maintenance slice of its range with its check and its proof kind, as data fields. They are not a list of claims to verify (ADR-0014).
++
++## Consequences
++
++A pre-existing red check gets a sanctioned route that leaves the Spec, its criterion set and the design approval untouched. The Critic reviews the fix as a fix, not as Spec coverage.
++
++The price:
++
++- A check without a Verify receipt from before the approval needs one PO signature.
++- A `.ts` test has no `.test` check form; it needs a registered `command:<id>`.
++
++Known limits:
++
++- The receipt route reads the Verify run store, which is private to the device. On the other machine it finds nothing and falls back to the acknowledgement.
++- The red observation proves the check is red at the dispatch's candidate. That the feature did not cause it rests on the receipt or the PO's word.
++- The audit bundle does not yet list maintenance deliveries separately. The Critic packet and the queue do.
++- Not run on native Windows.
++
++## Affected contracts
++
++- ADR-0095 (the criterion set is unchanged; an addendum still cannot add one);
++- ADR-0096 (the gate-strength and gate-definition paths stay out of a maintenance scope);
++- ADR-0061 / ADR-0074 (the critical ceremony and its new kind);
++- ADR-0014 (the Critic packet fields);
++- D195 (`command:<id>` checks); D205 (a shared item no longer blocks; only the slice or an overlapping write scope does).
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index ae5930f428b0428534e406a941b7ee9e7701b49a..29b161079c63c57b2d8db8a0348fe0bf65dfc23a 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -103,6 +103,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0094](0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md) | The Semgrep default pack blocks the severe classes in eight languages | accepted | 2026-11-12 |
+ | [0095](0095-a-spec-correction-during-implementation-is-a-signed-addendum.md) | A Spec correction during implementation is a signed addendum | accepted | 2026-11-13 |
+ | [0096](0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md) | A gate-definition change needs a bound proof, at commit and at close | accepted | 2026-11-13 |
++| [0097](0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) | A pre-existing red check is repaired by a maintenance dispatch | accepted | 2026-11-13 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index 230eee210f71e71510bb78284f34c5828219289e..463e8307a8c70205270efbf659cadcd8b77600a6 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -30,6 +30,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0085 amendment](adr/0085-one-review-one-signature-design-approval.md#amendment-2026-11-13-delta-rounds-until-pass-no-signature-over-an-open-review-d246) accepted 2026-11-13 (PO tiles, D246, Claude test run 3 finding L3):** design review delta rounds continue until a round passes (no round cap; 64 is only the structural chain bound), and `present-plan` refuses while the latest receipt leaves findings open (`PLAN-DESIGN-REVIEW-OPEN`); an approval already signed over open findings keeps verifying, and drift after any passing delta round stays a knowingly signed `unreviewedSourceDelta`. Built in candidate 29c; the host-observed reviewer model of the same tile is a separate slice.
+ **[ADR-0085 amendment](adr/0085-one-review-one-signature-design-approval.md#amendment-2026-11-13-the-reviewer-model-is-host-observed-where-a-route-exists-d247) accepted 2026-11-13 (PO tiles, D247, L3 part 3):** the design review receipt's reviewer model is host-observed where a route exists, labelled elsewhere: on Claude the plugin hooks record each `readiness-reviewer` dispatch (foreground resolved model, background child transcript, read by the hook and never into the agent's context), `export-report` writes the returned text as the report and `create` stamps `reviewerObservation`; Codex and Antigravity receipts say `unobserved` visibly. `present-plan` refuses an unobserved Claude round (`PLAN-DESIGN-REVIEW-UNOBSERVED`); fallback receipts pass; binding bytes unchanged. Built in candidate 29c.
+ **[ADR-0096](adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md) accepted 2026-11-13 (PO tiles, D248, Claude test run 3 finding L4):** `architecture/boundary-policy.json` (GS-16) and `architecture/fitness-model.json` (GS-17) join the gate-strength table (first creation free, re-materialization through the writer's own commit capability); the close walks every change of the gate-definition set in the feature range and derives a proof (first appearance, committed materialization, configure-verify labelled "confirmed via runner prompt, not signed", a consumed override), refuses an unproven one with no cut-off (`CLOSE-GATE-CHANGE-UNPROVEN`), and offers one PO acknowledgement of the unproven list per range as the repair; inspect lists the gaps early, and the bundle and the Critic input carry every change with its proof. Built in candidate 29c, never run on a consumer repository.
++**[ADR-0097](adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) accepted 2026-11-13 (PO tiles, D249, consumer finding K-28):** a red check that no criterion of the approved Spec covers is repaired by a maintenance dispatch: the item binding names `maintenance` instead of a criterion, exactly one check (the red one), a write scope of test- or tooling-shaped dependencies of that check outside every gate-strength path and the approved PRD/Spec; the host requires a red observation of the check on the real checkout at the dispatch candidate and proof that it was red before the feature (a red Verify receipt at or before the plan-approval commit, otherwise one signed PO acknowledgement `acknowledge-maintenance-red-check`, labelled; the PO chose both routes); the check must be green after delivery; the Critic packet names maintenance slices as their own kind. Built in candidate 29c, never run on a consumer repository.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.

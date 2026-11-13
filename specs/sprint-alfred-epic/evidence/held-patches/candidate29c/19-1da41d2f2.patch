@@ -1,0 +1,1094 @@
+diff --git a/docs/adr/0085-one-review-one-signature-design-approval.md b/docs/adr/0085-one-review-one-signature-design-approval.md
+index bc66607aceb6e9f53b0304a6bda2f84ba3dafa61..4ea58c664e8ee4c193294afa28a53587899b478e 100644
+--- a/docs/adr/0085-one-review-one-signature-design-approval.md
++++ b/docs/adr/0085-one-review-one-signature-design-approval.md
+@@ -133,6 +133,37 @@ above ("at most one delta follow-up") is replaced; everything else stands.
+    After an initial round alone the same drift stays a review-chain refusal.
+ 4. **Reviewer model:** the PO also chose that the receipt's reviewer model is
+    host-observed from the review dispatch; that part is built separately and is
+-   not decided by this amendment.
++   decided by the amendment below (D247).
+ 
+ Bindings over one or two receipts are byte-identical to before.
++
++## Amendment 2026-11-13: the reviewer model is host-observed where a route exists (D247)
++
++Accepted by PO tiles of 2026-11-13 (item 4 of the amendment above). A self-asserted
++reviewer identity stays refused (W7); the model comes from the host's own record of
++the review dispatch, labelled per runner:
++
++1. **Claude, observed.** The plugin's PostToolUse (foreground: `resolvedModel` and
++   the returned text) and SubagentStop (background: the models of the child's own
++   host-written transcript and its returned text) hooks record each
++   `readiness-reviewer` dispatch in the device-local private control area, keyed by
++   the digest of the returned text. The hook reads the transcript itself and keeps
++   only the model ids and the text; nothing of it enters the agent's context (PO).
++   `design-review-receipt.mjs export-report` writes that text as the report;
++   `create` finds the observation by the report's digest (the original's when
++   sanitized) and stamps the optional closed field `reviewerObservation`
++   (`assurance`, `modelsUsed`, `resultSha256`) and `reviewer.model`.
++2. **Labelled where no route exists.** Codex and Antigravity have no built route; their
++   receipts say `unobserved`, visibly weaker, like the Critic's `declared-unobserved`
++   record (PO tile 2026-11-01), until a live measurement builds one.
++3. **Presentation gate only.** `present-plan` refuses `PLAN-DESIGN-REVIEW-UNOBSERVED`
++   when any Claude round of the chain lacks an observation (including receipts made
++   before this amendment); the repair is a fresh dispatch and a new initial receipt.
++   A typed fallback receipt names its own route and is passed. The binding summary
++   never carries the field, so approval bytes and every stored-approval reader stay
++   unchanged, and an approval already signed keeps verifying. No refusal is added for
++   an observed model that differs from the requested one; it is recorded.
++4. **What it does not prove.** That the reviewer read the sources the receipt names
++   (the receipt binds them at `create`, as before), or which model a provider served
++   beyond what the host reports. The store is device-local, so `create` runs on the
++   machine that dispatched the review; the committed receipt carries the result.
+diff --git a/docs/state.md b/docs/state.md
+index afe6be276bba563d0d432f0b7570049d597a3eb3..6379f51ab9e9d72970c3fad9468ce019d3640ceb 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -28,6 +28,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) accepted 2026-11-11 (PO tiles, D240):** the feature close checks or writes the SBOM (CycloneDX 1.6 and SPDX 2.3 from pinned lockfiles, or an explicit `not-applicable`) and the audit bundle carries it; `stale`, `invalid`, `partial` and `unsupported` stop the close unless the PO's signed override for exactly those findings is recorded. Built in candidate 28c for npm, Python, Go and Rust; the amendment of 2026-11-12 (PO tiles) adds the other common lockfiles and Maven by pom plus CycloneDX in candidate 28d. Never run on a real repository. Candidate 28e corrects the readers after the Advisor review and adds `packages.config` (PO tile 2026-11-12, D243).
+ **[ADR-0092](adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) accepted 2026-11-12 (PO tiles, D241):** one tool registry feeds `docs/toolchain.md`, the preflight floors and the readiness findings; required on every machine: Node.js, Git, gitleaks, osv-scanner, semgrep (Trivy only with infrastructure files, with its adapter), OpenSSL where the PO signs; onboarding asks for a missing one, the person installs it or defers it, the deferral is recorded on the machine and lifts no check. Built in candidate 28e, never run in a real onboarding. **[ADR-0093](adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md) accepted 2026-11-12 (PO tile, D242):** a Semgrep finding at a blocking severity blocks only when the feature introduced it (a second `--baseline-commit` pass against the start of the active or last closed feature's range, in its own worktree); older findings are listed, not blocking; any doubt falls back to blocking everything, labelled. Built in candidate 28e, never run on a consumer repository. **[ADR-0094](adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md) accepted 2026-11-12 (PO tile, D244):** the offline Semgrep default pack gains 61 `pipeline-<language>-<class>` rules for Java, C#, Python, Go, JavaScript/TypeScript, Kotlin, PHP and Ruby; SQL and command injection, insecure deserialization, disabled TLS verification, XXE, path traversal and SSRF are ERROR and block, weak cryptography is WARNING; test-shaped paths are excluded, each rule has a firing and a quiet fixture. Built in candidate 28e; the false-positive rate on real Java/.NET code is unmeasured. **[ADR-0095](adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md) accepted 2026-11-13 (PO tiles, D245):** a Spec correction found by a Critic round during implementation is a separate file `specs/<feature>/spec-addendum-<NN>.md` whose header binds the approved Spec digest, the Critic packet and its findings; the Spec stays byte-identical, the criterion set may not change (that stays the PO's `reopen-design`); the PO approves each addendum in the `gates.human_approval` mode, the approval is committed evidence, the next Critic round is a delta round over it, and the Goldfish briefing, the close and the audit bundle read it. Built in candidate 28e, never run on a consumer repository.
+ **[ADR-0085 amendment](adr/0085-one-review-one-signature-design-approval.md#amendment-2026-11-13-delta-rounds-until-pass-no-signature-over-an-open-review-d246) accepted 2026-11-13 (PO tiles, D246, Claude test run 3 finding L3):** design review delta rounds continue until a round passes (no round cap; 64 is only the structural chain bound), and `present-plan` refuses while the latest receipt leaves findings open (`PLAN-DESIGN-REVIEW-OPEN`); an approval already signed over open findings keeps verifying, and drift after any passing delta round stays a knowingly signed `unreviewedSourceDelta`. Built in candidate 29c; the host-observed reviewer model of the same tile is a separate slice.
++**[ADR-0085 amendment](adr/0085-one-review-one-signature-design-approval.md#amendment-2026-11-13-the-reviewer-model-is-host-observed-where-a-route-exists-d247) accepted 2026-11-13 (PO tiles, D247, L3 part 3):** the design review receipt's reviewer model is host-observed where a route exists, labelled elsewhere: on Claude the plugin hooks record each `readiness-reviewer` dispatch (foreground resolved model, background child transcript, read by the hook and never into the agent's context), `export-report` writes the returned text as the report and `create` stamps `reviewerObservation`; Codex and Antigravity receipts say `unobserved` visibly. `present-plan` refuses an unobserved Claude round (`PLAN-DESIGN-REVIEW-UNOBSERVED`); fallback receipts pass; binding bytes unchanged. Built in candidate 29c.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index d7b70ba67694da8d411a4a64dc2236fd044375f8..aa884ed886dddc7a02a9b41be2612f57363ba980 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -9,6 +9,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { checkSubagentHandbackBeforeStop, finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+ import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
++import { designReviewObservationNotice, recordDesignReviewObservation } from "../lib/design-review-observation.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -310,6 +311,23 @@ if (isDirectInvocation(import.meta.url)) {
+     if (refusal) { process.stderr.write(`${refusal}\n`); process.exit(2); }
+     process.exit(0);
+   }
++  // D247 (L3 part 3): the end of a Claude design review dispatch (readiness-reviewer; foreground PostToolUse or background
++  // SubagentStop) is recorded with the host's model and the returned text's digest. The hook reads the child transcript itself
++  // and says one line; it never blocks. Every other call, and any fault, continues below exactly as before.
++  if (runner === "claude" && ["PostToolUse", "SubagentStop"].includes(input.hook_event_name)) {
++    let observed = { status: "not-applicable" };
++    try {
++      observed = recordDesignReviewObservation({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), runner, input,
++        readHandbackFn: readSubagentHandbackMessage });
++    } catch { observed = { status: "not-applicable" }; }
++    if (observed.status !== "not-applicable") {
++      const notice = designReviewObservationNotice(observed);
++      if (notice !== null && input.hook_event_name === "PostToolUse") {
++        process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: notice } })}\n`);
++      } else if (notice !== null) process.stderr.write(`${notice}\n`);
++      process.exit(0);
++    }
++  }
+   // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
+   // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
+   if (input.hook_event_name === "SubagentStop") {
+diff --git a/plugins/pipeline-core/lib/design-review-observation.mjs b/plugins/pipeline-core/lib/design-review-observation.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..f5c35b674ca2981e6a7aa6c7cbf8690510fab65d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/design-review-observation.mjs
+@@ -0,0 +1,194 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Host observation of a design review dispatch (L3 part 3, PO tiles 2026-11-13, D247).
++ *
++ * The design review is a dispatch of the read-only `readiness-reviewer` role. On Claude the plugin's own hooks see that
++ * dispatch end and record, in the device-local private control area, which model the host ran and the digest of the text
++ * it returned:
++ *  - foreground: the Task/Agent PostToolUse result (`tool_response.status: "completed"`, `resolvedModel`, `modelsUsed`,
++ *    the returned text blocks) -> assurance `host-observed-tool-use`;
++ *  - background: the SubagentStop carries no model, so the models come from the child's own host-written transcript
++ *    (`<transcript without .jsonl>/subagents/agent-<agent_id>.jsonl`, `message.model` of its assistant records), the same
++ *    file the Goldfish stop already trusts for a SubagentHandback; the returned text is `last_assistant_message`, else the
++ *    child's last handback -> assurance `host-observed-child-transcript`.
++ * The hook reads the transcript itself, bounded, and keeps only the model ids and the returned text: nothing of it reaches
++ * the agent's context (PO 2026-11-13: without flooding the context).
++ *
++ * `design-review-receipt.mjs export-report` writes the observed text as the report file, so the report bytes are the
++ * host's and their digest finds the observation again; `create` reads the observation by that digest and stamps it into
++ * the receipt. What this does not prove: that the reviewer read the sources the receipt names (the receipt binds them at
++ * create time, as before), or which model a provider actually served beyond what the host reports. Codex and Antigravity
++ * have no built route here; their receipts say `unobserved` (D247).
++ */
++import { createHash } from "node:crypto";
++import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
++import { isAbsolute, join } from "node:path";
++
++export const DESIGN_REVIEW_OBSERVATION_SCHEMA = "pipeline.design-review-observation.v1";
++export const DESIGN_REVIEW_OBSERVATION_DIR = ["agent-pipeline", "design-review-observations"];
++const REVIEWER_AGENT_TYPES = new Set(["readiness-reviewer"]);
++const MAX_TEXT_BYTES = 262144;
++const MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024;
++const MAX_MODELS = 8;
++const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,127}$/u;
++const SHA256 = /^[a-f0-9]{64}$/u;
++const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
++const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
++
++/** The private control directory of design review observations. */
++export function designReviewObservationDir(commonDir) { return join(commonDir, ...DESIGN_REVIEW_OBSERVATION_DIR); }
++
++/** Distinct model ids in first-use order; the host's placeholder for a synthetic record (`<synthetic>`) is not a model. */
++function distinctModels(list) {
++  const out = [];
++  for (const model of list) if (typeof model === "string" && MODEL.test(model) && model !== "unknown" && !out.includes(model)) out.push(model);
++  return out;
++}
++
++/**
++ * The model ids of a background child's own transcript, read bounded beside the parent transcript. Refuses a symlink, a
++ * file whose real location is not that exact place, an oversized file and a corrupt line.
++ * @returns {{ ok: true, models: string[] } | { ok: false, code: string }}
++ */
++export function readChildTranscriptModels(input) {
++  const unsafe = { ok: false, code: "DRO-TRANSCRIPT-UNSAFE" };
++  const transcriptPath = input?.transcript_path;
++  const agentId = input?.agent_id;
++  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")
++    || typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) return unsafe;
++  const sessionDir = transcriptPath.slice(0, -".jsonl".length);
++  const file = join(sessionDir, "subagents", `agent-${agentId}.jsonl`);
++  let text;
++  try {
++    if (lstatSync(file).isSymbolicLink()) return unsafe;
++    if (realpathSync(file) !== join(realpathSync(sessionDir), "subagents", `agent-${agentId}.jsonl`)) return unsafe;
++    const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
++    try {
++      const stat = fstatSync(fd);
++      if (!stat.isFile() || stat.size > MAX_TRANSCRIPT_BYTES) return unsafe;
++      text = readFileSync(fd).toString("utf8");
++    } finally { closeSync(fd); }
++  } catch (error) { return error?.code === "ENOENT" ? { ok: false, code: "DRO-TRANSCRIPT-MISSING" } : unsafe; }
++  const seen = [];
++  for (const line of text.split("\n")) {
++    if (line.trim() === "") continue;
++    let record;
++    try { record = JSON.parse(line); } catch { return unsafe; }
++    if (record?.type !== "assistant" && record?.message?.role !== "assistant") continue;
++    if (typeof record?.message?.model === "string") seen.push(record.message.model);
++  }
++  return { ok: true, models: distinctModels(seen) };
++}
++
++function textBlocks(response) {
++  const content = response?.content;
++  if (!Array.isArray(content) || content.length === 0 || !content.every((block) => block?.type === "text" && typeof block.text === "string")) return null;
++  return content.map((block) => block.text).join("\n");
++}
++
++/**
++ * What the hook saw of one Claude review dispatch: not-applicable (not a reviewer, or a background launch), an
++ * observation, or a typed reason why none could be made.
++ * @returns {{ status: "not-applicable" } | { status: "unobserved", code: string } | { status: "observed", assurance: string, modelsUsed: string[], text: string }}
++ */
++export function observeClaudeDesignReview(input, { readHandbackFn = null, readModelsFn = readChildTranscriptModels } = {}) {
++  if (input?.hook_event_name === "PostToolUse") {
++    if (!["Agent", "Task"].includes(input.tool_name) || !REVIEWER_AGENT_TYPES.has(normalizedAgentType(input.tool_input?.subagent_type))) return { status: "not-applicable" };
++    const response = input.tool_response;
++    if (response?.status !== "completed") return { status: "not-applicable" };
++    const models = distinctModels([...(Array.isArray(response.modelsUsed) ? response.modelsUsed : []), response.resolvedModel]);
++    if (typeof response.resolvedModel !== "string" || models.length === 0) return { status: "unobserved", code: "DRO-NO-RESOLVED-MODEL" };
++    const text = textBlocks(response);
++    if (text === null || text.trim() === "") return { status: "unobserved", code: "DRO-NO-TEXT" };
++    // The resolved model is the one the call ended on; it is the last entry.
++    return { status: "observed", assurance: "host-observed-tool-use", modelsUsed: [...models.filter((model) => model !== response.resolvedModel), response.resolvedModel], text };
++  }
++  if (input?.hook_event_name === "SubagentStop") {
++    if (!REVIEWER_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) return { status: "not-applicable" };
++    const read = readModelsFn(input);
++    if (!read.ok) return { status: "unobserved", code: read.code };
++    if (read.models.length === 0) return { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" };
++    let text = typeof input.last_assistant_message === "string" && input.last_assistant_message.trim() !== "" ? input.last_assistant_message : null;
++    if (text === null && typeof readHandbackFn === "function") {
++      const handback = readHandbackFn(input);
++      if (handback?.ok === true && typeof handback.message === "string" && handback.message.trim() !== "") text = handback.message;
++    }
++    if (text === null) return { status: "unobserved", code: "DRO-NO-TEXT" };
++    return { status: "observed", assurance: "host-observed-child-transcript", modelsUsed: read.models, text };
++  }
++  return { status: "not-applicable" };
++}
++
++/**
++ * Record one observation in the private control area, named by the returned text's digest, exclusive create (a second
++ * stop of the same text keeps the first record).
++ * @returns {{ status: "not-applicable" } | { status: "unobserved", code: string } | { status: "recorded" | "already-recorded", resultSha256: string, model: string, assurance: string } | { status: "unavailable" }}
++ */
++export function recordDesignReviewObservation({ commonDir, runner, input, nowMs = Date.now(), readHandbackFn = null, readModelsFn = readChildTranscriptModels } = {}) {
++  try {
++    if (runner !== "claude") return { status: "not-applicable" };
++    const seen = observeClaudeDesignReview(input, { readHandbackFn, readModelsFn });
++    if (seen.status !== "observed") return seen;
++    if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
++    if (Buffer.byteLength(seen.text, "utf8") > MAX_TEXT_BYTES) return { status: "unobserved", code: "DRO-TEXT-TOO-LARGE" };
++    const modelsUsed = seen.modelsUsed.slice(-MAX_MODELS);
++    const resultSha256 = sha256(seen.text);
++    const record = { schema: DESIGN_REVIEW_OBSERVATION_SCHEMA, runner, assurance: seen.assurance, modelsUsed, resultSha256, observedAtMs: nowMs, text: seen.text };
++    const dir = designReviewObservationDir(commonDir);
++    mkdirSync(dir, { recursive: true, mode: 0o700 });
++    const model = modelsUsed[modelsUsed.length - 1];
++    try { writeFileSync(join(dir, `${resultSha256}.json`), `${JSON.stringify(record)}\n`, { flag: "wx", mode: 0o600 }); }
++    catch (error) { if (error?.code === "EEXIST") return { status: "already-recorded", resultSha256, model, assurance: seen.assurance }; throw error; }
++    return { status: "recorded", resultSha256, model, assurance: seen.assurance };
++  } catch { return { status: "unavailable" }; }
++}
++
++function validRecord(record, sha) {
++  return record?.schema === DESIGN_REVIEW_OBSERVATION_SCHEMA && record.runner === "claude" && record.resultSha256 === sha
++    && ["host-observed-tool-use", "host-observed-child-transcript"].includes(record.assurance)
++    && Array.isArray(record.modelsUsed) && record.modelsUsed.length >= 1 && record.modelsUsed.length <= MAX_MODELS
++    && distinctModels(record.modelsUsed).length === record.modelsUsed.length
++    && typeof record.text === "string" && sha256(record.text) === sha && Number.isSafeInteger(record.observedAtMs);
++}
++
++/** One observation by the digest of its returned text; null when none (or a damaged one) is recorded. */
++export function readDesignReviewObservation({ commonDir, resultSha256 }) {
++  if (typeof commonDir !== "string" || commonDir === "" || typeof resultSha256 !== "string" || !SHA256.test(resultSha256)) return null;
++  const file = join(designReviewObservationDir(commonDir), `${resultSha256}.json`);
++  try {
++    if (!existsSync(file) || lstatSync(file).isSymbolicLink()) return null;
++    const record = JSON.parse(readFileSync(file, "utf8"));
++    return validRecord(record, resultSha256) ? record : null;
++  } catch { return null; }
++}
++
++/** Every valid observation not yet exported, newest first (export marks one with `<digest>.exported`). */
++export function listUnexportedDesignReviewObservations({ commonDir }) {
++  const dir = designReviewObservationDir(commonDir);
++  let names;
++  try { names = readdirSync(dir); } catch { return []; }
++  const out = [];
++  for (const name of names) {
++    const match = /^([a-f0-9]{64})\.json$/u.exec(name);
++    if (match === null || names.includes(`${match[1]}.exported`)) continue;
++    const record = readDesignReviewObservation({ commonDir, resultSha256: match[1] });
++    if (record !== null) out.push(record);
++  }
++  return out.sort((left, right) => right.observedAtMs - left.observedAtMs || (left.resultSha256 < right.resultSha256 ? -1 : 1));
++}
++
++/** Mark one observation exported; a second export of the same observation is refused by the caller. */
++export function markDesignReviewObservationExported({ commonDir, resultSha256 }) {
++  writeFileSync(join(designReviewObservationDir(commonDir), `${resultSha256}.exported`), "", { flag: "wx", mode: 0o600 });
++}
++
++/** One line for the hook's channel: where the observation is and the one command that turns it into the report file. */
++export function designReviewObservationNotice(result) {
++  if (result?.status === "recorded" || result?.status === "already-recorded") {
++    return `Design review observed: reviewer model ${result.model} (${result.assurance}). Write the report with node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <repo-relative report path>, then create the receipt with that --report; the receipt records the observed model itself.`;
++  }
++  if (result?.status === "unobserved") {
++    return `Design review not observed (${result.code}): the receipt of this review would say unobserved, and present-plan refuses an unobserved Claude review. Dispatch pipeline-core:readiness-reviewer again in a session whose plugin hooks are loaded.`;
++  }
++  return null;
++}
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 25d51bfd43f30d7a5a09094a603a8080f2491706..1a64f011af190b1b4e6077d0ac84ec542b68e611 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -54,6 +54,19 @@ const FALLBACK_ROUTE = "fallback-self-dispatch";
+ const FALLBACK_KEYS = ["observedIdentity", "reasonCode", "requestedRoute", "route"];
+ const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
+ const FALLBACK_REQUESTED_ROUTE = /^[\x21-\x7e]{1,128}$/u;
++// L3 part 3 (PO tiles 2026-11-13, D247): one OPTIONAL, closed field. It says where the reviewer's model came from: the host's
++// own record of the review dispatch (Claude: the foreground tool result's resolved model, or the background child's
++// host-written transcript), or `unobserved` on a runner without a built observation route (labelled, visibly weaker, like the
++// Critic's declared-unobserved record). An observation names the digest of the returned text, which must be the digest of the
++// report the receipt binds (its unpublished original when sanitized). A receipt without it is valid and byte-unchanged; the
++// binding summary never carries it, so approval bytes stay as they were.
++const OBSERVATION_KEY = "reviewerObservation";
++const OBSERVATION_KEYS = ["assurance", "modelsUsed", "resultSha256"];
++export const DESIGN_REVIEW_OBSERVED_ASSURANCES = Object.freeze(["host-observed-tool-use", "host-observed-child-transcript"]);
++export const DESIGN_REVIEW_UNOBSERVED_ASSURANCE = "unobserved";
++/** The runners with a built observation route (lib/design-review-observation.mjs); present-plan requires the observation only there. */
++export const DESIGN_REVIEW_OBSERVATION_RUNNERS = Object.freeze(["claude"]);
++const MAX_MODELS_USED = 8;
+ 
+ // Strict decoding: invalid UTF-8 is not a receipt. `ignoreBOM: true` keeps a leading BOM in the
+ // text, so a BOM-prefixed file fails JSON parsing instead of being silently normalised.
+@@ -126,6 +139,24 @@ export const isDesignReviewFallback = (value) => isObject(value) && hasExactKeys
+   && isString(value.reasonCode) && FALLBACK_REASON_CODE.test(value.reasonCode)
+   && isString(value.requestedRoute) && FALLBACK_REQUESTED_ROUTE.test(value.requestedRoute)
+   && isString(value.observedIdentity) && MODEL.test(value.observedIdentity);
++/** The closed observation record (D247). Observed: 1-8 distinct model ids and the returned text's digest. Unobserved: none of either. */
++export const isDesignReviewObservation = (value) => {
++  if (!isObject(value) || !hasExactKeys(value, OBSERVATION_KEYS) || !Array.isArray(value.modelsUsed)) return false;
++  if (value.assurance === DESIGN_REVIEW_UNOBSERVED_ASSURANCE) return value.modelsUsed.length === 0 && value.resultSha256 === null;
++  return DESIGN_REVIEW_OBSERVED_ASSURANCES.includes(value.assurance) && isSha256(value.resultSha256)
++    && value.modelsUsed.length >= 1 && value.modelsUsed.length <= MAX_MODELS_USED
++    && allOf(value.modelsUsed, (model) => isString(model) && MODEL.test(model) && model !== "unknown")
++    && new Set(value.modelsUsed).size === value.modelsUsed.length;
++};
++/** An observation fits its receipt: the returned text is the bound report (its original when sanitized) and the recorded model is the last one used. */
++const observationFitsReceipt = (observation, reviewer, report) => observation.assurance === DESIGN_REVIEW_UNOBSERVED_ASSURANCE
++  || (observation.resultSha256 === (Object.hasOwn(report, "originalSha256") ? report.originalSha256 : report.sha256)
++    && reviewer.model === observation.modelsUsed[observation.modelsUsed.length - 1]);
++/** True when the receipt carries a host observation of its reviewer (D247); false for unobserved and for receipts without the field. */
++export function isHostObservedDesignReview(receipt) {
++  return isObject(receipt) && Object.hasOwn(receipt, OBSERVATION_KEY) && isDesignReviewObservation(receipt[OBSERVATION_KEY])
++    && DESIGN_REVIEW_OBSERVED_ASSURANCES.includes(receipt[OBSERVATION_KEY].assurance);
++}
+ const isPreviousInput = (value) => isObject(value) && hasExactKeys(value, ["bytes", "path"]) && isString(value.path) && value.bytes instanceof Uint8Array;
+ 
+ // ----------------------------------------------------------------------------- semantic checks
+@@ -178,7 +209,9 @@ export function describeDesignReviewFindingIdRefusal(ids) {
+ function receiptRefusal(receipt) {
+   const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");
+   const hasWithdrawn = isObject(receipt) && Object.hasOwn(receipt, WITHDRAWN_KEY);
+-  if (!isObject(receipt) || !hasExactKeys(receipt, [...RECEIPT_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : [])])) return "DRR-SHAPE";
++  const hasObservation = isObject(receipt) && Object.hasOwn(receipt, OBSERVATION_KEY);
++  if (!isObject(receipt) || !hasExactKeys(receipt, [...RECEIPT_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : []), ...(hasObservation ? [OBSERVATION_KEY] : [])])) return "DRR-SHAPE";
++  if (hasObservation && !isDesignReviewObservation(receipt[OBSERVATION_KEY])) return "DRR-SHAPE";
+   const { sources, report, previousReceiptPath, previousReceiptSha256 } = receipt;
+   if (hasWithdrawn && (receipt.kind !== "delta" || !isStringList(receipt[WITHDRAWN_KEY]) || receipt[WITHDRAWN_KEY].length === 0)) return "DRR-SHAPE";
+   const shapeOk = receipt.schema === DESIGN_REVIEW_RECEIPT_SCHEMA
+@@ -196,6 +229,7 @@ function receiptRefusal(receipt) {
+     && isReviewedAt(receipt.reviewedAt);
+   if (!shapeOk) return "DRR-SHAPE";
+   if (!reportPairIsValid(report)) return "DRR-REPORT-PAIR";
++  if (hasObservation && !observationFitsReceipt(receipt[OBSERVATION_KEY], receipt.reviewer, report)) return "DRR-OBSERVATION";
+   const companionPaths = sources.companions.map((companion) => companion.path);
+   if (!pathsAreAcceptable(report.path, sources.prd.path, sources.spec.path, companionPaths, previousReceiptPath)) return "DRR-PATH";
+   if (!sourcesAreAcceptable(sources.prd.path, sources.spec.path, companionPaths)) return "DRR-SOURCES";
+@@ -344,8 +378,11 @@ export function createDesignReviewReceipt(input) {
+   const { featureId, previous, sources, reviewer, report, openFindingIds, reviewedAt } = input;
+   // `fallback` is optional; present (even null) it must be the closed fallback record.
+   const hasFallback = input.fallback !== undefined;
++  // D247: `reviewerObservation` is optional; present it must be the closed observation record and fit the reviewer and report.
++  const hasObservation = input.reviewerObservation !== undefined;
+   const shapeOk = isFeatureId(featureId)
+     && (!hasFallback || isDesignReviewFallback(input.fallback))
++    && (!hasObservation || isDesignReviewObservation(input.reviewerObservation))
+     && (previous === null || isPreviousInput(previous))
+     && isSourcesShape(sources)
+     && isReviewer(reviewer)
+@@ -354,6 +391,7 @@ export function createDesignReviewReceipt(input) {
+     && isReviewedAt(reviewedAt);
+   if (!shapeOk) return refuse("DRR-SHAPE");
+   if (!reportPairIsValid(report)) return refuse("DRR-REPORT-PAIR");
++  if (hasObservation && !observationFitsReceipt(input.reviewerObservation, reviewer, report)) return refuse("DRR-OBSERVATION");
+ 
+   const companions = sources.companions.map(({ path, sha256 }) => ({ path, sha256 })).sort((a, b) => compareUnits(a.path, b.path));
+   const normalized = {
+@@ -416,6 +454,7 @@ export function createDesignReviewReceipt(input) {
+     reviewedAt,
+     ...(withdrawnFindingIds === null ? {} : { [WITHDRAWN_KEY]: withdrawnFindingIds }),
+     ...(hasFallback ? { fallback: Object.fromEntries(FALLBACK_KEYS.map((key) => [key, input.fallback[key]])) } : {}),
++    ...(hasObservation ? { [OBSERVATION_KEY]: { assurance: input.reviewerObservation.assurance, modelsUsed: [...input.reviewerObservation.modelsUsed], resultSha256: input.reviewerObservation.resultSha256 } } : {}),
+   };
+   const bytes = ENCODER.encode(`${canonical(receipt)}\n`);
+   // Self-check: what is returned is exactly what parse accepts from these bytes.
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.test.mjs b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+index 93be1e39a550bbb27d552a7d265c3dc39668453f..e156e36dbf45a8bb17b8d7af0cd87f7dc5f232a2 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+@@ -847,6 +847,52 @@ test("U2-18: summarize passes the parse refusal code through", () => {
+ 
+ // ------------------------------------------------------------------ U2-19
+ 
++// D247 (L3 part 3): the optional, closed reviewer observation.
++const OBSERVED = { assurance: "host-observed-tool-use", modelsUsed: ["claude-sonnet-4", REVIEWER.model], resultSha256: REPORT_1.sha256 };
++const UNOBSERVED = { assurance: "unobserved", modelsUsed: [], resultSha256: null };
++
++test("D247: an observed and an unobserved receipt round-trip; a receipt without the field is byte-unchanged", async () => {
++  const { isHostObservedDesignReview } = await import("./design-review-receipt.mjs");
++  const observed = create({ reviewerObservation: clone(OBSERVED) });
++  assert.equal(observed.ok, true, JSON.stringify(observed));
++  assert.deepEqual(parse(Buffer.from(observed.bytes)).receipt.reviewerObservation, OBSERVED);
++  assert.equal(isHostObservedDesignReview(observed.receipt), true);
++  const unobserved = create({ reviewerObservation: clone(UNOBSERVED) });
++  assert.equal(unobserved.ok, true);
++  assert.equal(isHostObservedDesignReview(unobserved.receipt), false);
++  assert.equal(isHostObservedDesignReview(create().receipt), false, "a receipt made before the observation route is not observed");
++  assert.deepEqual(Buffer.from(create().bytes), bytesOf(initialObject()), "without the field the bytes are the hand-built v1 receipt");
++});
++
++test("D247: the observation must bind the bound report and name the reviewer model last (DRR-OBSERVATION)", () => {
++  assert.deepEqual(create({ reviewerObservation: { ...OBSERVED, resultSha256: REPORT_2.sha256 } }), refuse("DRR-OBSERVATION"));
++  assert.deepEqual(create({ reviewerObservation: { ...OBSERVED, modelsUsed: [REVIEWER.model, "claude-sonnet-4"] } }), refuse("DRR-OBSERVATION"));
++  assert.deepEqual(parse(initialObject({ reviewerObservation: { ...OBSERVED, resultSha256: REPORT_2.sha256 } })), refuse("DRR-OBSERVATION"));
++  // A sanitized report: the observation is the unpublished original's digest.
++  const sanitized = { ...REPORT_1, originalSha256: sha("original-1") };
++  assert.equal(create({ report: sanitized, reviewerObservation: { ...OBSERVED, resultSha256: sha("original-1") } }).ok, true);
++  assert.deepEqual(create({ report: sanitized, reviewerObservation: clone(OBSERVED) }), refuse("DRR-OBSERVATION"));
++});
++
++test("D247: the observation is closed and well-formed, else DRR-SHAPE", () => {
++  for (const bad of [
++    { ...OBSERVED, extra: 1 }, { assurance: OBSERVED.assurance, modelsUsed: OBSERVED.modelsUsed },
++    { ...OBSERVED, assurance: "self-asserted" }, { ...OBSERVED, modelsUsed: [] }, { ...OBSERVED, modelsUsed: [REVIEWER.model, REVIEWER.model] },
++    { ...OBSERVED, modelsUsed: ["unknown"] }, { ...OBSERVED, resultSha256: null }, { ...UNOBSERVED, modelsUsed: [REVIEWER.model] },
++    { ...UNOBSERVED, resultSha256: REPORT_1.sha256 }, { ...OBSERVED, modelsUsed: Array.from({ length: 9 }, (_, i) => `m-${i}`) }, null,
++  ]) {
++    assert.deepEqual(create({ reviewerObservation: bad }), refuse("DRR-SHAPE"), JSON.stringify(bad));
++    assert.deepEqual(parse(initialObject({ reviewerObservation: bad })), refuse("DRR-SHAPE"), JSON.stringify(bad));
++  }
++});
++
++test("D247: the binding summary never carries the observation", () => {
++  const summary = summaryOf(initialObject({ reviewerObservation: clone(OBSERVED) }));
++  assert.equal("reviewerObservation" in summary, false);
++  const plain = summaryOf(initialObject());
++  assert.deepEqual(Object.keys(summary).sort(), Object.keys(plain).sort());
++});
++
+ test("U2-19: the module imports only node:crypto and canonical from po-approval-proof (import rule of the contract header)", () => {
+   const source = readFileSync(new URL("./design-review-receipt.mjs", import.meta.url), "utf8");
+   const specifiers = [...source.matchAll(/\bfrom\s*["']([^"']+)["']/gu)].map((match) => match[1]);
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 53ecf02b0f77847dfe5f180c9c65eb942130330f..663ddbda2f7136dab6e99b2282d32333abc9b04b 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -252,8 +252,16 @@ function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
+     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
+ }
+ 
++// D247: the observed review text becomes the report under the same design-course paths a receipt's inputs use.
++const EXPORTED_REPORT_OUT = /^(?:specs|evidence|docs)\/[A-Za-z0-9._/-]{1,200}\.(?:md|txt)$/u;
+ function sanctionedDesignReviewReceiptArgs(args, root) {
+   try {
++    if (args[0] === "export-report") {
++      return matchFlagSpec(args.slice(1), {
++        requiredValue: { "--repo": (value) => value === root, "--out": (value) => EXPORTED_REPORT_OUT.test(value) && physicalDesignCoursePath(root, value) },
++        optionalValue: { "--observation": (value) => /^[a-f0-9]{64}$/u.test(value) },
++      });
++    }
+     if (args[0] !== "create") return false;
+     const companions = [], findings = [], remainder = [];
+     for (let index = 1; index < args.length; index += 1) {
+diff --git a/plugins/pipeline-core/lib/implementation-entry-gate.mjs b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+index 33037c8130cddbea82ab1da234fe819bb803a2ca..5830f7745ef55a6f8ccb19b7f676bf7c71bdb97d 100644
+--- a/plugins/pipeline-core/lib/implementation-entry-gate.mjs
++++ b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+@@ -60,6 +60,7 @@ const REPAIRS = new Map([
+   ["DCC-REVIEW-DELTA-CHAIN", "Create each later receipt with --previous <the receipt of the round before>, then pass the whole chain in order, initial first."],
+   // L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round, as often as needed.
+   ["PLAN-DESIGN-REVIEW-OPEN", "Correct the PRD or Spec for the open findings named here (commit; after submit-plan the PRD/Spec drift repairs apply: run submit-plan again), then run a delta readiness review: a fresh pipeline-core:readiness-reviewer that reads only these findings and what changed. Create its receipt with design-review-receipt.mjs create --previous <the last receipt> (a delta over unchanged documents may only withdraw findings), commit it, and run present-plan again with every receipt of the chain, initial first."],
++  ["PLAN-DESIGN-REVIEW-UNOBSERVED", "On Claude the reviewer model of every review round is read from the host's record of the dispatch (D247). Dispatch pipeline-core:readiness-reviewer again for the current sources in a session whose plugin hooks are loaded (after a plugin install or hook refresh: restart the session first). Write its returned text as the report with design-review-receipt.mjs export-report --repo <root> --out <new report path> (a sanitized publication goes in --report, the exported text in --original-report), create a new initial receipt with design-review-receipt.mjs create (no --previous: an earlier round made without an observation cannot be continued), commit both, and run present-plan with that chain. A typed fallback receipt (--fallback-reason-code) is passed as it is."],
+   ["DCC-REVIEW-ROUND-EXCEEDED", "The review chain is above the structural bound of 64 rounds: start a new initial review of the current sources and pass that chain."],
+   ["DCC-PATH-UNSAFE", "The bound path must be a regular repository file; restore it or remove it from the receipt's companions."],
+   ["DCC-PATH-IGNORED", "A bound file must be committed, so it cannot live under a git-ignored directory: move it into the feature folder specs/<feature>/, update the reference, commit, and create the receipt again."],
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index d1e8b109d735bf3c5063d09012a5b9ccb4a94711..fda095df893cb17b38dcffbaa7b778e32e817383 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -321,6 +321,9 @@ async function walkSteps(f, { actualGuard }) {
+   const reportPath = `specs/${f.featureId}/review/design-review-1.md`;
+   const receiptPath = `specs/${f.featureId}/review/design-review-receipt-1.json`;
+   writeFileSync(join(f.root, reportPath), '# Critic report\n\nVerdict: PASS\n');
++  // D247: the observed review text becomes the report through export-report, admitted in the same state (with and without a named observation).
++  check('design-review report export', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'export-report', '--repo', f.root, '--out', `specs/${f.featureId}/review/design-review-observed.md`));
++  check('design-review report export (named observation)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'export-report', '--repo', f.root, '--out', `specs/${f.featureId}/review/design-review-observed.md`, '--observation', 'a'.repeat(64)));
+   const create = walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+     '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', receiptPath);
+   const createAdmitted = check('design-review receipt (initial)', create);
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index 78613c2dd80c5feaa21f789656bde8ba26b0c72a..b2138b9f3f3ce136bf251547b8f30c384acfae5b 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -79,7 +79,8 @@ function planSteps() {
+     scriptStep({
+       id: "design-review-receipt", script: "design-review-receipt.mjs", verb: "create",
+       argv: ["create", "--repo", "<root>", "--feature", "<feature-id>", "--report", "<review-report-path>", "--prd", "<prd-path>", "--spec", "<spec-path>", "--out", "<review-receipt-path>"],
+-      needs: ["the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)"],
++      needs: ["the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)",
++        "on Claude, its report written by design-review-receipt.mjs export-report --repo <root> --out <review-report-path>, so the receipt records the host-observed reviewer model (present-plan refuses an unobserved Claude review)"],
+       producer: "the tracked design review receipt present-plan and prepare-seal name; never written by hand", commit: "commit the receipt with the design", next: ["submit-plan"],
+     }),
+     scriptStep({
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 539c3f622ccfc28d7a75fff231f160fa94ca52d1..32cd30c5b23e066aba7a821f455beb0dc7f933f4 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -17,7 +17,7 @@
+       "pathId": "plan",
+       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "aa1d53b7943602a7f43ff2ed9e0363a2f43995934eade4cd0b2799dbc324b727"
++      "sha256": "aa9cdff2982529d5b7d305994122b3cb606bd5df265094c8110b127d80bc0ba9"
+     },
+     {
+       "pathId": "implement",
+diff --git a/plugins/pipeline-core/runbooks/plan-path.v1.json b/plugins/pipeline-core/runbooks/plan-path.v1.json
+index 738543ae93c133b7eb6995f8592a3e0de41abf53..ea452a184d2e88c005dd54eddabb310d7837639f 100644
+--- a/plugins/pipeline-core/runbooks/plan-path.v1.json
++++ b/plugins/pipeline-core/runbooks/plan-path.v1.json
+@@ -150,7 +150,8 @@
+       "who": "agent",
+       "command": "node <plugin-root>/scripts/design-review-receipt.mjs create --repo <root> --feature <feature-id> --report <review-report-path> --prd <prd-path> --spec <spec-path> --out <review-receipt-path>",
+       "needs": [
+-        "the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)"
++        "the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)",
++        "on Claude, its report written by design-review-receipt.mjs export-report --repo <root> --out <review-report-path>, so the receipt records the host-observed reviewer model (present-plan refuses an unobserved Claude review)"
+       ],
+       "evidenceSchema": null,
+       "producer": "the tracked design review receipt present-plan and prepare-seal name; never written by hand",
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 140daaddc5208bd609d11f05f146e43092aac2d1..4f0f8ceb121bb81fcd15096ec7283c2a29e988e7 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -156,6 +156,14 @@ const originalDesignCases = [
+   {
+     "id": "DABX015",
+     "name": "L3 (Claude run 3): present-plan refuses a review chain whose last round leaves findings open, names them and the delta route, and writes no request"
++  },
++  {
++    "id": "DABX016",
++    "name": "D247: present-plan refuses a Claude review round without a host observation of its reviewer, names the round and the route, and writes no request"
++  },
++  {
++    "id": "DABX017",
++    "name": "D247: the named route completes: hook observation, export-report and create stamp the observed model, and present-plan hands over the signing step"
+   }
+ ];
+ const designCompletionCases = [];
+@@ -439,7 +447,7 @@ function continuityRequest(authority) {
+ 
+ /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
+ const MOVED_DIR = "specs/e2e-moved";
+-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [] } = {}) {
++async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false } = {}) {
+   stateModule ??= await import(pathToFileURL(CLI).href);
+   const governance = await loadLib("governance-scope.mjs");
+   const poGate = await loadLib("po-gate-authority.mjs");
+@@ -491,7 +499,9 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+   writeFileIn(dir, PLAN_PATH, prdText);
+   writeFileIn(dir, COMPANION_PATHS[0], "# Design\n");
+   writeFileIn(dir, COMPANION_PATHS[1], "| ID | Evidence |\n| --- | --- |\n");
+-  writeFileIn(dir, REPORT_PATH, "# Design review 1\nVerdict: pass.\n");
++  // D247 `hostRoute`: the report is not written here; the hook's observation becomes the report through export-report below.
++  if (!hostRoute) writeFileIn(dir, REPORT_PATH, "# Design review 1\nVerdict: pass.\n");
++  else mkdirSync(join(dir, ...dirname(REPORT_PATH).split("/")), { recursive: true });
+   writeFileIn(dir, "specs/e2e/acceptance.md", "# Controlled route acceptance\n");
+   writeFileIn(dir, "specs/e2e/result.md", "# Controlled route result\n");
+ 
+@@ -517,7 +527,31 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+ 
+   // Review receipt over the finished sources (contract section 5 fixture F), tracked and clean.
+   const sourceFor = (path) => ({ path, sha256: sha256(readFileSync(join(dir, ...path.split("/")))) });
+-  const created = receiptLib.createDesignReviewReceipt({
++  if (hostRoute) {
++    // D247, the whole Claude route: the plugin hook records a background readiness-reviewer stop (its models from the child's own
++    // transcript), export-report writes the returned text as the report, and create (the CLI, on the Claude runner signal) stamps the
++    // observation into the receipt itself. Nothing here supplies a model.
++    const sessionBase = mkdtempSync(join(dirname(dir), "design-route-transcript-"));
++    mkdirSync(join(sessionBase, "session", "subagents"), { recursive: true });
++    writeFileSync(join(sessionBase, "session.jsonl"), "");
++    writeFileSync(join(sessionBase, "session", "subagents", "agent-a1.jsonl"),
++      `${JSON.stringify({ type: "assistant", message: { role: "assistant", model: "claude-opus-4", content: [{ type: "text", text: "reading" }] } })}\n`);
++    const observationLib = await loadLib("design-review-observation.mjs");
++    const recorded = observationLib.recordDesignReviewObservation({ commonDir: gitCommonDir, runner: "claude", input: {
++      hook_event_name: "SubagentStop", agent_type: "pipeline-core:readiness-reviewer", agent_id: "a1",
++      transcript_path: join(sessionBase, "session.jsonl"), last_assistant_message: "# Design review 1\nVerdict: pass.\n" } });
++    if (recorded.status !== "recorded") throw new Error(`fixture observation not recorded: ${JSON.stringify(recorded)}`);
++    const receiptCli = await import(pathToFileURL(join(HERE, "design-review-receipt.mjs")).href);
++    const out = [];
++    const exported = receiptCli.main(["export-report", "--repo", dir, "--out", REPORT_PATH], {}, { writeFn: (text) => out.push(text), errorFn: () => {} });
++    if (exported !== 0) throw new Error(`fixture export-report refused: ${out.join("")}`);
++    const createdCli = receiptCli.main(["create", "--repo", dir, "--feature", FEATURE_ID, "--report", REPORT_PATH, "--prd", PLAN_PATH, "--spec", SPEC_PATH,
++      ...COMPANION_PATHS.flatMap((path) => ["--companion", path]), "--out", RECEIPT_PATH], { CLAUDECODE: "1" },
++      { writeFn: (text) => out.push(text), errorFn: () => {}, now: () => new Date("2026-10-09T09:00:00.000Z") });
++    if (createdCli !== 0) throw new Error(`fixture create refused: ${out.join("")}`);
++    fx.cliOutput = out.join("");
++  }
++  const created = hostRoute ? { ok: true, bytes: readFileSync(join(dir, ...RECEIPT_PATH.split("/"))) } : receiptLib.createDesignReviewReceipt({
+     featureId: FEATURE_ID,
+     previous: null,
+     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
+@@ -526,9 +560,11 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+     openFindingIds,
+     reviewedAt: "2026-10-09T09:00:00.000Z",
+     ...(fallback === undefined ? {} : { fallback }),
++    // D247: a native Claude review round carries the host's observation of its reviewer (export-report + create); `observed: false` is a round without one.
++    ...(fallback === undefined && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
+   });
+   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
+-  writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
++  if (!hostRoute) writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
+   fx.receiptPath = RECEIPT_PATH;
+ 
+   // Trust anchor for approve-plan (A10): project/critical-human-proof.json, schema v3, committed.
+@@ -765,6 +801,39 @@ test("L3 (Claude run 3): present-plan refuses a review chain whose last round le
+   assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
+ });
+ 
++// D247 (PO tiles 2026-11-13): on Claude the reviewer model is host-observed; a round without the observation (made by hand, in a
++// session without the hooks, or before this amendment) is not presented. A fallback receipt is passed (route 1 covers it).
++test("D247: present-plan refuses a Claude review round without a host observation of its reviewer, names the round and the route, and writes no request", async () => {
++  const fx = await buildSubmittedFeature("route-unobserved", { observed: false });
++  await bindRouteOwner(fx);
++  const refused = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
++  assert.equal(refused.status, 2, `present-plan must refuse; stdout: ${refused.stdout}; stderr: ${refused.stderr}`);
++  assert.match(refused.stderr, /PLAN-DESIGN-REVIEW-UNOBSERVED/u);
++  assert.match(refused.stderr, /design-review-receipt-1\.json \(round 1, made before reviewer observation\)/u);
++  assert.match(refused.stderr, /export-report/u);
++  assert.match(refused.stderr, /restart the session/u);
++  assert.equal(posixSigningCommands(refused.stdout).length, 0, "no signing command is handed over");
++  const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
++  assert.deepEqual(requests, [], "no approval request is written");
++  assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
++});
++
++test("D247: the named route completes: hook observation, export-report and create stamp the observed model, and present-plan hands over the signing step", async () => {
++  const fx = await buildSubmittedFeature("route-host-observed", { hostRoute: true });
++  const receipt = JSON.parse(readFileSync(join(fx.dir, ...fx.receiptPath.split("/")), "utf8"));
++  assert.deepEqual(receipt.reviewerObservation, { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: receipt.report.sha256 });
++  assert.equal(receipt.reviewer.model, "claude-opus-4", "the receipt's reviewer model is the observed one");
++  assert.match(fx.cliOutput, /"status":"exported"/u);
++  assert.equal(/"notice"/u.test(fx.cliOutput), false, "an observed Claude receipt carries no unobserved notice");
++  await bindRouteOwner(fx);
++  const presented = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
++  assert.equal(presented.status, 0, `present-plan over an observed receipt must exit 0; stderr: ${presented.stderr}`);
++  assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
++  // The binding never carries the observation: approval bytes are those of a receipt without it.
++  const requestPath = requestPathOf(posixSigningCommands(presented.stdout)[0]);
++  assert.equal("reviewerObservation" in JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0], false);
++});
++
+ test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {
+   const run = await routeRun();
+   if (skipForHostLimitation(t, run)) return;
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 5d722522ccc050c35085ee6664cc6294416ac0a8..283f3885fd9c2f2f7b2dd49aa93706855bc2256a 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -11,10 +11,10 @@
+  *   reviewedAt       the clock, at production time (injectable only through the exported API)
+  *   reviewer.runner  the runtime signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT or
+  *                    AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); no signal refuses
+- *   reviewer.model   the OBSERVED execution identity the caller supplies, else `unknown`. It is never read
+- *                    from an agent profile: a profile's `model:` line is a request, not an observation.
+- *                    The result and the CLI report additionally carry the reviewer role (`critic`) and the
+- *                    requested route, as the caller supplies it, kept apart from the observation.
++ *   reviewer.model   D247: on Claude the model the host recorded for the readiness-reviewer dispatch whose
++ *                    returned text is this report (lib/design-review-observation.mjs; `export-report` writes
++ *                    that text), stamped with `reviewerObservation`; otherwise `unknown` and `unobserved`.
++ *                    It is never read from an agent profile or supplied by the caller (W7).
+  *   every sha256     the bytes of the file on disk
+  * There is deliberately no flag for a timestamp, a hash, a runner or a model: such a flag is refused
+  * as DRC-FORBIDDEN-FLAG. The bytes are the library's own canonical output (createDesignReviewReceipt)
+@@ -23,7 +23,8 @@
+  * Refusals are typed. Library codes (DRR-*) pass through unchanged; this command adds DRC-USAGE,
+  * DRC-UNKNOWN-FLAG, DRC-FORBIDDEN-FLAG, DRC-PATH-UNSAFE, DRC-OUT-EXISTS, DRC-OUT-PARENT-MISSING,
+  * DRC-FILE-MISSING, DRC-FILE-UNSAFE, DRC-NO-RUNNER, DRC-CLOCK,
+- * DRC-REPO-INVALID, DRC-WRITE-FAILED and DRC-INTERNAL.
++ * DRC-REPO-INVALID, DRC-WRITE-FAILED and DRC-INTERNAL; `export-report` adds DRC-OBSERVATION-STORE,
++ * DRC-OBSERVATION-MISSING and DRC-OBSERVATION-AMBIGUOUS.
+  *
+  * Its pure counterpart is lib/design-review-receipt-write-guard.mjs, which recognises a receipt that
+  * was written by hand instead.
+@@ -33,15 +34,19 @@ import { createHash } from "node:crypto";
+ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { dirname, join, sep } from "node:path";
+ 
+-import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal } from "../lib/design-review-receipt.mjs";
++import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
++import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation } from "../lib/design-review-observation.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ 
+ export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
+ 
+ const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
+   + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
+-  + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
+-  + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
++  + "       design-review-receipt.mjs export-report --repo <repo-root> --out <report> [--observation <sha256>]\n"
++  + "Every path is repo-relative. The review time, runner, reviewer model and all digests are derived, never supplied. On Claude the "
++  + "reviewer model is read from the host's record of the readiness-reviewer dispatch, found by the report's digest (export-report "
++  + "writes the returned text as the report); without one, and on another runner, the receipt says unobserved.";
+ 
+ export const OBSERVED_IDENTITY_UNKNOWN = "unknown";
+ export const REVIEWER_ROLE = "critic";
+@@ -179,10 +184,11 @@ export function createReceiptFromDisk(input, deps = {}) {
+     }
+     if (requestedRoute === null) return refuse("DRC-USAGE", "a fallback names the route that was requested: supply --requested-route with --fallback-reason-code");
+   }
+-  // W7 attestation: no verifiable source-owned dispatch observation route exists yet, so a self-asserted requested route
+-  // or observed identity is unattested. Only the typed fallback record (which says it is not an independent review) may carry them.
++  // W7 attestation: a self-asserted requested route or observed identity is unattested and stays refused. The observed model
++  // comes only from the host's own record of the review dispatch (D247), which this command reads itself below. Only the typed
++  // fallback record (which says it is not an independent review) may carry a supplied route and identity.
+   if ((requestedRoute !== null || observedIdentity !== null) && fallbackReasonCode === null) {
+-    return refuse("DRC-OBSERVATION-UNATTESTED", "a requested route or observed identity cannot be recorded: no verifiable source-owned dispatch observation exists, so a self-asserted value is unattested; omit it (the identity is recorded as unknown)");
++    return refuse("DRC-OBSERVATION-UNATTESTED", "a requested route or observed identity cannot be supplied: a self-asserted value is unattested; omit it. On Claude the reviewer's model is read from the host's record of the readiness-reviewer dispatch (write the report with export-report); on another runner the receipt says unobserved");
+   }
+ 
+   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
+@@ -243,8 +249,28 @@ export function createReceiptFromDisk(input, deps = {}) {
+ 
+   const runner = detectRunner(env);
+   if (runner === null) return refuse("DRC-NO-RUNNER", "no runner signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); the reviewer runner is never supplied by hand");
++  // D247: the reviewer observation. A fallback receipt names its own route and carries none (no dispatch was observed). On
++  // Claude the host's record of the readiness-reviewer dispatch is found by the digest of the returned text, which is the
++  // report (its unpublished original when sanitized); found, it is stamped in and gives `reviewer.model`. Otherwise, and on a
++  // runner without a built observation route, the receipt says `unobserved`.
++  let reviewerObservation;
++  let observedModel = null;
++  if (fallbackReasonCode === null) {
++    const returnedSha256 = originalSha256 ?? sha256Of(reportRead.bytes);
++    let record = null;
++    if (runner === "claude") {
++      let commonDir = null;
++      try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
++      record = commonDir === null ? null : readDesignReviewObservation({ commonDir, resultSha256: returnedSha256 });
++    }
++    if (record === null) reviewerObservation = { assurance: DESIGN_REVIEW_UNOBSERVED_ASSURANCE, modelsUsed: [], resultSha256: null };
++    else {
++      reviewerObservation = { assurance: record.assurance, modelsUsed: record.modelsUsed, resultSha256: returnedSha256 };
++      observedModel = record.modelsUsed[record.modelsUsed.length - 1];
++    }
++  }
+   // The old `reviewer.model` field is kept for existing readers and carries the honest value: the observation, else unknown.
+-  const model = observedIdentity ?? OBSERVED_IDENTITY_UNKNOWN;
++  const model = observedModel ?? observedIdentity ?? OBSERVED_IDENTITY_UNKNOWN;
+   const clock = now();
+   if (!(clock instanceof Date) || Number.isNaN(clock.getTime())) return refuse("DRC-CLOCK", "the clock did not yield a valid time");
+ 
+@@ -258,6 +284,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+     reviewedAt: clock.toISOString(),
+     specBytes,
+     ...(fallbackReasonCode === null ? {} : { fallback: { route: FALLBACK_ROUTE, reasonCode: fallbackReasonCode, requestedRoute, observedIdentity: model } }),
++    ...(reviewerObservation === undefined ? {} : { reviewerObservation }),
+   });
+   if (!created.ok) {
+     // AC-155: a PASS is refused while a declared foundational Spec decision has no ADR/register reference and no
+@@ -291,12 +318,60 @@ export function createReceiptFromDisk(input, deps = {}) {
+     ok: true, path: request.outPath, sha256: created.sha256, receipt: created.receipt,
+     reviewerRole: REVIEWER_ROLE, requestedRoute, observedIdentity: model,
+     ...(created.receipt.fallback === undefined ? {} : { fallback: created.receipt.fallback }),
++    ...(reviewerObservation === undefined ? {} : { reviewerObservation: { assurance: reviewerObservation.assurance, model } }),
++    ...(reviewerObservation?.assurance === DESIGN_REVIEW_UNOBSERVED_ASSURANCE && runner === "claude"
++      ? { notice: UNOBSERVED_CLAUDE_NOTICE } : {}),
+   };
+ }
+ 
++/** D247: the one route to an observed Claude review, said where the receipt came out unobserved. */
++export const UNOBSERVED_CLAUDE_NOTICE = "this receipt says unobserved, and present-plan refuses an unobserved Claude review (PLAN-DESIGN-REVIEW-UNOBSERVED). "
++  + "Dispatch pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded (after an install or hook refresh: restart the session first), "
++  + "write its returned text as the report with design-review-receipt.mjs export-report --repo <root> --out <report path>, and create a new receipt with that --report "
++  + "(the report reads, as returned; a sanitized publication goes in --report and the exported text in --original-report).";
++
++/**
++ * D247: write the text a host-observed Claude design review returned as the report file, exclusive create. The digest of
++ * those bytes is what `create` finds the observation by. Without --observation exactly one observation may be unexported.
++ * @returns {{ ok: true, path: string, resultSha256: string, model: string, assurance: string } | { ok: false, code: string, message: string }}
++ */
++export function exportReportFromObservation(input, deps = {}) {
++  const request = input ?? {};
++  if (typeof request.repo !== "string" || request.repo === "" || !isSafePath(request.outPath)) return refuse("DRC-USAGE", "export-report needs --repo and a safe repo-relative --out");
++  if (request.observation !== null && !(typeof request.observation === "string" && /^[a-f0-9]{64}$/u.test(request.observation))) return refuse("DRC-USAGE", "--observation is the 64-hex digest an earlier refusal listed");
++  let repoReal;
++  try { repoReal = realpathSync(request.repo); if (!statSync(repoReal).isDirectory()) throw new Error("not a directory"); }
++  catch { return refuse("DRC-REPO-INVALID", "the repository root is not an existing directory"); }
++  const output = resolveOutput(repoReal, request.outPath);
++  if (!output.ok) return output;
++  let commonDir = null;
++  try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
++  if (commonDir === null) return refuse("DRC-OBSERVATION-STORE", "the private control area of this repository could not be resolved");
++  let record;
++  if (request.observation !== null) {
++    record = readDesignReviewObservation({ commonDir, resultSha256: request.observation });
++    if (record === null) return refuse("DRC-OBSERVATION-MISSING", `no design review observation ${request.observation} is recorded on this device`);
++  } else {
++    const open = listUnexportedDesignReviewObservations({ commonDir });
++    if (open.length === 0) return refuse("DRC-OBSERVATION-MISSING", "no unexported design review observation is recorded on this device. Only a Claude dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded records one (after an install or hook refresh: restart the session first); dispatch the review again");
++    if (open.length > 1) {
++      return refuse("DRC-OBSERVATION-AMBIGUOUS", `${open.length} design review observations are unexported; name one with --observation: ${open.slice(0, 8).map((entry) => `${entry.resultSha256} (${entry.modelsUsed[entry.modelsUsed.length - 1]}, ${new Date(entry.observedAtMs).toISOString()}, ${Buffer.byteLength(entry.text, "utf8")} bytes)`).join("; ")}`);
++    }
++    record = open[0];
++  }
++  try { writeFileSync(output.absolute, record.text, { flag: "wx" }); }
++  catch (error) {
++    if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}`);
++    return refuse("DRC-WRITE-FAILED", `the report could not be written: ${request.outPath}`);
++  }
++  try { markDesignReviewObservationExported({ commonDir, resultSha256: record.resultSha256 }); } catch { /* an exported marker only narrows the next default choice */ }
++  return { ok: true, path: request.outPath, resultSha256: record.resultSha256, model: record.modelsUsed[record.modelsUsed.length - 1], assurance: record.assurance };
++}
++
+ function parseArgv(argv) {
+   const [command, ...rest] = argv;
+-  if (command !== "create") return refuse("DRC-USAGE", `expected the subcommand \`create\`\n${USAGE}`);
++  if (command === "export-report") return parseExportArgv(rest);
++  if (command !== "create") return refuse("DRC-USAGE", `expected the subcommand \`create\` or \`export-report\`\n${USAGE}`);
+   const single = new Map();
+   const repeated = { companionPaths: [], openFindingIds: [] };
+   let index = 0;
+@@ -327,7 +402,23 @@ function parseArgv(argv) {
+   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
+   const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
+   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
+-  return { ok: true, request };
++  return { ok: true, command: "create", request };
++}
++
++const EXPORT_FLAGS = new Map([["repo", "repo"], ["out", "outPath"], ["observation", "observation"]]);
++function parseExportArgv(rest) {
++  const request = { repo: null, outPath: null, observation: null };
++  for (let index = 0; index < rest.length; index += 2) {
++    const token = rest[index];
++    const name = typeof token === "string" && token.startsWith("--") ? token.slice(2) : null;
++    if (name === null || !EXPORT_FLAGS.has(name)) return refuse(name === null ? "DRC-USAGE" : "DRC-UNKNOWN-FLAG", `unexpected argument ${JSON.stringify(token)}\n${USAGE}`);
++    const value = rest[index + 1];
++    if (value === undefined || value.startsWith("--")) return refuse("DRC-USAGE", `--${name} needs a value\n${USAGE}`);
++    if (request[EXPORT_FLAGS.get(name)] !== null) return refuse("DRC-USAGE", `--${name} was given more than once\n${USAGE}`);
++    request[EXPORT_FLAGS.get(name)] = value;
++  }
++  if (request.repo === null || request.outPath === null) return refuse("DRC-USAGE", `export-report needs --repo and --out\n${USAGE}`);
++  return { ok: true, command: "export-report", request };
+ }
+ 
+ export function main(argv = process.argv.slice(2), env = process.env, deps = {}) {
+@@ -346,7 +437,13 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
+   try {
+     const parsed = parseArgv(argv);
+     if (!parsed.ok) return refused(parsed);
+-    const result = createReceiptFromDisk(parsed.request, { env, now: deps.now });
++    if (parsed.command === "export-report") {
++      const exported = exportReportFromObservation(parsed.request, { commonDirFn: deps.commonDirFn });
++      if (!exported.ok) return refused(exported);
++      write(`${JSON.stringify({ schema: DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA, status: "exported", path: exported.path, resultSha256: exported.resultSha256, model: exported.model, assurance: exported.assurance })}\n`);
++      return 0;
++    }
++    const result = createReceiptFromDisk(parsed.request, { env, now: deps.now, commonDirFn: deps.commonDirFn });
+     if (!result.ok) return refused(result);
+     write(`${JSON.stringify({
+       schema: DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA,
+@@ -361,6 +458,8 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
+       requestedRoute: result.requestedRoute,
+       observedIdentity: result.observedIdentity,
+       ...(result.fallback === undefined ? {} : { fallback: result.fallback }),
++      ...(result.reviewerObservation === undefined ? {} : { reviewerObservation: result.reviewerObservation }),
++      ...(result.notice === undefined ? {} : { notice: result.notice }),
+     })}\n`);
+     return 0;
+   } catch (error) {
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index 4ed8b360779af2f1c27766436fe135e4874f7e26..4e4d256c0793e9040e454d19763f84cc32807b37 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -468,3 +468,147 @@ test("the script carries the shebang and SPDX header and importing it runs nothi
+   assert.ok(source.startsWith("#!/usr/bin/env node\n// SPDX-License-Identifier: SUL-1.0\n"));
+   assert.equal(typeof main, "function");
+ });
++
++// ----------------------------------------------------------------------------- D247: host-observed reviewer model (L3 part 3)
++
++/** A private control area and a fake background child transcript, both outside the repository. */
++function observationWorld(t, models = ["claude-opus-4"]) {
++  const base = mkdtempSync(join(tmpdir(), "drc-obs-"));
++  t.after(() => rmSync(base, { recursive: true, force: true }));
++  const commonDir = join(base, "common");
++  mkdirSync(join(base, "session", "subagents"), { recursive: true });
++  writeFileSync(join(base, "session.jsonl"), "");
++  const lines = models.map((model) => JSON.stringify({ type: "assistant", message: { role: "assistant", model, content: [{ type: "text", text: "x" }] } }));
++  lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", model: "<synthetic>", content: [] } }));
++  writeFileSync(join(base, "session", "subagents", "agent-a1.jsonl"), `${lines.join("\n")}\n`);
++  const stop = (text) => ({ hook_event_name: "SubagentStop", agent_type: "pipeline-core:readiness-reviewer", agent_id: "a1", transcript_path: join(base, "session.jsonl"), last_assistant_message: text });
++  return { commonDir, stop, deps: { commonDirFn: () => commonDir } };
++}
++
++test("D247: a background reviewer stop is recorded with the child transcript's models, and an unrelated stop is not", async (t) => {
++  const { recordDesignReviewObservation, readDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t, ["claude-sonnet-4", "claude-opus-4"]);
++  const recorded = recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Review\n\nVerdict: PASS\n"), nowMs: 1 });
++  assert.equal(recorded.status, "recorded");
++  assert.equal(recorded.model, "claude-opus-4");
++  assert.equal(recorded.assurance, "host-observed-child-transcript");
++  const record = readDesignReviewObservation({ commonDir: world.commonDir, resultSha256: sha("# Review\n\nVerdict: PASS\n") });
++  assert.deepEqual(record.modelsUsed, ["claude-sonnet-4", "claude-opus-4"], "first-use order, the host's synthetic placeholder is no model");
++  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Review\n\nVerdict: PASS\n") }).status, "already-recorded");
++  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: { ...world.stop("x"), agent_type: "pipeline-core:critic" } }).status, "not-applicable");
++  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "codex", input: world.stop("x") }).status, "not-applicable", "no Codex route is built");
++});
++
++test("D247: a foreground reviewer result is recorded with its resolved model; a background launch is left to the stop", async (t) => {
++  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t);
++  const post = (response) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:readiness-reviewer" }, tool_response: response });
++  assert.equal(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: post({ status: "async_launched" }) }).status, "not-applicable");
++  assert.deepEqual(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: post({ status: "completed", content: [{ type: "text", text: "r" }] }) }), { status: "unobserved", code: "DRO-NO-RESOLVED-MODEL" });
++  const recorded = recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude",
++    input: post({ status: "completed", resolvedModel: "claude-opus-4-1", modelsUsed: ["claude-opus-4-1"], content: [{ type: "text", text: "report" }] }) });
++  assert.equal(recorded.status, "recorded");
++  assert.equal(recorded.assurance, "host-observed-tool-use");
++  assert.equal(recorded.model, "claude-opus-4-1");
++});
++
++test("D247: a child transcript that is a symlink or holds no model is refused, never read through", async (t) => {
++  const { observeClaudeDesignReview } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t, []);
++  assert.deepEqual(observeClaudeDesignReview(world.stop("r")), { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" });
++  const linked = observationWorld(t);
++  const file = join(linked.stop("r").transcript_path.slice(0, -".jsonl".length), "subagents", "agent-a1.jsonl");
++  rmSync(file);
++  symlinkSync(join(tmpdir(), "nowhere.jsonl"), file);
++  assert.deepEqual(observeClaudeDesignReview(linked.stop("r")), { status: "unobserved", code: "DRO-TRANSCRIPT-UNSAFE" });
++});
++
++test("D247: export-report writes the observed text, and create stamps the observation and the observed model", withRepo(async (repo, t) => {
++  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t);
++  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Observed review\n\nVerdict: PASS\n") });
++  const out = "specs/feat-x/review/design-review-observed.md";
++  const exported = runMain(["export-report", "--repo", repo, "--out", out], CLAUDE, world.deps);
++  assert.equal(exported.code, 0, exported.stderr);
++  assert.equal(exported.json.status, "exported");
++  assert.equal(readFileSync(join(repo, out), "utf8"), "# Observed review\n\nVerdict: PASS\n", "the text as returned");
++  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/again.md"], CLAUDE, world.deps).json.code, "DRC-OBSERVATION-MISSING", "an exported observation is not chosen again by default");
++  const created = runMain(baseArgv(repo, { report: out }), CLAUDE, world.deps);
++  assert.equal(created.code, 0, created.stderr);
++  assert.deepEqual(created.json.reviewerObservation, { assurance: "host-observed-child-transcript", model: "claude-opus-4" });
++  assert.equal("notice" in created.json, false);
++  const receipt = parseDesignReviewReceipt(readFileSync(join(repo, RECEIPT1))).receipt;
++  assert.equal(receipt.reviewer.model, "claude-opus-4");
++  assert.deepEqual(receipt.reviewerObservation, { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sha("# Observed review\n\nVerdict: PASS\n") });
++  assert.equal("reviewerObservation" in summarizeDesignReviewReceipt({ path: RECEIPT1, bytes: readFileSync(join(repo, RECEIPT1)) }).summary, false, "the binding summary never carries it");
++}));
++
++test("D247: a sanitized report binds the observation through its unpublished original", withRepo(async (repo, t) => {
++  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t);
++  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# Original\n") });
++  const original = "specs/feat-x/review/original.md";
++  assert.equal(runMain(["export-report", "--repo", repo, "--out", original], CLAUDE, world.deps).code, 0);
++  const created = runMain([...baseArgv(repo), "--original-report", original], CLAUDE, world.deps);
++  assert.equal(created.code, 0, created.stderr);
++  assert.equal(created.json.reviewerObservation.assurance, "host-observed-child-transcript");
++}));
++
++test("D247: without an observation a Claude receipt says unobserved and names the route; Codex and Antigravity say unobserved without a notice", withRepo((repo, t) => {
++  const world = observationWorld(t);
++  const claude = runMain(baseArgv(repo), CLAUDE, world.deps);
++  assert.equal(claude.code, 0, claude.stderr);
++  assert.deepEqual(claude.json.reviewerObservation, { assurance: "unobserved", model: "unknown" });
++  assert.match(claude.json.notice, /PLAN-DESIGN-REVIEW-UNOBSERVED/u);
++  assert.match(claude.json.notice, /export-report/u);
++  for (const [env, out] of [[{ CODEX_SESSION_ID: "s" }, "specs/feat-x/review/codex.receipt.json"], [{ ANTIGRAVITY_AGENT: "1" }, "specs/feat-x/review/agy.receipt.json"]]) {
++    const run = runMain(baseArgv(repo, { report: REPORT2, out }), env, world.deps);
++    assert.equal(run.code, 0, run.stderr);
++    assert.deepEqual(run.json.reviewerObservation, { assurance: "unobserved", model: "unknown" });
++    assert.equal("notice" in run.json, false);
++  }
++}));
++
++test("D247: export-report refuses an ambiguous choice with a compact list, an unknown digest and a second write", withRepo(async (repo, t) => {
++  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t);
++  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("one"), nowMs: 1 });
++  recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("two"), nowMs: 2 });
++  const ambiguous = runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md"], CLAUDE, world.deps);
++  assert.equal(ambiguous.json.code, "DRC-OBSERVATION-AMBIGUOUS");
++  assert.ok(ambiguous.json.message.includes(sha("one")) && ambiguous.json.message.includes(sha("two")));
++  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md", "--observation", "a".repeat(64)], CLAUDE, world.deps).json.code, "DRC-OBSERVATION-MISSING");
++  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md", "--observation", sha("two")], CLAUDE, world.deps).code, 0);
++  assert.equal(runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/r.md", "--observation", sha("one")], CLAUDE, world.deps).json.code, "DRC-OUT-EXISTS");
++}));
++
++test("D247: the installed hook records a reviewer's foreground result and background stop, says one line, and never blocks", withRepo((repo, t) => {
++  assert.equal(spawnSync("git", ["init", "-q"], { cwd: repo }).status, 0);
++  // The hook acts only in a governed project (an ungoverned one exits at once); the onboarding consent marker governs this fixture.
++  mkdirSync(join(repo, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(repo, ".agent-pipeline", "onboarding-consent.json"), `${JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: CLOCK })}\n`);
++  const hook = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
++  const runHook = (input) => spawnSync(process.execPath, [hook, "--runner", "claude"], { cwd: repo, input: JSON.stringify({ cwd: repo, session_id: "s-1", ...input }),
++    encoding: "utf8", env: { ...strippedEnv(), CLAUDECODE: "1", CLAUDE_PROJECT_DIR: repo } });
++  const store = join(repo, ".git", "agent-pipeline", "design-review-observations");
++  const foreground = runHook({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_use_id: "tu-1", tool_input: { subagent_type: "pipeline-core:readiness-reviewer" },
++    tool_response: { status: "completed", resolvedModel: "claude-opus-4", content: [{ type: "text", text: "# Foreground review\n" }] } });
++  assert.equal(foreground.status, 0, foreground.stderr);
++  assert.notEqual(foreground.stdout, "", `the foreground hook says one line; stderr: ${foreground.stderr}`);
++  const context = JSON.parse(foreground.stdout).hookSpecificOutput.additionalContext;
++  assert.match(context, /^Design review observed: reviewer model claude-opus-4 \(host-observed-tool-use\)\. /u);
++  assert.equal(context.includes("Foreground review"), false, "the returned text never reaches the agent's context through the hook");
++  assert.ok(existsSync(join(store, `${sha("# Foreground review\n")}.json`)));
++  const world = observationWorld(t);
++  const background = runHook(world.stop("# Background review\n"));
++  assert.equal(background.status, 0, background.stderr);
++  assert.equal(background.stdout, "", "a stop is never blocked");
++  assert.ok(existsSync(join(store, `${sha("# Background review\n")}.json`)));
++}));
++
++test("D247: a self-asserted identity stays refused next to the observation route (W7)", withRepo((repo, t) => {
++  const world = observationWorld(t);
++  const run = runMain([...baseArgv(repo), "--observed-identity", "claude-opus-4"], CLAUDE, world.deps);
++  assert.equal(run.json.code, "DRC-OBSERVATION-UNATTESTED");
++  assert.equal(existsSync(join(repo, RECEIPT1)), false);
++}));
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2f15b4d5f8572079e3a20feadce98064f91144eb..d40a1143b1bc3d51a2f8e6f26ac9d1dbed8e03b2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -393,7 +393,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, reso
+ import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+-import { DESIGN_REVIEW_MAX_ROUNDS, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { DESIGN_REVIEW_MAX_ROUNDS, DESIGN_REVIEW_OBSERVATION_RUNNERS, isHostObservedDesignReview, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+@@ -10556,6 +10556,24 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
+         message: `round ${latest.summary.round} of the readiness review leaves ${latest.summary.openFindingIds.length} finding(s) open: ${latest.summary.openFindingIds.join(", ")}`,
+         repair: entryGateRepair("PLAN-DESIGN-REVIEW-OPEN") };
+     } },
++    // D247 (L3 part 3, PO tiles 2026-11-13): on a runner with a built observation route (Claude) every review round of the chain is
++    // presented only with the host's observation of its reviewer. A typed fallback receipt names its own route and is passed; a
++    // runner without a route (Codex, Antigravity) passes with its receipt's visible `unobserved` label. Presentation gate only.
++    { id: "design-review-unobserved", run: () => {
++      if (!inputs?.ok || !Array.isArray(inputs.receipts)) return null;
++      const unobserved = [];
++      for (const entry of inputs.receipts) {
++        const parsed = parseDesignReviewReceipt(entry.bytes);
++        if (!parsed.ok) continue;
++        const receipt = parsed.receipt;
++        if (!DESIGN_REVIEW_OBSERVATION_RUNNERS.includes(receipt.reviewer.runner) || Object.hasOwn(receipt, "fallback") || isHostObservedDesignReview(receipt)) continue;
++        unobserved.push(`${entry.path} (round ${receipt.round}, ${Object.hasOwn(receipt, "reviewerObservation") ? receipt.reviewerObservation.assurance : "made before reviewer observation"})`);
++      }
++      if (unobserved.length === 0) return null;
++      return { code: "PLAN-DESIGN-REVIEW-UNOBSERVED", path: inputs.receipts.at(-1).path,
++        message: `the reviewer model of ${unobserved.length} review round(s) was not observed by the host: ${unobserved.join("; ")}`,
++        repair: entryGateRepair("PLAN-DESIGN-REVIEW-UNOBSERVED") };
++    } },
+     // C28e (Codex test run): approve-plan later reads the approval policy, the PRD, the Spec, the companions and the review receipts
+     // from the commit the request binds. A file that exists only in the working tree surfaced only after the signature
+     // (CAC-SOURCE-UNAVAILABLE) and cost a second one; each such file is named here, before a request exists.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index 135a68f977a0240b3a43d332f9711603c158c235..d2955bd75e992f9cae706fd210b17046b1edacae 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -54,11 +54,21 @@ was needed; capability evidence is not an Advisor answer.
+    as `DRR-FINDING-IDS` and the refusal names the id). It reads the
+    sources and the report from disk and stamps the review time, runner and
+    reviewer model itself. Never write or edit a receipt by hand: a hand-written
+-   receipt is not admissible evidence. Omit `--requested-route` and
+-   `--observed-identity` unless a source-owned dispatch observation exists: a
+-   self-asserted value is refused with `DRC-OBSERVATION-UNATTESTED` and the
+-   identity is then recorded as `unknown` (only the typed fallback record,
+-   `--fallback-reason-code`, may carry a route).
++   receipt is not admissible evidence. Never pass `--requested-route` or
++   `--observed-identity`: a self-asserted value is refused with
++   `DRC-OBSERVATION-UNATTESTED` (only the typed fallback record,
++   `--fallback-reason-code`, may carry a route). On Claude the plugin hooks
++   record the end of each `readiness-reviewer` dispatch with the host's model;
++   write the report with `node <plugin-root>/scripts/design-review-receipt.mjs
++   export-report --repo <root> --out <report path>` (it writes the returned
++   text as returned and prints one line; a sanitized publication goes in
++   `--report`, the exported text in `--original-report`), and `create` stamps
++   the observed model into the receipt itself. A Claude round without that
++   observation (a report written by hand, a session started before the hooks
++   were loaded) says `unobserved`, and `present-plan` refuses it
++   (`PLAN-DESIGN-REVIEW-UNOBSERVED`): dispatch the review again and start a new
++   initial receipt. On Codex and Antigravity there is no observation route yet;
++   their receipts say `unobserved` visibly and are presented.
+    Dispatching the design review: the `critic-review` skill is for implementation
+    batches (diff range, batch preflight) and does not fit uncommitted design
+    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.

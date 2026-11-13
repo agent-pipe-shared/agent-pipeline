@@ -1,0 +1,54 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 5f125efe46115bae10bae67da5b90830eb11701d..fbd4ac3cb48fdaaf53040a82cb0a23d347f46c5f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -49,6 +49,7 @@ import { fileURLToPath } from "node:url";
+ import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
+ import { readSettledPendingPreview } from "../lib/routine-repair.mjs";
+ import { readSpecAddenda } from "../lib/spec-addendum.mjs";
++import { classifyCriticChangedPaths } from "../lib/critic-skip-decision.mjs";
+ 
+ const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+ const cliArguments = process.argv.slice(2);
+@@ -1155,6 +1156,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     }
+   }
+ 
++  const declaredDiff = classifyCriticChangedPaths(allowedPaths);
+   const binding = {
+     schema: NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA,
+     dispatchId,
+@@ -1171,7 +1173,9 @@ export function generateDispatchBinding(options, deps = {}) {
+       schema: "pipeline.critic-required-decision.v1",
+       trigger: {
+         schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
+-        diff: { mechanical: false, architecture: true, guardrails: false, security: false },
++        // C29 (Glossover K-29): guardrails and security are derived from the allowed paths with the classifier the host checks
++        // the real diff with (criticDecisionPathFinding), so a write scope under docs/security/** or an auth path is never under-declared.
++        diff: { mechanical: false, architecture: true, guardrails: declaredDiff.guardrails, security: declaredDiff.security },
+       },
+       appliedRow: "T1",
+     },
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index ebc348dcd64eb343d9d5e6182d88d4f31b3416a3..ac9a880f0624f726c202cf1593af80f2911b5f80 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -188,6 +188,18 @@ process.on('exit',()=>process.stderr.write('HELP-AUDIT:'+JSON.stringify(calls)+'
+   }
+ });
+ 
++test("C29 (Glossover K-29): a security or guardrail write scope is declared in the Critic trigger, so the host's path check finds no under-declaration", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { criticDecisionPathFinding } = await import("../lib/critic-skip-decision.mjs");
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx, {}, ["--path", "docs/security/audit-exceptions.md", "--path", "src/app/api/auth/route.ts", "--path", "plugins/x/policies/rule.mjs"]), depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++  const { diff } = result.binding.criticDecision.trigger;
++  assert.deepEqual(diff, { mechanical: false, architecture: true, guardrails: true, security: true });
++  assert.equal(result.binding.criticDecision.appliedRow, "T1");
++  assert.equal(criticDecisionPathFinding(result.binding.criticDecision, result.binding.allowedPaths), null);
++});
++
+ test("binding fields equal the facts of their own sources", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();

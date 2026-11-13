@@ -1,0 +1,113 @@
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index b2138b9f3f3ce136bf251547b8f30c384acfae5b..11d986c45da0970a421572c9cd3b65e57a4c3561 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -63,7 +63,7 @@ function planSteps() {
+       id: "record-decisions", command: "call the architecture-decision skill once for each decision the design lists under decisions to record, and write the ADR at the path the design names",
+       needs: ["the design package names its decisions to record (title, trigger, ADR path) in the module adrReferences"],
+       producer: "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
+-      commit: "commit the ADRs with the design", next: ["create-adr", "design-review-receipt", "submit-plan"],
++      commit: "commit the ADRs with the design", next: ["create-adr", "design-review-export-report", "design-review-receipt", "submit-plan"],
+     }),
+     scriptStep({
+       id: "create-adr", script: "create-adr.mjs", verb: "--slug", argv: ["--root", "<root>", "--slug", "<slug>", "--title", "<title>"],
+@@ -74,7 +74,14 @@ function planSteps() {
+       id: "bind-adr-proposals", script: "bind-adr-proposals.mjs", verb: "--carrier",
+       argv: ["--root", "<root>", "--feature", "<feature-id>", "--carrier", "<design.md>", "--selection", "<po-selection.json>", "--draft", "<slug>"],
+       needs: ["the proposals from create-adr", "the PO's selection file"],
+-      producer: "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry", next: ["design-review-receipt"],
++      producer: "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry", next: ["design-review-export-report", "design-review-receipt"],
++    }),
++    scriptStep({
++      id: "design-review-export-report", script: "design-review-receipt.mjs", verb: "export-report",
++      argv: ["export-report", "--repo", "<root>", "--out", "<review-report-path>"],
++      needs: ["on Claude: a finished dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded (the hook records the host-observed reviewer model, D247); Codex and Antigravity skip this step and write the report from the returned text"],
++      producer: "the review report, byte for byte the text the reviewer returned, so create finds the host observation by its digest; --observation <sha256> names one when several are unexported",
++      next: ["design-review-receipt"],
+     }),
+     scriptStep({
+       id: "design-review-receipt", script: "design-review-receipt.mjs", verb: "create",
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 32cd30c5b23e066aba7a821f455beb0dc7f933f4..d2c42ff61e9a530be6863fbe2a785b446035cc51 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -17,7 +17,7 @@
+       "pathId": "plan",
+       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "aa9cdff2982529d5b7d305994122b3cb606bd5df265094c8110b127d80bc0ba9"
++      "sha256": "af24473e598839e96c756413559a9241b73b8f4387916194901347bf14eeb13d"
+     },
+     {
+       "pathId": "implement",
+diff --git a/plugins/pipeline-core/runbooks/plan-path.v1.json b/plugins/pipeline-core/runbooks/plan-path.v1.json
+index ea452a184d2e88c005dd54eddabb310d7837639f..16e6ae5bc551360850de7d78979caa7e22f8d64a 100644
+--- a/plugins/pipeline-core/runbooks/plan-path.v1.json
++++ b/plugins/pipeline-core/runbooks/plan-path.v1.json
+@@ -78,6 +78,7 @@
+       "humanGate": false,
+       "next": [
+         "create-adr",
++        "design-review-export-report",
+         "design-review-receipt",
+         "submit-plan"
+       ],
+@@ -124,6 +125,7 @@
+       "producer": "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry",
+       "humanGate": false,
+       "next": [
++        "design-review-export-report",
+         "design-review-receipt"
+       ],
+       "commit": null,
+@@ -145,6 +147,33 @@
+         "closed": false
+       }
+     },
++    {
++      "id": "design-review-export-report",
++      "who": "agent",
++      "command": "node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <review-report-path>",
++      "needs": [
++        "on Claude: a finished dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded (the hook records the host-observed reviewer model, D247); Codex and Antigravity skip this step and write the report from the returned text"
++      ],
++      "evidenceSchema": null,
++      "producer": "the review report, byte for byte the text the reviewer returned, so create finds the host observation by its digest; --observation <sha256> names one when several are unexported",
++      "humanGate": false,
++      "next": [
++        "design-review-receipt"
++      ],
++      "commit": null,
++      "catalogue": {
++        "script": "design-review-receipt.mjs",
++        "verb": "export-report",
++        "argv": [
++          "export-report",
++          "--repo",
++          "<root>",
++          "--out",
++          "<review-report-path>"
++        ],
++        "closed": false
++      }
++    },
+     {
+       "id": "design-review-receipt",
+       "who": "agent",
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 7e58dde468dedf542969c948219d581efc29eaa3..1e14fd056034e049afffd6d42244d1ac5ff512b0 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -30,8 +30,10 @@ The acceptance question of the one-shot close is asked in the project's human-fa
+ ## 1. Design
+ 
+ 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.
+-2. Review receipt and design course (agent): `design-review-receipt.mjs create` with `--repo --feature --report --prd --spec --out`; dispatch the
+-   read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
++2. Review receipt and design course (agent): dispatch the read-only `pipeline-core:readiness-reviewer`, not the Critic; on Claude write its
++   returned text as the report with `design-review-receipt.mjs export-report --repo <root> --out <report>` (the host-observed reviewer model,
++   D247); then `design-review-receipt.mjs create` with `--repo --feature --report --prd --spec --out`. Owner: `references/design-course.md`.
++   Never write a receipt or a report of the review by hand.
+    Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
+    `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
+    A decision the PO must accept with this design is a proposal first: `create-adr.mjs --root <root> --slug <slug> --title <title>` writes it (`--refresh` after an edit of the Markdown), then

@@ -1,0 +1,1048 @@
+diff --git a/docs/adr/0085-one-review-one-signature-design-approval.md b/docs/adr/0085-one-review-one-signature-design-approval.md
+index e8341c991e9b64f22b0498548537fab3ae99eb61..bc66607aceb6e9f53b0304a6bda2f84ba3dafa61 100644
+--- a/docs/adr/0085-one-review-one-signature-design-approval.md
++++ b/docs/adr/0085-one-review-one-signature-design-approval.md
+@@ -106,3 +106,33 @@ directory (T25).
+ - The consistency check fails with a typed code on a stale marker, a count
+   mismatch or an untracked bound path, and passes otherwise; it never returns a
+   content finding.
++
++## Amendment 2026-11-13: delta rounds until pass, no signature over an open review (D246)
++
++Accepted by PO tiles of 2026-11-13 (Claude test run 3, finding L3: a design
++approval was signed over a readiness review that was not ready). Decision step 4
++above ("at most one delta follow-up") is replaced; everything else stands.
++
++1. **Delta rounds until pass.** While the latest review round leaves findings
++   open, the next round is a delta review (a fresh reviewer, only the open
++   findings and what changed), chained to the round before by path and digest.
++   There is no round cap, like the Critic since D190. `DESIGN_REVIEW_MAX_ROUNDS`
++   (64) remains only as the structural bound on the chain length (bounded
++   input), not a review policy. A delta over unchanged documents may only
++   withdraw findings of the round before (PO decision 2026-11-09); such a
++   receipt is a valid link of the chain.
++2. **No presentation over an open review.** `present-plan` refuses with
++   `PLAN-DESIGN-REVIEW-OPEN` while the latest receipt is `open-findings`, names
++   the open ids and the delta route, and writes no request. This is a
++   presentation gate only: the pure binding and receipt modules do not refuse on
++   the verdict, so an approval already signed over open findings keeps
++   verifying, and the stored-approval and rebind readers are unchanged.
++3. **Decision Z is kept.** A source change after a passing delta round is still
++   carried as `unreviewedSourceDelta`, which the PO signs knowingly; it now
++   applies after any delta round (round 2 or later), not only after round 2.
++   After an initial round alone the same drift stays a review-chain refusal.
++4. **Reviewer model:** the PO also chose that the receipt's reviewer model is
++   host-observed from the review dispatch; that part is built separately and is
++   not decided by this amendment.
++
++Bindings over one or two receipts are byte-identical to before.
+diff --git a/docs/state.md b/docs/state.md
+index 1688d807ac5f49e7c8cd460d5a6bbdfee24ff62d..afe6be276bba563d0d432f0b7570049d597a3eb3 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -27,6 +27,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0090](adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md) accepted 2026-11-10 (PO tiles, D237 to D239):** the close exports the Critic reports, one follow-up commit carries the proof and the final records after any signed push, and a release includes its push. Built in candidate 27; never run on a real repository or a real signature.
+ **[ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) accepted 2026-11-11 (PO tiles, D240):** the feature close checks or writes the SBOM (CycloneDX 1.6 and SPDX 2.3 from pinned lockfiles, or an explicit `not-applicable`) and the audit bundle carries it; `stale`, `invalid`, `partial` and `unsupported` stop the close unless the PO's signed override for exactly those findings is recorded. Built in candidate 28c for npm, Python, Go and Rust; the amendment of 2026-11-12 (PO tiles) adds the other common lockfiles and Maven by pom plus CycloneDX in candidate 28d. Never run on a real repository. Candidate 28e corrects the readers after the Advisor review and adds `packages.config` (PO tile 2026-11-12, D243).
+ **[ADR-0092](adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) accepted 2026-11-12 (PO tiles, D241):** one tool registry feeds `docs/toolchain.md`, the preflight floors and the readiness findings; required on every machine: Node.js, Git, gitleaks, osv-scanner, semgrep (Trivy only with infrastructure files, with its adapter), OpenSSL where the PO signs; onboarding asks for a missing one, the person installs it or defers it, the deferral is recorded on the machine and lifts no check. Built in candidate 28e, never run in a real onboarding. **[ADR-0093](adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md) accepted 2026-11-12 (PO tile, D242):** a Semgrep finding at a blocking severity blocks only when the feature introduced it (a second `--baseline-commit` pass against the start of the active or last closed feature's range, in its own worktree); older findings are listed, not blocking; any doubt falls back to blocking everything, labelled. Built in candidate 28e, never run on a consumer repository. **[ADR-0094](adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md) accepted 2026-11-12 (PO tile, D244):** the offline Semgrep default pack gains 61 `pipeline-<language>-<class>` rules for Java, C#, Python, Go, JavaScript/TypeScript, Kotlin, PHP and Ruby; SQL and command injection, insecure deserialization, disabled TLS verification, XXE, path traversal and SSRF are ERROR and block, weak cryptography is WARNING; test-shaped paths are excluded, each rule has a firing and a quiet fixture. Built in candidate 28e; the false-positive rate on real Java/.NET code is unmeasured. **[ADR-0095](adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md) accepted 2026-11-13 (PO tiles, D245):** a Spec correction found by a Critic round during implementation is a separate file `specs/<feature>/spec-addendum-<NN>.md` whose header binds the approved Spec digest, the Critic packet and its findings; the Spec stays byte-identical, the criterion set may not change (that stays the PO's `reopen-design`); the PO approves each addendum in the `gates.human_approval` mode, the approval is committed evidence, the next Critic round is a delta round over it, and the Goldfish briefing, the close and the audit bundle read it. Built in candidate 28e, never run on a consumer repository.
++**[ADR-0085 amendment](adr/0085-one-review-one-signature-design-approval.md#amendment-2026-11-13-delta-rounds-until-pass-no-signature-over-an-open-review-d246) accepted 2026-11-13 (PO tiles, D246, Claude test run 3 finding L3):** design review delta rounds continue until a round passes (no round cap; 64 is only the structural chain bound), and `present-plan` refuses while the latest receipt leaves findings open (`PLAN-DESIGN-REVIEW-OPEN`); an approval already signed over open findings keeps verifying, and drift after any passing delta round stays a knowingly signed `unreviewedSourceDelta`. Built in candidate 29c; the host-observed reviewer model of the same tile is a separate slice.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.mjs b/plugins/pipeline-core/lib/design-approval-binding.mjs
+index de3dfe23b073920cf06ba1863ad3e8a8e8739fcc..87f0dd4e761bb3f6953c03cfa7a23d9189f1fdfc 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.mjs
+@@ -5,7 +5,7 @@
+  *
+  *   U  the binding carries the complete open-finding set of the latest review receipt
+  *      (empty on PASS), so the PO signs knowingly over open findings;
+- *   Z  after a round-2 (delta) receipt, later source drift is not a refusal: the binding
++ *   Z  after a delta receipt (any round from 2 on), later source drift is not a refusal: the binding
+  *      carries the CURRENT sources plus a visible `unreviewedSourceDelta`; after a round-1
+  *      receipt the same drift stays a review-chain refusal (decided by the U1 chain check);
+  *   T  a legacy design-workflow-package intent or record is told apart, never accepted here;
+@@ -51,8 +51,10 @@ const MAX_PATH_LENGTH = 240;
+ const MAX_COMPANIONS = 64;
+ const MAX_FINDING_IDS = 64;
+ const MAX_FINDING_ID_LENGTH = 80;
+-const MAX_RECEIPTS = 2;
+-const DELTA_ROUND = 2;
++// L3 (PO decision 2026-11-13, amending ADR-0085): delta rounds continue until the review passes. The bound is structural
++// (bounded input, the receipt module's DESIGN_REVIEW_MAX_ROUNDS), not a review policy; a binding over one or two receipts
++// is byte-identical to before, so every signed approval keeps verifying.
++const MAX_RECEIPTS = 64;
+ // Every bound path appears at most once per side (PRD, Spec and up to 64 companions).
+ const MAX_DELTA_ENTRIES = 2 * (MAX_COMPANIONS + 2);
+ 
+@@ -118,7 +120,7 @@ function isSourceSet(value) {
+     && (index === 0 || compareUnits(companions[index - 1].path, companion.path) < 0));
+ }
+ 
+-/** One to two entries, ascending rounds 1 and 2. */
++/** One to MAX_RECEIPTS entries, rounds ascending from 1 without a gap. */
+ function isReceiptList(value) {
+   if (!Array.isArray(value) || value.length < 1 || value.length > MAX_RECEIPTS) return false;
+   // K128: an entry may carry the closed `fallback` record of a receipt produced on the typed fallback route; otherwise it is exactly three keys.
+@@ -167,8 +169,8 @@ function isValidBinding(binding) {
+   // Decision U: the verdict is PASS exactly when no finding is open.
+   if ((binding.verdict === "pass") !== (binding.openFindingIds.length === 0)) return false;
+   if (Object.hasOwn(binding, "unreviewedSourceDelta")) {
+-    // Decision Z: only a round-2 (delta) receipt makes later source drift a knowingly signed delta.
+-    if (binding.reviewReceipts[binding.reviewReceipts.length - 1].round !== DELTA_ROUND) return false;
++    // Decision Z: only a delta receipt (round 2 or later) makes later source drift a knowingly signed delta.
++    if (binding.reviewReceipts[binding.reviewReceipts.length - 1].round < 2) return false;
+     if (!isUnreviewedDelta(binding.unreviewedSourceDelta, binding.sources)) return false;
+   }
+   if (Object.hasOwn(binding, "pathRebind") && !isPathRebind(binding.pathRebind, binding.sources)) return false;
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.test.mjs b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+index 4b29c0a4942ffefeb2b6b51466b869c44c224dff..42f015713385eff42ff86e49bc05122d5f26151f 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.test.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+@@ -405,13 +405,13 @@ test("U3-6d: an empty, unsorted or malformed unreviewedSourceDelta is DAB-SHAPE
+   assertRefusal(validateDesignApprovalBinding(notHex), "DAB-SHAPE");
+ });
+ 
+-test("U3-7: no receipts is DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-MISSING; three receipts with DCC-REVIEW-ROUND-EXCEEDED", () => {
++test("U3-7: no receipts is DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-MISSING; a repeated receipt breaks the chain (L3: no round cap, DCC-REVIEW-DELTA-CHAIN)", () => {
+   const scenario = deltaScenario();
+   const none = createDesignApprovalBinding({ featureId: FEATURE, receipts: [], currentSources: scenario.currentSources });
+   assertRefusal(none, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-RECEIPT-MISSING"]);
+   assert.deepStrictEqual(none.causes, chainCauses(FEATURE, [], scenario.currentSources));
+   const three = createDesignApprovalBinding({ featureId: FEATURE, receipts: asInput(scenario.first, scenario.second, scenario.second), currentSources: scenario.currentSources });
+-  assertRefusal(three, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-ROUND-EXCEEDED"]);
++  assertRefusal(three, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-DELTA-CHAIN"]);
+   assert.deepStrictEqual(three.causes, chainCauses(FEATURE, asInput(scenario.first, scenario.second, scenario.second), scenario.currentSources));
+ });
+ 
+@@ -427,6 +427,45 @@ test("U3-7b: the receipts are taken in chain order, so a reversed chain is DAB-R
+   assertRefusal(refusal, "DAB-REVIEW-CHAIN", chainCauses(FEATURE, reversed, scenario.currentSources));
+ });
+ 
++/** L3: a third round over the delta scenario (another Spec change), with the given open findings. */
++function thirdRoundScenario(openFindingIds, sources = sourcesWith({ spec: "spec-v3" })) {
++  const base = deltaScenario();
++  const made = createDesignReviewReceipt({
++    featureId: FEATURE, previous: { path: base.second.path, bytes: base.second.bytes }, sources, reviewer: REVIEWER,
++    report: { path: `${DIR}/review/design-review-3.md`, sha256: digestOf("report-3") }, openFindingIds, reviewedAt: "2026-10-07T12:00:00.000Z",
++  });
++  assert.equal(made.ok, true, `fixture: U2 must accept the round-3 receipt (${made.code})`);
++  const third = { path: `${DIR}/review/design-review-3.json`, bytes: made.bytes, sha256: made.sha256 };
++  return { ...base, third, receipts: [base.first, base.second, third], currentSources: sources };
++}
++
++test("L3: delta rounds until pass - a three-round chain binds with three ascending entries and the latest round's verdict", () => {
++  const passing = create(thirdRoundScenario([]));
++  assert.equal(passing.ok, true, JSON.stringify(passing));
++  assert.deepStrictEqual(passing.binding.reviewReceipts.map((entry) => entry.round), [1, 2, 3]);
++  assert.deepStrictEqual([passing.binding.verdict, passing.binding.openFindingIds], ["pass", []]);
++  const open = create(thirdRoundScenario(["F-4"]));
++  assert.equal(open.ok, true, JSON.stringify(open));
++  assert.deepStrictEqual([open.binding.verdict, open.binding.openFindingIds], ["open-findings", ["F-4"]], "the binding records the open set; the presentation gate, not the binding, refuses it");
++});
++
++test("L3 + decision Z: drift after a round-3 delta is carried as unreviewedSourceDelta, and a round-1-only binding still may not carry one", () => {
++  const scenario = { ...thirdRoundScenario([]), currentSources: sourcesWith({ spec: "spec-v4" }) };
++  const drifted = create(scenario);
++  assert.equal(drifted.ok, true, JSON.stringify(drifted));
++  assert.deepStrictEqual(drifted.binding.unreviewedSourceDelta.map((entry) => entry.path), [SPEC_PATH]);
++  assert.equal(validateDesignApprovalBinding(drifted.binding).ok, true);
++});
++
++test("PO 2026-11-09 + L3: a delta over unchanged sources that withdraws the open findings binds as pass with two entries", () => {
++  const sources = sourcesWith();
++  const first = initialReceipt(sources, ["F-1"]);
++  const second = deltaReceipt(first, sources, []);
++  const bound = createDesignApprovalBinding({ featureId: FEATURE, receipts: asInput(first, second), currentSources: sources });
++  assert.equal(bound.ok, true, JSON.stringify(bound));
++  assert.deepStrictEqual([bound.binding.verdict, bound.binding.reviewReceipts.length, Object.hasOwn(bound.binding, "unreviewedSourceDelta")], ["pass", 2, false]);
++});
++
+ test("U3-8: a featureId different from the receipts' (feat-y) is DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-BINDING, on create and on verify", () => {
+   const scenario = passScenario();
+   const refusal = createDesignApprovalBinding({ featureId: "feat-y", receipts: asInput(...scenario.receipts), currentSources: scenario.currentSources });
+diff --git a/plugins/pipeline-core/lib/design-consistency-check.mjs b/plugins/pipeline-core/lib/design-consistency-check.mjs
+index 07be85491957be4a94208f6b1aa0fdfc3be2d220..162e8c425530400de01550fc2f2c8f53440d1b64 100644
+--- a/plugins/pipeline-core/lib/design-consistency-check.mjs
++++ b/plugins/pipeline-core/lib/design-consistency-check.mjs
+@@ -5,7 +5,7 @@
+  *
+  *   W  the requirement register is reconciled against `traceability.md`;
+  *   Y  an undeclared register (no sidecar) is a visible skip, never a finding;
+- *   Z  after a round-2 (delta) review receipt, later source drift is a visible
++ *   Z  after a delta review receipt (round 2 or later), later source drift is a visible
+  *      `review.unreviewedSourceDelta` the PO may sign over knowingly; after a round-1
+  *      receipt the same drift stays a binding inconsistency.
+  *
+@@ -70,7 +70,11 @@ const REGISTER_IDS_MAX = 64;
+ const COMPANIONS_MAX = 64;
+ const FINDING_IDS_MAX = 64;
+ const SAFE_PATH_MAX = 240;
+-const MAX_REVIEW_ROUNDS = 2;
++// L3 (PO decision 2026-11-13, amending ADR-0085): delta rounds continue until the review passes; this is only the
++// structural bound on the chain length (the receipt module's DESIGN_REVIEW_MAX_ROUNDS), not a review policy.
++const MAX_REVIEW_ROUNDS = 64;
++// The optional summary key of a delta over unchanged documents that only withdraws earlier findings (PO decision 2026-11-09).
++const WITHDRAWN_KEY = "withdrawnFindingIds";
+ 
+ const INPUT_KEYS = ["submission", "prdBytes", "specBytes", "companions", "traceability", "register", "pathStates", "reviewReceipts"];
+ const SOURCES_ARGUMENT_KEYS = ["submission", "prdBytes", "specBytes", "companions", "pathStates"];
+@@ -217,7 +221,13 @@ function assertSourceSet(set, label, allowNull) {
+ function assertSummary(summary) {
+   // K128: `fallback` is the one optional key (present only when the review ran on the typed fallback route).
+   const hasFallback = isObject(summary) && Object.hasOwn(summary, "fallback");
+-  if (!hasExactKeys(summary, hasFallback ? [...SUMMARY_KEYS, "fallback"] : SUMMARY_KEYS)) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
++  const hasWithdrawn = isObject(summary) && Object.hasOwn(summary, WITHDRAWN_KEY);
++  if (!hasExactKeys(summary, [...SUMMARY_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : [])])) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
++  if (hasWithdrawn) {
++    const withdrawn = summary[WITHDRAWN_KEY];
++    if (summary.kind !== "delta" || !Array.isArray(withdrawn) || withdrawn.length === 0 || withdrawn.length > FINDING_IDS_MAX || !withdrawn.every(isRequirementId)
++      || new Set(withdrawn).size !== withdrawn.length || !Array.isArray(summary.openFindingIds) || withdrawn.some((id) => summary.openFindingIds.includes(id))) fail("a review receipt summary withdrawnFindingIds is malformed");
++  }
+   if (hasFallback && !(hasExactKeys(summary.fallback, ["observedIdentity", "reasonCode", "requestedRoute", "route"])
+     && Object.values(summary.fallback).every((value) => typeof value === "string"))) fail("a review receipt summary fallback is malformed");
+   if (typeof summary.path !== "string" || !isSha(summary.sha256)) fail("a review receipt summary path or digest is malformed");
+@@ -227,7 +237,7 @@ function assertSummary(summary) {
+   if (summary.kind === "initial") {
+     if (summary.round !== 1 || linkPath !== null || linkSha !== null) fail("an initial receipt summary is round 1 without a previous link");
+   } else if (summary.kind === "delta") {
+-    if (summary.round !== 2 || typeof linkPath !== "string" || !isSha(linkSha)) fail("a delta receipt summary is round 2 with a previous link");
++    if (!Number.isSafeInteger(summary.round) || summary.round < 2 || summary.round > MAX_REVIEW_ROUNDS || typeof linkPath !== "string" || !isSha(linkSha)) fail("a delta receipt summary is round 2 or later with a previous link");
+   } else {
+     fail("a review receipt summary kind must be initial or delta");
+   }
+@@ -368,21 +378,27 @@ function analyzeReviewChain(featureId, receipts, currentSources) {
+     entries.push(makeEntry("DCC-REVIEW-ROUND-EXCEEDED", { observed: String(receipts.length) }));
+     return { entries, stopped: true };
+   }
+-  const [first, second] = receipts;
++  const [first] = receipts;
+   if (first.kind !== "initial") entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN", { path: first.path }));
+-  if (second !== undefined) {
+-    const brokenLink = second.kind !== "delta"
+-      || second.previousReceiptSha256 !== first.sha256
+-      || second.previousReceiptPath !== first.path
+-      || second.sources.prd.path !== first.sources.prd.path
+-      || second.sources.spec.path !== first.sources.spec.path;
++  // L3: every later receipt is the delta of the one before it (round = position), linked by path and digest.
++  for (let index = 1; index < receipts.length; index += 1) {
++    const earlier = receipts[index - 1];
++    const later = receipts[index];
++    const brokenLink = later.kind !== "delta"
++      || later.round !== index + 1
++      || later.previousReceiptSha256 !== earlier.sha256
++      || later.previousReceiptPath !== earlier.path
++      || later.sources.prd.path !== earlier.sources.prd.path
++      || later.sources.spec.path !== earlier.sources.spec.path;
+     if (brokenLink) {
+-      entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN", { path: second.path, expected: first.sha256, observed: second.previousReceiptSha256 }));
++      entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN", { path: later.path, expected: earlier.sha256, observed: later.previousReceiptSha256 }));
+     }
+-    if (canonical(second.sources) === canonical(first.sources)) entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN"));
++    // Unchanged sources are a delta only when it withdraws findings of the round before and adds none (PO decision 2026-11-09);
++    // the receipt producer enforces that rule, this check only admits the closed record of it.
++    if (canonical(later.sources) === canonical(earlier.sources) && !Object.hasOwn(later, WITHDRAWN_KEY)) entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN"));
+   }
+   const latest = receipts[receipts.length - 1];
+-  // Decision Z: drift after a round-2 (delta) receipt is a visible delta, not an inconsistency.
++  // Decision Z: drift after a delta receipt (round 2 or later) is a visible delta, not an inconsistency.
+   // A byte-identical feature-directory rebind is accepted beside canonical equality, never instead of it.
+   if (latest.kind === "initial" && canonical(latest.sources) !== canonical(currentSources) && chainRebind(receipts, currentSources) === null) {
+     entries.push(makeEntry("DCC-REVIEW-RECEIPT-BINDING", {
+diff --git a/plugins/pipeline-core/lib/design-consistency-check.test.mjs b/plugins/pipeline-core/lib/design-consistency-check.test.mjs
+index 1d803160a195c687c83b42ad680ff616f732e157..8051423f7e89121b9f93b49b59def1c15e336f8d 100644
+--- a/plugins/pipeline-core/lib/design-consistency-check.test.mjs
++++ b/plugins/pipeline-core/lib/design-consistency-check.test.mjs
+@@ -94,6 +94,7 @@ function makeSummary({
+   previousPath,
+   previousSha,
+   reportSha,
++  round,
+ }) {
+   const delta = kind === "delta";
+   return {
+@@ -101,7 +102,7 @@ function makeSummary({
+     sha256: digestOf(`receipt-${n}`),
+     featureId,
+     kind,
+-    round: delta ? 2 : 1,
++    round: round ?? (delta ? 2 : 1),
+     previousReceiptPath: delta ? (previousPath ?? previous.path) : null,
+     previousReceiptSha256: delta ? (previousSha ?? previous.sha256) : null,
+     sources,
+@@ -551,16 +552,54 @@ test("U1-17: null or empty reviewReceipts yield exactly DCC-REVIEW-RECEIPT-MISSI
+   }
+ });
+ 
+-test("U1-18: three summaries yield DCC-REVIEW-ROUND-EXCEEDED with observed 3 and no chain finding", () => {
++test("L3: summaries above the structural bound of 64 yield DCC-REVIEW-ROUND-EXCEEDED with the count and no chain finding", () => {
+   const input = build({
+-    receipts: (current) => [1, 2, 3].map((n) => makeSummary({
+-      n, kind: "delta", sources: current, previousPath: `${DIR}/review/design-review-${n - 1}.json`, previousSha: digestOf(`receipt-${n - 1}`),
++    receipts: (current) => Array.from({ length: 65 }, (_, index) => index + 1).map((n) => makeSummary({
++      n, kind: "delta", round: Math.min(n + 1, 64), sources: current, previousPath: `${DIR}/review/design-review-${n - 1}.json`, previousSha: digestOf(`receipt-${n - 1}`),
+     })),
+   });
+   const result = checkDesignConsistency(input);
+-  assertInconsistent(result, [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "3" })]);
++  assertInconsistent(result, [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "65" })]);
+   assert.equal(result.review, null);
+-  assert.deepEqual(directChain(input), [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "3" })]);
++  assert.deepEqual(directChain(input), [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "65" })]);
++});
++
++test("L3: a three-round chain (initial, delta, delta) over changed sources is consistent and binds the latest round", () => {
++  const input = build({
++    receipts: (current) => {
++      const first = makeSummary({ n: 1, sources: withDigest(current, DESIGN_PATH, digestOf("design-r1")), verdict: "open-findings", openFindingIds: ["F-1"] });
++      const second = makeSummary({ n: 2, kind: "delta", round: 2, previous: first, sources: withDigest(current, DESIGN_PATH, digestOf("design-r2")), verdict: "open-findings", openFindingIds: ["F-2"] });
++      const third = makeSummary({ n: 3, kind: "delta", round: 3, previous: second, sources: current });
++      return [first, second, third];
++    },
++  });
++  assert.deepEqual(directChain(input), []);
++});
++
++test("L3: a later receipt whose round is not its chain position, or that links past its predecessor, is DCC-REVIEW-DELTA-CHAIN", () => {
++  const chain = (mutate) => build({
++    receipts: (current) => {
++      const first = makeSummary({ n: 1, sources: withDigest(current, DESIGN_PATH, digestOf("design-r1")), verdict: "open-findings", openFindingIds: ["F-1"] });
++      const second = makeSummary({ n: 2, kind: "delta", round: 2, previous: first, sources: withDigest(current, DESIGN_PATH, digestOf("design-r2")), verdict: "open-findings", openFindingIds: ["F-2"] });
++      return [first, second, mutate({ first, second, current })];
++    },
++  });
++  const skipped = chain(({ first, current }) => makeSummary({ n: 3, kind: "delta", round: 3, previous: first, sources: current }));
++  assert.ok(directChain(skipped).some((item) => item.code === "DCC-REVIEW-DELTA-CHAIN"), "links to round 1 instead of round 2");
++  const misnumbered = chain(({ second, current }) => makeSummary({ n: 3, kind: "delta", round: 4, previous: second, sources: current }));
++  assert.ok(directChain(misnumbered).some((item) => item.code === "DCC-REVIEW-DELTA-CHAIN"), "round 4 at position 3");
++});
++
++test("PO 2026-11-09 + L3: a delta over unchanged sources that withdraws findings is consistent; without the withdrawal it is DCC-REVIEW-DELTA-CHAIN", () => {
++  const input = (withdrawn) => build({
++    receipts: (current) => {
++      const first = makeSummary({ n: 1, sources: current, verdict: "open-findings", openFindingIds: ["F-1"] });
++      const second = makeSummary({ n: 2, kind: "delta", previous: first, sources: current });
++      return [first, withdrawn ? { ...second, withdrawnFindingIds: ["F-1"] } : second];
++    },
++  });
++  assert.deepEqual(directChain(input(true)), []);
++  assert.ok(directChain(input(false)).some((item) => item.code === "DCC-REVIEW-DELTA-CHAIN"));
+ });
+ 
+ // ---------------------------------------------------------------------------
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 762d43735f0b42301fe5d65282e0742ebf5a9b3d..25d51bfd43f30d7a5a09094a603a8080f2491706 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -5,8 +5,10 @@
+  * A receipt is the committed, byte-identical record of one design review round:
+  * which sources (PRD, Spec, companions) were reviewed, by which reviewer, against
+  * which report, and with which complete set of open findings. Round 1 is an
+- * `initial` receipt; round 2 is a `delta` receipt chained to round 1 by path and
+- * digest. There is no round 3 (DESIGN_REVIEW_MAX_ROUNDS).
++ * `initial` receipt; every later round is a `delta` receipt chained to the round before it
++ * by path and digest. Delta rounds continue until the review passes (PO decision 2026-11-13,
++ * L3, amending ADR-0085); DESIGN_REVIEW_MAX_ROUNDS is only the structural bound on the chain
++ * length (bounded input), not a review policy.
+  *
+  * The module is pure: no filesystem, no git, no clock (the caller supplies
+  * `reviewedAt` and every byte). Receipt bytes are exactly `canonical(receipt)` plus
+@@ -22,10 +24,9 @@ import { createHash } from "node:crypto";
+ import { canonical } from "./po-approval-proof.mjs";
+ 
+ export const DESIGN_REVIEW_RECEIPT_SCHEMA = "pipeline.design-review-receipt.v1";
+-export const DESIGN_REVIEW_MAX_ROUNDS = 2;
++export const DESIGN_REVIEW_MAX_ROUNDS = 64;
+ export const DESIGN_REVIEW_RECEIPT_MAX_BYTES = 65536;
+ 
+-const DELTA_ROUND = 2;
+ const MAX_COMPANIONS = 64;
+ const MAX_FINDING_IDS = 64;
+ const MAX_FINDING_ID_LENGTH = 80;
+@@ -204,7 +205,7 @@ function receiptRefusal(receipt) {
+   if (receipt.round > DESIGN_REVIEW_MAX_ROUNDS) return "DRR-ROUND-EXCEEDED";
+   const withoutPrevious = previousReceiptPath === null && previousReceiptSha256 === null;
+   const withPrevious = previousReceiptPath !== null && previousReceiptSha256 !== null;
+-  const consistent = receipt.kind === "initial" ? receipt.round === 1 && withoutPrevious : receipt.round === DELTA_ROUND && withPrevious;
++  const consistent = receipt.kind === "initial" ? receipt.round === 1 && withoutPrevious : receipt.round >= 2 && withPrevious;
+   return consistent ? null : "DRR-KIND-ROUND";
+ }
+ 
+@@ -212,7 +213,7 @@ function receiptRefusal(receipt) {
+ 
+ /**
+  * Parse receipt file bytes. Refusal order: SIZE, JSON, NONCANONICAL, SHAPE, PATH, SOURCES,
+- * FINDING-IDS, VERDICT, ROUND-EXCEEDED (round above 2), KIND-ROUND.
++ * FINDING-IDS, VERDICT, ROUND-EXCEEDED (round above the structural bound), KIND-ROUND.
+  * @param {Uint8Array} bytes
+  * @returns {{ ok: true, receipt: object, sha256: string } | { ok: false, code: string }}
+  */
+@@ -335,7 +336,7 @@ export function assessSpecDecisionContinuity(specBytes) {
+ /**
+  * Build a receipt and its canonical bytes. Sorts finding IDs and companions (code-unit order),
+  * rejects duplicates, derives the verdict. `previous: null` makes an initial receipt;
+- * `previous: { path, bytes }` makes the round-2 delta receipt chained to it.
++ * `previous: { path, bytes }` makes the next delta receipt (previous round plus one) chained to it.
+  * @returns {{ ok: true, receipt: object, bytes: Uint8Array, sha256: string } | { ok: false, code: string }}
+  */
+ export function createDesignReviewReceipt(input) {
+@@ -384,7 +385,7 @@ export function createDesignReviewReceipt(input) {
+       withdrawnFindingIds = withdrawn;
+     }
+     kind = "delta";
+-    round = DELTA_ROUND;
++    round = earlier.round + 1;
+     previousReceiptPath = previous.path;
+     previousReceiptSha256 = parsed.sha256;
+   }
+@@ -459,19 +460,20 @@ export function summarizeDesignReviewReceipt(input) {
+ /**
+  * Compare the sources a receipt was written against with the current sources. Equal canonical
+  * forms pass. Any difference (digest, path, added, removed or absent companion) is
+- * DRR-SOURCE-DRIFT; `nextRound` is 2 after an initial receipt and null after a delta (PO-Q2
+- * option b leaves this module unchanged). Malformed input drifts rather than passes.
++ * DRR-SOURCE-DRIFT; `nextRound` is the receipt's round plus one (L3: a delta may follow any
++ * round), null for a malformed summary or at the structural bound. Malformed input drifts
++ * rather than passes.
+  *
+  * Purpose: a strict "does this receipt still describe the current sources" check. It is NOT
+  * what `present-plan` uses: after a delta receipt, `createDesignApprovalBinding`
+  * (design-approval-binding.mjs) carries a later source change into the approval as
+- * `unreviewedSourceDelta` for the PO to sign knowingly, so `nextRound: null` is not a dead end.
+- * @returns {{ ok: true } | { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 2 | null }}
++ * `unreviewedSourceDelta` for the PO to sign knowingly (decision Z, kept by L3).
++ * @returns {{ ok: true } | { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: number | null }}
+  */
+ export function checkDesignReviewReceiptSources(input) {
+   const summary = isObject(input) ? input.summary : undefined;
+   const currentSources = isObject(input) ? input.currentSources : undefined;
+   if (isObject(summary) && sameSources(summary.sources, currentSources)) return { ok: true };
+-  const afterInitial = isObject(summary) && summary.kind === "initial" && summary.round === 1;
+-  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: afterInitial ? DELTA_ROUND : null };
++  const round = isObject(summary) && Number.isSafeInteger(summary.round) && summary.round >= 1 ? summary.round : null;
++  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: round !== null && round < DESIGN_REVIEW_MAX_ROUNDS ? round + 1 : null };
+ }
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.test.mjs b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+index 69089c8a587b9bcc7678893440254047ed6f188f..93be1e39a550bbb27d552a7d265c3dc39668453f 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+@@ -145,7 +145,8 @@ const SAFE_240 = `specs/${"a".repeat(231)}.md`;
+ 
+ test("U2-1: exports the contract constants and the four functions", () => {
+   assert.equal(DESIGN_REVIEW_RECEIPT_SCHEMA, "pipeline.design-review-receipt.v1");
+-  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 2);
++  // L3 (PO decision 2026-11-13): delta rounds until pass; the constant is the structural chain bound only.
++  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 64);
+   assert.equal(DESIGN_REVIEW_RECEIPT_MAX_BYTES, 65536);
+   for (const fn of [createDesignReviewReceipt, parseDesignReviewReceipt, summarizeDesignReviewReceipt, checkDesignReviewReceiptSources]) {
+     assert.equal(typeof fn, "function");
+@@ -512,8 +513,9 @@ test("U2-10: a consistent initial and a consistent delta parse", () => {
+   assert.equal(parse(deltaObject()).ok, true);
+ });
+ 
+-test("U2-10: a round above 2 is DRR-ROUND-EXCEEDED at parse", () => {
+-  for (const round of [3, 4, 99]) {
++test("L3: a delta of any round from 2 up to the structural bound parses; above it is DRR-ROUND-EXCEEDED", () => {
++  for (const round of [3, 4, 64]) assert.equal(parse(deltaObject({ round })).ok, true, `round ${round}`);
++  for (const round of [65, 99]) {
+     assert.deepStrictEqual(parse(deltaObject({ round })), refuse("DRR-ROUND-EXCEEDED"), `round ${round}`);
+   }
+ });
+@@ -613,19 +615,31 @@ test("PO 2026-11-09: a delta over changed sources carries no withdrawal field",
+ 
+ // ------------------------------------------------------------------ U2-13
+ 
+-test("U2-13: a delta on a delta is DRR-ROUND-EXCEEDED, even when the sources changed", () => {
++test("L3: a delta on a delta is round 3, chained to round 2 (delta rounds until pass)", () => {
+   const previous = previousOf(deltaObject(), RECEIPT2_PATH);
+   const sources = sourcesWith((s) => { s.companions[0].sha256 = sha("design-3"); }, SOURCES_2);
+   const report = { path: "specs/feat-x/review/design-review-3.md", sha256: sha("report-3") };
+-  assert.deepStrictEqual(create({ previous, sources, report }), refuse("DRR-ROUND-EXCEEDED"));
++  const result = create({ previous, sources, report });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.deepStrictEqual([result.receipt.kind, result.receipt.round, result.receipt.previousReceiptPath, result.receipt.previousReceiptSha256],
++    ["delta", 3, RECEIPT2_PATH, sha(previous.bytes)]);
+ });
+ 
+-test("U2-13: ROUND-EXCEEDED is decided before the chain and unchanged checks of create", () => {
++test("L3: a delta on a round-2 receipt keeps the chain and unchanged checks of create", () => {
+   const report = { path: "specs/feat-x/review/design-review-3.md", sha256: sha("report-3") };
+   const otherFeature = previousOf(deltaObject({ featureId: "feat-y" }), RECEIPT2_PATH);
+-  assert.deepStrictEqual(create({ previous: otherFeature, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"), "previous is a round-2 receipt of another feature");
++  assert.deepStrictEqual(create({ previous: otherFeature, sources: clone(SOURCES_2), report }), refuse("DRR-DELTA-CHAIN"), "previous is a round-2 receipt of another feature");
+   const identical = previousOf(deltaObject(), RECEIPT2_PATH);
+-  assert.deepStrictEqual(create({ previous: identical, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"), "previous is a round-2 receipt over identical sources");
++  assert.deepStrictEqual(create({ previous: identical, sources: clone(SOURCES_2), report, openFindingIds: ["F-3"] }), refuse("DRR-DELTA-UNCHANGED"), "previous is a round-2 receipt over identical sources, nothing withdrawn");
++  const withdrawn = create({ previous: identical, sources: clone(SOURCES_2), report, openFindingIds: [] });
++  assert.equal(withdrawn.ok, true, JSON.stringify(withdrawn));
++  assert.deepStrictEqual([withdrawn.receipt.round, withdrawn.receipt.verdict, withdrawn.receipt.withdrawnFindingIds], [3, "pass", ["F-3"]], "a round-3 delta over identical sources may withdraw round 2's finding");
++});
++
++test("L3: only a receipt at the structural bound refuses a further round (DRR-ROUND-EXCEEDED, before the chain checks)", () => {
++  const report = { path: "specs/feat-x/review/design-review-65.md", sha256: sha("report-65") };
++  const atBound = previousOf(deltaObject({ round: 64, featureId: "feat-y" }), RECEIPT2_PATH);
++  assert.deepStrictEqual(create({ previous: atBound, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"));
+ });
+ 
+ // ------------------------------------------------------------------ U2-14
+@@ -692,12 +706,14 @@ test("U2-15: drift after an initial receipt is DRR-SOURCE-DRIFT with nextRound 2
+   }
+ });
+ 
+-test("U2-15: drift after a delta is DRR-SOURCE-DRIFT with nextRound null (PO-Q2 option b leaves U2 unchanged)", () => {
++test("L3: drift after a delta is DRR-SOURCE-DRIFT with the next round (round plus one); at the structural bound nextRound is null", () => {
+   const summary = summaryOf(deltaObject(), RECEIPT2_PATH);
+   assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: clone(SOURCES_2) }), { ok: true });
+   const drifted = sourcesWith((s) => { s.companions[0].sha256 = sha("design-9"); }, SOURCES_2);
+-  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: drifted }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: null });
+-  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: clone(SOURCES_1) }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: null });
++  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: drifted }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 3 });
++  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: clone(SOURCES_1) }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 3 });
++  const atBound = summaryOf(deltaObject({ round: 64 }), RECEIPT2_PATH);
++  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary: atBound, currentSources: drifted }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: null });
+ });
+ 
+ // ------------------------------------------------------------------ U2-16
+@@ -822,7 +838,7 @@ test("U2-18: summarize passes the parse refusal code through", () => {
+     [Buffer.from(`${JSON.stringify(initialObject(), null, 2)}\n`), "DRR-NONCANONICAL"],
+     [bytesOf(initialObject({ dispatchId: "d-1" })), "DRR-SHAPE"],
+     [bytesOf(initialObject({ verdict: "pass", openFindingIds: ["F-3"] })), "DRR-VERDICT"],
+-    [bytesOf(deltaObject({ round: 3 })), "DRR-ROUND-EXCEEDED"],
++    [bytesOf(deltaObject({ round: 65 })), "DRR-ROUND-EXCEEDED"],
+   ];
+   for (const [bytes, code] of cases) {
+     assert.deepStrictEqual(summarizeDesignReviewReceipt({ path: RECEIPT1_PATH, bytes }), refuse(code), code);
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 514dd995a2f652336e679141a2917743e4820a31..7a31feeffc3d11c0b41e1cdb16e148cede2ed8a9 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -14,6 +14,10 @@ import * as SANCTIONED_CONSTANTS from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath } from "../path-spelling.mjs";
+ 
++// The structural bound of a design review chain (DESIGN_REVIEW_MAX_ROUNDS of lib/design-review-receipt.mjs, kept as a literal so the
++// guard's import closure does not grow; lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs pins the two equal).
++export const REVIEW_CHAIN_MAX_RECEIPTS = 64;
++
+ export function sanctionedSessionCriticFinalizerArgs(allArgs, root) {
+   // C28c: a trailing `--stage` on `finalize` (stage exactly the printed lineage commitPaths, never commit) is judged on the form before it.
+   const args = allArgs[0] === "finalize" && allArgs.length === 6 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
+@@ -453,10 +457,11 @@ export function sanctionedPipelineStateArgs(args, root) {
+     });
+   }
+   if (args[0] === "materialize-architecture") return args.length === 1;
+-  // Late binding step 4: `prepare-seal` writes only the seal plan file (never State), idempotent. It takes up to two readiness review
+-  // receipts (the same closed path rule as present-plan) to check them against the bytes being sealed.
++  // Late binding step 4: `prepare-seal` writes only the seal plan file (never State), idempotent. It takes the readiness review
++  // receipts of the chain (the same closed path rule as present-plan) to check them against the bytes being sealed.
++  // L3 (PO decision 2026-11-13): delta rounds until pass, so the chain is bounded only structurally (DESIGN_REVIEW_MAX_ROUNDS).
+   if (args[0] === "prepare-seal") {
+-    if (args.length !== 1 && args.length !== 3 && args.length !== 5) return false;
++    if (args.length % 2 !== 1 || args.length > 1 + 2 * REVIEW_CHAIN_MAX_RECEIPTS) return false;
+     const receipts = new Set();
+     for (let index = 1; index < args.length; index += 2) {
+       if (args[index] !== "--review-receipt" || receipts.has(args[index + 1]) || !designReviewReceiptPath(args[index + 1], root)) return false;
+@@ -520,7 +525,7 @@ export function sanctionedPipelineStateArgs(args, root) {
+   }
+   if (args[0] === "present-plan") {
+     if (args[1] !== "--by" || !validBy(args[2]) || args[2].startsWith("--")
+-      || ![3, 5, 7].includes(args.length)) return false;
++      || args.length < 3 || args.length % 2 !== 1 || args.length > 3 + 2 * REVIEW_CHAIN_MAX_RECEIPTS) return false;
+     const receipts = new Set();
+     for (let index = 3; index < args.length; index += 2) {
+       if (args[index] !== "--review-receipt" || receipts.has(args[index + 1])
+diff --git a/plugins/pipeline-core/lib/implementation-entry-gate.mjs b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+index 2703745e44cb9cb403d0da47eb404a775565c1d4..33037c8130cddbea82ab1da234fe819bb803a2ca 100644
+--- a/plugins/pipeline-core/lib/implementation-entry-gate.mjs
++++ b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+@@ -55,10 +55,12 @@ const REPEAT_REVIEW = "Run the design review for the current committed bytes (a
+ 
+ /** The repair for a known code. Agent work, repository-relative, and never a reopen-design for something a draft can still fix. */
+ const REPAIRS = new Map([
+-  ["DCC-REVIEW-RECEIPT-MISSING", "Pass one or two receipts: present-plan --by <name> --review-receipt <repo-relative-json-path>. A receipt comes from design-review-receipt.mjs create, never by hand."],
++  ["DCC-REVIEW-RECEIPT-MISSING", "Pass every receipt of the review chain, initial first: present-plan --by <name> --review-receipt <repo-relative-json-path> (repeat the flag per receipt). A receipt comes from design-review-receipt.mjs create, never by hand."],
+   ["DCC-REVIEW-RECEIPT-BINDING", REPEAT_REVIEW],
+-  ["DCC-REVIEW-DELTA-CHAIN", "Create the later receipt with --previous <the earlier receipt>, then pass both in order."],
+-  ["DCC-REVIEW-ROUND-EXCEEDED", "At most two review rounds bind one approval: keep the initial receipt and the last delta receipt."],
++  ["DCC-REVIEW-DELTA-CHAIN", "Create each later receipt with --previous <the receipt of the round before>, then pass the whole chain in order, initial first."],
++  // L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round, as often as needed.
++  ["PLAN-DESIGN-REVIEW-OPEN", "Correct the PRD or Spec for the open findings named here (commit; after submit-plan the PRD/Spec drift repairs apply: run submit-plan again), then run a delta readiness review: a fresh pipeline-core:readiness-reviewer that reads only these findings and what changed. Create its receipt with design-review-receipt.mjs create --previous <the last receipt> (a delta over unchanged documents may only withdraw findings), commit it, and run present-plan again with every receipt of the chain, initial first."],
++  ["DCC-REVIEW-ROUND-EXCEEDED", "The review chain is above the structural bound of 64 rounds: start a new initial review of the current sources and pass that chain."],
+   ["DCC-PATH-UNSAFE", "The bound path must be a regular repository file; restore it or remove it from the receipt's companions."],
+   ["DCC-PATH-IGNORED", "A bound file must be committed, so it cannot live under a git-ignored directory: move it into the feature folder specs/<feature>/, update the reference, commit, and create the receipt again."],
+   ["DCC-PATH-UNTRACKED", `Stage this file. ${COMMIT_THEN_REPEAT}`],
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index b18137081697c2d2f3a7b03088ca95cf80fa6bf1..97c4c8467e811284ed965bf1f1e93c04d543903f 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -133,12 +133,19 @@ function mirrorSanctionedArgs(patch) {
+   return { file, dir };
+ }
+ 
+-test("AC-123 present-plan: one and two distinct review receipts are admitted by the real guard in design phase", () => {
++test("L3: the guard's review-chain bound is the receipt module's structural bound", async () => {
++  const { REVIEW_CHAIN_MAX_RECEIPTS } = await import("../guard/sanctioned-args-scripts.mjs");
++  const { DESIGN_REVIEW_MAX_ROUNDS } = await import("../design-review-receipt.mjs");
++  assert.equal(REVIEW_CHAIN_MAX_RECEIPTS, DESIGN_REVIEW_MAX_ROUNDS);
++});
++
++test("AC-123 present-plan: one, two and (L3, delta rounds until pass) three distinct review receipts are admitted by the real guard in design phase", () => {
+   withFixture("feature", f => {
+-    const r1 = receipt(f, "review-1"); const r2 = receipt(f, "review-2");
++    const r1 = receipt(f, "review-1"); const r2 = receipt(f, "review-2"); const r3 = receipt(f, "review-3");
+     const one = stateAction("present-plan", "--by", "Fixture", "--review-receipt", r1);
+     const two = stateAction("present-plan", "--by", "Fixture", "--review-receipt", r1, "--review-receipt", r2);
+-    for (const action of [one, two]) {
++    const three = stateAction("present-plan", "--by", "Fixture", "--review-receipt", r1, "--review-receipt", r2, "--review-receipt", r3);
++    for (const action of [one, two, three]) {
+       assert.equal(admitted(action, f), true, JSON.stringify(action.argv));
+       assert.equal(guardCode(action, f), 0);
+     }
+@@ -149,11 +156,12 @@ test("AC-123 present-plan: one and two distinct review receipts are admitted by
+ 
+ test("AC-123 present-plan: admission stays narrow (no broad grammar relaxation)", () => {
+   withFixture("feature", f => {
+-    const r1 = receipt(f, "review-1"); const r2 = receipt(f, "review-2"); const r3 = receipt(f, "review-3");
++    const r1 = receipt(f, "review-1");
++    const aboveBound = Array.from({ length: 65 }, (_, index) => receipt(f, `bound-${index}`));
+     writeFileSync(join(f.root, "evidence/not-json.txt"), "x");
+     const rr = path => ["--review-receipt", path];
+     const refusals = [
+-      ["three receipts", ["--by", "F", ...rr(r1), ...rr(r2), ...rr(r3)]],
++      ["65 receipts, above the structural bound", ["--by", "F", ...aboveBound.flatMap(rr)]],
+       ["duplicate receipt", ["--by", "F", ...rr(r1), ...rr(r1)]],
+       ["missing receipt file", ["--by", "F", ...rr("evidence/absent.json")]],
+       ["non-json receipt", ["--by", "F", ...rr("evidence/not-json.txt")]],
+@@ -174,13 +182,13 @@ test("AC-123 present-plan: admission stays narrow (no broad grammar relaxation)"
+ });
+ 
+ test("AC-123 present-plan RED: a scratch mirror with widened receipt count admits what production refuses", async () => {
+-  withFixture("feature", f => {
+-    const r = ["a", "b", "c"].map(n => receipt(f, `red-${n}`));
++  return withFixture("feature", f => {
++    const r = Array.from({ length: 65 }, (_, index) => receipt(f, `red-${index}`));
+     const argv = ["present-plan", "--by", "F", ...r.flatMap(p => ["--review-receipt", p])];
+-    const mirror = mirrorSanctionedArgs(s => s.replace("![3, 5, 7].includes(args.length)", "![3, 5, 7, 9].includes(args.length)"));
++    const mirror = mirrorSanctionedArgs(s => s.replace("export const REVIEW_CHAIN_MAX_RECEIPTS = 64;", "export const REVIEW_CHAIN_MAX_RECEIPTS = 65;"));
+     return import(pathToFileURL(mirror.file).href).then(mod => {
+       try {
+-        assert.equal(mod.sanctionedPipelineStateArgs(argv, f.root), true, "mutant mirror must admit three receipts");
++        assert.equal(mod.sanctionedPipelineStateArgs(argv, f.root), true, "mutant mirror must admit 65 receipts");
+         assert.equal(admitted(node([stateScript, ...argv]), f), false, "production must refuse the same argv");
+       } finally { rmSync(mirror.dir, { recursive: true, force: true }); }
+     });
+diff --git a/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs b/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs
+index fe31a3cd043e96974b9b7a151658f8e81a4955cd..ac014ae753a03951a599f4f136d1dd8a163729ab 100644
+--- a/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs
+@@ -169,7 +169,7 @@ test("A8 legacy repair consumers stay exported and callable (nothing deleted, no
+ // revision (delta receipt, rebind, one request) is pinned by revised-native-design-cannot-reach-a-new-advisor-course (v);
+ // command admission of the initial and delta receipt spellings by the D64 walk (lifecycle-coordination-commands-refused-as-
+ // implementation-writes). What neither runs is the whole revision chain through the real guards: reopen-design, submit-plan,
+-// the delta receipt producer, and the present-plan that carries BOTH receipts (the CLI accepts one or two).
++// the delta receipt producer, and the present-plan that carries BOTH receipts (the CLI accepts the whole chain, L3).
+ // Real lifecycle-ready guard plus real dev-plan shell lane; the recording seam answers `ineligible`, so a refusal is a refusal.
+ async function revisionChainSteps(f, hooks, { receiptCount }) {
+   const { PIPELINE_STATE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT } = await import("../guard/constants.mjs");
+@@ -223,11 +223,12 @@ test("A10 revision path (single-review route): the reopen-design preview, submit
+     assert.deepEqual(admitted.filter((s) => s.code !== 0 || s.lane !== null).map((s) => `${s.label}: guard exit ${s.code}${s.lane ? `, lane ${s.lane}` : ""}; ${s.stderr}`), [],
+       "a revision-path command is refused by a real guard");
+     assert.equal(admitted.length, 4);
+-    // Control: the CLI takes one or two receipts; a third is not part of the route and must not be admitted by the same lane.
++    // L3 (PO decision 2026-11-13, delta rounds until pass): a third receipt is part of the route, so the guards admit the argv
++    // shape; whether the three files form a chain is the writer's check (DCC-REVIEW-DELTA-CHAIN, design-consistency-check.test.mjs).
+     const g = hooks.fixture("feature");
+     try {
+       const three = await revisionChainSteps(g, hooks, { receiptCount: 3 });
+-      assert.equal(three.at(-1).code !== 0 || three.at(-1).lane !== null, true, "present-plan with a third receipt is refused");
++      assert.deepEqual([three.at(-1).code, three.at(-1).lane], [0, null], `present-plan with a third receipt is admitted by the guards: ${three.at(-1).stderr}`);
+     } finally { g.cleanup(); }
+   } finally { f.cleanup(); }
+ });
+diff --git a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+index 68dd9b4c7d5dd3c40c448f739479dcf6d922e05b..2378a7b2069419c549c21920a65a681c93c72c74 100644
+--- a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+@@ -62,8 +62,8 @@ test("D64 criterion parser (RED mirror): the located-row check is meaningful, a
+   assert.notDeepEqual(scanAcceptedCriterionRows(THREE_COLUMN), scanAcceptedCriterionRows(FOUR_COLUMN));
+ });
+ 
+-test("D64 review chain: the spent-round count follows the chain, not the file names; a third round is refused under any name", () => {
+-  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 2);
++test("D64 review chain: the round count follows the chain, not the file names; the third round is round 3 under any name (L3)", () => {
++  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 64);
+   const r1 = receipt("spec-v1", null, "specs/f1/report-a.md", ["F-ONE"]);
+   const r2 = receipt("spec-v2", { path: "specs/f1/anything-but-round-two.json", bytes: r1.bytes }, "specs/f1/report-b.md");
+   assert.deepEqual([r2.receipt.kind, r2.receipt.round], ["delta", 2]);
+@@ -71,7 +71,7 @@ test("D64 review chain: the spent-round count follows the chain, not the file na
+     featureId: "f1", previous: { path: "specs/f1/receipt-1.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
+     report: ref("specs/f1/report-c.md", "c"), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z",
+   });
+-  assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
++  assert.deepEqual([third.ok, third.receipt?.kind, third.receipt?.round], [true, "delta", 3]);
+ });
+ 
+ test("D64 review chain (RED mirror): a producer given a predecessor derives round 2 from the chain, the caller cannot label it 'initial'", () => {
+diff --git a/plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs b/plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs
+index 1a57553c1040ab2bed23964659bd9dd52409bc87..ef09688bf644ce881ef5ebbbf7e8008efde62a38 100644
+--- a/plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Regression pin: pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review (AC-155).
+-// The ordinary design phase needs exactly one review receipt (at most one delta follow-up), no mandatory
++// The ordinary design phase needs exactly one review receipt (delta follow-ups until it passes: L3, PO 2026-11-13), no mandatory
+ // Advisor stage and no readiness ceremony; the design course is retired; the signed object carries only
+ // the review chain. Real modules, no mocks of the behavior under test.
+ import assert from "node:assert/strict";
+@@ -50,17 +50,21 @@ test("one review receipt is enough: a single PASS receipt yields a binding with
+   for (const forbidden of ["advisor", "readiness", "course", "exception"]) assert.equal(text.includes(forbidden), false, forbidden);
+ });
+ 
+-test("the review is capped at one initial plus at most one delta follow-up; a third round is refused", () => {
+-  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 2);
++test("L3: one initial review, then delta follow-ups until it passes; only the structural bound (64) caps the chain", () => {
++  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 64);
+   const r1 = receipt("spec-v1", null, ["F-ONE"]);
+-  const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes });
++  const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, ["F-TWO"]);
+   assert.equal(r2.receipt.kind, "delta");
+   assert.equal(r2.receipt.round, 2);
+   const third = createDesignReviewReceipt({
+     featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
+     report: ref("specs/f1/review-3.md", "r3"), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z",
+   });
+-  assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
++  assert.deepEqual([third.ok, third.receipt?.kind, third.receipt?.round, third.receipt?.verdict], [true, "delta", 3, "pass"]);
++  const binding = createDesignApprovalBinding({ featureId: "f1", currentSources: sources("spec-v3"), receipts: [
++    { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, { path: "specs/f1/receipt-3.json", bytes: third.bytes }] });
++  assert.equal(binding.ok, true, JSON.stringify(binding));
++  assert.equal(binding.binding.verdict, "pass");
+ });
+ 
+ test("one PO approval request is built from receipts alone (no Advisor record, no readiness evidence) and re-verifies", () => {
+@@ -133,15 +137,15 @@ test("RED mirror (request re-verifies): a request verified against drifted sourc
+   assert.equal(verifyDesignApprovalRequest({ request: request.request, featureId: "f1", receipts, currentSources: sources("spec-v2") }).ok, false);
+ });
+ 
+-test("RED mirror (round cap): the cap is exactly two, so a zero-finding second round never turns into an unbounded loop", () => {
++test("RED mirror (no endless loop without progress): a later round over unchanged documents that withdraws nothing is refused", () => {
+   const r1 = receipt("spec-v1", null, ["F-ONE"]);
+   const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, ["F-ONE"]);
+   const third = createDesignReviewReceipt({
+-    featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
++    featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v2"), reviewer,
+     report: ref("specs/f1/review-3.md", "r3"), openFindingIds: ["F-ONE"], reviewedAt: "2026-10-11T00:00:00.000Z",
+   });
+   assert.equal(third.ok, false);
+-  assert.equal(third.code, "DRR-ROUND-EXCEEDED");
++  assert.equal(third.code, "DRR-DELTA-UNCHANGED");
+ });
+ 
+ test("RED mirror (course retired): no runner value revives the multi-stage course", () => {
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs
+index 94f23aace4f05dbeaa53228634cea3cc4f4bc664..a6f8845be8fdf06f75d4fd1c19441c3a9e715cec 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs
+@@ -45,7 +45,7 @@ const course = () => readFileSync(here("../../skills/pipeline-start/references/d
+ test("order: agent submits the plan mechanically, one review, one final PO decision; retired DWP/Advisor-course routes are not recovery", () => {
+   const text = course();
+   assert.match(text, /mechanical agent work, not another PO permission/u);
+-  assert.match(text, /one independent design review, at most one delta/u);
++  assert.match(text, /one independent design review, delta follow-ups\s+until it passes/u);
+   assert.match(text, /one final PO decision/u);
+   assert.match(text, /DWP-PRESENT-RETIRED/u);
+   assert.match(text, /There is no\s+mandatory initial Advisor course/u);
+@@ -73,7 +73,7 @@ test("evidence reuse and current-source binding: an unchanged receipt is reused
+   assert.match(course(), /The approval binding must be rebuilt after material source or review drift/u);
+ });
+ 
+-test("bounded course with one final gate: one review receipt builds the single approval request, a third round is refused", () => {
++test("one final gate: one review receipt builds the single approval request; a third round is a delta until pass (L3)", () => {
+   const r1 = receipt("spec-v1");
+   const receipts = [{ path: "specs/f1/receipt-1.json", bytes: r1.bytes }];
+   const binding = createDesignApprovalBinding({ featureId: "f1", receipts, currentSources: sources("spec-v1") });
+@@ -85,7 +85,7 @@ test("bounded course with one final gate: one review receipt builds the single a
+     featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
+     report: ref("specs/f1/review-3.md", "r3"), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z",
+   });
+-  assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
++  assert.deepEqual([third.ok, third.receipt?.round], [true, 3]);
+ });
+ 
+ test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 and decisions D25/D121 (outside 0.7.0, no new schema before the test candidate); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {
+diff --git a/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs b/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs
+index e5b44cb30f23160c1d3c89d36b348775ba9ce304..510481085e5c4026c434e7e6a9e46e1fa47f1f72 100644
+--- a/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs
++++ b/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs
+@@ -260,8 +260,8 @@ function assertSingleStepRevision(bind,t){
+ 
+ test('(v) a design revision on the replacement route is one delta receipt and one rebind with zero PO interactions',t=>{
+  const {f,receipts,sources2,rebound}=assertSingleStepRevision(input=>createDesignApprovalBinding(input),t);
+- // Does not loop: a further edit after the delta review is carried as an unreviewed delta in the SAME binding step,
+- // and a third review round is refused (QG-13) instead of being asked for.
++ // Does not loop: a further edit after the delta review is carried as an unreviewed delta in the SAME binding step.
++ // L3 (PO 2026-11-13): a third review round is admitted (delta rounds until pass), never demanded by the binding.
+  f.put('specs/f1/design.md','Design v2 (edited after the delta review)\n');
+  const drifted=createDesignApprovalBinding({featureId:'f1',receipts,currentSources:f.sourcesNow()});
+  assert.equal(drifted.ok,true,JSON.stringify(drifted));
+@@ -269,7 +269,7 @@ test('(v) a design revision on the replacement route is one delta receipt and on
+  assert.equal(drifted.binding.reviewReceipts.length,2);
+  f.put('specs/f1/review/report-3.md','Review round 3.\n');
+  const third=f.receiptAt(3,{previous:'specs/f1/review/receipt-2.json',open:[],hour:'12'});
+- assert.deepEqual([third.ok,third.code],[false,'DRR-ROUND-EXCEEDED']);
++ assert.deepEqual([third.ok,third.ok?JSON.parse(Buffer.from(third.bytes).toString('utf8')).round:null],[true,3],JSON.stringify(third.code));
+  assert.notDeepEqual(rebound.binding.sources,f.sourcesNow(),'fixture: the drift really changed a source');
+  void sources2;
+ });
+@@ -278,7 +278,9 @@ test('(v-doc) the documented revision route is mechanical agent work and names n
+  const doc=readFileSync(new URL('../../skills/pipeline-start/references/design-course.md',import.meta.url),'utf8');
+  assert.match(doc,/mechanical agent work, not another PO permission/u);
+  // Restated 2026-11-08 (QG-04, candidate 21): 20j made a correction before submit-plan an ordinary edit; reopen-design stays for a submitted package.
+- assert.match(doc,/correct the\s+sources now\. Before `submit-plan` this is an ordinary edit and commit;\s+`reopen-design` exists only for a package that was already submitted/u);
++ // L3 (2026-11-13): the correction now leads to the next delta round; the ordinary-edit rule before submit-plan is unchanged.
++ assert.match(doc,/correct the sources\s+and run the next delta round/u);
++ assert.match(doc,/Before `submit-plan` a correction\s+is an ordinary edit and commit; `reopen-design` exists only for a package\s+that was already submitted/u);
+  assert.match(doc,/There is no\s+mandatory initial Advisor course/u);
+  const state=readFileSync(new URL('../../scripts/pipeline-state.mjs',import.meta.url),'utf8');
+  assert.match(state,/present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path>/u,'present-plan takes no dispatch, course or override argument');
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index a546708a8aedcc884c93abe7015757b035c3b9fb..78613c2dd80c5feaa21f789656bde8ba26b0c72a 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -96,7 +96,7 @@ function planSteps() {
+     }),
+     scriptStep({
+       id: "present-plan", script: STATE, verb: "present-plan", argv: ["present-plan", "--by", "<name>", "--review-receipt", "<review-receipt-path>"],
+-      needs: ["a submitted plan", "a tracked design review receipt (at most two --review-receipt)", "the prepared seal plan, for a draft package in the PRD release scope"],
++      needs: ["a submitted plan", "every tracked design review receipt of the chain, initial first (one --review-receipt each)", "the prepared seal plan, for a draft package in the PRD release scope"],
+       producer: "plan presentation record bound to the exact submission (and the seal plan digest), and the design approval request file under scratch/",
+       next: ["sign-intent", "approve-plan"],
+     }),
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 7eb594aa831a44de99755f552b669bee7b1292f2..539c3f622ccfc28d7a75fff231f160fa94ca52d1 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -17,7 +17,7 @@
+       "pathId": "plan",
+       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "ca1b5d9d662964b7ca2fcd49541e0ff9570c14352596957ef6aac512b1821527"
++      "sha256": "aa1d53b7943602a7f43ff2ed9e0363a2f43995934eade4cd0b2799dbc324b727"
+     },
+     {
+       "pathId": "implement",
+diff --git a/plugins/pipeline-core/runbooks/plan-path.v1.json b/plugins/pipeline-core/runbooks/plan-path.v1.json
+index c10cd1f32de91925c19c42d8e9702b9ca5cdfa70..738543ae93c133b7eb6995f8592a3e0de41abf53 100644
+--- a/plugins/pipeline-core/runbooks/plan-path.v1.json
++++ b/plugins/pipeline-core/runbooks/plan-path.v1.json
+@@ -239,7 +239,7 @@
+       "command": "node <plugin-root>/scripts/pipeline-state.mjs present-plan --by <name> --review-receipt <review-receipt-path>",
+       "needs": [
+         "a submitted plan",
+-        "a tracked design review receipt (at most two --review-receipt)",
++        "every tracked design review receipt of the chain, initial first (one --review-receipt each)",
+         "the prepared seal plan, for a draft package in the PRD release scope"
+       ],
+       "evidenceSchema": null,
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 42b473ba32c9d80477c881466d8eaf079305571b..140daaddc5208bd609d11f05f146e43092aac2d1 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -152,6 +152,10 @@ const originalDesignCases = [
+   {
+     "id": "DABX014",
+     "name": "C28e (Glossover G7): present-plan refuses a PRD and Spec the feature package cannot carry, before any request exists"
++  },
++  {
++    "id": "DABX015",
++    "name": "L3 (Claude run 3): present-plan refuses a review chain whose last round leaves findings open, names them and the delta route, and writes no request"
+   }
+ ];
+ const designCompletionCases = [];
+@@ -435,7 +439,7 @@ function continuityRequest(authority) {
+ 
+ /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
+ const MOVED_DIR = "specs/e2e-moved";
+-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false } = {}) {
++async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [] } = {}) {
+   stateModule ??= await import(pathToFileURL(CLI).href);
+   const governance = await loadLib("governance-scope.mjs");
+   const poGate = await loadLib("po-gate-authority.mjs");
+@@ -519,7 +523,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
+     reviewer: { runner: "claude", model: "claude-opus-4" },
+     report: sourceFor(REPORT_PATH),
+-    openFindingIds: [],
++    openFindingIds,
+     reviewedAt: "2026-10-09T09:00:00.000Z",
+     ...(fallback === undefined ? {} : { fallback }),
+   });
+@@ -745,6 +749,22 @@ test("C28e (Codex test run): present-plan names a trust policy that is not in th
+   // repeated here.
+ });
+ 
++// L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round until it passes.
++// The binding itself still records an open set (an approval already signed over one keeps verifying), so this is the presentation gate.
++test("L3 (Claude run 3): present-plan refuses a review chain whose last round leaves findings open, names them and the delta route, and writes no request", async () => {
++  const fx = await buildSubmittedFeature("route-open-findings", { openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"] });
++  await bindRouteOwner(fx);
++  const refused = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
++  assert.equal(refused.status, 2, `present-plan must refuse; stdout: ${refused.stdout}; stderr: ${refused.stderr}`);
++  assert.match(refused.stderr, /PLAN-DESIGN-REVIEW-OPEN/u);
++  assert.match(refused.stderr, /DESIGN-REVIEW-1, DESIGN-REVIEW-2/u);
++  assert.match(refused.stderr, /design-review-receipt\.mjs create --previous/u);
++  assert.equal(posixSigningCommands(refused.stdout).length, 0, "no signing command is handed over");
++  const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
++  assert.deepEqual(requests, [], "no approval request is written");
++  assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
++});
++
+ test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {
+   const run = await routeRun();
+   if (skipForHostLimitation(t, run)) return;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 0b7e445e2dea2c17f266dc882396e23b1a0bd463..2f15b4d5f8572079e3a20feadce98064f91144eb 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -393,7 +393,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, reso
+ import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+-import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { DESIGN_REVIEW_MAX_ROUNDS, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+@@ -4507,7 +4507,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+       if (!validPlanPresentation(presentation) || presentation.schema !== PLAN_PRESENTATION_DESIGN_SCHEMA || presentation.submissionSha256 !== lifecycle.submissionSha256) {
+         return { kind: "collect-input", mutation: false, requiresConfirmation: false, code: "DAB-REVIEW-RECEIPT-REQUIRED",
+           inputs: [{ name: "reviewReceipt", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true }],
+-          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required."
++          guidance: "Run present-plan --review-receipt with every tracked review receipt of the chain (initial first), and --by the presenter. No design course or dispatch is required."
+             // Late binding step 5: a draft package (PRD release scope) is sealed by the approval, so its plan is prepared first.
+             + (readAuthoritySeal(state?.continuity?.authority).status === "draft"
+               ? " This package is an unsealed draft: run prepare-seal with no arguments BEFORE present-plan (the approval seals the PRD and the Spec; the review receipts go to present-plan). Before the PO has signed, cancel-submitted-plan is the way back."
+@@ -10459,7 +10459,9 @@ function validPlanPresentation(value) {
+ // ADR-0085: observe physical, tracked, clean sources and the explicit receipt chain.
+ function readDesignApprovalInputs(dir, submission, paths) {
+   try {
+-    if (!Array.isArray(paths) || paths.length < 1 || paths.length > 2 || new Set(paths).size !== paths.length) return { ok: false, code: "DCC-REVIEW-RECEIPT-MISSING" };
++    if (!Array.isArray(paths) || paths.length < 1 || new Set(paths).size !== paths.length) return { ok: false, code: "DCC-REVIEW-RECEIPT-MISSING" };
++    // L3: every receipt of the chain is passed (initial first); above the structural bound the chain check names DCC-REVIEW-ROUND-EXCEEDED.
++    if (paths.length > DESIGN_REVIEW_MAX_ROUNDS) return { ok: false, code: "DCC-REVIEW-ROUND-EXCEEDED" };
+     const receipts = paths.map(path => ({ path, bytes: physicalRebindFile(dir, path)?.bytes }));
+     const summaries = receipts.map(entry => summarizeDesignReviewReceipt(entry));
+     const refused = summaries.find(entry => !entry.ok);
+@@ -10544,6 +10546,16 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
+       if (Array.isArray(inputs.inconsistencies)) return inputs.inconsistencies.map(dcc);
+       return { code: inputs.code, message: inputs.message ?? null, repair: entryGateRepair(inputs.code) };
+     } },
++    // L3 (Claude run 3, PO decision 2026-11-13): a design is presented for signature only over a passing readiness review. This is a
++    // presentation gate, never a binding rule: an approval already signed over open findings keeps verifying (the binding is unchanged).
++    { id: "design-review-open", run: () => {
++      if (!inputs?.ok || !Array.isArray(inputs.receipts) || inputs.receipts.length === 0) return null;
++      const latest = summarizeDesignReviewReceipt(inputs.receipts.at(-1));
++      if (!latest.ok || latest.summary.verdict !== "open-findings") return null;
++      return { code: "PLAN-DESIGN-REVIEW-OPEN", path: latest.summary.path,
++        message: `round ${latest.summary.round} of the readiness review leaves ${latest.summary.openFindingIds.length} finding(s) open: ${latest.summary.openFindingIds.join(", ")}`,
++        repair: entryGateRepair("PLAN-DESIGN-REVIEW-OPEN") };
++    } },
+     // C28e (Codex test run): approve-plan later reads the approval policy, the PRD, the Spec, the companions and the review receipts
+     // from the commit the request binds. A file that exists only in the working tree surfaced only after the signature
+     // (CAC-SOURCE-UNAVAILABLE) and cost a second one; each such file is named here, before a request exists.
+@@ -12921,7 +12933,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       }
+       const parsedPresentation = parseAllowedOptionalFlags(presentationArgv, new Set(["by"]));
+       if (!parsedPresentation.ok) {
+-        console.error("Error: present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path> (one or two receipts for epic/feature; none for mini).");
++        console.error("Error: present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path> (every receipt of the review chain, initial first, for epic/feature; none for mini).");
+         return 2;
+       }
+       const presentationFlags = parsedPresentation.value;
+@@ -14067,8 +14079,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+     case "prepare-seal": {
+       const reviewPaths = [];
+       for (let index = 0; index < rest.length; index += 2) {
+-        if (rest[index] !== "--review-receipt" || typeof rest[index + 1] !== "string" || rest[index + 1].startsWith("--") || reviewPaths.includes(rest[index + 1]) || reviewPaths.length >= 2) {
+-          console.error("Error: prepare-seal accepts only --review-receipt <repo-relative-json-path> (at most two), to bind the readiness review it should check.");
++        if (rest[index] !== "--review-receipt" || typeof rest[index + 1] !== "string" || rest[index + 1].startsWith("--") || reviewPaths.includes(rest[index + 1]) || reviewPaths.length >= DESIGN_REVIEW_MAX_ROUNDS) {
++          console.error(`Error: prepare-seal accepts only --review-receipt <repo-relative-json-path> (every receipt of the review chain, at most ${DESIGN_REVIEW_MAX_ROUNDS}), to bind the readiness review it should check.`);
+           return 2;
+         }
+         reviewPaths.push(rest[index + 1]);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index 241c0114ef5a7c838944c2e59e4c618f29e3af0f..135a68f977a0240b3a43d332f9711603c158c235 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -2,8 +2,8 @@
+ 
+ Load this before the first `submit-plan` for an `epic` or `feature`. The
+ Coordinator owns the sequence; routine preparation is agent work. ADR-0085
+-governs the receipt-based flow: one independent design review, at most one delta
+-follow-up, and one final PO decision. Do not assemble a design-workflow package
++governs the receipt-based flow: one independent design review, delta follow-ups
++until it passes, and one final PO decision. Do not assemble a design-workflow package
+ or register an authoring dispatch as an approval input.
+ 
+ Normal architecture/design choices use Chat tiles with concrete options,
+@@ -41,8 +41,9 @@ was needed; capability evidence is not an Advisor answer.
+    record holds the new title.` A criterion no user sees is tagged
+    `[not user-facing: <reason>]`; `[user-facing]` forces the duty.
+ 2. Obtain one independent review of the final design sources. Resolve its
+-   findings; if sources change, use at most one delta follow-up and bind the
+-   final receipt to the current sources. Do not add a separate readiness child
++   findings; while a round leaves findings open, run a delta follow-up (fresh
++   reviewer, only the open findings and what changed) until a round passes, and
++   bind the final receipt to the current sources. Do not add a separate readiness child
+    that repeats the content review. Preserve the report and canonical review
+    receipt, including the receipt chain when a delta is used. Produce each
+    receipt with `node <plugin-root>/scripts/design-review-receipt.mjs create`
+@@ -72,13 +73,16 @@ was needed; capability evidence is not an Advisor answer.
+    Every finding the report leaves open goes into the receipt as one
+    `--open-finding <id>`: a report that says ready while it still lists findings
+    is `open-findings`, not `pass`, and the PO sees that when signing.
+-   After the delta round: if round 2 still reports open findings, correct the
+-   sources now. Before `submit-plan` this is an ordinary edit and commit;
+-   `reopen-design` exists only for a package that was already submitted. The
+-   approval then carries the change as `unreviewedSourceDelta`, which the PO
+-   signs knowingly; there is no round 3. `DRR-SOURCE-DRIFT` with
+-   `nextRound: null` is not a dead end here: `present-plan` does not use that
+-   check.
++   After a delta round that still reports open findings: correct the sources
++   and run the next delta round (`--previous` the last receipt); there is no
++   round cap (only a structural bound of 64). Before `submit-plan` a correction
++   is an ordinary edit and commit; `reopen-design` exists only for a package
++   that was already submitted. A delta over unchanged documents may only
++   withdraw findings of the round before. `present-plan` refuses while the last
++   receipt is `open-findings` (`PLAN-DESIGN-REVIEW-OPEN`) and names the next
++   delta round. Pass every receipt of the chain, initial first. A source change
++   after a passing delta round is carried as `unreviewedSourceDelta`, which the
++   PO signs knowingly.
+ 3. Use the sanctioned source-binding and document-integration routes. Update
+    digests once, after the last edit: `create-adr.mjs --root <root> --refresh`
+    without `--slug` recomputes every ADR draft, and the PRD's
+@@ -97,9 +101,9 @@ was needed; capability evidence is not an Advisor answer.
+    is mechanical agent work, not another PO permission. Inspect the resulting
+    state. For `epic`/`feature`, use `present-plan --by <presenter>
+    --review-receipt <repo-relative-json-path>`, repeating `--review-receipt`
+-   once only when the current review chain includes the delta follow-up.
++   once per delta follow-up of the current review chain.
+    `--by` is an actor attribution, not a substitute for approval.
+-   Supply one or two distinct tracked receipts in chain order. The retired
++   Supply every distinct tracked receipt of the chain in chain order. The retired
+    `--design-workflow-package` flag is rejected with `DWP-PRESENT-RETIRED`;
+    it is not a recovery route.
+ 6. The lifecycle writer checks the current source/receipt binding mechanically:
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 34ed1169ec04afbd39998f26b21cfab6ec9e1af9..7e58dde468dedf542969c948219d581efc29eaa3 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -44,7 +44,7 @@ The acceptance question of the one-shot close is asked in the project's human-fa
+    the design input). It writes `scratch/seal-plan.json` (the digest-bound seal plan) and never State; it also replaces a damaged plan file. `inspect` -> `sealSituation`
+    names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
+ 4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
+-   present the plan to the PO; its digest is part of what the one signature covers. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
++   present the plan to the PO; its digest is part of what the one signature covers. Pass every receipt of the review chain, initial first; while the last one is `open-findings` it refuses (`PLAN-DESIGN-REVIEW-OPEN`) until a delta round passes. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
+    Before asking for a signature on a design that changes the architecture rules of code that already exists, preview what the check will say: `architecture-boundary-check.mjs --root <root> --preview-prd <repo-relative PRD path>` (read-only, no signature, writes nothing). It checks the tracked tree against the modules of the PRD's PROPOSED design block, with the same rules as the real check (ownership, forbidden dependency, line bound); the map that the real check reads exists only after the signature. Fix the PRD, not the code, when it names a finding the design should have allowed. A pass is a preview, not an approval.
+ 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
+    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow

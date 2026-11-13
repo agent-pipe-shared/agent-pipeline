@@ -1,0 +1,112 @@
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-execution.mjs b/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
+index cf788b779173226fe3e5d294605df44263a665fe..b7a7790601d8c1e37e96628ff2adf93f9375884b 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
+@@ -130,7 +130,16 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
+   // A patch or diff file stores its context lines as " " + the line, so every blank context line is a trailing-whitespace "error" in
+   // the file that carries it: the check must not read those files as source, or every Goldfish that delivers a held patch fails here
+   // (measured 2026-11-01: 16 stop failures, 12 of them in the last two days, and a member left armed for the repair to clear).
+-  if (git(root, ["diff", "--cached", "--check", "--", ".", ":(exclude,glob)**/*.patch", ":(exclude,glob)**/*.diff"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
++  const check = runGit(root, ["diff", "--cached", "--check", "--", ".", ":(exclude,glob)**/*.patch", ":(exclude,glob)**/*.diff"], spawn);
++  if (check.error || check.status !== 0) {
++    // K-33 (Glossover, 29c): the refusal leaves the index as it found it (the admission demanded an empty one), so the recovery route
++    // can run at once, and it names the files git flagged. A generated file (a framework's SQL migration) is excused by the project's
++    // own `.gitattributes` line `<pattern> -whitespace`, which git honours in this same check; the check itself is never skipped.
++    const flagged = [...new Set(String(check.stdout ?? "").split("\n").map((line) => /^(.+?):\d+: /u.exec(line)?.[1]).filter((path) => admitted.paths.includes(path)))];
++    const restored = runGit(root, ["--literal-pathspecs", "reset", "-q", "--", ...admitted.paths], spawn);
++    return { ...fail(code("HOST-COMMIT-DIFF-CHECK")), detail: { reason: "staged-diff-whitespace", condition: restored.error || restored.status !== 0 ? "index-left-staged" : "index-restored",
++      ...(flagged.length > 0 ? { paths: flagged.slice(0, 5) } : {}), ...(flagged.length > 5 ? { extraCount: flagged.length - 5 } : {}) } };
++  }
+   const stagedTree = git(root, ["write-tree"], spawn)?.trim();
+   if (!stagedTree) return fail(code("HOST-COMMIT-TREE"));
+   // Neither --no-verify nor a temporary hooksPath is permitted here. A hook
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs b/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
+index a92ef69bc79d9c5302f5a5670f20f79250a5a009..748e88f4573b75e9945afb2c7ed664b0be0eb662 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
+@@ -16,7 +16,7 @@ function git(root, ...args) {
+   assert.equal(run.status, 0, run.stderr);
+   return run.stdout.trim();
+ }
+-function fixture(run) {
++function fixture(run, baselineFiles = {}) {
+   const root = mkdtempSync(join(tmpdir(), "agy-host-commit-execution-"));
+   try {
+     git(root, "init", "-q");
+@@ -24,7 +24,8 @@ function fixture(run) {
+     git(root, "config", "user.email", "fixture@example.invalid");
+     git(root, "config", "commit.gpgsign", "false");
+     writeFileSync(join(root, "file.txt"), "before\n");
+-    git(root, "add", "--", "file.txt");
++    for (const [path, text] of Object.entries(baselineFiles)) writeFileSync(join(root, path), text);
++    git(root, "add", "--", "file.txt", ...Object.keys(baselineFiles));
+     git(root, "commit", "-q", "-m", "fixture baseline");
+     const parent = git(root, "rev-parse", "HEAD");
+     const capture = captureAgyHostCommitBaseline({ root, candidateCommit: parent, resultPath: "scratch/return.json" });
+@@ -277,9 +278,23 @@ test("AHE15 trailing whitespace in any other file is still refused by the diff c
+   assert.equal(result.ok, false);
+   assert.equal(result.code, "AGY-HOST-COMMIT-DIFF-CHECK");
+   assert.equal(git(root, "rev-parse", "HEAD"), parent);
++  // K-33 (Glossover, 29c): the refusal restores the empty index the admission found and names the flagged file, so recovery runs at once.
++  assert.equal(git(root, "diff", "--cached", "--name-only"), "", "nothing is left staged");
++  assert.deepEqual(result.detail, { reason: "staged-diff-whitespace", condition: "index-restored", paths: ["file.txt"] });
+ }));
+ 
+-assert.equal(cases.length, 15, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
++test("AHE16 K-33: a generated file the project marks -whitespace in .gitattributes passes the same check; the check is never skipped", () => fixture(({ root, parent, baseline }) => {
++  // The shape `payload migrate:create` writes: SQL in a template literal with a space before a tab and trailing blanks.
++  writeFileSync(join(root, "0001_init.sql"), "CREATE TABLE \"items\" (\n \t\"id\" serial PRIMARY KEY NOT NULL \n);\n");
++  const result = commitFromObservedAdmission({
++    baseline, final: { outcome: "succeeded", changedPaths: ["0001_init.sql"] },
++    allowedPaths: ["0001_init.sql"], taskId: "AGY-EXAMPLE-16",
++  });
++  assert.equal(result.ok, true, result.code);
++  assert.equal(git(root, "rev-parse", "HEAD~1"), parent);
++}, { ".gitattributes": "*.sql -whitespace\n" }));
++
++assert.equal(cases.length, 16, "the complete Agy Host Commit Execution corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+index 24cf013d14aca5b37d74c9f6c06ab8a4f5fdf29a..5332f51c9011dcd0c465b5ae1beb44de28646785 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+@@ -347,6 +347,13 @@ export function plan(options) {
+   const result = { schema: PLAN_SCHEMA, status: refusals.length > 0 ? "refused" : recovered ? "already-recovered" : "ready", code: refusals[0]?.code ?? (recovered ? "GHCR-ALREADY-RECOVERED" : "GHCR-READY"),
+     dispatchId, source, candidateCommit, head: headSha, stopFailure, paths: refusals.length === 0 && !landed ? paths : [], refusals,
+     ...(stopFailure ? {} : { stopFailureNote: "no stop-failure record for this dispatch; the stop left no diagnostic" }) };
++  // K-33 (Glossover, 29c): a host commit refused by git's whitespace check names the files it flagged. Generated files (a framework's
++  // SQL migration) are excused in the project's own .gitattributes, so the NEXT host commit of such a file passes without this route.
++  if (/HOST-COMMIT-DIFF-CHECK$/u.test(stopFailure?.code ?? "")) {
++    const flagged = Array.isArray(stopFailure.detail?.paths) ? stopFailure.detail.paths : [];
++    result.diffCheckNote = `the host commit was refused by git diff --cached --check (whitespace)${flagged.length > 0 ? ` in ${flagged.join(", ")}` : ""}. `
++      + "If these files are generated by a tool and must keep their bytes, add one line `<path pattern> -whitespace` for them to the project's .gitattributes in its own commit, so the next host commit of such a file passes; otherwise correct the whitespace before apply. This recovery commit does not run that check.";
++  }
+   if (headAdvance && !landed) result.headAdvance = headAdvance;
+   if (landed) result.commit = landed;
+   if (recordOnly) result.mode = "record-only";
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+index e3b9923d3d9f8e9dc8315e1308f818054fa456c5..658c95de519407bf8ff476b2ed8c09b6d711bb35 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+@@ -135,6 +135,19 @@ test("K-32: a framework route folder ([...slug], (group)) lands literally; a sib
+   } finally { cleanup(root); }
+ });
+ 
++test("K-33: after a whitespace refusal the plan names the flagged files and the .gitattributes route for generated files", () => {
++  const { root } = fixture({ stopOver: { code: "NATIVE-HOST-COMMIT-DIFF-CHECK", detail: { reason: "staged-diff-whitespace", condition: "index-restored", paths: ["allowed/new.txt"] } } });
++  try {
++    const { status, json } = run(root, "plan");
++    assert.equal(status, 0, JSON.stringify(json));
++    assert.equal(json.status, "ready");
++    assert.match(json.diffCheckNote, /in allowed\/new\.txt/u);
++    assert.match(json.diffCheckNote, /-whitespace/u);
++  } finally { cleanup(root); }
++  const plain = fixture();
++  try { assert.equal(run(plain.root, "plan").json.diffCheckNote, undefined, "no note for another stop code"); } finally { cleanup(plain.root); }
++});
++
+ test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and stage, and the detail's own reason when the record has none", () => {
+   const recorded = fixture({ stopOver: { stage: "pending-read", reason: "NGHS-PENDING-MISSING" } });
+   try {

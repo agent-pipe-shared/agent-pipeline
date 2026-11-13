@@ -1,0 +1,1191 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 0150081d91bf24033ec04592f90fbe5a7f86858f..2759ff0acb9488f66f3b2ef9f5032c7a65e36ed3 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4915,6 +4915,18 @@
+       "file": "plugins/pipeline-core/lib/gate-definition-changes.test.mjs",
+       "invariantPinned": "The close's gate-definition walk (ADR-0096) lists every add, change and deletion of a gate-definition file in the feature range against the first parent, skips an exempt-field-only pipeline.user.yaml edit, and derives each proof: first appearance, committed materialization of the fitness model, the labelled configure-verify record, a consumed override for its next change of the path only, or the PO acknowledgement naming that exact change; a re-creation after a deletion and an unacknowledged later change stay unproven",
+       "nonOverlapNote": "Unique unit suite on real git histories for the walk and its proof derivation; pre-commit-hook-install.test.mjs pins the commit-time refusal of GS-16/GS-17"
++    },
++    {
++      "name": "maintenance-delivery-tests",
++      "file": "plugins/pipeline-core/lib/maintenance-delivery.test.mjs",
++      "invariantPinned": "A maintenance delivery (ADR-0097) binds one check by what runs (verify:configured, command:<id> or a .test file), never by its dispatch id; its scope is test- or tooling-shaped, never a gate-strength path or specs/; the first red observation at a commit stands; the red-before proof is a sealed red receipt at or before the plan-approval commit, else the PO's acknowledgement of this feature and plan approval",
++      "nonOverlapNote": "Unique unit suite on real git histories for the shared maintenance library; maintenance-red-check-tests runs the observing script, dispatch-briefing-binding-tests the --maintenance binding"
++    },
++    {
++      "name": "maintenance-red-check-tests",
++      "file": "plugins/pipeline-core/scripts/maintenance-red-check.test.mjs",
++      "invariantPinned": "maintenance-red-check.mjs observe runs one check on the clean HEAD of a real repository and records the first result at that commit; an untracked or non-test check, a dirty tree, no active feature, a timeout, a command the shell cannot run and a run that changes the tree are refused and record nothing",
++      "nonOverlapNote": "Unique script suite (ADR-0097, K-28); maintenance-delivery-tests pins the library it writes through"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 09e9f36c048ceb9c202d0fb7095d7bdaeb4af4e4..d55ca23748cc0b19f2f36177196bb61ff9a639bb 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -681,7 +681,7 @@ function sanctionedProofWaitArgs(args, root) {
+ // script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
+ const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
+ export const SCRIPTS_ANSWERING_HELP = new Map([
+-  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "audit-proof-followup", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
++  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "audit-proof-followup", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "maintenance-red-check", "onboarding-init",
+     "pipeline-state", "prepare-dispatch", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+     "publication-readback", "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+     "validate-runner-profiles-v2", "wait-host-commit"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.mjs b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+index 54ea8120e70e1eb0407e568a852f0057deb79e9b..8fc5d5105ce18789326974563a3705ac35ed5704 100644
+--- a/plugins/pipeline-core/lib/maintenance-delivery.mjs
++++ b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+@@ -7,13 +7,14 @@
+  *                                   derives the proof itself and never takes it from the briefing)
+  *   maintenanceCheckSha256          the identity of the one red check (canonical JSON of the check object)
+  *   maintenanceScopeRefusal         the narrow write scope: test- or tooling-shaped, never a gate-strength path, never under specs/
+- *   red observation                 written by the binding generator after running the check on the clean HEAD of the real checkout,
+- *                                   kept in private state under <git-common-dir>/agent-pipeline/maintenance/observations/
++ *   maintenanceCheckIdentity        what runs: { verify: "configured" }, { command } or { path } -- the key of the three records below
++ *   red observation                 written by maintenance-red-check.mjs observe after running the check on the clean HEAD of the real
++ *                                   checkout, kept in private state under <git-common-dir>/agent-pipeline/maintenance/observations/
+  *   preApprovalRedReceipt           a sealed red Verify suite receipt at or before the plan-approval commit (the mechanical route)
+  *   maintenanceAcknowledgement      the PO's acknowledgement (kind acknowledge-maintenance-red-check), the fallback route
+  *   maintenanceRedProof             receipt first, then acknowledgement, else null
+  *
+- * Nothing here runs a check; the generator runs it and hands the result in.
++ * Nothing here runs a check; scripts/maintenance-red-check.mjs runs it and hands the result in.
+  */
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+@@ -59,8 +60,22 @@ export function isConfiguredVerifyCheck(check) {
+   return object(check) && Object.hasOwn(check, "verify") && check.verify === "configured";
+ }
+ 
++/**
++ * What runs when the check runs, without the dispatch-specific id and dependency list: `{ verify: "configured" }`, `{ command }` or
++ * `{ path }` (a .test file). The observation, the receipt route and the acknowledgement all key on it, so a check observed red before a
++ * binding exists is the same check the binding later names. A document check is never a maintenance check (null).
++ */
++export function maintenanceCheckIdentity(check) {
++  if (!object(check) || Object.hasOwn(check, "document")) return null;
++  if (isConfiguredVerifyCheck(check)) return { verify: "configured" };
++  if (typeof check.command === "string" && check.command !== "") return { command: check.command };
++  if (Object.hasOwn(check, "verify") || Object.hasOwn(check, "command")) return null;
++  return typeof check.path === "string" && CHECK_TEST_FILE.test(check.path) ? { path: check.path } : null;
++}
++
+ export function maintenanceCheckSha256(check) {
+-  return sha256(canonical(check));
++  const identity = maintenanceCheckIdentity(check);
++  return identity === null ? null : sha256(canonical(identity));
+ }
+ 
+ /** The Verify suite a check's red receipt is filed under, or null when the check form has no suite of its own. */
+@@ -71,6 +86,8 @@ export function maintenanceReceiptSuite(check) {
+ }
+ 
+ const TEST_FILE = /(?:^|\/)[^/]+\.(?:test|spec)\.[A-Za-z0-9]+$/u;
++/** A .test file a check can name: the forms dispatch-briefing.mjs binds and `node --test` runs. */
++const CHECK_TEST_FILE = /\.test\.(?:mjs|cjs|js)$/u;
+ const TOOLING_SEGMENTS = new Set(["test", "tests", "__tests__", "fixtures", "scripts", "tools"]);
+ 
+ function gateStrengthRule(path) {
+@@ -119,7 +136,8 @@ export function writeMaintenanceRedObservation({ commonDir, featureId, check, ca
+     return { ok: false, code: "MAINTENANCE-OBSERVATION-INPUT" };
+   }
+   const checkSha256 = maintenanceCheckSha256(check);
+-  const record = { schema: MAINTENANCE_RED_OBSERVATION_SCHEMA, featureId, check, checkSha256, candidate: { commit: candidate.commit, tree: candidate.tree },
++  if (checkSha256 === null) return { ok: false, code: "MAINTENANCE-OBSERVATION-CHECK" };
++  const record = { schema: MAINTENANCE_RED_OBSERVATION_SCHEMA, featureId, check: maintenanceCheckIdentity(check), checkSha256, candidate: { commit: candidate.commit, tree: candidate.tree },
+     exitCode, signal: typeof signal === "string" ? signal : null, red: exitCode !== 0 || typeof signal === "string", outputSha256, observedAt };
+   const directory = maintenanceObservationDirectory(commonDir);
+   const path = join(directory, observationName(checkSha256, candidate.commit));
+@@ -147,6 +165,7 @@ export function writeMaintenanceRedObservation({ commonDir, featureId, check, ca
+ export function readMaintenanceRedObservation({ commonDir, check, candidate }) {
+   if (typeof commonDir !== "string" || !object(check) || !object(candidate) || !OID.test(candidate.commit ?? "")) return null;
+   const checkSha256 = maintenanceCheckSha256(check);
++  if (checkSha256 === null) return null;
+   const path = join(maintenanceObservationDirectory(commonDir), observationName(checkSha256, candidate.commit));
+   try {
+     const info = lstatSync(path);
+@@ -263,7 +282,7 @@ export function buildMaintenanceAcknowledgementSubject({ commonDir, root, featur
+   const red = listMaintenanceRedObservations({ commonDir, featureId, candidate }).filter((record) => record.red);
+   const open = red.filter((record) => maintenanceRedProof({ commonDir, root, featureId, approvalSha256, approvalCommit, check: record.check, runGit, ...(readApprovals ? { readApprovals } : {}) }) === null);
+   if (open.length === 0) return { ok: false, code: "MRA-NOTHING-TO-ACKNOWLEDGE", detail: red.length === 0
+-    ? "no red maintenance check is observed at the clean HEAD; generate the maintenance binding first (dispatch-briefing.mjs --maintenance), which runs and records the check"
++    ? "no red maintenance check is observed at the clean HEAD; observe it first (maintenance-red-check.mjs observe), which runs the check and records the result"
+     : "every red maintenance check observed at the clean HEAD already has a proof" };
+   const checks = open.map((record) => ({ checkSha256: record.checkSha256, check: record.check, observedExitCode: record.exitCode }))
+     .sort((a, b) => (a.checkSha256 < b.checkSha256 ? -1 : a.checkSha256 > b.checkSha256 ? 1 : 0));
+@@ -301,6 +320,7 @@ export function maintenanceAcknowledgementConfirmationLines(subject) {
+     `feature: ${subject.featureId}`,
+     ...subject.checks.slice(0, 16).map((entry) => `red check without a Spec criterion: ${describeMaintenanceCheck(entry.check)} (exit ${entry.observedExitCode ?? "signal"} at the clean HEAD)`),
+     "this acknowledgement states that these checks were already red before the feature; a maintenance dispatch may then repair them in test or tooling paths only. It is recorded as \"red before the feature acknowledged by the PO\"; the Critic still reviews the fix.",
++    "scope: it holds for each listed check for the rest of this feature under this plan approval, also when the check turns red again later, so a later red of the same check needs no new acknowledgement; every repair still has to turn the check green (the configured verify at the feature close).",
+   ];
+ }
+ 
+@@ -312,6 +332,23 @@ export function describeMaintenanceCheck(check) {
+   return object(check) && typeof check.path === "string" ? check.path : "unknown check";
+ }
+ 
++/** The --check spelling of a check (the one dispatch-briefing.mjs and maintenance-red-check.mjs take): verify:configured, command:<id> or the path. */
++export function maintenanceCheckSpelling(check) {
++  const identity = maintenanceCheckIdentity(check);
++  if (identity === null) return "<check>";
++  if (identity.verify === "configured") return CONFIGURED_VERIFY_CHECK;
++  return identity.command !== undefined ? `command:${identity.command}` : identity.path;
++}
++
++/** Parse a --check spelling into a check identity, or null. */
++export function parseMaintenanceCheckSpelling(spelling) {
++  if (typeof spelling !== "string" || spelling === "" || spelling.length > 1024) return null;
++  if (spelling === CONFIGURED_VERIFY_CHECK) return { verify: "configured" };
++  if (spelling.startsWith("command:")) return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(spelling.slice(8)) ? { command: spelling.slice(8) } : null;
++  if (spelling.includes(":") || spelling.startsWith("/") || spelling.includes("\\") || spelling.split("/").some((part) => part === "" || part === "." || part === "..")) return null;
++  return CHECK_TEST_FILE.test(spelling) ? { path: spelling } : null;
++}
++
+ export function maintenanceAcknowledgementRepair({ stateWriter = "pipeline-state.mjs" } = {}) {
+   return `no Verify receipt shows this check red at or before the plan approval; the PO acknowledges it once: run node ${stateWriter} approve-maintenance-red-check --by <the label the PO gives for this command>, `
+     + "which prints the PO's signing command (or records it at once in chat mode), then generate the binding again";
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.test.mjs b/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
+index 763d84600ae3cc60b66c5cd9205fe7e57d2dfdd0..c5fe428e941dc274147bad98116b9467bb4a6dc2 100644
+--- a/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
+@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, buildMaintenanceAcknowledgementSubject,
++import { CONFIGURED_VERIFY_CHECK, MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA, maintenanceCheckSpelling, parseMaintenanceCheckSpelling,MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, buildMaintenanceAcknowledgementSubject,
+   describeMaintenanceCheck, maintenanceAcknowledgement, maintenanceCheckSha256, maintenanceChecksDigest, maintenanceReceiptSuite, maintenanceRedProof,
+   maintenanceScopeRefusal, planApprovalCommit, preApprovalRedReceipt, readMaintenanceRedObservation, validMaintenanceBinding,
+   writeMaintenanceRedObservation } from "./maintenance-delivery.mjs";
+@@ -56,7 +56,24 @@ test("the kind is a critical action, the binding is closed and the receipt suite
+   assert.equal(maintenanceReceiptSuite(configuredCheck), "configured-verify");
+   assert.equal(maintenanceReceiptSuite({ id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }), null);
+   assert.equal(describeMaintenanceCheck(configuredCheck), "the configured verify command");
+-  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, dependencies: [...commandCheck.dependencies, "tests/x.test.mjs"] }));
++  // The identity is what runs: the dispatch id and the dependency list of a later binding never change it, so a check observed red
++  // before any binding exists is the same check the binding names. Another command, form or test file is another check.
++  assert.equal(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, id: "other", dependencies: [...commandCheck.dependencies, "tests/x.test.mjs"] }));
++  assert.equal(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ command: "docs" }));
++  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, command: "lint" }));
++  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256(configuredCheck));
++  assert.notEqual(maintenanceCheckSha256({ path: "tests/a.test.mjs" }), maintenanceCheckSha256({ path: "tests/b.test.mjs" }));
++  for (const notMaintenance of [{ id: "d", path: "docs/a.md", document: "docs/a.md", dependencies: ["docs/a.md"] }, { path: "src/app.ts" }, { verify: "other" }, null]) {
++    assert.equal(maintenanceCheckSha256(notMaintenance), null, JSON.stringify(notMaintenance));
++  }
++  assert.deepEqual([CONFIGURED_VERIFY_CHECK, "command:docs", "tests/a.test.mjs"].map(parseMaintenanceCheckSpelling),
++    [{ verify: "configured" }, { command: "docs" }, { path: "tests/a.test.mjs" }]);
++  for (const spelling of ["document:docs/a.md", "src/app.ts", "/abs/a.test.mjs", "../a.test.mjs", "a/./b.test.mjs", "command:", "verify:other", ""]) {
++    assert.equal(parseMaintenanceCheckSpelling(spelling), null, spelling);
++  }
++  for (const check of [commandCheck, configuredCheck, { id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }]) {
++    assert.equal(maintenanceCheckSha256(parseMaintenanceCheckSpelling(maintenanceCheckSpelling(check))), maintenanceCheckSha256(check), "the spelling round-trips");
++  }
+ });
+ 
+ test("the scope admits test and tooling paths only, never a gate-strength path or the approved specs", () => {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index 0bbc1fd5cb2de390a0ba3179bd736f79ba4f20e8..9657eddff27f67ad3f35dac926c71ce4518e93fa 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -272,9 +272,14 @@ export const DOCUMENT_CHECK_PREFIX='document:';
+ export const DOCUMENT_CHECK_FILE=/\.(?:md|mdx|txt|rst|adoc)$/u;
+ /** D195: a check is the 3-key .test form, the additive 4-key command form (path = the calibration that registers the command) or, G20-65,
+  * the 4-key document form (path = the owned document, `document` repeats it, so the check names exactly one file of the write scope). */
+-function validCheckForm(check){
++function validCheckForm(check,{maintenance=false}={}){
++  // ADR-0097: the configured-verify form (path = the calibration that registers the top-level verify command) exists only in a maintenance binding.
++  if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'verify'))
++    return maintenance&&exact(check,['id','path','verify','dependencies'])&&check.verify==='configured'&&normalizedPath(check.path)
++      &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
++  // A document check proves a document exists, never that a red check turned green: it is not a maintenance check.
+   if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'document'))
+-    return exact(check,['id','path','document','dependencies'])&&check.document===check.path&&normalizedPath(check.path)&&DOCUMENT_CHECK_FILE.test(check.path)
++    return !maintenance&&exact(check,['id','path','document','dependencies'])&&check.document===check.path&&normalizedPath(check.path)&&DOCUMENT_CHECK_FILE.test(check.path)
+       &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
+   if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'command'))
+     return exact(check,['id','path','command','dependencies'])&&typeof check.command==='string'&&COMMAND_ID.test(check.command)&&normalizedPath(check.path)
+@@ -283,19 +288,38 @@ function validCheckForm(check){
+ }
+ /** Typed selection data; original approval and actual source bytes are checked
+  * independently by the authenticated continuation writer. */
++/** ADR-0097: the closed maintenance binding (no criterion, no proof reference; the host derives the proof). */
++export const MAINTENANCE_BINDING_SCHEMA='pipeline.maintenance-binding.v1';
++/** True when an item delivery (briefing or queue delivery) is a maintenance delivery. */
++export function isMaintenanceDelivery(value){
++  return value!==null&&typeof value==='object'&&Object.hasOwn(value,'maintenance');
++}
++/** The one key the comparators bind a delivery to: its criterion id, or `maintenance:<what runs>` (never a Spec criterion). What runs is
++ * the check's identity without its dispatch-derived id: verify:configured, command:<id> or the .test path (maintenance-delivery.mjs). */
++export function itemDeliveryBindingKey(value){
++  if(isMaintenanceDelivery(value)){
++    const check=value.checks?.[0];
++    return `maintenance:${check?.verify==='configured'?'verify:configured':typeof check?.command==='string'?`command:${check.command}`:check?.path??''}`;
++  }
++  return value?.criterionLocator?.criterionId??(Array.isArray(value?.criteria)?value.criteria[0]:undefined);
++}
+ export function validateItemDeliveryBriefing(value) {
++  const maintenance=isMaintenanceDelivery(value);
+   const locator=value?.criterionLocator;
+   const hasContinuation=value!==null&&typeof value==='object'&&Object.hasOwn(value,'continuationOf');
+-  if(!exact(value,hasContinuation?['schema','sliceId','itemId','criterionLocator','checks','continuationOf']:['schema','sliceId','itemId','criterionLocator','checks'])
++  const bindingKey=maintenance?'maintenance':'criterionLocator';
++  if(!exact(value,hasContinuation?['schema','sliceId','itemId',bindingKey,'checks','continuationOf']:['schema','sliceId','itemId',bindingKey,'checks'])
+     ||(hasContinuation&&(typeof value.continuationOf!=='string'||!ID.test(value.continuationOf)))||value.schema!=='pipeline.item-delivery-briefing.v1'
+     ||!ID.test(value.sliceId??'')||!ID.test(value.itemId??'')
+-    ||!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
+-    ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
+-    ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!isCriterionId(locator.criterionId)
+-    ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096
++    ||(maintenance
++      ?!exact(value.maintenance,['schema'])||value.maintenance.schema!==MAINTENANCE_BINDING_SCHEMA||!Array.isArray(value.checks)||value.checks.length!==1
++      :!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
++        ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
++        ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!isCriterionId(locator.criterionId)
++        ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096)
+     ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
+     ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length
+-    ||value.checks.some(check=>!validCheckForm(check)||!ID.test(check.id??'')||!normalizedPath(check.path)
++    ||value.checks.some(check=>!validCheckForm(check,{maintenance})||!ID.test(check.id??'')||!normalizedPath(check.path)
+       ||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
+       ||!check.dependencies.every(normalizedPath)||new Set(check.dependencies).size!==check.dependencies.length))return fail('NGHR-ITEM-DELIVERY-SHAPE');
+   return {ok:true,code:'NGHR-ITEM-DELIVERY-VALID'};
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index acbe6b19dc813dde04dc2ecb7de73396a1e39843..a6edc41b0493fb0f16d882207312a913adfabead 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -25,17 +25,21 @@ import { observeCurrentPlanApprovalForCalibration } from "../scripts/pipeline-st
+ import { resolveV3DutyRoute } from "./critic-route-v3.mjs";
+ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
+ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
+-import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
++import { isMaintenanceDelivery, itemDeliveryBindingKey, parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
++import { describeMaintenanceCheck, maintenanceAcknowledgementRepair, maintenanceCheckSha256, maintenanceCheckSpelling, maintenanceRedProof, maintenanceScopeRefusal, planApprovalCommit, readMaintenanceRedObservation } from "./maintenance-delivery.mjs";
+ import { parseDispatchSlice } from "./dispatch-policy.mjs";
+ import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
+ import { sliceQueueLocation, readSliceQueueSource, readBoundedFile, writeWorkingQueue, restoreWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
+ import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+ import { isSafeTaskId } from "./dispatch-record.mjs";
+ import { fileURLToPath } from "node:url";
++/** ADR-0097: what an item delivery is bound to -- its criterion locator, or its maintenance binding with the identity of the one red check (two maintenance deliveries of different checks never compare equal). Every comparator reads it through here. */
++const deliveryBinding=delivery=>isMaintenanceDelivery(delivery)?{maintenance:delivery.maintenance,checkSha256:maintenanceCheckSha256(delivery.checks?.[0])}:delivery?.criterionLocator;
+ 
+ // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
+ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+ const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
++const MAINTENANCE_RED_CHECK_SCRIPT = fileURLToPath(new URL("../scripts/maintenance-red-check.mjs", import.meta.url));
+ const CODEX_PREPARE_SCRIPT = fileURLToPath(new URL("../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
+ /** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
+  * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
+@@ -308,7 +312,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     const named = parseDispatchSlice(fields.prompt);
+     const item = deliveryQueue.normalized.slices.find(row => row.id === named.sliceId);
+     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
+-    if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
++    if((item.delivery.criterionLocator||isMaintenanceDelivery(item.delivery))&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
+     if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd(),admissionDeadline,publishRetry:dependencies.publishRetry});
+       if(readiness.status!=='observed')return integrationReadinessRefusal(readiness);
+       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
+@@ -724,7 +728,7 @@ function nativePendingQueueJoin(state,repository) {
+   if(!state.binding.itemDelivery)return state; // retained basic legacy contract
+   const original=state.binding.itemDelivery,approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
+   if(item.delivery.itemId!==original.itemId||item.delivery.baseCommit!==state.binding.candidateCommit||approval.status!=='eligible'
+-    ||item.delivery.approvalSha256!==approval.approvalSha256||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(original.criterionLocator)
++    ||item.delivery.approvalSha256!==approval.approvalSha256||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(original))
+     ||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(original.checks))throw nativeManagedFault('native-item-original-queue-binding-drift');
+   // Governed runtime metadata may gain another independent item. This Source
+   // member/original-approval join authorizes only its current queue bytes;
+@@ -803,7 +807,7 @@ export function readNativeReservedItemScopes({repository,boundary}={}) {
+     if(released.has(operation.bindingSha256))continue;
+     const state=effectiveNativePendingState(read,entry);
+     if(settled.has(state.delivery?.sliceId))continue;
+-    reservations.push({pendingSha256:entry.sourceFact.sha256,sliceId:state.delivery?.sliceId??null,itemId:state.delivery?.itemId??null,criterionSha256:state.binding.itemDelivery?nativeManagedDigest(state.binding.itemDelivery.criterionLocator):null,writeScope:state.delivery?.writeScope??state.binding.allowedPaths});
++    reservations.push({pendingSha256:entry.sourceFact.sha256,sliceId:state.delivery?.sliceId??null,itemId:state.delivery?.itemId??null,criterionSha256:state.binding.itemDelivery?nativeManagedDigest(deliveryBinding(state.binding.itemDelivery)):null,writeScope:state.delivery?.writeScope??state.binding.allowedPaths});
+   }
+   return {reservations};
+ }
+@@ -1464,7 +1468,8 @@ const CRITIC_DELIVERY_KEYS='baseCommit,criteria,itemId';
+  * criteria of the slices it covers (the validator allows 1..64 unique safe ids). */
+ function criticDeliveryCriteria(covered,known,fallback) {
+   const ids=[];
+-  for(const list of [...known,...covered.map(row=>row.delivery?.criteria)])
++  // ADR-0097: a maintenance slice has no criterion; it contributes its slice id, never a Spec criterion.
++  for(const list of [...known,...covered.map(row=>isMaintenanceDelivery(row.delivery)?[row.id]:row.delivery?.criteria)])
+     for(const id of Array.isArray(list)?list:[])if(typeof id==='string'&&isSafeTaskId(id)&&!ids.includes(id))ids.push(id);
+   return (ids.length?ids:fallback).slice(0,64);
+ }
+@@ -1528,14 +1533,32 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       if(paths.status!=='ready')throw nativeManagedFault('item-course-authority-unavailable');
+       const stateBytes=readFileSync(join(physical,paths.state)),state=parseStrictJson(stateBytes);
+       if(digest(stateBytes)!==approval.stateSha256||!state.activeFeature?.id||!state.planSubmission?.specPath)throw nativeManagedFault('item-course-state-drift');
+-      const locator=itemDelivery.criterionLocator;
+-      const source=approval.sourceRefs.find(ref=>ref.path===locator.sourcePath&&ref.sha256===locator.sourceSha256);
+-      if(!source||locator.sourcePath!==state.planSubmission.specPath)throw nativeManagedFault('item-course-original-unbound');
+-      const sourcePath=join(physical,source.path),sourceInfo=lstatSync(sourcePath);
+-      if(sourceInfo.isSymbolicLink()||!sourceInfo.isFile()||realpathSync(sourcePath)!==sourcePath)throw nativeManagedFault('item-course-original-unsafe');
+-      const sourceBytes=readFileSync(sourcePath);
+-      const criterion=parseAcceptedCriticCriterion({sourceBytes,locator,packageContext:{featureId:state.activeFeature.id,sourceBindings:[{path:source.path,sha256:source.sha256,role:'spec'}]}});
+-      if(!['explicit-actual-independent-pass','no-explicit-criterion'].includes(criterion.status))throw nativeManagedFault('item-course-criterion-unbound');
++      const maintenance=isMaintenanceDelivery(itemDelivery);
++      const locator=maintenance?null:itemDelivery.criterionLocator;
++      const bindingKey=itemDeliveryBindingKey(itemDelivery);
++      let source=null,redProof=null;
++      if(maintenance){
++        // ADR-0097 (D249): no criterion. The scope is narrow, the check was observed red at this candidate, and it was red before the feature
++        // (a pre-approval red Verify receipt, else the PO's acknowledgement). Every proof is derived here, never taken from the briefing.
++        const check=itemDelivery.checks[0];
++        const scope=maintenanceScopeRefusal(writeScope);
++        if(scope)return {status:'refused',code:scope.code,reason:scope.reason,repair:scope.repair};
++        const observation=readMaintenanceRedObservation({commonDir:repository.commonDir,check,candidate});
++        if(observation===null||!observation.red||observation.featureId!==state.activeFeature.id)return {status:'refused',code:'SQ-MAINTENANCE-RED-UNOBSERVED',
++          reason:`no red observation of ${describeMaintenanceCheck(check)} exists at candidate ${String(candidate.commit).slice(0,12)}`,repair:`observe the check at the clean HEAD first: node ${MAINTENANCE_RED_CHECK_SCRIPT} observe --root <repo> --check ${maintenanceCheckSpelling(check)} (it runs the check and records the result), then ${regenerate}`};
++        redProof=maintenanceRedProof({commonDir:repository.commonDir,root:physical,featureId:state.activeFeature.id,approvalSha256:approval.approvalSha256,
++          approvalCommit:planApprovalCommit({root:physical,state}),check});
++        if(redProof===null)return {status:'refused',code:'SQ-MAINTENANCE-RED-UNPROVEN',reason:`nothing proves that ${describeMaintenanceCheck(check)} was red before the feature`,repair:maintenanceAcknowledgementRepair()};
++        redProof=redProof.kind==='verify-receipt'?{kind:'verify-receipt',ref:redProof.ref}:{kind:'po-acknowledgement',ref:redProof.ref,mode:redProof.mode,label:redProof.label};
++      } else {
++        source=approval.sourceRefs.find(ref=>ref.path===locator.sourcePath&&ref.sha256===locator.sourceSha256);
++        if(!source||locator.sourcePath!==state.planSubmission.specPath)throw nativeManagedFault('item-course-original-unbound');
++        const sourcePath=join(physical,source.path),sourceInfo=lstatSync(sourcePath);
++        if(sourceInfo.isSymbolicLink()||!sourceInfo.isFile()||realpathSync(sourcePath)!==sourcePath)throw nativeManagedFault('item-course-original-unsafe');
++        const sourceBytes=readFileSync(sourcePath);
++        const criterion=parseAcceptedCriticCriterion({sourceBytes,locator,packageContext:{featureId:state.activeFeature.id,sourceBindings:[{path:source.path,sha256:source.sha256,role:'spec'}]}});
++        if(!['explicit-actual-independent-pass','no-explicit-criterion'].includes(criterion.status))throw nativeManagedFault('item-course-criterion-unbound');
++      }
+       // AC-108: the queue is read and written at its working copy under the Git common directory (the handover copy is only read, byte-identical, while no working copy exists).
+       const location=sliceQueueLocation({root:physical,planDir:dirname(state.activeFeature.planPath)}),path=location.workingPath;
+       if(relative(physical,location.handoverAbs).startsWith('..')||realpathSync(dirname(location.handoverAbs))!==dirname(location.handoverAbs))throw nativeManagedFault('item-course-queue-path');
+@@ -1556,19 +1579,22 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       }
+       const existing=raw.slices.find(row=>row.id===itemDelivery.sliceId);
+       if(itemDelivery.continuationOf!==undefined){const refusal=continuationPredecessorRefusal(itemDelivery.continuationOf,itemDelivery.sliceId,raw.slices);if(refusal)return refusal;}
+-      const delivery={itemId:itemDelivery.itemId,criteria:[locator.criterionId],baseCommit:candidate.commit,
+-        criterionLocator:locator,checks:itemDelivery.checks,approvalSha256:approval.approvalSha256};
+-      const canRebindLegacy=existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator
++      const delivery=maintenance
++        ?{itemId:itemDelivery.itemId,baseCommit:candidate.commit,maintenance:{...itemDelivery.maintenance},checks:itemDelivery.checks,approvalSha256:approval.approvalSha256,redProof}
++        :{itemId:itemDelivery.itemId,criteria:[locator.criterionId],baseCommit:candidate.commit,
++          criterionLocator:locator,checks:itemDelivery.checks,approvalSha256:approval.approvalSha256};
++      const sameBinding=row=>itemDeliveryBindingKey(row?.delivery)===bindingKey;
++      const canRebindLegacy=!maintenance&&existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator&&!isMaintenanceDelivery(existing.delivery)
+         &&existing.delivery.itemId===itemDelivery.itemId&&nativeManagedDigest(existing.delivery.criteria)===nativeManagedDigest([locator.criterionId])
+         &&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
+-      // A never-dispatched `ready` slice with the identical item, criterion and write scope rebinds to the current candidate.
++      // A never-dispatched `ready` slice with the identical item, criterion (or maintenance check) and write scope rebinds to the current candidate.
+       const canRebindReady=existing&&existing.state==='ready'&&existing.delivery?.status!=='unbound-legacy'&&existing.delivery?.itemId===itemDelivery.itemId
+-        &&nativeManagedDigest(existing.delivery?.criteria)===nativeManagedDigest([locator.criterionId])&&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
++        &&sameBinding(existing)&&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
+       if(existing?.delivery?.status!=='unbound-legacy'&&existing&&!canRebindLegacy&&!canRebindReady){
+         if(nativeManagedDigest(existing.delivery)!==nativeManagedDigest(delivery)||nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)){
+           // PF-47: nothing was written; name the queue row the binding must match instead of a generic authority fault.
+           const differs=[existing.state!=='ready'?`state ${existing.state}`:null,nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)?'write scope':null,
+-            existing.delivery?.itemId!==itemDelivery.itemId?'item':null,nativeManagedDigest(existing.delivery?.criteria)!==nativeManagedDigest([locator.criterionId])?'criterion':null].filter(Boolean);
++            existing.delivery?.itemId!==itemDelivery.itemId?'item':null,!sameBinding(existing)?'criterion':null].filter(Boolean);
+           return {status:'refused',code:'SQ-ITEM-BINDING-DRIFT',reason:`the binding for ${existing.id} differs from its queue row in ${differs.join(', ')||'its delivery binding'}`,
+             repair:existing.state!=='ready'?`slice ${existing.id} is ${existing.state}; it cannot be rebound: choose a new slice id`
+               :differs.includes('item')||differs.includes('criterion')?`slice ${existing.id} belongs to another item or criterion; choose a new slice id (--dispatch-id)`
+@@ -1577,7 +1603,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+         return resolveGovernedItemQueue({root:physical});
+       }
+       if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];if(itemDelivery.continuationOf!==undefined)existing.continuationOf=itemDelivery.continuationOf;}
+-      else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',...(itemDelivery.continuationOf!==undefined?{continuationOf:itemDelivery.continuationOf}:{}),dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
++      else raw.slices.push({id:itemDelivery.sliceId,title:maintenance?`maintenance of ${describeMaintenanceCheck(itemDelivery.checks[0])}`.slice(0,120):locator.criterionId,state:'ready',...(itemDelivery.continuationOf!==undefined?{continuationOf:itemDelivery.continuationOf}:{}),dependsOn:[],writeScope:[...writeScope],...(source?{readScope:[source.path]}:{}),tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
+       orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId,candidate.commit);
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
+       // A held dependency refuses before the queue is written, so a refused dispatch leaves the tree as it was.
+@@ -1860,6 +1886,12 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,b
+     // test fails; the verdict of a check must not depend on the runner that happens to host this process.
+     delete checkEnv.NODE_TEST_CONTEXT;
+     for(const check of itemDelivery.checks) {
++      if(check.verify==='configured') {
++        // ADR-0097: the full configured Verify of a maintenance delivery can outlast a hook, so it is not run here. The row says so
++        // (deferredTo), and green is the feature's own close Verify, which the close requires anyway (configured-verify suite).
++        results.push({id:check.id,path:check.path,verify:'configured',deferredTo:'close-verify',status:0,signal:null,error:null,stdoutSha256:digest(Buffer.alloc(0)),stderrSha256:digest(Buffer.alloc(0))});
++        continue;
++      }
+       if(check.document!==undefined) {
+         // G20-65: verified above from the committed bytes; no process runs, the row records the document and its passing status.
+         results.push({id:check.id,path:check.path,document:check.document,status:0,signal:null,error:null,stdoutSha256:digest(Buffer.alloc(0)),stderrSha256:digest(Buffer.alloc(0))});
+@@ -1915,10 +1947,12 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
+       const governed=resolveGovernedItemQueue({root:repository.primaryRoot}),approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
+       const item=governed.status==='required'?governed.normalized.slices.find(row=>row.id===original.sliceId):null;
+       if(!item||item.delivery.itemId!==original.itemId||approval.status!=='eligible'||item.delivery.approvalSha256!==approval.approvalSha256
+-        ||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(original.criterionLocator)||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(checks))throw nativeManagedFault('native-item-scope-approved-course-unavailable');
++        ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(original))||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(checks))throw nativeManagedFault('native-item-scope-approved-course-unavailable');
+       const amendments=nativeScopeAmendments(read,entry,operation),latest=amendments.at(-1),effective=effectiveNativePendingState(read,entry);
+       const allowedPaths=[...new Set([...effective.binding.allowedPaths,...effective.delivery.writeScope,...input.additionalPaths])].sort(),writeScope=[...new Set([...effective.delivery.writeScope,...input.additionalPaths])].sort();
+       if(allowedPaths.length>64||writeScope.length>64)throw nativeManagedFault('native-item-scope-record-bound');
++      // ADR-0097: an amendment never widens a maintenance delivery past its narrow scope.
++      if(isMaintenanceDelivery(item.delivery)){const refusal=maintenanceScopeRefusal(writeScope);if(refusal)throw Object.assign(nativeManagedFault(refusal.reason),{code:refusal.code,repair:refusal.repair});}
+       const unchanged=nativeManagedDigest(allowedPaths)===nativeManagedDigest([...effective.binding.allowedPaths].sort());
+       const raw=structuredClone(governed.queue),rawItem=raw.slices.find(row=>row.id===original.sliceId);
+       if(!unchanged&&nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effective.delivery.writeScope))throw nativeManagedFault('native-item-scope-queue-recovery-required');
+@@ -1983,7 +2017,7 @@ function nativeItemRecheckPlan({repository,boundary,pendingSha256}) {
+   const item=governed.status==='required'?governed.normalized.slices.find(row=>row.id===pending.value.delivery.sliceId):null;
+   const approval=observeCurrentPlanApprovalForCalibration({rootDir:repository.primaryRoot});
+   if(!item||item.delivery.itemId!==pending.value.delivery.itemId||approval.status!=='eligible'||item.delivery.approvalSha256!==approval.approvalSha256
+-    ||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(pending.value.binding.itemDelivery.criterionLocator)
++    ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(pending.value.binding.itemDelivery))
+     ||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(pending.value.binding.itemDelivery.checks))throw nativeManagedFault('native-item-recheck-approved-course-unavailable');
+   const {original,amendments,latest}=nativeItemQualifications(read,pendingSha256);
+   if(!original||!latest)throw nativeManagedFault('native-item-targeted-evidence-required');
+@@ -2236,7 +2270,7 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
+         if(!pending?.value.binding.itemDelivery||!item)continue;
+         const briefing=pending.value.binding.itemDelivery;
+         if(item.delivery.baseCommit!==pending.value.binding.candidateCommit||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effectiveNativePendingState(read,pending).delivery.writeScope)
+-          ||nativeManagedDigest(item.delivery.criterionLocator)!==nativeManagedDigest(briefing.criterionLocator)||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(briefing.checks))continue;
++          ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(briefing))||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(briefing.checks))continue;
+         const current=itemCheckSnapshot(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate);
+         if(nativeManagedDigest(current.files)!==nativeManagedDigest(row.value.files))continue;
+         integrated.push(item.id);
+diff --git a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+index ab8811a57f4b88fb800f0af1fbb3a007d6748ede..6527e331db9ad106d49909c59835ef0b088dc805 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+@@ -389,3 +389,76 @@ test("(h) PF-58: the review unit binds every criterion id form the binding admit
+   const many = Array.from({ length: 200 }, (_, index) => `AC-E1-1-${index + 1}`).join(" ");
+   assert.equal(ids(many).length, 128, "the 128-id cap still holds");
+ });
++
++// ADR-0097 (D249, K-28): a red check that no Spec criterion covers is repaired by a maintenance dispatch, with only shipped
++// commands and no injected approval or digest: observe the check red, the binding refuses without a red-before proof, the PO
++// acknowledges it (chat mode in this fixture: recorded at once, labelled unattested), the regenerated binding prepares a
++// maintenance slice whose red proof the host derived itself, a product path is refused, and the host-run check is green
++// after the repair. The acknowledgement step leaves HEAD and the tree as they were, so the observation still applies.
++test("(i) ADR-0097: observe, acknowledge, bind and admit a maintenance repair of a pre-existing red check", async () => {
++  const { main: observeMain } = await import("../../scripts/maintenance-red-check.mjs");
++  const fx = consumer();
++  const RED = "tests/links.test.mjs";
++  const HELPER = "tests/helpers/links.mjs";
++  fx.write(HELPER, "export const links = () => [\"javascript:alert(1)\"];\n");
++  fx.write(RED, "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\nimport { links } from \"./helpers/links.mjs\";\n\ntest(\"no script links\", () => { assert.ok(links().every((link) => !link.startsWith(\"javascript:\"))); });\n");
++  // The observation binds a clean HEAD: the fixture's materialize-architecture step left the map refreshed but uncommitted.
++  fx.gitOk("add", "--update");
++  fx.gitOk("add", "--", HELPER, RED);
++  fx.gitOk("commit", "-q", "-m", "an example check that is already red");
++  assert.equal(fx.gitOk("status", "--porcelain", "--untracked-files=no"), "");
++  const observe = () => {
++    let stdout = "", stderr = "";
++    const exitCode = observeMain(["observe", "--root", fx.root, "--check", RED], { stdout: { write: (text) => { stdout += text; } }, stderr: { write: (text) => { stderr += text; } } });
++    return { exitCode, stdout, stderr };
++  };
++  const observed = observe();
++  assert.equal(observed.exitCode, 0, observed.stderr);
++  assert.equal(JSON.parse(observed.stdout).status, "red");
++  const maintenanceBinding = (dispatchId, paths) => runDispatchBriefing(["binding", "--root", fx.root, "--dispatch-id", dispatchId, "--item", "links-check", "--maintenance",
++    "--agent-type", "goldfish-implementor", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", RED, ...paths.flatMap((path) => ["--path", path])],
++  { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "available", value: "a".repeat(64) }, selectedPlugin: { version: "pin" } }, pluginRoot: null }) });
++  const unproven = maintenanceBinding("PIN-MAINT-1", [HELPER]);
++  assert.equal(unproven.code, "DBG-MAINTENANCE-RED-UNPROVEN", JSON.stringify(unproven));
++  assert.match(unproven.message, /approve-maintenance-red-check --by/u);
++
++  const before = { head: fx.gitOk("rev-parse", "HEAD"), tree: fx.gitOk("rev-parse", "HEAD^{tree}"), status: fx.gitOk("status", "--porcelain", "--untracked-files=no") };
++  const logs = [];
++  const old = { log: console.log, error: console.error };
++  console.log = (...args) => { logs.push(args.map(String).join(" ")); };
++  console.error = (...args) => { logs.push(args.map(String).join(" ")); };
++  let acknowledged;
++  try { acknowledged = run(["approve-maintenance-red-check", "--by", "synthetic-po"], { dir: fx.root, now: () => AT }); } finally { Object.assign(console, old); }
++  assert.equal(acknowledged, 0, logs.join("\n"));
++  assert.match(logs.join("\n"), /chat-attributed-unattested/u);
++  assert.deepEqual({ head: fx.gitOk("rev-parse", "HEAD"), tree: fx.gitOk("rev-parse", "HEAD^{tree}"), status: fx.gitOk("status", "--porcelain", "--untracked-files=no") }, before,
++    "recording the acknowledgement moves neither HEAD nor the tree, so the red observation still names the candidate");
++
++  const product = maintenanceBinding("PIN-MAINT-2", [SOURCE]);
++  assert.equal(product.code, "DBG-MAINTENANCE-SCOPE", JSON.stringify(product));
++  const bound = maintenanceBinding("PIN-MAINT-1", [HELPER]);
++  assert.equal(bound.ok, true, JSON.stringify(bound));
++  assert.deepEqual(bound.binding.itemDelivery.maintenance, { schema: "pipeline.maintenance-binding.v1" });
++  assert.equal(bound.binding.itemDelivery.criterionLocator, undefined);
++  // A hand-widened delivery that passes the general item-scope rule (the product path is a dependency of the check) is still refused.
++  const [boundCheck] = bound.binding.itemDelivery.checks;
++  const widened = { ...bound.binding.itemDelivery, sliceId: "PIN-MAINT-3", checks: [{ ...boundCheck, dependencies: [...boundCheck.dependencies, SOURCE].sort() }] };
++  const productScope = prepareGovernedItemQueue({ root: fx.root, itemDelivery: widened, candidate: fx.candidate(), writeScope: [HELPER, SOURCE].sort() });
++  assert.equal(productScope.code, "SQ-MAINTENANCE-SCOPE", JSON.stringify(productScope));
++  const prepared = prepareGovernedItemQueue({ root: fx.root, itemDelivery: bound.binding.itemDelivery, candidate: fx.candidate(), writeScope: bound.binding.allowedPaths });
++  assert.notEqual(prepared.status, "refused", JSON.stringify(prepared));
++  const queue = JSON.parse(readSliceQueueSource(sliceQueueLocation({ root: fx.root, planDir: "specs/e2e" })).bytes.toString("utf8"));
++  const slice = queue.slices.find((row) => row.id === "PIN-MAINT-1");
++  assert.equal(slice.state, "ready");
++  assert.equal(slice.readScope, undefined, "a maintenance slice reads no Spec criterion");
++  assert.deepEqual(slice.delivery.maintenance, { schema: "pipeline.maintenance-binding.v1" });
++  assert.deepEqual([slice.delivery.redProof.kind, slice.delivery.redProof.mode, slice.delivery.redProof.label],
++    ["po-acknowledgement", "chat-attributed-unattested", "red before the feature acknowledged by the PO"], "the host derived the proof from the recorded acknowledgement");
++  assert.equal(slice.delivery.criteria, undefined, "no Spec criterion is claimed");
++
++  fx.write(HELPER, "export const links = () => [\"https://example.invalid/\"];\n");
++  fx.gitOk("add", "--", HELPER);
++  fx.gitOk("commit", "-q", "-m", "repair the example check");
++  const executed = executeGovernedItemDeliveryChecks({ root: fx.root, itemDelivery: bound.binding.itemDelivery, candidate: fx.candidate() });
++  assert.equal(executed.code, "SQ-TARGETED-CHECKS-PASSED", JSON.stringify(executed.evidence ?? executed));
++});
+diff --git a/plugins/pipeline-core/lib/slice-queue.mjs b/plugins/pipeline-core/lib/slice-queue.mjs
+index 63dec4850ccb3f68f4f0fa0833b51df8641df9ef..d348c4f06f879371132c9a7f6698c4dc20b3e15f 100644
+--- a/plugins/pipeline-core/lib/slice-queue.mjs
++++ b/plugins/pipeline-core/lib/slice-queue.mjs
+@@ -74,6 +74,14 @@ export function checkCancelClass(value) {
+     repair: `give the class that says why the slice ends: ${CANCEL_CLASSES.map((name) => `${name} (${CANCEL_CLASS_HELP[name]})`).join("; ")}`,
+   };
+ }
++/** ADR-0097: the closed red-before proof of a maintenance delivery: a pre-approval red Verify receipt, or the PO's labelled acknowledgement. */
++export function validRedProof(value) {
++  if (!isObject(value) || typeof value.ref !== "string" || value.ref === "" || value.ref.length > 200) return false;
++  const keys = Object.keys(value).sort().join(",");
++  if (value.kind === "verify-receipt") return keys === "kind,ref" && /^[a-f0-9]{64}$/u.test(value.ref);
++  if (value.kind === "po-acknowledgement") return keys === "kind,label,mode,ref" && ["signature", "chat-attributed-unattested"].includes(value.mode) && typeof value.label === "string" && value.label !== "";
++  return false;
++}
+ export const DEFAULT_MAX_ATTEMPTS = 2;
+ /** Same value as fanout-ledger.mjs `DEFAULT_STALE_AFTER_MINUTES` (pinned by a test). */
+ export const DEFAULT_STALE_AFTER_MINUTES = 20;
+@@ -592,7 +600,12 @@ export function validateSliceQueue(input, options = {}) {
+       const modern=keys==='approvalSha256,baseCommit,checks,criteria,criterionLocator,itemId';
+       const selected=modern&&validateItemDeliveryBriefing({schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId:delivery.itemId,criterionLocator:delivery.criterionLocator,checks:delivery.checks}).ok
+         &&/^[a-f0-9]{64}$/u.test(delivery.approvalSha256??'')&&delivery.criteria.length===1&&delivery.criteria[0]===delivery.criterionLocator.criterionId;
+-      if(!legacy&&(!basic||modern&&!selected))err('SQ-DELIVERY',`slice ${id}: v2 delivery binding is invalid`,{sliceId:id});
++      // ADR-0097: a maintenance delivery binds one red check and the host-derived proof it was red before the feature; it carries no criterion.
++      const maintenance=keys==='approvalSha256,baseCommit,checks,itemId,maintenance,redProof'&&isSafeTaskId(delivery.itemId)
++        &&/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(delivery.baseCommit??'')&&/^[a-f0-9]{64}$/u.test(delivery.approvalSha256??'')
++        &&validateItemDeliveryBriefing({schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId:delivery.itemId,maintenance:delivery.maintenance,checks:delivery.checks}).ok
++        &&validRedProof(delivery.redProof);
++      if(!legacy&&!maintenance&&(!basic||modern&&!selected))err('SQ-DELIVERY',`slice ${id}: v2 delivery binding is invalid`,{sliceId:id});
+     }
+     if (!isLine(raw.title)) err("SQ-SCHEMA", `slice ${id}: title must be one non-empty line`, { sliceId: id });
+     const state = SLICE_STATES.includes(raw.state) ? raw.state : null;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 53159b5e28e8155f4585efbcdce02884d77cb0a2..6fd3b886923b4396b4cbd1a8fd154d050b856660 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -56,7 +56,7 @@ const cliArguments = process.argv.slice(2);
+ const cliHelp = directInvocation && cliArguments.some(argument => argument === "--help" || argument === "-h");
+ const USAGE = `Usage:
+   node <plugin-root>/scripts/dispatch-briefing.mjs --help | -h
+-  node <plugin-root>/scripts/dispatch-briefing.mjs binding --dispatch-id <id> --item <slug> --agent-type <type> --model-id <model> --check <test-path> [--path <path>]...
++  node <plugin-root>/scripts/dispatch-briefing.mjs binding --dispatch-id <id> --item <slug> --agent-type <type> --model-id <model> --check <test-path> [--path <path>]... [--maintenance]
+   node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> [--out scratch/<briefing>.md] [--root <directory>]
+   node <plugin-root>/scripts/dispatch-briefing.mjs probe --package <package.json> [--root <directory>]
+ 
+@@ -82,6 +82,11 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
+   --check document:<owned path> (G20-65) names one document a documentation-only module owns (every owned path a document); the host finalize
+     verifies that the delivery changed it as a non-empty committed file. A code module keeps a test it owns or command:<id>.
+   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
++  --maintenance (ADR-0097, no value, never with --criterion) binds a check that was red before the feature and that no Spec criterion
++    covers. --check is a .test file, command:<id> or verify:configured (the calibration's verify command); the write scope holds only
++    test- or tooling-shaped paths. First: maintenance-red-check.mjs observe --root <repo> --check <the same spelling> on the clean HEAD.
++    The proof that it was red before the feature is a red Verify receipt at or before the plan approval, else the PO's acknowledgement
++    (pipeline-state.mjs approve-maintenance-red-check --by <label>). This generator only reads both; it runs no check.
+ 
+ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+   Required strings: id, item, agentType, modelId, check, title, ac, goal.
+@@ -153,6 +158,20 @@ const { deliversModuleSlice, moduleDispatchScope, readPrdModules } = cliHelp ? {
+ const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
+ const { inspectSpecJourneys } = cliHelp ? {} : await import("../lib/spec-journey-coverage.mjs");
+ const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
++const {
++  CONFIGURED_VERIFY_CHECK,
++  MAINTENANCE_BINDING_SCHEMA,
++  describeMaintenanceCheck,
++  maintenanceAcknowledgementRepair,
++  maintenanceCheckSpelling,
++  maintenanceRedProof,
++  maintenanceScopeRefusal,
++  parseMaintenanceCheckSpelling,
++  planApprovalCommit,
++  readMaintenanceRedObservation,
++} = cliHelp ? {} : await import("../lib/maintenance-delivery.mjs");
++const { sha256CanonicalJson } = cliHelp ? {} : await import("../lib/plan-spec-state-v2.mjs");
++const MAINTENANCE_RED_CHECK_SCRIPT = fileURLToPath(new URL("./maintenance-red-check.mjs", import.meta.url));
+ 
+ export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
+ export const DISPATCH_REFUSAL_SCHEMA = "pipeline.dispatch-briefing.refusal.v1";
+@@ -180,6 +199,8 @@ const DUTY_ROUTE_OF_AGENT = Object.freeze({
+ // The environment keys through which `resolveActiveRunner` (pipeline-start-preflight.mjs) learns the runner of a process.
+ const RUNNER_SIGNAL_KEYS = Object.freeze(["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT"]);
+ const REPEATED_FLAGS = Object.freeze({ "--path": "paths" });
++// ADR-0097 (K-28): a flag without a value. `--maintenance` binds a red check that no Spec criterion covers instead of a criterion.
++const BOOLEAN_FLAGS = Object.freeze({ "--maintenance": "maintenance" });
+ const REQUIRED_FLAGS = Object.freeze(["--dispatch-id", "--item", "--agent-type", "--model-id", "--check"]);
+ const READ_ONLY_GIT = new Set(["rev-parse", "status"]);
+ const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
+@@ -306,6 +327,12 @@ export function parseBindingArgv(argv) {
+     if (typeof token !== "string" || !token.startsWith("--")) refuse("DBG-ARGUMENT-UNEXPECTED", `unexpected argument ${JSON.stringify(token)}; every input is a --flag`);
+     const equals = token.indexOf("=");
+     const flag = equals === -1 ? token : token.slice(0, equals);
++    if (Object.hasOwn(BOOLEAN_FLAGS, flag)) {
++      if (equals !== -1) refuse("DBG-FLAG-VALUE", `flag ${flag} takes no value`);
++      if (Object.hasOwn(values, BOOLEAN_FLAGS[flag])) refuse("DBG-FLAG-REPEATED", `flag ${flag} may be given once`);
++      values[BOOLEAN_FLAGS[flag]] = true;
++      continue;
++    }
+     const single = Object.hasOwn(SINGLE_FLAGS, flag);
+     if (!single && !Object.hasOwn(REPEATED_FLAGS, flag)) refuse("DBG-FLAG-UNKNOWN", `unknown flag ${flag}`);
+     let value;
+@@ -495,15 +522,46 @@ function defaultSpecPathFromState(root) {
+ }
+ 
+ /** The active feature id the host parses the criterion with (K-25), or null when the project state names none. */
+-function activeFeatureIdFromState(root) {
++function projectStateFromRoot(root) {
+   try {
+     const paths = resolveProjectAuthorityPaths({ rootDir: root });
+     if (paths.status !== "ready" || typeof paths.state !== "string") return null;
+-    const id = JSON.parse(readFileSync(resolve(root, paths.state), "utf8"))?.activeFeature?.id;
+-    return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(id) ? id : null;
++    return JSON.parse(readFileSync(resolve(root, paths.state), "utf8"));
+   } catch { return null; }
+ }
+ 
++function activeFeatureIdFromState(root) {
++  const id = projectStateFromRoot(root)?.activeFeature?.id;
++  return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(id) ? id : null;
++}
++
++/**
++ * ADR-0097: read-only. The red observation of the maintenance check at the candidate and the proof that it was red before the
++ * feature, derived the way the host derives them. The generator never runs the check: maintenance-red-check.mjs observe does.
++ */
++function maintenanceReadiness(root, check, candidate, deps, soft) {
++  const spelling = maintenanceCheckSpelling(check);
++  const state = (deps.projectState ?? projectStateFromRoot)(root);
++  const featureId = state?.activeFeature?.id;
++  if (typeof featureId !== "string" || featureId === "" || state?.planApproval === null || typeof state?.planApproval !== "object") {
++    soft("DBG-MAINTENANCE-NO-APPROVAL", "a maintenance binding belongs to the active feature after its plan approval; the project State names no approved active feature");
++    return;
++  }
++  const commonDir = (deps.gitCommonDir ?? resolveGitCommonDir)(root);
++  const observation = commonDir === null ? null : readMaintenanceRedObservation({ commonDir, check, candidate });
++  if (observation === null || observation.featureId !== featureId) {
++    soft("DBG-MAINTENANCE-RED-UNOBSERVED", `no observation of ${describeMaintenanceCheck(check)} exists at the candidate ${candidate.commit.slice(0, 12)} for feature ${featureId}; repair: commit or restore the tracked changes, run node ${MAINTENANCE_RED_CHECK_SCRIPT} observe --root <repo> --check ${spelling} (it runs the check and records the result), then generate this binding again`);
++    return;
++  }
++  if (!observation.red) {
++    soft("DBG-MAINTENANCE-GREEN", `${describeMaintenanceCheck(check)} was observed green at the candidate ${candidate.commit.slice(0, 12)}: there is nothing to repair, so no maintenance dispatch is admitted`);
++    return;
++  }
++  const proof = (deps.maintenanceRedProof ?? maintenanceRedProof)({ commonDir, root, featureId, approvalSha256: sha256CanonicalJson(state.planApproval),
++    approvalCommit: planApprovalCommit({ root, state }), check });
++  if (proof === null) soft("DBG-MAINTENANCE-RED-UNPROVEN", `nothing proves that ${describeMaintenanceCheck(check)} was red before the feature; repair: ${maintenanceAcknowledgementRepair()}`);
++}
++
+ /** A regular, non-symlinked file strictly inside the (already real) root, or null. */
+ function readRepoFile(root, rel) {
+   try {
+@@ -708,10 +766,12 @@ export function assertBindingInvariants(binding) {
+   const checks = binding?.itemDelivery?.checks;
+   if (!Array.isArray(checks) || checks.length !== 1 || !Array.isArray(binding.allowedPaths)) refuse("DBG-BINDING-INVALID", "the binding must carry exactly one item-delivery check");
+   const [check] = checks;
+-  if (check.command !== undefined) {
++  if (check.command !== undefined || check.verify !== undefined) {
+     // D195: the calibration the command is registered in is a dependency, never a write path (the command stays human-approved).
+-    if (binding.allowedPaths.includes(check.path)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${check.path} that registers command ${check.command} must not be among the allowed paths`);
+-    if (!check.dependencies.includes(check.path)) refuse("DBG-BINDING-INVALID", `the calibration ${check.path} must be a dependency of command check ${check.command}`);
++    // ADR-0097: the same for the calibration holding the verify command of a maintenance check.
++    const named = check.command !== undefined ? `command check ${check.command}` : `check ${CONFIGURED_VERIFY_CHECK}`;
++    if (binding.allowedPaths.includes(check.path)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${check.path} of ${named} must not be among the allowed paths`);
++    if (!check.dependencies.includes(check.path)) refuse("DBG-BINDING-INVALID", `the calibration ${check.path} must be a dependency of ${named}`);
+   } else if (!binding.allowedPaths.includes(check.path) || !check.dependencies.includes(check.path)) {
+     refuse("DBG-CHECK-NOT-IN-PATHS", `check ${check.path} is not among the allowed paths`);
+   }
+@@ -796,10 +856,18 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
+   const commandId = check.startsWith(COMMAND_CHECK_PREFIX) ? check.slice(COMMAND_CHECK_PREFIX.length) : null;
++  // ADR-0097 (K-28): a maintenance binding names a check that was red before the feature instead of a Spec criterion. Its check may
++  // also be `verify:configured`, the calibration's top-level verify command (bound, like a command check, to the calibration file).
++  const maintenance = options.maintenance === true;
++  const configuredVerify = check === CONFIGURED_VERIFY_CHECK;
++  if (configuredVerify && !maintenance) refuse("DBG-CHECK-VERIFY-MAINTENANCE-ONLY", `check ${CONFIGURED_VERIFY_CHECK} exists only in a maintenance binding (--maintenance, ADR-0097); an item that delivers a Spec criterion names a .test file or command:<id>`);
++  if (maintenance && options.criterion !== undefined) refuse("DBG-MAINTENANCE-CRITERION", "a maintenance binding repairs a red check that no Spec criterion covers, so it names no --criterion; for work a criterion covers, drop --maintenance");
++  const calibrationBound = commandId !== null || configuredVerify;
+   // G20-65: `document:<owned path>` names one document of a documentation-only module's write scope as the item check.
+-  const documentPath = commandId === null && check.startsWith(DOCUMENT_CHECK_PREFIX) ? check.slice(DOCUMENT_CHECK_PREFIX.length) : null;
++  const documentPath = !calibrationBound && check.startsWith(DOCUMENT_CHECK_PREFIX) ? check.slice(DOCUMENT_CHECK_PREFIX.length) : null;
++  if (maintenance && documentPath !== null) refuse("DBG-MAINTENANCE-DOCUMENT", "a document check proves a document exists, never that a red check turned green; a maintenance binding names a .test file, command:<id> or verify:configured");
+   const checkFile = documentPath ?? check;
+-  for (const path of [...(commandId === null ? [checkFile] : []), ...options.paths]) {
++  for (const path of [...(calibrationBound ? [] : [checkFile]), ...options.paths]) {
+     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
+   }
+   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
+@@ -808,7 +876,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (documentPath !== null) {
+     if (!DOCUMENT_CHECK_FILE.test(documentPath)) soft("DBG-CHECK-DOCUMENT-KIND", `check ${check} must name a document file (a path ending in .md, .mdx, .txt, .rst or .adoc); repair: name one of the documents of the documentation-only module, or use a .test file or command:<id>`);
+     else if (options.documentationModule === undefined) soft("DBG-CHECK-DOCUMENT-MODULE", `check ${check} is the check of a documentation-only module (every owned path a document), and this dispatch names no such module; repair: dispatch through a briefing package that names "module" and "modulePlan" of a documentation-only module, or use a .test.mjs, .test.cjs or .test.js file or command:<id> of a command the project calibration registers under verifyImpact`);
+-  } else if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) {
++  } else if (!calibrationBound && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) {
+     // G20-65: the module is documentation-only (it owns only documents), so the repair names the document form.
+     const documentRepair = options.documentationModule !== undefined && DOCUMENT_CHECK_FILE.test(check)
+       ? `; module ${options.documentationModule} owns only documents. repair: name ${check} as the check in the document form ${DOCUMENT_CHECK_PREFIX}${check}` : "";
+@@ -830,7 +898,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     directoryExpansions.push({ path, files: listed });
+     expandedPaths.push(...listed);
+   }
+-  const allowedPaths = [...new Set([...(commandId === null ? [checkFile] : []), ...expandedPaths])].sort();
++  const allowedPaths = [...new Set([...(calibrationBound ? [] : [checkFile]), ...expandedPaths])].sort();
+   if (allowedPaths.length > MAX_ALLOWED_PATHS) refuse("DBG-SCOPE-TOO-MANY-PATHS", `the write scope holds ${allowedPaths.length} exact files and the native host admits at most ${MAX_ALLOWED_PATHS}${directoryExpansions.length === 0 ? "" : ` (directories expanded: ${directoryExpansions.map((entry) => `${entry.path} -> ${entry.files.length}`).join(", ")})`}; split the work into several dispatches, each with its own exact files`);
+   for (const entry of directoryExpansions) {
+     warnings.push({ code: "DBG-DIRECTORY-EXPANDED", path: entry.path, files: entry.files, message: `${entry.path} is a directory: the write scope lists its ${entry.files.length} regular file(s) as they exist now. A file created there later is outside the scope; bind it with a new --path (a new binding), never by widening the match` });
+@@ -850,6 +918,19 @@ export function generateDispatchBinding(options, deps = {}) {
+       soft("DBG-CHECK-COMMAND-UNKNOWN", `command ${commandId} is not registered in the project calibration ${commandCheckPath}${why}. repair: register it as {"id": "${commandId}", "command": "<the real verify command>"} under verifyImpact.baseline in ${commandCheckPath} (schema pipeline.project-verify-impact.v1), commit that calibration so the candidate commit of this briefing carries it, and run this command again`);
+     }
+     if (allowedPaths.includes(commandCheckPath)) soft("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that registers command ${commandId} must not be a --path of the same dispatch (the command stays human-approved)`);
++  } else if (configuredVerify) {
++    commandCheckPath = (deps.calibrationRelPath ?? ((rootDir) => resolveAuthorityArtifactPath("calibration", { rootDir }).relPath))(root);
++    let fullCommand = null;
++    let why = "";
++    try { fullCommand = (deps.readConsumerVerify ?? readConsumerVerifyConfiguration)(root).fullCommand; }
++    catch (error) { why = ` (${String(error?.message ?? error).slice(0, 160)})`; }
++    if (fullCommand === null) soft("DBG-CHECK-VERIFY-UNCONFIGURED", `the project calibration ${commandCheckPath} has no verify command${why}; ${CONFIGURED_VERIFY_CHECK} names that command. repair: name the red check as a .test file or command:<id> instead`);
++    if (allowedPaths.includes(commandCheckPath)) soft("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that holds the verify command must not be a --path of the same dispatch (the command stays human-approved)`);
++  }
++  if (maintenance) {
++    // ADR-0097 Decision 2: test- or tooling-shaped paths only, never a gate-strength path, never under specs/. The host checks it again.
++    const scope = maintenanceScopeRefusal(allowedPaths);
++    if (scope !== null) soft("DBG-MAINTENANCE-SCOPE", `${scope.reason}; repair: ${scope.repair}`);
+   }
+ 
+   // Original acceptance: the criterion, its byte span, and (Alfred route only) the backlog item it names.
+@@ -862,7 +943,11 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (!specBytes || specBytes.byteLength < 1) refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not a readable regular file under --root`);
+   let locator;
+   let itemId;
+-  if (options.criterion !== undefined) {
++  if (maintenance) {
++    // No criterion: the item id is derived exactly as for a consumer criterion, <spec folder>.<item>.
++    itemId = `${specPath.split("/")[1]}.${item}`;
++    if (!ITEM_ID.test(itemId)) refuse("DBG-ITEM-ID", `derived item id ${JSON.stringify(itemId)} does not match ${ITEM_ID}`);
++  } else if (options.criterion !== undefined) {
+     // Generic route: a consumer's own `AC-<n>`; the item id is derived, no backlog item is involved.
+     let occurrences;
+     try { occurrences = findCriterionOccurrences(specBytes, options.criterion); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
+@@ -1164,6 +1249,11 @@ export function generateDispatchBinding(options, deps = {}) {
+     candidateTree = String(git(root, ["rev-parse", "HEAD^{tree}"])).trim();
+   } catch { refuse("DBG-GIT-HEAD", "git rev-parse HEAD failed under --root"); }
+   if (!OID.test(candidateCommit) || !OID.test(candidateTree)) refuse("DBG-GIT-HEAD", "git returned a malformed commit or tree id");
++  if (maintenance) {
++    const identity = parseMaintenanceCheckSpelling(check);
++    if (identity === null) soft("DBG-MAINTENANCE-CHECK", `check ${check} is not a maintenance check: a .test file, command:<id> or ${CONFIGURED_VERIFY_CHECK}`);
++    else maintenanceReadiness(root, identity, { commit: candidateCommit, tree: candidateTree }, deps, soft);
++  }
+   try {
+     if (String(git(root, ["status", "--porcelain", "--", specPath])).trim() !== "") {
+       warnings.push({ code: "DBG-SPEC-UNCOMMITTED", path: specPath, message: `${specPath} differs from HEAD; the locator hashes the working-tree bytes, not the candidate's` });
+@@ -1208,10 +1298,10 @@ export function generateDispatchBinding(options, deps = {}) {
+       schema: "pipeline.item-delivery-briefing.v1",
+       sliceId: dispatchId,
+       itemId,
+-      criterionLocator: locator,
+-      checks: [commandId === null
++      ...(maintenance ? { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA } } : { criterionLocator: locator }),
++      checks: [!calibrationBound
+         ? { id: `${dispatchId.toLowerCase()}-check`, path: checkFile, ...(documentPath === null ? {} : { document: documentPath }), dependencies: [...allowedPaths] }
+-        : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, command: commandId, dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
++        : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, ...(configuredVerify ? { verify: "configured" } : { command: commandId }), dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
+     },
+   };
+   assertBindingInvariants(binding);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index ac9a880f0624f726c202cf1593af80f2911b5f80..031c66fd42198610fbdc58dd1e8733d2ac8c6657 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2722,3 +2722,100 @@ test("G20-65: the happy-path guide states the document check rule in one sentenc
+   const guide = readFileSync(join(HERE, "..", "skills", "pipeline-start", "references", "happy-path.md"), "utf8");
+   assert.match(guide, /documentation-only module[^\n]*`document:<owned path>`/u);
+ });
++
++// ADR-0097 (K-28): --maintenance binds a check that was red before the feature and that no Spec criterion covers. The generator only
++// reads the red observation (maintenance-red-check.mjs observe writes it) and the red-before proof; it runs no check.
++const M_CHECK = "tests/unit/links.test.mjs";
++const M_HELPER = "tests/helpers/links-fixture.mjs";
++const M_STATE = { activeFeature: { id: "feat-x" }, planApproval: { approvedBy: "fixture", approvedAt: "2026-11-13T10:00:00.000Z" } };
++async function maintenanceDeps(fx, { observation = "red", proof = { kind: "verify-receipt", ref: "c".repeat(64) }, over = {} } = {}) {
++  const { writeMaintenanceRedObservation, parseMaintenanceCheckSpelling } = await import("../lib/maintenance-delivery.mjs");
++  const common = join(fx.root, "common-fixture");
++  if (observation !== null) {
++    const check = parseMaintenanceCheckSpelling(over.spelling ?? M_CHECK);
++    const written = writeMaintenanceRedObservation({ commonDir: common, featureId: "feat-x", check, candidate: { commit: COMMIT, tree: TREE },
++      exitCode: observation === "red" ? 1 : 0, outputSha256: "d".repeat(64), observedAt: "2026-11-13T11:00:00.000Z" });
++    assert.equal(written.ok, true, JSON.stringify(written));
++  }
++  const { spelling, ...rest } = over;
++  void spelling;
++  return depsOf(fx, { projectState: () => M_STATE, gitCommonDir: () => common, maintenanceRedProof: () => proof, ...rest });
++}
++const maintenanceArgv = (fx, overrides = {}, extra = []) => argvOf(fx, { "--check": M_CHECK, "--path": M_HELPER, ...overrides }, ["--maintenance", ...extra]);
++
++test("ADR-0097 --maintenance builds a binding without a criterion: the closed maintenance object, the narrow scope, the derived item id", async () => {
++  const { runDispatchBriefing, assertBindingInvariants } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(maintenanceArgv(fx), await maintenanceDeps(fx));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 600));
++  const delivery = result.binding.itemDelivery;
++  assert.deepEqual(Object.keys(delivery).sort(), ["checks", "itemId", "maintenance", "schema", "sliceId"]);
++  assert.deepEqual(delivery.maintenance, { schema: "pipeline.maintenance-binding.v1" });
++  assert.equal(delivery.itemId, "feat-x.sample-slug");
++  assert.deepEqual(result.binding.allowedPaths, [M_HELPER, M_CHECK].sort());
++  assert.deepEqual(Object.keys(delivery.checks[0]).sort(), ["dependencies", "id", "path"]);
++  assert.doesNotThrow(() => assertBindingInvariants(result.binding));
++  assert.equal(validateItemDeliveryBriefing(delivery).ok, true);
++});
++
++test("ADR-0097 --maintenance refuses without a red observation at the candidate, on a green one, and without a red-before proof", async () => {
++  const { runDispatchBriefing } = await lib();
++  const unobserved = makeFixture();
++  const none = runDispatchBriefing(maintenanceArgv(unobserved), await maintenanceDeps(unobserved, { observation: null }));
++  assert.equal(none.code, "DBG-MAINTENANCE-RED-UNOBSERVED", none.message);
++  assert.match(none.message, new RegExp(`maintenance-red-check\\.mjs observe --root <repo> --check ${M_CHECK.replaceAll(".", "\\.")}`, "u"));
++  const greenFx = makeFixture();
++  const green = runDispatchBriefing(maintenanceArgv(greenFx), await maintenanceDeps(greenFx, { observation: "green" }));
++  assert.equal(green.code, "DBG-MAINTENANCE-GREEN", green.message);
++  const unprovenFx = makeFixture();
++  const unproven = runDispatchBriefing(maintenanceArgv(unprovenFx), await maintenanceDeps(unprovenFx, { proof: null }));
++  assert.equal(unproven.code, "DBG-MAINTENANCE-RED-UNPROVEN", unproven.message);
++  assert.match(unproven.message, /approve-maintenance-red-check --by/u);
++  const noFeatureFx = makeFixture();
++  const noFeature = runDispatchBriefing(maintenanceArgv(noFeatureFx), await maintenanceDeps(noFeatureFx, { over: { projectState: () => ({ activeFeature: { id: "feat-x" } }) } }));
++  assert.equal(noFeature.code, "DBG-MAINTENANCE-NO-APPROVAL", noFeature.message);
++});
++
++test("ADR-0097 verify:configured exists only with --maintenance and is bound, like a command, to the calibration it reads", async () => {
++  const { runDispatchBriefing, assertBindingInvariants } = await lib();
++  const fx = makeFixture();
++  const configured = () => ({ fullCommand: "pnpm verify:ci", baseline: [], areas: [] });
++  const plain = runDispatchBriefing(argvOf(fx, { "--check": "verify:configured" }), depsOf(fx, { readConsumerVerify: configured }));
++  assert.equal(plain.code, "DBG-CHECK-VERIFY-MAINTENANCE-ONLY", plain.message);
++  const result = runDispatchBriefing(maintenanceArgv(fx, { "--check": "verify:configured" }),
++    await maintenanceDeps(fx, { over: { spelling: "verify:configured", readConsumerVerify: configured, calibrationRelPath: () => "project/pipeline.json" } }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 600));
++  const [check] = result.binding.itemDelivery.checks;
++  assert.deepEqual(Object.keys(check).sort(), ["dependencies", "id", "path", "verify"]);
++  assert.equal(check.verify, "configured");
++  assert.equal(check.path, "project/pipeline.json");
++  assert.ok(check.dependencies.includes("project/pipeline.json"));
++  assert.deepEqual(result.binding.allowedPaths, [M_HELPER], "the calibration is never writable");
++  assert.doesNotThrow(() => assertBindingInvariants(result.binding));
++  const broken = structuredClone(result.binding);
++  broken.allowedPaths = [...broken.allowedPaths, "project/pipeline.json"].sort();
++  assert.throws(() => assertBindingInvariants(broken), (error) => error.code === "DBG-CHECK-COMMAND-PATH-WRITABLE");
++  const unconfiguredFx = makeFixture();
++  const unconfigured = runDispatchBriefing(maintenanceArgv(unconfiguredFx, { "--check": "verify:configured" }),
++    await maintenanceDeps(unconfiguredFx, { over: { spelling: "verify:configured", readConsumerVerify: () => ({ fullCommand: null, baseline: [], areas: [] }) } }));
++  assert.equal(unconfigured.code, "DBG-CHECK-VERIFY-UNCONFIGURED", unconfigured.message);
++});
++
++test("ADR-0097 --maintenance never takes a criterion, a document check, a non-test path, or a value", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const deps = await maintenanceDeps(fx);
++  const withCriterion = runDispatchBriefing(maintenanceArgv(fx, {}, ["--criterion", "AC-1"]), deps);
++  assert.equal(withCriterion.code, "DBG-MAINTENANCE-CRITERION", withCriterion.message);
++  const documentCheck = runDispatchBriefing(maintenanceArgv(fx, { "--check": "document:docs/guide.md", "--path": null }), deps);
++  assert.equal(documentCheck.code, "DBG-MAINTENANCE-DOCUMENT", documentCheck.message);
++  const productPath = runDispatchBriefing(maintenanceArgv(fx, { "--path": "src/app.mjs" }), deps);
++  assert.equal(productPath.code, "DBG-MAINTENANCE-SCOPE", productPath.message);
++  assert.match(productPath.message, /src\/app\.mjs/u);
++  const specPath = runDispatchBriefing(maintenanceArgv(fx, { "--path": "specs/feat-x/tests/a.test.mjs" }), deps);
++  assert.equal(specPath.code, "DBG-MAINTENANCE-SCOPE", specPath.message);
++  const valued = runDispatchBriefing([...argvOf(fx, { "--check": M_CHECK, "--path": M_HELPER }), "--maintenance=yes"], deps);
++  assert.equal(valued.code, "DBG-FLAG-VALUE", valued.message);
++  const twice = runDispatchBriefing(maintenanceArgv(fx, {}, ["--maintenance"]), deps);
++  assert.equal(twice.code, "DBG-FLAG-REPEATED", twice.message);
++});
+diff --git a/plugins/pipeline-core/scripts/maintenance-red-check.mjs b/plugins/pipeline-core/scripts/maintenance-red-check.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..99aa89ef981c8e71f315abe988c6b868877ff22b
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/maintenance-red-check.mjs
+@@ -0,0 +1,163 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * maintenance-red-check.mjs -- observe a check that is red before a maintenance dispatch (ADR-0097, D249, K-28).
++ *
++ *   node maintenance-red-check.mjs observe --root <repo> --check <test-path | command:<id> | verify:configured>
++ *
++ * A maintenance dispatch repairs a check that was already red before the feature and that no criterion of the approved Spec
++ * covers. The host admits its binding only when this script has observed the check red at the exact candidate. The script:
++ *   - needs the active feature in the project State and a clean tracked tree (the observation binds HEAD and its tree);
++ *   - runs the check the way the host's targeted checks run it: a .test file with `node --test`, a `command:<id>` with the
++ *     command the project calibration registers under verifyImpact, `verify:configured` with the calibration's `verify` command;
++ *   - refuses, writing nothing, when the run timed out, could not start, or changed the tree;
++ *   - otherwise records the result once under <git-common-dir>/agent-pipeline/maintenance/observations/ (the first observation at a
++ *     commit stands: a rerun cannot replace red with green or the reverse).
++ * verify:configured runs the project's whole verify (up to 30 minutes here). Start it as a background command, not in a foreground
++ * tool call with a shorter timeout: a stopped run records nothing and has to start again.
++ * Exit 0 with one JSON line when the check is observed red; exit 1 when it is green (nothing to repair, also recorded); exit 2 with
++ * one `MAINTENANCE-RED-CHECK-REFUSED: <code>: <message>` line on stderr otherwise.
++ *
++ * After it: the proof that the check was red before the feature is a red Verify receipt at or before the plan approval, read by the
++ * host itself; without one the PO acknowledges it once (`pipeline-state.mjs approve-maintenance-red-check --by <label>`). Then
++ * `dispatch-briefing.mjs binding --maintenance --check <the same spelling>` generates the binding.
++ */
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { readFileSync, realpathSync } from "node:fs";
++import { resolve } from "node:path";
++
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
++import { resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
++import { readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
++import { describeMaintenanceCheck, maintenanceCheckSpelling, parseMaintenanceCheckSpelling, writeMaintenanceRedObservation } from "../lib/maintenance-delivery.mjs";
++
++const REFUSAL_PREFIX = "MAINTENANCE-RED-CHECK-REFUSED";
++const USAGE = "usage: node maintenance-red-check.mjs observe --root <repo> --check <test-path | command:<id> | verify:configured>\n"
++  + "  verify:configured runs the whole project verify (up to 30 minutes): start it as a background command, not a short foreground call.";
++/** The host's targeted checks run for at most a minute; the configured verify of a whole project can take far longer. */
++export const CHECK_TIMEOUT_MS = 60_000;
++export const CONFIGURED_VERIFY_TIMEOUT_MS = 30 * 60_000;
++const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
++
++class Refusal extends Error {
++  constructor(code, message) { super(message); this.code = code; }
++}
++
++function parseArgs(argv) {
++  if (argv[0] !== "observe") throw new Refusal("MRC-USAGE", USAGE);
++  const values = new Map();
++  for (let index = 1; index < argv.length; index += 2) {
++    const flag = argv[index];
++    if (!["--root", "--check"].includes(flag)) throw new Refusal("MRC-USAGE", `unknown argument ${JSON.stringify(String(flag).slice(0, 64))}; ${USAGE}`);
++    if (values.has(flag)) throw new Refusal("MRC-USAGE", `${flag} given twice`);
++    if (typeof argv[index + 1] !== "string") throw new Refusal("MRC-USAGE", `${flag} needs a value`);
++    values.set(flag, argv[index + 1]);
++  }
++  for (const flag of ["--root", "--check"]) if (!values.has(flag)) throw new Refusal("MRC-USAGE", `${flag} is required; ${USAGE}`);
++  const check = parseMaintenanceCheckSpelling(values.get("--check"));
++  if (check === null) throw new Refusal("MRC-CHECK", "--check must be a repository-relative .test.mjs, .test.cjs or .test.js file, command:<id> of a command the calibration registers, or verify:configured (a document check is never a maintenance check)");
++  return { root: values.get("--root"), check };
++}
++
++function gitIn(root) {
++  return (args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 15000, maxBuffer: 8 * 1024 * 1024 });
++}
++
++/** HEAD, its tree and the tracked status: the observation binds all three and they must not move while the check runs. */
++function snapshot(git) {
++  const commit = git(["rev-parse", "--verify", "--quiet", "HEAD"]), tree = git(["rev-parse", "--verify", "--quiet", "HEAD^{tree}"]);
++  const status = git(["status", "--porcelain=v1", "--untracked-files=no"]);
++  if ([commit, tree, status].some((run) => run.error || run.status !== 0)) throw new Refusal("MRC-HEAD-UNAVAILABLE", "HEAD, its tree or the tracked status could not be read");
++  return { commit: commit.stdout.trim(), tree: tree.stdout.trim(), status: status.stdout };
++}
++
++function checkEnvironment() {
++  const env = { ...process.env };
++  // The same exclusions as the host's targeted checks: an inherited test-runner context makes a nested `node --test` exit 0 with
++  // empty output even when its test fails, and an outer Verify recorder descriptor belongs to that suite, not to this run.
++  delete env.NODE_TEST_CONTEXT;
++  delete env.PIPELINE_VERIFY_CASE_COMPLETION_FD;
++  delete env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES;
++  return env;
++}
++
++/** How the check runs: the executable and arguments, or a shell command, plus its timeout. */
++function checkInvocation(root, check, readConfiguration = readConsumerVerifyConfiguration) {
++  if (check.path !== undefined) return { executable: process.execPath, args: ["--test", resolve(root, check.path)], shell: false, timeout: CHECK_TIMEOUT_MS };
++  let registry;
++  try { registry = readConfiguration(root); }
++  catch (error) { throw new Refusal("MRC-CALIBRATION", `the project calibration could not be read: ${String(error.message).slice(0, 300)}`); }
++  if (check.verify === "configured") {
++    if (registry.fullCommand === null) throw new Refusal("MRC-VERIFY-UNCONFIGURED", "the calibration has no verify command; verify:configured names the calibration's top-level verify command");
++    return { executable: registry.fullCommand, args: [], shell: true, timeout: CONFIGURED_VERIFY_TIMEOUT_MS };
++  }
++  const entry = [...registry.baseline, ...registry.areas.flatMap((area) => area.commands)].find((row) => row.id === check.command);
++  if (!entry) throw new Refusal("MRC-COMMAND-UNREGISTERED", `command ${check.command} is not registered under verifyImpact in the calibration`);
++  return { executable: entry.command, args: [], shell: true, timeout: CHECK_TIMEOUT_MS };
++}
++
++/**
++ * Observe one check. In tests `dependencies.run` replaces the process start ({ status, signal, error, stdout, stderr }) and
++ * `dependencies.readConsumerVerify` the calibration reader.
++ * Returns `{ exitCode, result }` where exitCode is 0 (red), 1 (green) and result is the printed object.
++ */
++export function observeMaintenanceRedCheck({ root: rootInput, check }, dependencies = {}) {
++  let root;
++  try { root = realpathSync(resolve(rootInput)); } catch { throw new Refusal("MRC-ROOT", "--root is not a readable directory"); }
++  const commonDir = resolveGitCommonDir(root);
++  if (commonDir === null) throw new Refusal("MRC-NOT-A-REPOSITORY", "--root is not inside a git repository");
++  let state;
++  try { state = JSON.parse(readFileSync(resolveAuthorityArtifactPath("state", { rootDir: root }).path, "utf8")); }
++  catch { throw new Refusal("MRC-STATE-UNAVAILABLE", "the project State could not be read"); }
++  const featureId = state?.activeFeature?.id;
++  if (typeof featureId !== "string" || featureId === "") throw new Refusal("MRC-NO-FEATURE", "a maintenance check belongs to the active feature; there is none");
++  const git = gitIn(root);
++  const before = snapshot(git);
++  if (before.status.trim() !== "") throw new Refusal("MRC-DIRTY", "the observation binds the clean HEAD; commit or restore the tracked changes first");
++  if (check.path !== undefined) {
++    // A test file that is not committed at HEAD is no check of this candidate: `node --test` on a missing file is red for the wrong reason.
++    const listed = git(["ls-tree", "--name-only", "HEAD", "--", check.path]);
++    if (listed.error || listed.status !== 0 || listed.stdout.trim() !== check.path) throw new Refusal("MRC-CHECK-UNTRACKED", `${check.path} is not a file committed at HEAD; a maintenance check is a test of the candidate`);
++  }
++  const invocation = checkInvocation(root, check, dependencies.readConsumerVerify);
++  const run = (dependencies.run ?? ((spec) => spawnSync(spec.executable, spec.args, { cwd: root, env: checkEnvironment(), shell: spec.shell, timeout: spec.timeout, maxBuffer: MAX_OUTPUT_BYTES })))(invocation);
++  if (run.error?.code === "ETIMEDOUT") throw new Refusal("MRC-TIMEOUT", `${describeMaintenanceCheck(check)} did not finish within ${Math.round(invocation.timeout / 1000)} s; a run that was stopped proves neither red nor green, so nothing was recorded`);
++  if (run.error) throw new Refusal("MRC-RUN-FAILED", `${describeMaintenanceCheck(check)} could not be started (${run.error.code ?? "error"}); nothing was recorded`);
++  // A shell reports a command it cannot find (127) or cannot execute (126) as an exit code: that is a broken command, not a red check.
++  if (invocation.shell && (run.status === 126 || run.status === 127)) {
++    throw new Refusal("MRC-COMMAND-NOT-RUNNABLE", `the shell could not ${run.status === 127 ? "find" : "execute"} the command of ${describeMaintenanceCheck(check)} (exit ${run.status}); fix the command or the toolchain first, nothing was recorded`);
++  }
++  const after = snapshot(git);
++  if (after.commit !== before.commit || after.tree !== before.tree || after.status !== before.status) {
++    throw new Refusal("MRC-DRIFT", `HEAD or the tracked files changed while ${describeMaintenanceCheck(check)} ran; restore them and observe again (nothing was recorded)`);
++  }
++  const outputSha256 = createHash("sha256").update(Buffer.concat([Buffer.from(run.stdout ?? ""), Buffer.from(run.stderr ?? "")])).digest("hex");
++  const written = writeMaintenanceRedObservation({ commonDir, featureId, check, candidate: { commit: before.commit, tree: before.tree },
++    exitCode: Number.isSafeInteger(run.status) ? run.status : null, signal: typeof run.signal === "string" ? run.signal : null, outputSha256,
++    observedAt: (dependencies.now ?? (() => new Date()))().toISOString() });
++  if (!written.ok) throw new Refusal(written.code, "the observation could not be recorded");
++  const record = written.record;
++  const result = { status: record.red ? "red" : "green", check: maintenanceCheckSpelling(record.check), featureId, candidate: record.candidate,
++    exitCode: record.exitCode, signal: record.signal, observedAt: record.observedAt, existing: written.existing,
++    next: record.red
++      ? `generate the binding: dispatch-briefing.mjs binding --maintenance --check ${maintenanceCheckSpelling(record.check)} (the host reads a red Verify receipt at or before the plan approval; without one the PO acknowledges the check once: pipeline-state.mjs approve-maintenance-red-check --by <label>)`
++      : `${describeMaintenanceCheck(record.check)} is green at this commit: there is nothing to repair${written.existing ? " (an earlier observation at this commit stands)" : ""}` };
++  return { exitCode: record.red ? 0 : 1, result };
++}
++
++export function main(argv = process.argv.slice(2), io = { stdout: process.stdout, stderr: process.stderr }, dependencies = {}) {
++  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) { io.stdout.write(`${USAGE}\n`); return 0; }
++  try {
++    const { exitCode, result } = observeMaintenanceRedCheck(parseArgs(argv), dependencies);
++    io.stdout.write(`${JSON.stringify(result)}\n`);
++    return exitCode;
++  } catch (error) {
++    if (!(error instanceof Refusal)) throw error;
++    io.stderr.write(`${REFUSAL_PREFIX}: ${error.code}: ${error.message}\n`);
++    return 2;
++  }
++}
++
++if (isDirectInvocation(import.meta.url)) process.exitCode = main();
+diff --git a/plugins/pipeline-core/scripts/maintenance-red-check.test.mjs b/plugins/pipeline-core/scripts/maintenance-red-check.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c960bbd10405769c7b7920fd70aca54e70d8f13
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/maintenance-red-check.test.mjs
+@@ -0,0 +1,122 @@
++// SPDX-License-Identifier: SUL-1.0
++// ADR-0097 (D249, K-28): maintenance-red-check.mjs observe runs one check on the clean HEAD of a real git repository and records the
++// result once; it refuses, writing nothing, for a run that proves neither red nor green.
++import test, { after } from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { main, CONFIGURED_VERIFY_TIMEOUT_MS } from "./maintenance-red-check.mjs";
++import { maintenanceObservationDirectory, readMaintenanceRedObservation } from "../lib/maintenance-delivery.mjs";
++
++const SCRIPT = fileURLToPath(new URL("./maintenance-red-check.mjs", import.meta.url));
++const roots = [];
++after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
++
++function repo({ state = { activeFeature: { id: "epic2" } } } = {}) {
++  const dir = mkdtempSync(join(tmpdir(), "mrc-"));
++  roots.push(dir);
++  const git = (...args) => {
++    const result = spawnSync("git", ["-C", dir, "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
++    assert.equal(result.status, 0, `${args.join(" ")}: ${result.stderr}`);
++    return result.stdout.trim();
++  };
++  git("init", "-q", "-b", "main");
++  const put = (path, text) => { mkdirSync(join(dir, path, ".."), { recursive: true }); writeFileSync(join(dir, path), text); };
++  put(".claude/pipeline-state.json", `${JSON.stringify(state)}\n`);
++  put("tests/unit/red.test.mjs", "import test from 'node:test';\nimport assert from 'node:assert/strict';\ntest('red', () => assert.equal(1, 2));\n");
++  put("tests/unit/green.test.mjs", "import test from 'node:test';\ntest('green', () => {});\n");
++  git("add", "--all");
++  git("commit", "-q", "--no-verify", "-m", "fixture");
++  const head = () => ({ commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") });
++  return { dir, git, put, head, common: join(dir, ".git") };
++}
++
++function run(argv, dependencies = {}) {
++  let stdout = "", stderr = "";
++  const exitCode = main(argv, { stdout: { write: (text) => { stdout += text; } }, stderr: { write: (text) => { stderr += text; } } }, dependencies);
++  return { exitCode, stdout, stderr, json: stdout.trim() === "" ? null : JSON.parse(stdout) };
++}
++const observations = (r) => (existsSync(maintenanceObservationDirectory(r.common)) ? readdirSync(maintenanceObservationDirectory(r.common)) : []);
++
++test("a red test file is observed red at the clean HEAD and recorded once; a rerun keeps the first record", () => {
++  const r = repo();
++  const first = run(["observe", "--root", r.dir, "--check", "tests/unit/red.test.mjs"]);
++  assert.equal(first.exitCode, 0, first.stderr);
++  assert.equal(first.json.status, "red");
++  assert.equal(first.json.check, "tests/unit/red.test.mjs");
++  assert.equal(first.json.featureId, "epic2");
++  assert.deepEqual(first.json.candidate, r.head());
++  assert.match(first.json.next, /dispatch-briefing\.mjs binding --maintenance --check tests\/unit\/red\.test\.mjs/u);
++  const record = readMaintenanceRedObservation({ commonDir: r.common, check: { path: "tests/unit/red.test.mjs" }, candidate: r.head() });
++  assert.equal(record.red, true);
++  assert.notEqual(record.exitCode, 0);
++  const again = run(["observe", "--root", r.dir, "--check", "tests/unit/red.test.mjs"], { run: () => ({ status: 0, signal: null, stdout: "", stderr: "" }) });
++  assert.equal(again.exitCode, 0, "the first observation at a commit stands, a later green run does not replace it");
++  assert.equal(again.json.existing, true);
++  assert.equal(observations(r).length, 1);
++});
++
++test("a green test file is recorded green and exits 1: there is nothing to repair", () => {
++  const r = repo();
++  const green = run(["observe", "--root", r.dir, "--check", "tests/unit/green.test.mjs"]);
++  assert.equal(green.exitCode, 1, green.stderr);
++  assert.equal(green.json.status, "green");
++  assert.match(green.json.next, /nothing to repair/u);
++});
++
++test("refusals write nothing: untracked or non-test check, dirty tree, no active feature, timeout, unrunnable command, drift", () => {
++  const r = repo();
++  r.put("tests/unit/new.test.mjs", "import test from 'node:test';\ntest('x', () => { throw new Error('x'); });\n");
++  const untracked = run(["observe", "--root", r.dir, "--check", "tests/unit/new.test.mjs"]);
++  assert.equal(untracked.exitCode, 2);
++  assert.match(untracked.stderr, /^MAINTENANCE-RED-CHECK-REFUSED: MRC-CHECK-UNTRACKED: /u);
++  for (const spelling of ["src/app.mjs", "tests/unit/red.test.ts", "document:docs/a.md", "../x.test.mjs"]) {
++    assert.match(run(["observe", "--root", r.dir, "--check", spelling]).stderr, /MRC-CHECK: /u, spelling);
++  }
++  r.put("tests/unit/green.test.mjs", "import test from 'node:test';\ntest('changed', () => {});\n");
++  assert.match(run(["observe", "--root", r.dir, "--check", "tests/unit/red.test.mjs"]).stderr, /MRC-DIRTY: /u);
++  r.git("checkout", "--", "tests/unit/green.test.mjs");
++  const timedOut = run(["observe", "--root", r.dir, "--check", "tests/unit/red.test.mjs"], { run: () => ({ status: null, signal: "SIGTERM", error: { code: "ETIMEDOUT" } }) });
++  assert.match(timedOut.stderr, /MRC-TIMEOUT: .*nothing was recorded/u);
++  const configured = () => ({ fullCommand: "pnpm verify:ci", baseline: [{ id: "lint", command: "pnpm lint" }], areas: [] });
++  const missing = run(["observe", "--root", r.dir, "--check", "command:lint"], { readConsumerVerify: configured, run: () => ({ status: 127, signal: null, stdout: "", stderr: "pnpm: not found" }) });
++  assert.match(missing.stderr, /MRC-COMMAND-NOT-RUNNABLE: .*exit 127/u);
++  const unregistered = run(["observe", "--root", r.dir, "--check", "command:absent"], { readConsumerVerify: configured });
++  assert.match(unregistered.stderr, /MRC-COMMAND-UNREGISTERED: /u);
++  const drift = run(["observe", "--root", r.dir, "--check", "tests/unit/red.test.mjs"], { run: () => {
++    r.put("tests/unit/green.test.mjs", "// changed by the check\n");
++    return { status: 1, signal: null, stdout: "", stderr: "" };
++  } });
++  assert.match(drift.stderr, /MRC-DRIFT: /u);
++  assert.deepEqual(observations(r), [], "no refusal recorded anything");
++  const noFeature = repo({ state: {} });
++  assert.match(run(["observe", "--root", noFeature.dir, "--check", "tests/unit/red.test.mjs"]).stderr, /MRC-NO-FEATURE: /u);
++});
++
++test("verify:configured runs the calibration's verify command through the shell with the long timeout", () => {
++  const r = repo();
++  let seen = null;
++  const result = run(["observe", "--root", r.dir, "--check", "verify:configured"], {
++    readConsumerVerify: () => ({ fullCommand: "pnpm verify:ci", baseline: [], areas: [] }),
++    run: (spec) => { seen = spec; return { status: 1, signal: null, stdout: "1 failed", stderr: "" }; },
++  });
++  assert.equal(result.exitCode, 0, result.stderr);
++  assert.deepEqual(seen, { executable: "pnpm verify:ci", args: [], shell: true, timeout: CONFIGURED_VERIFY_TIMEOUT_MS });
++  assert.equal(result.json.check, "verify:configured");
++  const unconfigured = run(["observe", "--root", repo().dir, "--check", "verify:configured"], { readConsumerVerify: () => ({ fullCommand: null, baseline: [], areas: [] }) });
++  assert.match(unconfigured.stderr, /MRC-VERIFY-UNCONFIGURED: /u);
++});
++
++test("usage: --help answers, any other shape is refused with the usage", () => {
++  const help = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
++  assert.equal(help.status, 0);
++  assert.match(help.stdout, /^usage: node maintenance-red-check\.mjs observe --root <repo> --check /u);
++  for (const argv of [[], ["inspect"], ["observe", "--root", "."], ["observe", "--root", ".", "--check", "a.test.mjs", "--extra", "x"]]) {
++    const refused = run(argv);
++    assert.equal(refused.exitCode, 2, JSON.stringify(argv));
++    assert.match(refused.stderr, /MRC-USAGE: /u, JSON.stringify(argv));
++  }
++});

@@ -1,0 +1,164 @@
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+index beb9187a0c53a9d4c2bddc96d73df96c2b3f8ceb..080871993051a0596ca7a5d8a40366fc8fdc9e4d 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+@@ -228,7 +228,7 @@ function claimedSessionConflict({ runner, excludeSession, env = process.env, hos
+   return null;
+ }
+ 
+-function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir, limits } = {}) {
++function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir, limits, allowEmpty = false } = {}) {
+   if (runner !== CODEX_RUNNER) return { unavailable: unavailable(runner ?? "unknown", "runner-transcript-source-unavailable") };
+   if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
+     return { unavailable: unavailable(runner, "current-session-identity-unavailable") };
+@@ -246,7 +246,8 @@ function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env =
+     .sort((left, right) => right.mtimeMs - left.mtimeMs
+       || (left.sessionId < right.sessionId ? -1 : left.sessionId > right.sessionId ? 1 : 0)
+       || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
+-  if (candidates.length === 0) {
++  // allowEmpty (C29 C1, export only): the name index may still find the session beyond the bound; the caller types the empty case.
++  if (candidates.length === 0 && !allowEmpty) {
+     return { unavailable: unavailable(runner, "no-prior-project-matching-transcript") };
+   }
+   return { candidates, boundReached: enumeration.boundReached === true };
+@@ -786,8 +787,11 @@ function exportCandidates(options, sessionId = null) {
+   // Codex, Antigravity and unknown runners resolve through the Codex adapter, which types every non-Codex
+   // runner as `runner-transcript-source-unavailable`; only Claude has a second adapter.
+   if (options.runner === CLAUDE_RUNNER) return claudeProjectCandidates(options);
+-  const found = priorProjectMatchingCandidates(options);
+-  return found.unavailable || sessionId === null ? found : withCodexNameIndex(found, options, sessionId);
++  if (sessionId === null) return priorProjectMatchingCandidates(options);
++  const found = priorProjectMatchingCandidates({ ...options, allowEmpty: true });
++  if (found.unavailable) return found;
++  const indexed = withCodexNameIndex(found, options, sessionId);
++  return indexed.candidates.length === 0 ? { unavailable: unavailable(options.runner, "no-prior-project-matching-transcript") } : indexed;
+ }
+ 
+ /**
+@@ -809,13 +813,23 @@ function withCodexNameIndex(found, options, sessionId) {
+     .map((filePath) => candidateMetadata(filePath, projectIdentity))
+     .filter((candidate) => candidate !== null && candidate.sessionId === sessionId);
+   // The bound stays reached unless the name walk is whole AND every file beyond the bound names its own session (a UUID
+-  // suffix): only then can no unopened file belong to this session. Same sorted walk, so the first maxCandidates paths are
+-  // exactly the ones the candidate enumeration saw.
++  // suffix): only then can no unopened file be a segment of this session. Same sorted walk, so the first maxCandidates paths
++  // are exactly the ones the candidate enumeration saw.
+   const beyond = nameIndex.paths.slice(options.limits?.maxCandidates ?? MAX_CANDIDATES);
+-  const resolved = nameIndex.complete && beyond.every((filePath) => CODEX_ROLLOUT_NAME.test(basename(filePath)));
++  // A child may be known only through its own parent_thread_id (no agent id in the parent). It cannot predate its parent, so
++  // every rollout file beyond the bound that sorts after the session's oldest segment is opened and authenticated as well.
++  const sessionNames = [...found.candidates.filter((candidate) => candidate.sessionId === sessionId), ...added]
++    .map((candidate) => basename(candidate.filePath)).filter((name) => CODEX_ROLLOUT_NAME.test(name)).sort();
++  const oldest = sessionNames[0] ?? null;
++  const addedPaths = new Set(added.map((candidate) => candidate.filePath));
++  const later = oldest === null ? [] : beyond
++    .filter((filePath) => !known.has(filePath) && !addedPaths.has(filePath) && CODEX_ROLLOUT_NAME.test(basename(filePath)) && basename(filePath) > oldest)
++    .map((filePath) => candidateMetadata(filePath, projectIdentity))
++    .filter((candidate) => candidate !== null && candidate.sessionId !== options.excludeSession);
++  const resolved = nameIndex.complete && oldest !== null && beyond.every((filePath) => CODEX_ROLLOUT_NAME.test(basename(filePath)));
+   return {
+     ...found,
+-    candidates: [...found.candidates, ...added],
++    candidates: [...found.candidates, ...added, ...later],
+     boundReached: found.boundReached === true && !resolved,
+     nameIndex,
+   };
+@@ -970,11 +984,12 @@ function childResult(children, flags) {
+     ...(flags.skippedRecords ? ["child-records-skipped"] : []),
+     ...(flags.nested ? ["nested-workflow-children-not-listed"] : []),
+     ...((flags.unknownChildren ?? 0) > 0 ? ["child-segment-not-found"] : []),
++    ...((flags.outsideChildren ?? 0) > 0 ? ["child-outside-repository"] : []),
+   ];
+-  return { value: sortedChildren(children), incompleteReasons: reasons, unknownChildren: flags.unknownChildren ?? 0 };
++  return { value: sortedChildren(children), incompleteReasons: reasons, unknownChildren: flags.unknownChildren ?? 0, outsideChildren: flags.outsideChildren ?? 0 };
+ }
+ 
+-const typedChildren = (reason) => ({ value: reason, incompleteReasons: [], unknownChildren: 0 });
++const typedChildren = (reason) => ({ value: reason, incompleteReasons: [], unknownChildren: 0, outsideChildren: 0 });
+ 
+ /**
+  * Claude: the parent's own tool_use / tool_result blocks locate the child in the parent's turns through the meta toolUseId.
+@@ -1085,7 +1100,11 @@ function codexChildSessions({ found, sessionId, records, turnView, projectIdenti
+     .map((filePath) => candidateMetadata(filePath, projectIdentity)).filter((candidate) => candidate !== null);
+   const candidates = [...(found?.candidates ?? []), ...located];
+   const spawned = candidates.filter((candidate) => candidate.spawn?.parentId === sessionId && candidate.sessionId !== sessionId);
+-  const unknownChildren = [...spawnedIds].filter((id) => !spawned.some((candidate) => candidate.sessionId === id)).length;
++  // Same split as audit-current (C1a): a missing child whose session file exists by name but does not authenticate for this
++  // project worked elsewhere (outsideChildren); one with no file at all is unknown.
++  const missing = [...spawnedIds].filter((id) => !spawned.some((candidate) => candidate.sessionId === id));
++  const outsideChildren = missing.filter((id) => namedFor(found?.nameIndex ?? null, id).length > 0).length;
++  const unknownChildren = missing.length - outsideChildren;
+   const byChild = new Map();
+   for (const candidate of spawned) byChild.set(candidate.sessionId, [...(byChild.get(candidate.sessionId) ?? []), candidate]);
+   const spawnCalls = new Map();
+@@ -1112,7 +1131,7 @@ function codexChildSessions({ found, sessionId, records, turnView, projectIdenti
+     });
+     return { start: turnView.turnAt[startRecord], end: turnView.turnAt[lastRecord] };
+   };
+-  const flags = { rejected: 0, boundReached: false, skippedRecords: false, nested: false, unknownChildren };
++  const flags = { rejected: 0, boundReached: false, skippedRecords: false, nested: false, unknownChildren, outsideChildren };
+   const children = [];
+   for (const [childId, segments] of [...byChild.entries()].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))) {
+     if (children.length + flags.rejected >= MAX_CHILD_SESSIONS) { flags.boundReached = true; break; }
+@@ -1299,6 +1318,7 @@ function describeExport({ runner, sessionId, snapshots, options, found }) {
+     childSessions: children.value,
+     // C29 (C1): children the session spawned whose own session file was not found; complete needs 0.
+     unknownChildren: children.unknownChildren ?? 0,
++    outsideChildren: children.outsideChildren ?? 0,
+     turns: turnView.turns,
+     effort: extractRunnerEffort(runner, mergedRecords, children.value),
+     segmentCount: parsed.length,
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+index 0f5107db0baf03f0226943b36aa4b4293e358777..40f00f478241dbd685c7302387cce5adf19b0c2e 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+@@ -308,7 +308,7 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
+ 
+     // Data-minimising: counts, digests and timestamps only.
+     assert.deepEqual(Object.keys(result).sort(), [
+-      "childSessions", "completeness", "effort", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
++      "childSessions", "completeness", "effort", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "outsideChildren", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
+       "segments", "sessionId", "status", "turns", "unknownChildren", "unparsedLineCount", "usage",
+     ]);
+     // Justification (CGF-14, restated in place, nothing weakened): the key set is still pinned; `effort` is the one new key, the per-answer
+@@ -624,6 +624,40 @@ test("C29-C1: a spawned child with no session file is counted as unknown and mak
+   });
+ });
+ 
++test("C29-C1: a child known only by its own parent link beyond the bound is opened; a session wholly beyond the bound is found", () => {
++  withExportFixture(({ project, codexHome }) => {
++    // The parent sorts oldest; its child names no agent id in the parent and sorts between the parent and the bound.
++    codexSegment(codexHome, c1Rollout("01", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:00:00") });
++    codexSegment(codexHome, c1Rollout("03", C1_CHILD), {
++      cwd: project, sessionId: C1_CHILD, metaTimestamp: stamp("05:00:04"),
++      metaExtra: { source: { subagent: { thread_spawn: { parent_thread_id: C1_PARENT, depth: 1 } } } },
++    });
++    c1Filler(codexHome, project, "08", 1);
++    c1Filler(codexHome, project, "07", 2);
++    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: C1_PARENT, env: { CODEX_HOME: codexHome }, limits: { maxCandidates: 2 } });
++    assert.equal(result.status, "available", "the session beyond the bound is found by name although no listed file matches it");
++    assert.deepEqual(result.childSessions.map((child) => child.childId), [C1_CHILD]);
++    assert.deepEqual(result.incompleteReasons, []);
++    assert.equal(result.completeness, "complete");
++  });
++});
++
++test("C29-C1: a spawned child whose session file belongs to another repository is counted as outside, not unknown", () => {
++  withExportFixture(({ project, foreign, codexHome }) => {
++    codexSegment(codexHome, c1Rollout("05", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:00:00"), records: c1Spawn("s1", C1_CHILD) });
++    codexSegment(codexHome, c1Rollout("06", C1_CHILD), {
++      cwd: foreign, sessionId: C1_CHILD, metaTimestamp: stamp("05:00:04"),
++      metaExtra: { source: { subagent: { thread_spawn: { parent_thread_id: C1_PARENT, depth: 1 } } } },
++    });
++    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: C1_PARENT, env: { CODEX_HOME: codexHome } });
++    assert.deepEqual(result.childSessions, []);
++    assert.equal(result.outsideChildren, 1);
++    assert.equal(result.unknownChildren, 0);
++    assert.ok(result.incompleteReasons.includes("child-outside-repository"));
++    assert.equal(result.completeness, "partial");
++  });
++});
++
+ test("export reports byte-ceiling when an optional seam ceiling truncates a segment, without failing or hiding the full digest", () => {
+   withExportFixture(({ project, codexHome }) => {
+     const path = codexSegment(codexHome, "big.jsonl", {

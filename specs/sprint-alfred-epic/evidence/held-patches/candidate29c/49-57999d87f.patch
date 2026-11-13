@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 5293433d45faa30758c8e0995cb0ac699aaa0c32..5fd36b9e1885c5761440579e9965b27f12f09028 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -487,6 +487,7 @@
+         "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
+         "verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:g6-aggregate-native-boundaries-tests",
++        "verify-phase:harness/scripts/verify.mjs:gate-definition-changes-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+@@ -540,6 +541,7 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-ledger-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-private-state-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-review-receipt-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-git-gg22-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
+@@ -611,6 +613,8 @@
+         "verify-phase:harness/scripts/verify.mjs:local-worker-pool-tests",
+         "verify-phase:harness/scripts/verify.mjs:machine-plane-tests",
+         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
++        "verify-phase:harness/scripts/verify.mjs:maintenance-delivery-tests",
++        "verify-phase:harness/scripts/verify.mjs:maintenance-red-check-tests",
+         "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
+         "verify-phase:harness/scripts/verify.mjs:measure-tofu-push-e2e-tests",
+         "verify-phase:harness/scripts/verify.mjs:mid-session-hook-refresh-tests",

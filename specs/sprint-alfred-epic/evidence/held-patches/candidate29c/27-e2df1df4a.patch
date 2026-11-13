@@ -1,0 +1,37 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 663ddbda2f7136dab6e99b2282d32333abc9b04b..09e9f36c048ceb9c202d0fb7095d7bdaeb4af4e4 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -222,6 +222,9 @@ const RECEIPT_OUT = /^(?:specs|evidence|docs)\/[A-Za-z0-9._/-]{1,200}\.json$/u;
+ const FINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
+ const REQUESTED_ROUTE = /^[A-Za-z0-9][\x21-\x7e]{0,127}$/u;
+ const OBSERVED_IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,127}$/u;
++// K128/D247: the typed fallback route is the only one that may name a requested route and an observed identity, and it names its
++// reason code; the same pattern scripts/design-review-receipt.mjs checks.
++const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
+ const GIT_REVISION = /^[A-Za-z0-9][A-Za-z0-9._/~^@-]{0,127}$/u;
+ const GIT_OBJECT_ID = /^[a-f0-9]{7,64}$/u;
+ 
+@@ -290,6 +293,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
+         "--original-report": input,
+         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
+         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
++        "--fallback-reason-code": (value) => FALLBACK_REASON_CODE.test(value),
+       },
+     });
+   } catch { return false; }
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 97c4c8467e811284ed965bf1f1e93c04d543903f..d91a5fc7c7ffa5b76006bde28f0d2472d02c9104 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -469,7 +469,10 @@ test("D64 design-review receipt production: the documented forms are admitted, d
+     bothAdmit(scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report2, "--prd", r.prd, "--spec", r.spec,
+       "--previous", `specs/${f.featureId}/review/receipt-1.json`, "--open-finding", "F-1", "--open-finding", "F-2", "--companion", f.sources.design.path,
+       "--requested-route", "claude-sonnet-5-5", "--observed-identity", "claude-sonnet-5-5", "--out", r.out), f, "delta round with companions and findings");
++    // K128/D247: the script takes a requested route and an observed identity only on the typed fallback route, which names its reason code.
++    bothAdmit(receiptCreate(f, r, { "--requested-route": "duty.critic_normal", "--observed-identity": "unknown", "--fallback-reason-code": "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER" }), f, "typed fallback round");
+     const refusals = [
++      ["a fallback reason code that is not a code", receiptCreate(f, r, { "--requested-route": "duty.critic_normal", "--fallback-reason-code": "no carrier" })],
+       ["a flag that supplies a derived value", receiptCreate(f, r, { "--reviewed-at": "2026-10-22T00:00:00.000Z" })],
+       ["a digest flag", receiptCreate(f, r, { "--sha256": "a".repeat(64) })],
+       ["foreign repo", receiptCreate(f, r, { "--repo": join(f.root, "..") })],

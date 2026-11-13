@@ -1,0 +1,29 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 94e146c1a298b0d4dd061d6bfb1cf73afa2c10b4..5f125efe46115bae10bae67da5b90830eb11701d 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -977,7 +977,10 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (settledPreview !== null && (settledPreview.settledCount > 0 || leavingEntries.length > 0)) {
+     const argv = ["node", fileURLToPath(new URL("./routine-repair.mjs", import.meta.url)), "run", "heal", "--root", root, "--reason", "retire settled pending states before dispatch"];
+     preDispatch = [{ kind: "routine-repair", argv, why: `${settledPreview.settledCount} settled pending states, ${leavingEntries.length} stop-failure records` }];
+-    warnings.push({ code: "DBG-SETTLED-PENDING-HEAL", message: `${settledPreview.settledCount} settled pending states and ${leavingEntries.length} stop-failure record(s) of settled dispatches remain; run before dispatching: ${argv.join(" ")}` });
++    // C29 (Glossover K-26): the printed command is copied into a shell, so every argument that is not a plain word is single-quoted
++    // (the reason has spaces; a bare join split it and routine-repair refused with RR-ARGS).
++    const shellWord = (value) => (/^[A-Za-z0-9_./:=@%+,-]+$/u.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`);
++    warnings.push({ code: "DBG-SETTLED-PENDING-HEAL", message: `${settledPreview.settledCount} settled pending states and ${leavingEntries.length} stop-failure record(s) of settled dispatches remain; run before dispatching: ${argv.map(shellWord).join(" ")}` });
+   }
+   for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
+     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index afb8ee9441e995c55988b902694b9e8e04c98262..ebc348dcd64eb343d9d5e6182d88d4f31b3416a3 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1935,6 +1935,8 @@ test("W7: settled pending states and stop-failure records of settled dispatches
+   const summary = result.warnings.filter((entry) => entry.code === "DBG-SETTLED-PENDING-HEAL");
+   assert.equal(summary.length, 1);
+   assert.match(summary[0].message, /routine-repair\.mjs run heal/u);
++  // C29 (Glossover K-26): the printed command survives a shell: the multi-word reason is one quoted argument.
++  assert.ok(summary[0].message.endsWith("--reason 'retire settled pending states before dispatch'"), summary[0].message);
+   const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { settledPending: settled, stopFailures: stops }));
+   assert.equal(binding.preDispatch?.length, 1, "the binding route reports it too");
+   assert.deepEqual(directorySnapshot(fx.root), before);

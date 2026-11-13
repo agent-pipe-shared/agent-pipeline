@@ -1,0 +1,113 @@
+diff --git a/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs b/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
+index 4fa3fe4f6f3805ad3c9ade4c7c79063ac2cf9b2c..9abae39001525df86ade995e6967f2eb13fa2583 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
+@@ -36,7 +36,7 @@ import { tmpdir, devNull } from "node:os";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
+-import { parseAcceptedCriticCriterion } from "../critic-accepted-contract.mjs";
++import { parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
+ // Namespaces, not named imports: a missing export must fail its own case, not the loading of this whole file.
+ import * as hostReturn from "../native-goldfish-host-return.mjs";
+ import * as contract from "../critic-accepted-contract.mjs";
+@@ -76,6 +76,8 @@ const SPEC_TEXT = [
+   "   keeping the running total visible.", "",
+   "```", "AC-12: this id is only inside a code fence", "```", "",
+   "AC-7: first statement of seven", "AC-7: second statement of seven", "",
++  // K-31: a table row is a place only inside an acceptance table the host reads (header and delimiter row).
++  "| # | Criterion | Evidence |", "| --- | --- | --- |",
+   "| AC-8 | WHEN a table says it THE SYSTEM SHALL count once | t |", "- AC-8: WHEN a list says it THE SYSTEM SHALL count twice", "",
+ ].join("\n");
+ 
+@@ -204,7 +206,7 @@ test("a malformed criterion id and an over-long criterion are typed refusals", a
+   const fx = makeFixture();
+   assert.equal(runDispatchBriefing(argvOf(fx, "AC-0"), depsOf(fx)).code, "DBG-CRITERION-ID");
+   assert.equal(runDispatchBriefing(argvOf(fx, "ac-1"), depsOf(fx)).code, "DBG-CRITERION-ID");
+-  const long = makeFixture(`| AC-1 | ${"WHEN x THE SYSTEM SHALL y ".repeat(200)} | t |\n`);
++  const long = makeFixture(`| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | ${"WHEN x THE SYSTEM SHALL y ".repeat(200)} | t |\n`);
+   const result = runDispatchBriefing(argvOf(long, "AC-1"), depsOf(long));
+   assert.equal(result.ok, false);
+   assert.equal(result.code, "DBG-CRITERION-TOO-LONG");
+@@ -481,6 +483,24 @@ test("a reference-only table cell and a heading that merely mentions an id do no
+   }
+ });
+ 
++// K-31 (Glossover, 2026-11-13): a slice-plan table whose FIRST cell is the criterion id, under a non-normative heading, made the
++// generator count a second place (DBG-CRITERION-AMBIGUOUS) although the host parser reads only an acceptance table and binds the bullet.
++test("K-31: an id-first row of a table the host does not read as an acceptance table is not a second place", async () => {
++  const sliced = [EARS_SPEC, "## 5h. Build plan: order and vertical slices", "",
++    "| Criterion | S1 | S2 |", "| --- | --- | --- |",
++    "| AC-E1-01-09 | S1: the cart part | S2: the rest |", "",
++    "| AC-E1-01-11 | without a header row | still a reference |", ""].join("\n");
++  const { parsed } = await bindAndCheck("AC-E1-01-09", E09, sliced);
++  assert.equal(parsed.parserVersion, "markdown-acceptance-bullet-item.v1");
++  await bindAndCheck("AC-E1-01-11", E11, sliced);
++  // Parity: the host scan sees exactly one row for the id, the generator agrees, and a real acceptance table row still counts.
++  assert.equal(scanAcceptedCriterionRows(sliced).filter((row) => row.id === "AC-E1-01-09").length, 1);
++  const twice = [sliced, "## 18. Acceptance criteria (table)", "", "| # | Criterion | Evidence |", "| --- | --- | --- |",
++    `| AC-E1-01-09 | ${E09} | test |`, ""].join("\n");
++  const { result } = await bindEars("AC-E1-01-09", twice);
++  assert.equal(result.code, "DBG-CRITERION-AMBIGUOUS", JSON.stringify(result).slice(0, 300));
++});
++
+ test("a compound prefix id does not match: AC-E1-02-1 is not AC-E1-02-10, and a plain id is not a compound one", async () => {
+   const short = await bindAndCheck("AC-E1-02-1", E_SHORT);
+   const long = await bindAndCheck("AC-E1-02-10", E_LONG);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index fbd4ac3cb48fdaaf53040a82cb0a23d347f46c5f..53159b5e28e8155f4585efbcdce02884d77cb0a2 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -543,6 +543,20 @@ function findCriterionRows(sourceBytes, needle) {
+   return rows;
+ }
+ 
++/**
++ * K-31: is line `index` the header of a table the host parser reads as an acceptance table, with its delimiter row next?
++ * Mirrors scanAcceptedCriterionRows (lib/critic-accepted-contract.mjs): the exact three-column header `# | Criterion | Evidence`,
++ * or a two-column header whose cells are a number label and a criterion label.
++ */
++function acceptanceTableHeaderAt(lines, index) {
++  const header = tableCells(lines[index]?.text ?? "").map((cell) => cell.value);
++  const delimiter = tableCells(lines[index + 1]?.text ?? "").map((cell) => cell.value);
++  const threeColumn = header.length === 3 && header.join("\0") === "#\0Criterion\0Evidence";
++  const twoColumn = header.length === 2 && /^(?:#|nr\.?|id)$/iu.test(header[0])
++    && /^(?:kriterium|kriterien|abnahmekriterium|anforderung|criterion|requirement)$/iu.test(header[1]);
++  return (threeColumn || twoColumn) && delimiter.length === header.length && delimiter.every((cell) => /^:?-{3,}:?$/u.test(cell));
++}
++
+ /** Cells of one Markdown table row (leading bar required, escaped bars kept); `from`/`to` index the line. */
+ function tableCells(text) {
+   const bars = [];
+@@ -585,12 +599,22 @@ function findCriterionOccurrences(sourceBytes, id) {
+   const listMarker = /^\s*(?:[-*+]|[0-9]{1,3}[.)])[ \t]/u;
+   const found = [];
+   let fence = null;
++  // K-31 (Glossover, 2026-11-13): a table row is a criterion place only inside a table the host parser reads as an acceptance
++  // table (scanAcceptedCriterionRows, lib/critic-accepted-contract.mjs): the header `| # | Criterion | Evidence |` or a two-column
++  // `| #/Nr./id | Criterion/Kriterium/... |`, followed by a delimiter row. Any other table (a slice plan whose first column lists
++  // criterion ids) is a reference, so the generator no longer counts it as a second place.
++  let acceptanceTable = false;
+   for (let index = 0; index < lines.length; index++) {
+     const line = lines[index];
+     const fenced = /^\s*(`{3,}|~{3,})/u.exec(line.text);
+-    if (fenced) { fence = fence === null ? fenced[1][0] : fence === fenced[1][0] ? null : fence; continue; }
++    if (fenced) { acceptanceTable = false; fence = fence === null ? fenced[1][0] : fence === fenced[1][0] ? null : fence; continue; }
+     if (fence !== null) continue;
+     if (line.text.trimStart().startsWith("|")) {
++      if (!acceptanceTable) {
++        acceptanceTable = acceptanceTableHeaderAt(lines, index);
++        if (acceptanceTable) index++; // the delimiter row
++        continue;
++      }
+       const cells = tableCells(line.text);
+       // A two-column acceptance table (`Nr. | Kriterium`) numbers its rows `n` or `R-n`; the host parser maps both to `AC-n`
+       // (scanAcceptedCriterionRows, lib/critic-accepted-contract.mjs), so the generator must find the same row.
+@@ -601,6 +625,7 @@ function findCriterionOccurrences(sourceBytes, id) {
+       }
+       continue;
+     }
++    acceptanceTable = false;
+     const heading = /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line.text);
+     if (heading) {
+       // The host parser admits a heading only when it IS the id; a heading that merely mentions it is a reference.

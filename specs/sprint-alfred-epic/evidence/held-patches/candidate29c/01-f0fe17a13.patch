@@ -1,0 +1,171 @@
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+index 271dc14cfc091c1a7c4082b4740e879d72819413..d1df0d630f13ef3751cb9cf81650affbcc3f1789 100644
+--- a/plugins/pipeline-core/lib/close-acceptance-record.mjs
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -30,22 +30,50 @@ export function openChecksOf(named) {
+ }
+ 
+ /**
+- * C28 (AC-108): the ONE fixed answer form of a yes. The words come from the project's human-facing language as Continuity records it
++ * C28 (AC-108): the printed answer form of a yes (C29 widens what counts to the closed list below). The words come from the project's human-facing language as Continuity records it
+  * (`continuity.runtime.humanFacingLanguage`), so a German-speaking human answers in German; every other language, and a project without a
+  * Continuity binding, falls back to the English form. Only the form of the project's own language is a yes.
+  */
+ export const ACCEPTANCE_YES_FORMS = Object.freeze({ en: "yes, I accept", de: "ja, ich akzeptiere" });
+-export function acceptanceYesForm(language) {
++/**
++ * Candidate 29 (Codex greenfield run 3, C8; PO tile 2026-11-13): a CLOSED list of clear yes answers per language. The run's human
++ * answered "ja akzeptiert" and was told only "ja, ich akzeptiere" counts. Each list starts with the form the question prints; only the
++ * list of the project's own language counts, a comma and repeated spaces do not matter (see yesKey), and nothing outside the list is a
++ * yes: no keyword is searched in free text, so "ja, aber ..." or "yes, but ..." stays a decline.
++ */
++export const ACCEPTANCE_YES_ANSWERS = Object.freeze({
++  en: Object.freeze(["yes, I accept", "yes", "yes, accepted", "accepted", "I accept"]),
++  de: Object.freeze(["ja, ich akzeptiere", "ja", "ja, akzeptiert", "akzeptiert", "ich akzeptiere"]),
++});
++const languageKey = (language) => {
+   const key = typeof language === "string" ? language.trim().toLowerCase().split(/[-_]/u)[0] : "";
+-  return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? ACCEPTANCE_YES_FORMS[key] : ACCEPTANCE_YES_FORMS.en;
++  return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? key : "en";
++};
++export function acceptanceYesForm(language) { return ACCEPTANCE_YES_FORMS[languageKey(language)]; }
++const formLanguage = (form) => Object.keys(ACCEPTANCE_YES_FORMS).find((key) => ACCEPTANCE_YES_FORMS[key] === form) ?? null;
++const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").replace(/,/gu, " ").replace(/\s+/gu, " ").trim().toLowerCase();
++/**
++ * An acceptance only for an answer on the closed list of the form's language (normalised for case, commas, inner and surrounding
++ * space and a closing `.` or `!`). A form outside ACCEPTANCE_YES_FORMS keeps the old one-form rule. No keyword search in free text.
++ */
++export function isAcceptanceYes(answer, form) {
++  if (typeof answer !== "string") return false;
++  const language = formLanguage(form);
++  const allowed = language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language];
++  return allowed.some((entry) => yesKey(answer) === yesKey(entry));
++}
++/** The clear yes answers of the form's language, quoted for a sentence. */
++export function acceptanceYesAnswersText(form) {
++  const language = formLanguage(form);
++  return (language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language]).map((entry) => `"${entry}"`).join(", ");
+ }
+-const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").trim().toLowerCase();
+-/** An acceptance only for exactly the fixed form, normalised for case, surrounding space and closing `.` or `!`. No keyword search in free text. */
+-export function isAcceptanceYes(answer, form) { return typeof answer === "string" && yesKey(answer) === yesKey(form); }
+ 
+-/** The one sentence the agent asks the human in the chat; it ends with the fixed yes form. */
++/** The one sentence the agent asks the human in the chat, in the project's language (the form's language); it names the clear yes answers. */
+ export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
+-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer exactly "${form}"; any other answer is not an acceptance.`;
++  if (formLanguage(form) === "de") {
++    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; jede andere Antwort ist keine Abnahme.`;
++  }
++  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; any other answer is not an acceptance.`;
+ }
+ 
+ export const DECLINE_BEGIN = "<!-- close-decline:begin -->";
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 69c576246883fbb01e381b963e998685f78a8c3c..fdae4725fa4d36deee48424366eb382ea9441c67 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
+ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+-import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, featureStatusVocabulary, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
++import { acceptanceQuestion, acceptanceTarget, acceptanceYesAnswersText, acceptanceYesForm, featureStatusVocabulary, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
+ import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
+ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+@@ -435,7 +435,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form. An answer that is not exactly that form is never an acceptance and no keyword is searched in it; the way out is the decline.
+       const yesForm = acceptanceYesForm(state.continuity?.runtime?.humanFacingLanguage);
+       const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
+-      const bothWays = `if the human answered exactly "${yesForm}", rerun the identical command: ${rerun(again)}${named} --human-acceptance "${yesForm}". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
++      const bothWays = `if the human answered with one of the clear yes forms (${acceptanceYesAnswersText(yesForm)}), rerun the identical command: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
+       if (humanDecline !== null) {
+         const declineRepair = (error) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command with --human-decline "<the human's literal answer>": ${rerun(again)}${named}`;
+         stages.push("decline-record");
+@@ -504,7 +504,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+           message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
+       }
+       if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
+-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is not the fixed yes form "${yesForm}" (case, surrounding space and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
++        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is none of the clear yes forms ${acceptanceYesAnswersText(yesForm)} (case, commas, spaces and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
+           `nothing was written. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
+       }
+       const recorded = readAcceptanceRecord(root, featureId);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 561f2ed66a0547995f4e2ba2d6a6590c0183201e..7693dda739efb05fb28523143befa992e8ef022d 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -733,25 +733,26 @@ test("C28: the acceptance question states the one fixed yes form and the stop na
+     const stopped = oneShotClose(f.input, { runCommand: f.runner });
+     assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+     assert.ok(stopped.stop.reason.includes("\"yes, I accept\""), `the question states the fixed form: ${stopped.stop.reason}`);
+-    assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
++    assert.match(stopped.stop.repair, /"yes, I accept", "yes", "yes, accepted", "accepted", "I accept"/u); // C29 (C8, PO tile 2026-11-13): the closed list of clear yes forms replaces the one fixed form.
++    assert.match(stopped.stop.repair, /--human-acceptance "<the human's literal answer>"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
+     assert.deepEqual(f.calls, []); assert.equal(f.git("status", "--porcelain").trim(), "");
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+-test("C28: an answer that is not the fixed yes form is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
+-  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "yes", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?"]) {
++test("C28: an answer that is not on the closed yes list is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
++  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?", "yes yes", "not accepted", "ja"]) { // C29 (C8): a bare "yes" is on the closed list now; "ja" is not an English project's form.
+     const f = oneShotFixture({ acceptance: false });
+     try {
+       const stopped = oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner });
+       assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 300)); assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
+-      assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline/u);
++      assert.match(stopped.stop.repair, /--human-acceptance "<the human's literal answer>"/u); assert.match(stopped.stop.repair, /--human-decline/u);
+       assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
+     } finally { rmSync(f.root, { recursive: true, force: true }); }
+   }
+ });
+ 
+ test("C28: the fixed yes form is read normalised for case, surrounding space and closing punctuation, and the literal answer is recorded as given", () => {
+-  for (const answer of ["  YES, I accept!  ", "Yes, I accept.", "yes, i ACCEPT"]) {
++  for (const answer of ["  YES, I accept!  ", "Yes, I accept.", "yes, i ACCEPT", "yes", "Yes!", "accepted", "yes accepted", "I accept."]) {
+     const f = oneShotFixture({ acceptance: false });
+     try {
+       assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer);
+@@ -766,8 +767,14 @@ test("C28: the fixed form follows the project's human-facing language so a Germa
+     const stopped = oneShotClose(de.input, { runCommand: de.runner });
+     assert.ok(stopped.stop.reason.includes("\"ja, ich akzeptiere\""), stopped.stop.reason);
+     assert.equal(oneShotClose({ ...de.input, humanAcceptance: "yes, I accept" }, { runCommand: de.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", "the English form is not the German project's form");
++    assert.match(stopped.stop.reason, /^Nehmen Sie das Feature-Paket /u, "C29 (C8): the question itself is asked in the project's language");
++    for (const refused of ["yes", "ja, aber Level 2 klemmt", "nein", "ja ja"]) assert.equal(oneShotClose({ ...de.input, humanAcceptance: refused }, { runCommand: de.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", refused);
+     assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere." }, { runCommand: de.runner }).status, "commit-required");
+   } finally { rmSync(de.root, { recursive: true, force: true }); }
++  const deShort = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
++  try { // C29 (C8, Codex run 3): the human answered "ja akzeptiert" and was refused; it is on the closed German list now.
++    assert.equal(oneShotClose({ ...deShort.input, humanAcceptance: "ja akzeptiert" }, { runCommand: deShort.runner }).status, "commit-required");
++  } finally { rmSync(deShort.root, { recursive: true, force: true }); }
+   const fr = oneShotFixture({ acceptance: false, continuity: true, language: "fr" });
+   try { assert.ok(oneShotClose(fr.input, { runCommand: fr.runner }).stop.reason.includes("\"yes, I accept\"")); } finally { rmSync(fr.root, { recursive: true, force: true }); }
+ });
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index a066829bbf639320fbc5d3e77a4b4fcdbff9b523..53929ffe6a5962fc21ee3baedc5f850dce570836 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -25,7 +25,7 @@ It produces the Verify evidence in candidate mode bound to the Critic packet (fo
+ 
+ The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-RESULT-NOT-BOUND` (no Result is bound yet; in a project with a session-authority catalogue the command opens the Close lifecycle itself and its repair names each owner-route call), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps. At `closed-local` the result's `pushEvidence.command` is the Critic-bound Verify the push gate reads (`evidence/verify-latest.json`): run it, then `push-init.mjs`.
+ 
+-**The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence ends with ONE fixed answer form for yes (in the project's human-facing language: `yes, I accept`; `ja, ich akzeptiere` for a German project; English for any other language). If the human answers exactly that form (case, surrounding space and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for that form only: any other answer (a bug report, a change request, a doubt, a bare "yes") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
++**The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence is in the project's human-facing language (German for a German project, English for any other language) and ends with a closed list of clear yes forms of that language (`yes, I accept`, `yes`, `yes, accepted`, `accepted`, `I accept`; `ja, ich akzeptiere`, `ja`, `ja, akzeptiert`, `akzeptiert`, `ich akzeptiere`). If the human answers with one of those forms (case, commas, spaces and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for those forms only: any other answer (a bug report, a change request, a doubt, a "yes, but ...") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
+ **The SBOM (a standard part of the close, ADR-0091).** Before the acceptance question the close reads the lockfiles tracked in the repository (JavaScript, Python, Go, Rust, JVM, .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++ and committed CycloneDX files; Maven by its pom plus a CycloneDX file) and checks or writes `specs/<feature>/evidence/sbom/` (`record.json`, `cyclonedx.json`, `spdx.json`); a repository with no component gets an explicit `not-applicable` record. A finding of the state `stale`, `invalid`, `partial` or `unsupported` stops the close with its code (`SBOM-SOURCE-INPUTS-STALE`, `SBOM-RECORD-INVALID`, `SBOM-PARTIAL`, `SBOM-ADAPTER-UNSUPPORTED`) and the repair, before anything is written. Repair the cause (pin the dependencies in a lockfile, remove a stale `sbom` directory, add a reader to `SBOM_READERS` for another ecosystem) and rerun the identical command. Only the PO can accept the gap, and only by signature: the stop prints a request under `scratch/` and the one command the PO runs in their own terminal (`po-human-approval.mjs sign-intent --request <the request>`, which shows the findings and writes the proof next to the request). Hand the PO that command when they can run it at once, change nothing in the tree in between (the request names HEAD), then rerun the identical command with `--sbom-override-proof <the proof file>`. The close verifies the proof against the trust anchors of `project/critical-human-proof.json` (without an anchor the gap cannot be accepted, only repaired), records the findings, the actor and the signing key, keeps the signed request and proof in `specs/<feature>/evidence/sbom/`, and the audit bundle names it `SBOM-OVERRIDDEN`, carries the signed request and proof and re-checks the signature offline (`AB-SBOM-OVERRIDE`). A sentence in chat is never an override, and the agent never signs.
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 37ac1b6b85c184e4996323de710a9dc4ff9f88a2..34ed1169ec04afbd39998f26b21cfab6ec9e1af9 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -25,7 +25,7 @@ start or open it the way the PO will and look at what it really shows. Then tell
+ see it and why. This holds for every kind of result (an app, a page, a command-line tool, a library, a document) and for every hand-over, not
+ only the acceptance question at the close. It is not a gate: the Pipeline cannot check what you saw, only you can.
+ 
+-The acceptance question of the one-shot close ends with ONE fixed yes form (`yes, I accept`; `ja, ich akzeptiere` in a German project; English for any other language). Only exactly that form (case, surrounding space and a closing `.` or `!` aside) is recorded as the acceptance through `--human-acceptance`; any other answer stops with `ONESHOT-ACCEPTANCE-NOT-YES` and records nothing. If the human answers anything else (a bug, a change request), rerun the identical command with `--human-decline "<the human's literal answer>"`: the words are recorded (never as an acceptance), the bound Result is retired, and the close returns `declined` with the correction steps in order: commit, correction dispatch, Critic delta round, then the identical close command with the new packet. Do not reopen the design for a declined acceptance (`reopen-design` refuses with a bound Result and names this route).
++The acceptance question of the one-shot close is asked in the project's human-facing language (German for a German project, English for any other language) and names a closed list of clear yes forms of that language (`yes, I accept`, `yes`, `yes, accepted`, `accepted`, `I accept`; `ja, ich akzeptiere`, `ja`, `ja, akzeptiert`, `akzeptiert`, `ich akzeptiere`). Only a form on that list (case, commas, spaces and a closing `.` or `!` aside) is recorded as the acceptance through `--human-acceptance`; any other answer stops with `ONESHOT-ACCEPTANCE-NOT-YES` and records nothing. If the human answers anything else (a bug, a change request), rerun the identical command with `--human-decline "<the human's literal answer>"`: the words are recorded (never as an acceptance), the bound Result is retired, and the close returns `declined` with the correction steps in order: commit, correction dispatch, Critic delta round, then the identical close command with the new packet. Do not reopen the design for a declined acceptance (`reopen-design` refuses with a bound Result and names this route).
+ 
+ ## 1. Design
+ 

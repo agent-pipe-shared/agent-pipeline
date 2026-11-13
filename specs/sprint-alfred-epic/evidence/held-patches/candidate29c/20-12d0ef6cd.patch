@@ -1,0 +1,183 @@
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+index ebe3a3fa53b280b5ce8abad2f373c584ba56bc9a..8dd9d7859ad87c5102f49ef8f6640f284636a97b 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+@@ -119,7 +119,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+   if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:join(common,'agent-pipeline')});
+   mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
+   const source=path=>({path,sha256:hash(bytes(f,path))});
+-  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
++  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
+   assert(review.ok,'SETUP actual review producer: '+review.code);write(f,RECEIPT,Buffer.from(review.bytes));
+   const keys=generateKeyPairSync('ed25519');f.publicKey=keys.publicKey.export({type:'spki',format:'pem'});f.keyReference='synthetic-p16-key';f.signDigest=value=>sign(null,Buffer.from(value),keys.privateKey).toString('base64');
+   writeJson(f,'project/critical-human-proof.json',{schema:'pipeline.critical-human-proof-policy.v3',requiredKinds:['push'],waivedKinds:[],trustAnchors:[{keyReference:f.keyReference,publicKeySha256:hash(f.publicKey)}]});
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+index 125fca1dfd21cc09ba894c77e4eba0433e6b08c2..799864cf7656719837b941d71ec5ed22ac6988ea 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+@@ -138,7 +138,7 @@ test("LB4-8 the seal plan digest enters the signed binding additively: no plan,
+   const source = (path, bytes) => ({ path, sha256: sha(Buffer.from(bytes)) });
+   const sources = { prd: source(PLAN, "prd"), spec: source(SPEC, "spec"), companions: COMPANIONS.map((path) => source(path, path)) };
+   const report = source(REPORT, "report");
+-  const made = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources, reviewer: { runner: "claude", model: "claude-opus-4" }, report, openFindingIds: [], reviewedAt: AT });
++  const made = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: report.sha256 }, report, openFindingIds: [], reviewedAt: AT });
+   assert.ok(made.ok, made.code);
+   const receipts = [{ path: RECEIPT, bytes: made.bytes }];
+   const plain = createDesignApprovalBinding({ featureId: FEATURE, receipts, currentSources: sources });
+@@ -227,7 +227,7 @@ function buildDraft(name, { reviewOf } = {}) {
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: sha(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: [...COMPANIONS.map(source), ...(reviewOf === "with-input" ? [source(INPUT)] : [])] }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
++  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: [...COMPANIONS.map(source), ...(reviewOf === "with-input" ? [source(INPUT)] : [])] }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(RECEIPT, Buffer.from(review.bytes));
+   gitOk("add", "--", PLAN, SPEC, INPUT, ...COMPANIONS, REPORT, RECEIPT, "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", "docs/adr/.gitkeep", NEUTRAL_MANIFEST);
+diff --git a/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs b/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
+index 9bf3fc6c4c9d152639e842d648e6b01730b518fe..a10b0ce836e286930f1ff46a1f0aa4fdba210b85 100644
+--- a/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
++++ b/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
+@@ -205,6 +205,7 @@ async function routeFixture(t, { ignored = null } = {}) {
+     featureId: ROUTE_FEATURE, previous: null,
+     sources: { prd: sourceFor(ROUTE_PLAN), spec: sourceFor(ROUTE_SPEC), companions: [ROUTE_DESIGN, ROUTE_TRACE].map(sourceFor) },
+     reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(ROUTE_REPORT),
++    reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(ROUTE_REPORT).sha256 },
+     openFindingIds: [], reviewedAt: "2026-10-09T09:00:00.000Z",
+   });
+   assert.equal(created.ok, true, JSON.stringify(created));
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index bbccfbcea9b36057dfbf3d41676c200494b9b180..2bee585808d79218261fee42a8bb824693152f82 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -158,7 +158,7 @@ function buildConsumer(name) {
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: sha256(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
++  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(RECEIPT, Buffer.from(review.bytes));
+   const publicKey = generateKeyPairSync("ed25519").publicKey.export({ type: "spki", format: "pem" });
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
+index 79d4ba0b86f9ec58d7a08b1f6105d079578363d7..457615b99214e2c42bbe4396119c89d765d7a62b 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
+@@ -141,7 +141,7 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: sha256(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
++  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(RECEIPT, Buffer.from(review.bytes));
+   // A throwaway key: its public half is the trust anchor; in signature mode its private half stands in for the PO's
+@@ -192,7 +192,7 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
+     write(PLAN, read(PLAN).toString("utf8").replace(sha256(oldSpec), sha256(newSpec)));
+     write(SPEC, newSpec);
+     write("specs/e2e/review/design-review-2.md", "# Synthetic round-2 review\nVerdict: pass.\n");
+-    const review2 = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source("specs/e2e/review/design-review-2.md"), openFindingIds: [], reviewedAt: AT });
++    const review2 = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source("specs/e2e/review/design-review-2.md").sha256 }, report: source("specs/e2e/review/design-review-2.md"), openFindingIds: [], reviewedAt: AT });
+     assert.ok(review2.ok, `SETUP actual round-2 review producer: ${review2.code}`);
+     write("specs/e2e/review/design-review-receipt-2.json", Buffer.from(review2.bytes));
+     gitOk("add", "--", PLAN, SPEC, "specs/e2e/review/design-review-2.md", "specs/e2e/review/design-review-receipt-2.json");
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+index 9b8e81d62c4b5606eb1501d7d1dd1b83559bd658..ba7783945d2a444127cae62b2de313cd2ed4cdea 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+@@ -137,7 +137,7 @@ function fixture({ stateTracked, verifyAtPhase = false, registered = true }) {
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: sha256(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
++  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(RECEIPT, Buffer.from(review.bytes));
+   // Only the PUBLIC half of a throwaway key is used: the policy needs a trust anchor, no proof is ever signed.
+diff --git a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+index c4458e0dfa57c69fcd336c5ee2acd8576bfd73e7..ab8811a57f4b88fb800f0af1fbb3a007d6748ede 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+@@ -152,7 +152,7 @@ function buildConsumer({ name, authored, session }) {
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: sha256(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
++  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(RECEIPT, Buffer.from(review.bytes));
+   const publicKey = generateKeyPairSync("ed25519").publicKey.export({ type: "spki", format: "pem" });
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 4f97ad986b241bbc4898b98a1445a5d2ecf18906..de8a51404af402e94a543e542c0545801037407f 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -298,7 +298,7 @@ function buildDefaultModeDesignPresentation() {
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: designDigest(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: feature, previous: null, sources: { prd: source(plan), spec: source(spec), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(reportPath), openFindingIds: [], reviewedAt: DESIGN_AT });
++  const review = createDesignReviewReceipt({ featureId: feature, previous: null, sources: { prd: source(plan), spec: source(spec), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(reportPath).sha256 }, report: source(reportPath), openFindingIds: [], reviewedAt: DESIGN_AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(receiptPath, Buffer.from(review.bytes));
+   // The PO key: encrypted, so production prints the disclosure and asks for no typed confirmation (the passphrase seam answers OpenSSL).
+diff --git a/plugins/pipeline-core/lib/po-gate-authority.test.mjs b/plugins/pipeline-core/lib/po-gate-authority.test.mjs
+index 2a6dfff18f8e9748c1c0e0eee7427a4ca7c508e7..d2c7a1b9a019de662f29a61b42901919e5fa9b9f 100644
+--- a/plugins/pipeline-core/lib/po-gate-authority.test.mjs
++++ b/plugins/pipeline-core/lib/po-gate-authority.test.mjs
+@@ -918,6 +918,7 @@ function submitFixturePlan(primary, authority, profile) {
+     previous: null,
+     sources: { prd: sourceFor(planPath), spec: sourceFor(specPath), companions: companionPaths.map(sourceFor) },
+     reviewer: { runner: "claude", model: "claude-opus-4" },
++    reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reportPath).sha256 },
+     report: sourceFor(reportPath),
+     openFindingIds: [],
+     reviewedAt: "2026-10-09T09:00:00.000Z",
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 593f82ec2796b2bbea6e1696fd36a6653a3d196c..ba897d7f80331d3a26eca9f98f5b34a0e315d014 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -663,6 +663,7 @@ function materializeDesignReviewReceiptFixture({ rootDir, featureId, planPath, s
+     previous: null,
+     sources: { prd: sourceFor(planPath), spec: sourceFor(specPath), companions: companionPaths.map(sourceFor) },
+     reviewer: { runner: "claude", model: "claude-opus-4" },
++    reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reportPath).sha256 },
+     report: sourceFor(reportPath),
+     openFindingIds: [],
+     reviewedAt: new Date(Date.UTC(2026, 9, 9, 9, 0, round)).toISOString(),
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index ca1c982b63dd543756a091406879888d8740c967..c6b1a470e9e9de75776d44aff8e6e75e6a948228 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -173,7 +173,7 @@ function consumerFixture(log, identity) {
+   mkdirSync(dirname(profilePath), { recursive: true, mode: 0o700 });
+   writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   const source = (path) => ({ path, sha256: sha256(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: FEATURE_ID, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
++  const review = createDesignReviewReceipt({ featureId: FEATURE_ID, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(RECEIPT, Buffer.from(review.bytes));
+   const keyPair = generateKeyPairSync("ed25519");
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index f4f74a5566a167957bea538f04f953c25a75edfe..4231730f97a843ab20dc58fca5354af31b10b3dc 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -1453,6 +1453,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+         featureId, previous: null,
+         sources: { prd: sourceFor(prdPath), spec: sourceFor(`${sourceBase}/spec.md`), companions: [fixtureSources[1][0], fixtureSources[2][0]].map(sourceFor) },
+         reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(reviewReportPath),
++        reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reviewReportPath).sha256 },
+         openFindingIds: [], reviewedAt: "2026-10-09T09:00:00.000Z",
+       });
+       assert.equal(createdReceipt.ok, true, `${runner}: fixture review receipt refused: ${createdReceipt.code}`);
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 89dc1b6debae51330efab0197429a8bb2f66a3b6..e58d7ca14a77abe86eb253ebfff4a4b3b53fe7c5 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -322,7 +322,7 @@ function provisionApprovedImplementationFixture(parent) {
+     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+   }
+   const source = (path) => ({ path, sha256: digestHex(read(path)) });
+-  const review = createDesignReviewReceipt({ featureId: LIFECYCLE_FEATURE, previous: null, sources: { prd: source(LIFECYCLE_PLAN), spec: source(LIFECYCLE_SPEC), companions: LIFECYCLE_COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(LIFECYCLE_REPORT), openFindingIds: [], reviewedAt: LIFECYCLE_AT });
++  const review = createDesignReviewReceipt({ featureId: LIFECYCLE_FEATURE, previous: null, sources: { prd: source(LIFECYCLE_PLAN), spec: source(LIFECYCLE_SPEC), companions: LIFECYCLE_COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(LIFECYCLE_REPORT).sha256 }, report: source(LIFECYCLE_REPORT), openFindingIds: [], reviewedAt: LIFECYCLE_AT });
+   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+   write(LIFECYCLE_RECEIPT, Buffer.from(review.bytes));
+   // Only the PUBLIC half of a throwaway key is used: the policy needs a trust anchor, no proof is ever signed.

@@ -1,0 +1,118 @@
+diff --git a/plugins/pipeline-core/lib/design-review-observation.mjs b/plugins/pipeline-core/lib/design-review-observation.mjs
+index ea1fda32492168e22b124b9647ddf3f471f0a05c..553c9573751b3c57ad7ee5ba78091c4e608b2bda 100644
+--- a/plugins/pipeline-core/lib/design-review-observation.mjs
++++ b/plugins/pipeline-core/lib/design-review-observation.mjs
+@@ -17,8 +17,11 @@
+  * `design-review-receipt.mjs export-report` writes the observed text as the report file, so the report bytes are the
+  * host's and their digest finds the observation again; `create` reads the observation by that digest and stamps it into
+  * the receipt. What this does not prove: that the reviewer read the sources the receipt names (the receipt binds them at
+- * create time, as before), or which model a provider actually served beyond what the host reports. Codex and Antigravity
+- * have no built route here; their receipts say `unobserved` (D247).
++ * create time, as before), or which model a provider actually served beyond what the host reports. The store is refused to an
++ * agent's own Write/Edit and shell writes (guard-gate-strength, GUARD-CONTROLPLANE-WRITE); a writer outside the hooked tool
++ * calls (another process, a runner whose child tool calls are not hooked) is not covered -- host sandboxing is that boundary.
++ * One observation stamps one review: `create` binds it to the PRD and Spec of its first receipt (`<digest>.consumed`).
++ * Codex and Antigravity have no built route here; their receipts say `unobserved` (D247).
+  */
+ import { createHash } from "node:crypto";
+ import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+@@ -206,6 +209,25 @@ export function listUnexportedDesignReviewObservations({ commonDir }) {
+   return out.sort((left, right) => right.observedAtMs - left.observedAtMs || (left.resultSha256 < right.resultSha256 ? -1 : 1));
+ }
+ 
++/**
++ * One observed review stamps the receipts of ONE review: the first `create` that stamps an observation binds it to the PRD and
++ * Spec digests it was made for (`<digest>.consumed`, exclusive create). A later stamp over the same digests (a receipt made
++ * again after a mistaken flag) is admitted; over other bytes it is a replay, wherever its receipt would be written.
++ * @returns {{ ok: true } | { ok: false, code: "DRO-CONSUMED-ELSEWHERE" | "DRO-CONSUME-UNAVAILABLE" }}
++ */
++export function consumeDesignReviewObservation({ commonDir, resultSha256, prdSha256, specSha256 }) {
++  try {
++    if (![resultSha256, prdSha256, specSha256].every((value) => typeof value === "string" && SHA256.test(value))) return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" };
++    const file = join(designReviewObservationDir(commonDir), `${resultSha256}.consumed`);
++    const body = `${JSON.stringify({ prdSha256, specSha256 })}\n`;
++    try { writeFileSync(file, body, { flag: "wx", mode: 0o600 }); return { ok: true }; }
++    catch (error) { if (error?.code !== "EEXIST") return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" }; }
++    if (lstatSync(file).isSymbolicLink()) return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" };
++    const bound = JSON.parse(readFileSync(file, "utf8"));
++    return bound?.prdSha256 === prdSha256 && bound?.specSha256 === specSha256 ? { ok: true } : { ok: false, code: "DRO-CONSUMED-ELSEWHERE" };
++  } catch { return { ok: false, code: "DRO-CONSUME-UNAVAILABLE" }; }
++}
++
+ /** Mark one observation exported; a second export of the same observation is refused by the caller. */
+ export function markDesignReviewObservationExported({ commonDir, resultSha256 }) {
+   writeFileSync(join(designReviewObservationDir(commonDir), `${resultSha256}.exported`), "", { flag: "wx", mode: 0o600 });
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index d67cd1c9eeffae440970e0f48f3475740b645d4c..5e8adbf48f2ee1000b9f991714dcabed5010f90a 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -35,7 +35,7 @@ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFile
+ import { dirname, join, sep } from "node:path";
+ 
+ import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
+-import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
++import { consumeDesignReviewObservation, listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ 
+@@ -273,17 +273,18 @@ export function createReceiptFromDisk(input, deps = {}) {
+   // runner without a built observation route, the receipt says `unobserved`.
+   let reviewerObservation;
+   let observedModel = null;
++  let commonDir = null;
++  const replayRoute = "One observed review dispatch stamps one review: dispatch pipeline-core:readiness-reviewer again for this round, write its report with export-report, and pass the earlier receipt with --previous. A receipt made by mistake and not yet committed may be deleted and made again over the same PRD and Spec";
+   if (fallbackReasonCode === null) {
+     const returnedSha256 = originalSha256 ?? sha256Of(reportRead.bytes);
+     let record = null;
+     if (runner === "claude") {
+-      let commonDir = null;
+       try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
+       record = commonDir === null ? null : readDesignReviewObservation({ commonDir, resultSha256: returnedSha256 });
+     }
+     const claimed = record === null ? null : receiptClaimingObservation(repoReal, request.outPath, previous, returnedSha256);
+     if (claimed !== null) {
+-      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${returnedSha256.slice(0, 12)}...) already stamps ${claimed}. One observed review dispatch stamps one round: dispatch pipeline-core:readiness-reviewer again for this round, write its report with export-report, and pass the earlier receipt with --previous`);
++      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${returnedSha256.slice(0, 12)}...) already stamps ${claimed}. ${replayRoute}`);
+     }
+     if (record === null) reviewerObservation = { assurance: DESIGN_REVIEW_UNOBSERVED_ASSURANCE, modelsUsed: [], resultSha256: null };
+     else {
+@@ -329,6 +330,15 @@ export function createReceiptFromDisk(input, deps = {}) {
+     return refuse(created.code, `design review receipt refused: ${created.code}`);
+   }
+ 
++  // D247: the observation is bound to the PRD and Spec of its first receipt, so it cannot stamp a review of other bytes in any folder.
++  if (reviewerObservation !== undefined && reviewerObservation.resultSha256 !== null) {
++    const consumed = consumeDesignReviewObservation({ commonDir, resultSha256: reviewerObservation.resultSha256, prdSha256: sources.prd.sha256, specSha256: sources.spec.sha256 });
++    if (!consumed.ok && consumed.code === "DRO-CONSUMED-ELSEWHERE") {
++      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${reviewerObservation.resultSha256.slice(0, 12)}...) already stamps a receipt over other PRD or Spec bytes. ${replayRoute}`);
++    }
++    if (!consumed.ok) return refuse("DRC-OBSERVATION-STORE", "the host observation could not be bound to this receipt in the private control area; nothing was written");
++  }
++
+   try {
+     writeFileSync(output.absolute, created.bytes, { flag: "wx" });
+   } catch (error) {
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index b71937dddaf311c5827a1e85fba833dab04be49f..c7a15c87a5797f297b596f7cc64e629c3db566ec 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -575,6 +575,19 @@ test("D247: export-report writes the observed text, and create stamps the observ
+     assert.match(replayed.json.message, /design-review-1\.receipt\.json/u);
+     assert.equal(existsSync(join(repo, RECEIPT2)), false);
+   }
++  // In another folder, over one changed Spec byte and without --previous, it is still a replay (bound in the private store).
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
++  mkdirSync(join(repo, "evidence"), { recursive: true });
++  const elsewhere = runMain(baseArgv(repo, { report: out, out: "evidence/receipt-elsewhere.json" }), CLAUDE, world.deps);
++  assert.equal(elsewhere.json.code, "DRC-OBSERVATION-REPLAYED");
++  assert.match(elsewhere.json.message, /other PRD or Spec bytes/u);
++  assert.equal(existsSync(join(repo, "evidence/receipt-elsewhere.json")), false);
++  // A receipt made by mistake and deleted before commit is made again over the same PRD and Spec.
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v1\n");
++  rmSync(join(repo, RECEIPT1));
++  const again = runMain(baseArgv(repo, { report: out }), CLAUDE, world.deps);
++  assert.equal(again.code, 0, again.stderr);
++  assert.equal(again.json.reviewerObservation.assurance, "host-observed-child-transcript");
+ }));
+ 
+ test("D247: a sanitized report binds the observation through its unpublished original", withRepo(async (repo, t) => {

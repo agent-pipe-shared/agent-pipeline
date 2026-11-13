@@ -1,0 +1,371 @@
+diff --git a/plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs b/plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs
+index 44bdaa4f4d736d5d46c341a7af91eed824c75be4..9c03d0842978001c5884bb65a75cdf4104cc0785 100644
+--- a/plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs
++++ b/plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs
+@@ -5,7 +5,7 @@
+ // protection; there it must say so honestly (`nofollow-unavailable`), and the cases that need a
+ // successful readback are skipped with that typed host-limitation reason.
+ import assert from "node:assert/strict";
+-import { appendFileSync, constants, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { appendFileSync, constants, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ import { dirname, join, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+@@ -383,7 +383,9 @@ test("a parent that cannot be found is stated as incomplete, never silently omit
+   } finally { cleanup(fx); }
+ });
+ 
+-test("a session file beyond the former 8 MiB cap is read by head and tail windows; growth during the audit is tolerated, shrinkage is not", { skip: HOST_LIMIT }, () => {
++// C29 (Codex run 3, C1; PO tile 2026-11-13 "full paginated audit export"), restating the former head-and-tail case: the run's
++// audit skipped about 33.9 MB of middles and still could not give exact counts. Every byte is read now, page by page, and hashed.
++test("a session file beyond the former 8 MiB cap is read whole, page by page and hashed; growth during the audit is tolerated, shrinkage is not", { skip: HOST_LIMIT }, () => {
+   const fx = fixture();
+   try {
+     const filler = Array.from({ length: 90 }, (_, n) => at("2026-10-19T10:10:00.000Z", { type: "response_item", payload: { n, text: "x".repeat(100 * 1024) } }));
+@@ -393,10 +395,14 @@ test("a session file beyond the former 8 MiB cap is read by head and tail window
+     });
+     withEnv(ENV(fx), () => {
+       const out = audit(fx);
+-      assert.equal(out.status, "available", JSON.stringify(out));
++      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
+       const [segment] = out.segments;
+-      assert.equal(segment.observation, "head-and-tail-windows");
+-      assert.equal(segment.unreadBytes > 0, true);
++      assert.equal(segment.observation, "complete");
++      assert.equal(segment.unreadBytes, 0);
++      assert.equal(segment.pages > 2, true, "more than one page");
++      assert.equal(segment.contentSha256, sha256(readFileSync(file)));
++      assert.equal(segment.recordCount, 93, "every middle record is read");
++      assert.equal(out.completeness, "complete"); assert.equal(out.unreadBytes, 0); assert.equal(out.totals.status, "complete"); assert.equal(out.totals.records, 93);
+       assert.equal(segment.endedAt, "2026-10-19T10:59:00.000Z");
+       assert.deepEqual(segment.tokenCounters, usageOf(5));
+       assert.equal(segment.tokenDelta.total_tokens, 60);
+@@ -413,3 +419,76 @@ test("a session file beyond the former 8 MiB cap is read by head and tail window
+     });
+   } finally { cleanup(fx); }
+ });
++
++test("C29-C1 records split across tiny pages are carried whole; an over-long record is read and hashed but counted unparsed once; an in-progress last line is not unread", { skip: HOST_LIMIT }, () => {
++  const fx = fixture();
++  try {
++    const rows = [at("2026-10-19T10:01:00.000Z", { type: "turn_context", payload: { model: "gpt-5.5" } }),
++      at("2026-10-19T10:02:00.000Z", { type: "response_item", payload: { type: "function_call", name: "shell", call_id: "c1", arguments: "{}" } }),
++      at("2026-10-19T10:03:00.000Z", { type: "response_item", payload: { type: "message", text: "y".repeat(5000) } }),
++      usageRow("2026-10-19T10:04:00.000Z", 1), usageRow("2026-10-19T10:05:00.000Z", 2)];
++    const file = put(fx, "2026/10", SESSION, fx.project, { ts: "2026-10-19T10:00:00.000Z", rows });
++    withEnv(ENV(fx), () => {
++      const out = audit(fx, { limits: { windowBytes: 64 } });
++      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
++      const [segment] = out.segments;
++      assert.equal(segment.recordCount, 6); assert.equal(segment.unparsedRecordCount, 0);
++      assert.equal(segment.turnCount, 1); assert.equal(segment.toolCallCount, 1);
++      assert.equal(segment.contentSha256, sha256(readFileSync(file))); assert.equal(segment.unreadBytes, 0);
++      assert.equal(out.completeness, "complete");
++      const tight = audit(fx, { limits: { windowBytes: 64, recordBytes: 1024 } });
++      assert.equal(tight.segments[0].unparsedRecordCount, 1, "the 5000-byte record is one unparsed record");
++      assert.equal(tight.segments[0].recordCount, 5); assert.equal(tight.segments[0].unreadBytes, 0);
++      assert.equal(tight.completeness, "partial"); assert.ok(tight.incompleteReasons.includes("records-skipped"));
++      assert.equal(tight.totals.status, "partial", "sums over a partial audit are labelled partial");
++    });
++    appendFileSync(file, '{"timestamp":"2026-10-19T10:06:00.000Z","type":"event_m');
++    withEnv(ENV(fx), () => {
++      const live = audit(fx, { limits: { windowBytes: 64 } });
++      assert.equal(live.segments[0].trailingPartialBytes > 0, true); assert.equal(live.segments[0].unreadBytes, 0);
++      assert.equal(live.completeness, "complete", "an in-progress record of a live session is not unread");
++    });
++  } finally { cleanup(fx); }
++});
++
++test("C29-C1 a spawned child with no session file is an unknown child, one in another repository is named outside; both make the audit partial", { skip: HOST_LIMIT }, () => {
++  const fx = fixture();
++  try {
++    const spawn = (ts, callId, agentId) => [at(ts, { type: "response_item", payload: { type: "function_call", name: "spawn_agent", call_id: callId, arguments: "{}" } }),
++      at(ts, { type: "response_item", payload: { type: "function_call_output", call_id: callId, output: JSON.stringify({ agent_id: agentId }) } })];
++    put(fx, "2026/10", SESSION, fx.project, { ts: "2026-10-19T10:00:00.000Z", rows: [...spawn("2026-10-19T10:01:00.000Z", "c1", "audit-kid-found"), ...spawn("2026-10-19T10:02:00.000Z", "c2", "audit-kid-missing"), ...spawn("2026-10-19T10:03:00.000Z", "c3", "audit-kid-elsewhere")] });
++    put(fx, "2026/10", "audit-kid-found", fx.project, { ts: "2026-10-19T10:01:05.000Z", payload: viaSource(SESSION) });
++    put(fx, "2026/10", "audit-kid-elsewhere", fx.foreign, { ts: "2026-10-19T10:03:05.000Z", payload: viaSource(SESSION) });
++    withEnv(ENV(fx), () => {
++      const out = audit(fx);
++      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
++      assert.equal(out.unknownChildren, 1); assert.equal(out.outsideChildren, 1);
++      assert.equal(out.completeness, "partial");
++      assert.ok(out.incompleteReasons.includes("child-segment-not-found")); assert.ok(out.incompleteReasons.includes("child-outside-repository"));
++      assert.equal(out.segments.find((segment) => segment.role === "current").spawnedChildren, 3);
++      const text = JSON.stringify(out);
++      for (const leak of ["audit-kid-found", "audit-kid-missing", "audit-kid-elsewhere"]) assert.equal(text.includes(leak), false, leak);
++    });
++    put(fx, "2026/10", "audit-kid-missing", fx.project, { ts: "2026-10-19T10:02:05.000Z", payload: viaSource(SESSION) });
++    withEnv(ENV(fx), () => {
++      const out = audit(fx);
++      assert.equal(out.unknownChildren, 0); assert.equal(out.outsideChildren, 1);
++    });
++  } finally { cleanup(fx); }
++});
++
++test("C29-C1 a lineage member over the byte bound is not read and its whole size is counted unread, never dropped silently", { skip: HOST_LIMIT }, () => {
++  const fx = fixture();
++  try {
++    put(fx, "2026/10", SESSION, fx.project, { ts: "2026-10-19T10:00:00.000Z" });
++    const child = put(fx, "2026/10", "audit-big-child", fx.project, { ts: "2026-10-19T10:01:00.000Z", payload: viaSource(SESSION), rows: [at("2026-10-19T10:02:00.000Z", { type: "response_item", payload: { text: "z".repeat(4096) } })] });
++    withEnv(ENV(fx), () => {
++      const out = audit(fx, { limits: { segmentBytes: 1024 } });
++      assert.equal(out.status, "available", JSON.stringify(out).slice(0, 600));
++      assert.equal(out.unreadSegments, 1); assert.equal(out.unreadBytes, statSync(child).size);
++      assert.equal(out.completeness, "partial"); assert.equal(out.truncated, true);
++      assert.ok(out.incompleteReasons.includes("segment-byte-bound-reached")); assert.ok(out.incompleteReasons.includes("segment-bytes-unread"));
++      assert.equal(audit(fx).completeness, "complete");
++    });
++  } finally { cleanup(fx); }
++});
+diff --git a/plugins/pipeline-core/lib/runner-own-session-audit.mjs b/plugins/pipeline-core/lib/runner-own-session-audit.mjs
+index 2c4d069fb38ee23e6581689da633ac3503f56c01..fd9a0fc3b84f481aadfddabb21d77e379a8ab6c5 100644
+--- a/plugins/pipeline-core/lib/runner-own-session-audit.mjs
++++ b/plugins/pipeline-core/lib/runner-own-session-audit.mjs
+@@ -18,10 +18,13 @@ import { isAbsolute, join, resolve, dirname } from 'node:path';
+ import { createHash } from 'node:crypto';
+ import { resolveModelRoleHostSessionIdentity } from './model-role-host-identity.mjs';
+ 
++// C29 (Codex run 3, C1; PO tile 2026-11-13 "full paginated audit export"): a lineage member is read whole, page by page
++// (`windowBytes` per page, one running sha256 over [0, snapshot size)), never by head and tail windows. Memory stays one page plus one
++// record; `segmentBytes` bounds the bytes of all non-current members together and `recordBytes` the one record a page boundary splits.
+ const LIMIT = {
+   entries: 20_000, directories: 4_096, depth: 8,
+   headBytes: 512 * 1024, headChunk: 16 * 1024, scanBytes: 256 * 1024 * 1024,
+-  windowBytes: 2 * 1024 * 1024, segmentBytes: 64 * 1024 * 1024,
++  windowBytes: 2 * 1024 * 1024, segmentBytes: 1024 * 1024 * 1024, recordBytes: 16 * 1024 * 1024,
+   repositorySessions: 2_048, segments: 64, lineageDepth: 16,
+ };
+ const SCHEMA = 'pipeline.runner-own-session-audit.v1';
+@@ -121,7 +124,7 @@ function parentOf(meta) {
+ function enumerate(storage, root, active, LIM, hook) {
+   const scan = { entriesVisited: 0, directoriesVisited: 0, candidateFiles: 0, foreignSessions: 0, repositorySessions: 0,
+     nonSessionFiles: 0, skippedCandidates: 0, bytesRead: 0 };
+-  const reasons = new Set(), repository = [], activeFiles = [], stack = [{ path: storage, depth: 0 }], cache = new Map();
++  const reasons = new Set(), repository = [], activeFiles = [], stack = [{ path: storage, depth: 0 }], cache = new Map(), foreignIds = new Set();
+   let firstFailure = null, stop = false;
+   const inRepository = cwd => {
+     if (typeof cwd !== 'string' || !isAbsolute(cwd)) return false;
+@@ -162,7 +165,7 @@ function enumerate(storage, root, active, LIM, hook) {
+         if (typeof meta.cwd !== 'string' || !isAbsolute(meta.cwd) || physical(meta.cwd, true) !== root) fail('session-repository-conflict');
+         if (activeFiles.length) fail('session-identity-ambiguous');
+         activeFiles.push({ path, id: meta.id, parentId: parentOf(meta) });
+-      } else if (!inRepository(meta.cwd)) scan.foreignSessions += 1;
++      } else if (!inRepository(meta.cwd)) { scan.foreignSessions += 1; if (SESSION_ID.test(meta.id)) foreignIds.add(meta.id); }
+       else if (repository.length >= LIM.repositorySessions) reasons.add('repository-session-bound-reached');
+       else repository.push({ path, id: meta.id, parentId: parentOf(meta) });
+     }
+@@ -170,7 +173,7 @@ function enumerate(storage, root, active, LIM, hook) {
+     for (const entry of [...names].reverse()) if (entry.directory) stack.push({ path: join(directory.path, entry.name), depth: directory.depth + 1 });
+   }
+   scan.repositorySessions = repository.length + activeFiles.length;
+-  return { scan, reasons, repository, activeFiles, firstFailure };
++  return { scan, reasons, repository, activeFiles, firstFailure, foreignIds };
+ }
+ 
+ /** The active session, the sessions it descends from, and the sessions descending from it. */
+@@ -221,60 +224,105 @@ function eventOf(row) {
+   return event;
+ }
+ 
+-/** Read one lineage member (whole file, or its head and tail windows) and reduce it to bounded metadata. */
++const TOOL_CALL_TYPES = new Set(['function_call', 'custom_tool_call', 'local_shell_call']);
++
++/** The agent id a Codex spawn result names (`{"agent_id": ...}`, the shape the export reads too), or null. */
++function spawnedAgentId(payload) {
++  if (payload?.type !== 'function_call_output') return null;
++  let value = payload.output;
++  if (typeof value === 'string') { try { value = JSON.parse(value); } catch { return null; } }
++  return value && typeof value === 'object' && typeof value.agent_id === 'string' && SESSION_ID.test(value.agent_id) ? value.agent_id : null;
++}
++
++/**
++ * Read one lineage member whole, page by page, and fold it into bounded metadata. Every byte of [0, snapshot size) is read and
++ * hashed; a record a page boundary splits is carried (up to `recordBytes`). Not unread: bytes appended after the snapshot size
++ * (a live session grows; `grewDuringRead`), a last line without its newline (an in-progress record; `trailingPartialBytes`) and
++ * a record too long to parse (read and hashed, counted in `unparsedRecordCount`).
++ */
+ function observe(member, root, LIM, hook, budget) {
+-  const plan = size => (size <= 2 * LIM.windowBytes ? [[0, size]] : [[0, LIM.windowBytes], [size - LIM.windowBytes, size]]);
+-  const { value, size, grew } = withFile(member.path, hook, (fd, length) => plan(length).map(([start, end]) => ({ start, bytes: readAt(fd, start, end) })));
+-  const read = value.reduce((total, chunk) => total + chunk.bytes.length, 0);
+-  budget.bytes += read;
+-  const rows = [];
+-  let unparsed = 0;
+-  for (const chunk of value) {
+-    const lines = chunk.bytes.toString('utf8').split('\n');
+-    if (chunk.start > 0) lines.shift(); // begins inside a record
+-    if (chunk.start + chunk.bytes.length < size || chunk.bytes.at(-1) !== 10) lines.pop(); // clipped or in-progress record
+-    for (const line of lines) {
+-      if (!line.trim()) continue;
+-      if (line.length > LIM.headBytes) { unparsed += 1; continue; }
+-      try { rows.push(JSON.parse(line)); } catch { unparsed += 1; }
+-    }
+-  }
+-  if (rows[0]?.type !== 'session_meta' || rows[0].payload?.id !== member.id) fail('session-identity-changed');
+-  if (member.role === 'current') {
+-    const cwd = rows[0].payload.cwd;
+-    if (rows.filter(row => row?.type === 'session_meta').length !== 1 || typeof cwd !== 'string'
+-      || !isAbsolute(cwd) || physical(cwd, true) !== root) fail('session-repository-conflict');
+-  }
+-  let startMs = null, endMs = null, modelIdentity = 'unavailable', first = null, last = null, observations = 0;
+-  for (const row of rows) {
++  const fold = { rows: 0, unparsed: 0, firstRow: undefined, lastRow: undefined, startMs: null, endMs: null, modelIdentity: 'unavailable',
++    first: null, last: null, observations: 0, turns: 0, toolCalls: 0, spawned: new Set(), metaConflict: false };
++  const take = (line) => {
++    if (line.length === 0 || !line.toString('utf8').trim()) return;
++    if (line.length > LIM.recordBytes) { fold.unparsed += 1; return; }
++    let row;
++    try { row = JSON.parse(line.toString('utf8')); } catch { fold.unparsed += 1; return; }
++    fold.rows += 1;
++    if (fold.firstRow === undefined) fold.firstRow = row;
++    fold.lastRow = row;
++    // Only the first record names the session. A later session_meta (a fork or a resume can carry one) must not claim another
++    // working directory for the same id; another id is history this file carries, never an identity.
++    if (fold.rows > 1 && row?.type === 'session_meta' && row.payload?.id === member.id && row.payload?.cwd !== fold.firstRow?.payload?.cwd) fold.metaConflict = true;
+     const ms = stampOf(row);
+-    if (ms !== null) { startMs = startMs === null ? ms : Math.min(startMs, ms); endMs = endMs === null ? ms : Math.max(endMs, ms); }
+-    if (row?.type === 'turn_context' && typeof row.payload?.model === 'string'
+-      && /^(?:gpt-|codex-|o[1-9])[A-Za-z0-9._-]{1,80}$/u.test(row.payload.model)) modelIdentity = row.payload.model;
++    if (ms !== null) { fold.startMs = fold.startMs === null ? ms : Math.min(fold.startMs, ms); fold.endMs = fold.endMs === null ? ms : Math.max(fold.endMs, ms); }
++    if (row?.type === 'turn_context') {
++      fold.turns += 1;
++      if (typeof row.payload?.model === 'string' && /^(?:gpt-|codex-|o[1-9])[A-Za-z0-9._-]{1,80}$/u.test(row.payload.model)) fold.modelIdentity = row.payload.model;
++    }
++    if (row?.type === 'response_item' && TOOL_CALL_TYPES.has(row.payload?.type)) fold.toolCalls += 1;
++    if (row?.type === 'response_item') { const spawned = spawnedAgentId(row.payload); if (spawned !== null) fold.spawned.add(spawned); }
+     if (row?.type === 'event_msg' && row.payload?.type === 'token_count') {
+       const usage = row.payload.info?.total_token_usage;
+       if (usage && COUNTER_KEYS.every(key => Number.isSafeInteger(usage[key]) && usage[key] >= 0)) {
+-        last = Object.fromEntries(COUNTER_KEYS.map(key => [key, usage[key]]));
+-        first ??= last;
+-        observations += 1;
+-      } else last = 'unavailable';
++        fold.last = Object.fromEntries(COUNTER_KEYS.map(key => [key, usage[key]]));
++        fold.first ??= fold.last;
++        fold.observations += 1;
++      } else fold.last = 'unavailable';
+     }
++  };
++  const { value, size, grew } = withFile(member.path, hook, (fd, length) => {
++    const hash = createHash('sha256');
++    // `carry` holds the start of a record a page boundary split. A record longer than recordBytes is still read and hashed, but
++    // its bytes are not kept (`overflow`) and it counts once as unparsed when its newline arrives.
++    let carry = [], carryBytes = 0, overflow = false, overflowBytes = 0, pages = 0, read = 0;
++    for (let start = 0; start < length; start += LIM.windowBytes) {
++      const page = readAt(fd, start, Math.min(length, start + LIM.windowBytes));
++      hash.update(page); pages += 1; read += page.length;
++      let from = 0;
++      for (let newline = page.indexOf(10); newline >= 0; newline = page.indexOf(10, from)) {
++        if (overflow) fold.unparsed += 1;
++        else take(carryBytes ? Buffer.concat([...carry, page.subarray(from, newline)]) : page.subarray(from, newline));
++        carry = []; carryBytes = 0; overflow = false; overflowBytes = 0; from = newline + 1;
++      }
++      const rest = page.subarray(from);
++      if (overflow) overflowBytes += rest.length;
++      else if (carryBytes + rest.length > LIM.recordBytes) { overflow = true; overflowBytes = carryBytes + rest.length; carry = []; carryBytes = 0; }
++      else if (rest.length > 0) { carry.push(rest); carryBytes += rest.length; }
++    }
++    return { pages, read, trailing: overflow ? overflowBytes : carryBytes, contentSha256: hash.digest('hex') };
++  });
++  budget.bytes += value.read;
++  if (fold.firstRow?.type !== 'session_meta' || fold.firstRow.payload?.id !== member.id) fail('session-identity-changed');
++  if (member.role === 'current') {
++    const cwd = fold.firstRow.payload.cwd;
++    if (fold.metaConflict || typeof cwd !== 'string' || !isAbsolute(cwd) || physical(cwd, true) !== root) fail('session-repository-conflict');
+   }
+-  const tokenCounters = last ?? 'unavailable';
+-  const delta = observations >= 2 && tokenCounters !== 'unavailable'
+-    ? Object.fromEntries(COUNTER_KEYS.map(key => [key, tokenCounters[key] - first[key]])) : null;
++  const tokenCounters = fold.last ?? 'unavailable';
++  const delta = fold.observations >= 2 && tokenCounters !== 'unavailable'
++    ? Object.fromEntries(COUNTER_KEYS.map(key => [key, tokenCounters[key] - fold.first[key]])) : null;
+   return {
+-    sortMs: startMs, role: member.role, depth: member.depth, sessionSha256: digest(member.id),
++    sortMs: fold.startMs, role: member.role, depth: member.depth, sessionSha256: digest(member.id), spawnedIds: fold.spawned,
+     ...(member.parentId ? { parentSessionSha256: digest(member.parentId) } : {}),
+-    startedAt: iso(startMs), endedAt: iso(endMs), elapsedMs: startMs === null || endMs === null ? 'unavailable' : endMs - startMs,
+-    firstEvent: eventOf(rows[0]), lastEvent: eventOf(rows.at(-1)),
+-    recordCount: rows.length, unparsedRecordCount: unparsed,
+-    observation: value.length === 1 ? 'complete' : 'head-and-tail-windows', unreadBytes: size - read, grewDuringRead: grew,
+-    modelIdentity, tokenCounters, tokenObservations: observations,
++    startedAt: iso(fold.startMs), endedAt: iso(fold.endMs), elapsedMs: fold.startMs === null || fold.endMs === null ? 'unavailable' : fold.endMs - fold.startMs,
++    firstEvent: eventOf(fold.firstRow), lastEvent: eventOf(fold.lastRow),
++    recordCount: fold.rows, unparsedRecordCount: fold.unparsed,
++    observation: value.read === size ? 'complete' : 'partial', unreadBytes: size - value.read, grewDuringRead: grew,
++    snapshotBytes: size, pages: value.pages, contentSha256: value.contentSha256, trailingPartialBytes: value.trailing,
++    turnCount: fold.turns, toolCallCount: fold.toolCalls,
++    modelIdentity: fold.modelIdentity, tokenCounters, tokenObservations: fold.observations,
+     tokenDelta: delta && COUNTER_KEYS.every(key => delta[key] >= 0) ? delta : 'unavailable',
+   };
+ }
+ 
++/**
++ * C29 (C1): the one completeness verdict. Complete only when every byte of every lineage member was read, no spawned child is
++ * missing and no other reason was recorded; anything else is partial, and every sum built from the segments says so.
++ */
++export function auditCompleteness({ unreadBytes, unknownChildren, incompleteReasons }) {
++  return unreadBytes === 0 && unknownChildren === 0 && incompleteReasons.length === 0 ? 'complete' : 'partial';
++}
++
+ /**
+  * No supplied session selector, storage pathname, transcript body, or read grant. The optional second
+  * argument is a test seam (`limits`, `afterRead`) that no command-line route supplies.
+@@ -304,11 +352,27 @@ export function auditCurrentRunnerSession(options = {}, internals = undefined) {
+       }
+       fail(found.firstFailure ?? 'current-session-unavailable');
+     }
+-    const reasons = found.reasons, budget = { bytes: 0 }, segments = [];
+-    for (const member of lineageOf(found.activeFiles[0], found.repository, LIM, reasons)) {
+-      if (member.role !== 'current' && budget.bytes >= LIM.segmentBytes) { reasons.add('segment-byte-bound-reached'); break; }
++    const reasons = found.reasons, budget = { bytes: 0 }, segments = [], members = lineageOf(found.activeFiles[0], found.repository, LIM, reasons);
++    // C29 (C1): a member that does not fit the byte bound is not read at all and its whole size is counted unread, never dropped silently.
++    let unreadBytes = 0, unreadSegments = 0;
++    for (const member of members) {
++      if (member.role !== 'current') {
++        const size = lstatSync(member.path).size;
++        if (budget.bytes + size > LIM.segmentBytes) { reasons.add('segment-byte-bound-reached'); unreadBytes += size; unreadSegments += 1; continue; }
++      }
+       segments.push(observe(member, root, LIM, hook, budget));
+     }
++    unreadBytes += segments.reduce((sum, segment) => sum + segment.unreadBytes, 0);
++    if (unreadBytes > 0) reasons.add('segment-bytes-unread');
++    // C29 (C1): every child a lineage member spawned (its spawn result names the agent id) must be a member itself. A child that ran
++    // in another working directory is named as such; one with no session file found is unknown. Only counts leave this module.
++    const memberIds = new Set(members.map(member => member.id));
++    const spawned = new Set(segments.flatMap(segment => [...segment.spawnedIds]));
++    const missing = [...spawned].filter(id => !memberIds.has(id));
++    const outsideChildren = missing.filter(id => found.foreignIds.has(id)).length;
++    const unknownChildren = missing.length - outsideChildren;
++    if (outsideChildren > 0) reasons.add('child-outside-repository');
++    if (unknownChildren > 0) reasons.add('child-segment-not-found');
+     segments.sort((left, right) => left.depth - right.depth
+       || (left.sortMs === null) - (right.sortMs === null) || (left.sortMs ?? 0) - (right.sortMs ?? 0)
+       || (left.sessionSha256 < right.sessionSha256 ? -1 : left.sessionSha256 > right.sessionSha256 ? 1 : 0));
+@@ -323,17 +387,25 @@ export function auditCurrentRunnerSession(options = {}, internals = undefined) {
+     const incompleteReasons = [...reasons].sort();
+     const distinct = role => new Set(segments.filter(segment => segment.role === role).map(segment => segment.sessionSha256)).size;
+     found.scan.segmentBytesRead = budget.bytes;
++    const completeness = auditCompleteness({ unreadBytes, unknownChildren, incompleteReasons });
++    const tokenTotals = segments.every(segment => segment.tokenDelta !== 'unavailable')
++      ? Object.fromEntries(COUNTER_KEYS.map(key => [key, segments.reduce((sum, segment) => sum + segment.tokenDelta[key], 0)])) : 'unavailable';
+     return { schema: SCHEMA, runner, status: 'available',
+       identityAssurance: 'host-environment-and-local-session-metadata',
+       sessionSha256: digest(identity.sessionId), repositorySha256: digest(root),
+       modelIdentity: current.modelIdentity, phaseWallTime: 'unavailable', tokenCounters: current.tokenCounters,
+       startedAt: iso(starts.length ? Math.min(...starts) : null), endedAt: iso(ends.length ? Math.max(...ends) : null),
+-      completeness: incompleteReasons.length === 0 ? 'complete' : 'partial',
++      completeness,
+       truncated: incompleteReasons.some(reason => BOUND_REASON.test(reason)), incompleteReasons,
++      unreadBytes, unreadSegments, unknownChildren, outsideChildren,
++      // Sums over the segments that were read. `status` says whether they are the whole lineage: a partial audit gives partial sums.
++      totals: { status: completeness, segments: segments.length, records: segments.reduce((sum, segment) => sum + segment.recordCount, 0),
++        turns: segments.reduce((sum, segment) => sum + segment.turnCount, 0), toolCalls: segments.reduce((sum, segment) => sum + segment.toolCallCount, 0),
++        tokenDelta: tokenTotals },
+       limits: LIM, scan: found.scan,
+       lineage: { ancestors: distinct('parent'), descendants: distinct('child') },
+       segmentCount: segments.length,
+-      segments: segments.map(({ sortMs, ...segment }, ordinal) => ({ ordinal, ...segment })),
++      segments: segments.map(({ sortMs, spawnedIds, ...segment }, ordinal) => ({ ordinal, ...segment, spawnedChildren: spawnedIds.size })),
+       privacy: { transcriptContent: 'excluded', storagePaths: 'excluded', identifiers: 'sha256' } };
+   } catch (error) {
+     const known = new Set(['path-alias', 'nofollow-unavailable', 'snapshot-changed',

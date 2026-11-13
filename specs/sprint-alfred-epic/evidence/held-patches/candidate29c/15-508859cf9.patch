@@ -1,0 +1,151 @@
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 33c91e4f1c0f19209f9f47e547b1d1955fb7d23b..794dbb44e50a6fbe9442acf910d18df892310513 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -33,6 +33,7 @@ import {
+   deriveRequiredCriticGuardrails,
+ } from "../lib/critic-required-guardrails.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
+ import {
+   RequirementTraceabilityError,
+   evaluateRequirementTraceability,
+@@ -435,8 +436,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   // Keep this read-only: the later session gate still owns packet/launch.
+   let courseAdmission = null;
+   let reviewBase = { commit: baseCommit, tree: baseTree };
+-  const featureMatch = /^specs\/([^/]+)\//u.exec(spec);
+-  const featureId = featureMatch?.[1] ?? null;
++  // K-30: the package may live under the feature id while the approved Spec stays in its earlier dated folder.
++  const featureId = packageFeatureIdForSpec(realRoot, candidateCommit, spec, isObject(courseContext) && typeof courseContext.featureId === "string" ? [courseContext.featureId] : []);
+   if (featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
+     stage = "critic-course";
+     if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
+@@ -646,11 +647,47 @@ function reviewAdmissionTaskIds({ root, baseCommit, candidateCommit, given = nul
+   return { matching, considered, appliedRows };
+ }
+ 
+-/** The feature package's rigor at the candidate (the close rule reads the same field), or null when there is no readable package. Read-only. */
+-function featureRigor(root, candidateCommit, specPath) {
++/** The active feature id of the project state, or null when the state names none (the host and the briefing read the same field, K-25). */
++function activeFeatureIdFromState(root) {
++  try {
++    const statePath = resolveAuthorityArtifactPath("state", { rootDir: root })?.relPath;
++    if (typeof statePath !== "string") return null;
++    const id = JSON.parse(readFileSync(resolve(root, statePath), "utf8"))?.activeFeature?.id;
++    return typeof id === "string" && PACKAGE_FEATURE_ID.test(id) ? id : null;
++  } catch { return null; }
++}
++const PACKAGE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
++
++/**
++ * Glossover K-30: the feature id of the package a feature Spec belongs to, at the candidate. The Spec's folder name when that folder holds
++ * the package (the usual case). When the feature id changed after the design, the approved Spec stays in its earlier dated folder and the
++ * package lives at specs/<feature id>/ binding that Spec (28e carry, K-25): then the first of `preferred` (the course context's feature id)
++ * and the active feature id of the project state whose package at the candidate names exactly this Spec path. Otherwise the folder name.
++ * Null only for a path outside specs/<folder>/. Read-only.
++ */
++function packageFeatureIdForSpec(root, candidateCommit, specPath, preferred = []) {
+   const match = /^specs\/([^/]+)\//u.exec(specPath ?? "");
+   if (match === null) return null;
+-  try { const value = JSON.parse(candidateText(root, candidateCommit, `specs/${match[1]}/lifecycle.json`))?.feature?.rigor; return Number.isInteger(value) && value >= 0 ? value : null; } catch { return null; }
++  const manifest = (id) => { try { return JSON.parse(candidateText(root, candidateCommit, `specs/${id}/lifecycle.json`)); } catch { return null; } };
++  if (manifest(match[1]) !== null) return match[1];
++  const binds = (id) => {
++    if (typeof id !== "string" || !PACKAGE_FEATURE_ID.test(id) || id === match[1]) return false;
++    const value = manifest(id);
++    return value?.feature?.id === id && Array.isArray(value.artifacts) && value.artifacts.some((artifact) => artifact?.class === "spec" && artifact.path === specPath);
++  };
++  for (const id of [...preferred, activeFeatureIdFromState(root)]) if (binds(id)) return id;
++  // No named id: exactly one package at the candidate that binds this Spec path; none or several keep the folder name (nothing is guessed).
++  const listed = gitOrNull(root, ["ls-tree", "-r", "--name-only", candidateCommit, "--", "specs"]);
++  const ids = (listed ?? "").split("\n").map((line) => /^specs\/([^/]+)\/lifecycle\.json$/u.exec(line.trim())?.[1]).filter((id) => id !== undefined).slice(0, 512);
++  const bound = ids.filter(binds);
++  return bound.length === 1 ? bound[0] : match[1];
++}
++
++/** The feature package's rigor at the candidate (the close rule reads the same field), or null when there is no readable package. Read-only. */
++function featureRigor(root, candidateCommit, specPath) {
++  const id = packageFeatureIdForSpec(root, candidateCommit, specPath);
++  if (id === null) return null;
++  try { const value = JSON.parse(candidateText(root, candidateCommit, `specs/${id}/lifecycle.json`))?.feature?.rigor; return Number.isInteger(value) && value >= 0 ? value : null; } catch { return null; }
+ }
+ 
+ /** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
+@@ -856,7 +893,7 @@ export function parseCriticDispatchPreflightArgs(argv) {
+     const baseCommit = featureMatch === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.base}^{commit}`]);
+     const candidateCommit = baseCommit === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]);
+     if (candidateCommit !== null) {
+-      const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: featureMatch[1], baseCommit, candidateCommit,
++      const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: packageFeatureIdForSpec(values.root, candidateCommit, values.specPath), baseCommit, candidateCommit,
+         deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") });
+       if (derivation.status === "derived") selectors["--registration-commit"] = derivation.commit;
+       else if (derivation.status === "ambiguous") {
+@@ -880,7 +917,9 @@ export function parseCriticDispatchPreflightArgs(argv) {
+       catch { fail("CDP-ARGUMENT", "Criterion locator is unavailable."); }
+       if (!isObject(criterionLocator) || Object.keys(criterionLocator).sort().join() !== ["criterionId", "endByte", "excerptSha256", "schema", "sourcePath", "sourceSha256", "startByte"].join()) fail("CDP-ARGUMENT", "Criterion locator must be closed.");
+     }
+-    values.courseContext = { featureId: match[1], registrationCommit: selectors["--registration-commit"],
++    // K-30: the package's feature id at the candidate, not the Spec's folder name, when the approved Spec stayed in an earlier dated folder.
++    const courseCandidate = typeof values.root === "string" && typeof values.candidate === "string" ? gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]) : null;
++    values.courseContext = { featureId: courseCandidate === null ? match[1] : packageFeatureIdForSpec(values.root, courseCandidate, values.specPath), registrationCommit: selectors["--registration-commit"],
+       acceptedReference: acceptedPath === null ? null : { schema: "pipeline.accepted-delivery-contract-reference.v1", path: acceptedPath,
+         sha256: sha256(candidateBytes(values.root, selectors["--registration-commit"], acceptedPath)) },
+       criterionLocator, deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") };
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 9672bf156c7e4381b4e759f0dcf26478eb1d0ed5..e2daccfb4aaed4911e65091862b013a0b0dac06d 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1724,6 +1724,52 @@ function parentLineageFixture({ afterRound = null } = {}) {
+   const c4 = correct("fix4"); const d4 = parentRegisterDiagnostic(root, featureId, c4, "r4");
+   return { root, featureId, specPath, genesis, c1, c2, c3, c4, evidence4: d4.diagnosticPath, head: d4.registration };
+ }
++test("K-30 a package under the feature id binding an approved Spec in its earlier dated folder admits the first course round, with the course flags and without", () => {
++  const featureId = "held-feature", prefix = `specs/${featureId}`, specPath = "specs/2026-01-01-held-feature/spec.md", manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
++  const root = mkdtempSync(join(tmpdir(), "cdp-k30-"));
++  try {
++    git(root, ["init", "-q", "-b", "main"]);
++    mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngovernance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++    writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
++    writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
++    writeFileSync(join(root, ".gitignore"), "/evidence/\n/scratch/\n");
++    commit(root, "base");
++    mkdirSync(join(root, "specs/2026-01-01-held-feature"), { recursive: true }); mkdirSync(join(root, prefix, "design"), { recursive: true }); mkdirSync(join(root, prefix, "evidence"), { recursive: true });
++    writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\n");
++    writeFileSync(join(root, unitPath), JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior", specPath, logicalWorkIds: ["scope-one", "scope-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
++    const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
++      const path = `${prefix}/${rel}`; writeFileSync(join(root, path), `${klass}\n`);
++      return { class: klass, path, sha256: sha256(readFileSync(join(root, path))), authority, mutability, retention };
++    });
++    const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", candidate: null, supersedes: null, artifacts: [
++      { class: "spec", path: specPath, sha256: sha256(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active" },
++      { class: "design", path: unitPath, sha256: sha256(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }, ...topo] };
++    writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++    const genesis = commit(root, "declare feature review unit");
++    mkdirSync(join(root, "src"), { recursive: true }); writeFileSync(join(root, "src/behavior.mjs"), "export const behavior = 1;\n");
++    const c1 = commit(root, "integrate feature behavior");
++    const logPath = `${prefix}/evidence/targeted-r1.log`, diagnosticPath = `${prefix}/evidence/diagnostic-r1.json`, capturedPath = `evidence/${featureId}-targeted-r1.log`;
++    const produced = produceCriticDiagnostic({ root, candidate: c1, specPath, guardrailPaths: PARENT_GUARDRAILS, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++    writeFileSync(join(root, logPath), readFileSync(join(root, capturedPath))); produced.targeted.log.path = logPath;
++    writeFileSync(join(root, diagnosticPath), JSON.stringify(produced));
++    for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
++    writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++    const registration = parentCommitPaths(root, [manifestPath, logPath, diagnosticPath], "register the r1 diagnostic");
++    const base = { root, base: genesis, candidate: c1, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
++    const withContext = preflightCriticDispatch({ ...base, courseContext: { featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
++    assert.equal(withContext.status, "packet-ready", JSON.stringify(withContext).slice(0, 600));
++    assert.equal(withContext.coordinatorOnly.courseAdmission.featureId, featureId);
++    assert.equal(withContext.coordinatorOnly.courseAdmission.round, 1);
++    // The CLI form: the course context names the package found at the candidate, not the dated folder.
++    const parsed = parseCriticDispatchPreflightArgs(["--root", root, "--base", genesis, "--candidate", c1, "--spec", specPath, "--evidence", diagnosticPath, "--registration-commit", registration]);
++    assert.equal(parsed.courseContext.featureId, featureId);
++    const viaCli = preflightCriticDispatch(parsed);
++    assert.equal(viaCli.status, "packet-ready", JSON.stringify(viaCli).slice(0, 600));
++    assert.equal(viaCli.coordinatorOnly.courseAdmission.featureId, featureId);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("CCA-PARENT a push review of a feature with course history names the last registered round and a repair that is followed to an admitted dispatch", () => {
+   const fx = parentLineageFixture();
+   try {

@@ -1,0 +1,40 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index c2321f7e023e8cb80894632912ebf127547ed124..1f19d8fc72825f23dd6b59f1c27c31586600a2e5 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -833,6 +833,19 @@ at the void of the design approval, an addendum reader that skipped its approval
+ apply an unapproved Spec correction, and a looser id grammar could address another feature's
+ state, which is why none of them can be lifted by a window.
+ 
++Candidate 29c adds four modules that the kernel imports. `hooks/guard-gate-strength.mjs` imports
++`plugins/pipeline-core/lib/private-state-write-guard.mjs`, which refuses an agent's own write into
++`.git/agent-pipeline/`. `scripts/pipeline-state.mjs` and `scripts/po-human-approval.mjs` import
++`plugins/pipeline-core/lib/gate-definition-changes.mjs`, the derived proof of every gate-definition
++change in a feature range (ADR-0096), and `plugins/pipeline-core/lib/maintenance-delivery.mjs`,
++the red-before proof of a maintenance delivery (ADR-0097), which `lib/native-goldfish-host-state.mjs`
++also imports. The change walk imports `plugins/pipeline-core/lib/close-commit-split.mjs` for the
++feature range base. Every first-party module these four import is itself a kernel path. A write
++guard that admitted private state would let an agent forge a host record, a change walk that missed
++a range would hide a weakened gate, a maintenance proof read loosely would admit a dispatch that no
++criterion and no red-before proof covers, and a wrong range base would move the walk, which is why
++none of them can be lifted by a window.
++
+ ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+ and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+ (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 3d78e4697fa4ed016bcdd742433cd4c7fe48bd9d..ce5a82a4923c19dba771e6e62795ceef459f44d7 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -956,6 +956,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // scripts/pipeline-state.mjs, scripts/po-human-approval.mjs).
+   "plugins/pipeline-core/lib/reopen-design-po-step.mjs", "plugins/pipeline-core/lib/spec-addendum.mjs",
+   "plugins/pipeline-core/lib/feature-id.mjs",
++  // Candidate 29c (GMWKC01): the private-state write guard (hooks/guard-gate-strength.mjs), the gate-definition change walk
++  // (ADR-0096) and the maintenance delivery (ADR-0097), imported by scripts/pipeline-state.mjs, scripts/po-human-approval.mjs
++  // and lib/native-goldfish-host-state.mjs, plus the commit split the walk imports.
++  "plugins/pipeline-core/lib/private-state-write-guard.mjs", "plugins/pipeline-core/lib/gate-definition-changes.mjs",
++  "plugins/pipeline-core/lib/maintenance-delivery.mjs", "plugins/pipeline-core/lib/close-commit-split.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever

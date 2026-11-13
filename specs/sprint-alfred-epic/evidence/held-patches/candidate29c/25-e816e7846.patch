@@ -1,0 +1,106 @@
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 4f0f8ceb121bb81fcd15096ec7283c2a29e988e7..82929c5b94664c693122454a0c64bf6f46c64dcc 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -164,6 +164,10 @@ const originalDesignCases = [
+   {
+     "id": "DABX017",
+     "name": "D247: the named route completes: hook observation, export-report and create stamp the observed model, and present-plan hands over the signing step"
++  },
++  {
++    "id": "DABX018",
++    "name": "D247: a Codex review round is presented with its visible unobserved label, and the signed binding is unchanged"
+   }
+ ];
+ const designCompletionCases = [];
+@@ -447,7 +451,7 @@ function continuityRequest(authority) {
+ 
+ /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
+ const MOVED_DIR = "specs/e2e-moved";
+-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false } = {}) {
++async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false, reviewerRunner = "claude" } = {}) {
+   stateModule ??= await import(pathToFileURL(CLI).href);
+   const governance = await loadLib("governance-scope.mjs");
+   const poGate = await loadLib("po-gate-authority.mjs");
+@@ -555,13 +559,15 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+     featureId: FEATURE_ID,
+     previous: null,
+     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
+-    reviewer: { runner: "claude", model: "claude-opus-4" },
++    reviewer: { runner: reviewerRunner, model: reviewerRunner === "claude" ? "claude-opus-4" : "unknown" },
+     report: sourceFor(REPORT_PATH),
+     openFindingIds,
+     reviewedAt: "2026-10-09T09:00:00.000Z",
+     ...(fallback === undefined ? {} : { fallback }),
+     // D247: a native Claude review round carries the host's observation of its reviewer (export-report + create); `observed: false` is a round without one.
+-    ...(fallback === undefined && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
++    // A runner without an observation route (`reviewerRunner: "codex"`) carries the visible `unobserved` label, as create writes it.
++    ...(fallback === undefined && reviewerRunner !== "claude" ? { reviewerObservation: { assurance: "unobserved", modelsUsed: [], resultSha256: null } } : {}),
++    ...(fallback === undefined && reviewerRunner === "claude" && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
+   });
+   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
+   if (!hostRoute) writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
+@@ -829,11 +835,24 @@ test("D247: the named route completes: hook observation, export-report and creat
+   const presented = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+   assert.equal(presented.status, 0, `present-plan over an observed receipt must exit 0; stderr: ${presented.stderr}`);
+   assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
++  assert.match(presented.stdout, /Reviewer model: \S+design-review-receipt-1\.json \(round 1, claude\): claude-opus-4, host-observed-child-transcript -- observed by the host, not attested by the provider\./u,
++    "the PO sees how the reviewer model is known before signing");
+   // The binding never carries the observation: approval bytes are those of a receipt without it.
+   const requestPath = requestPathOf(posixSigningCommands(presented.stdout)[0]);
+   assert.equal("reviewerObservation" in JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0], false);
+ });
+ 
++test("D247: a Codex review round is presented with its visible unobserved label, and the signed binding is unchanged", async () => {
++  const fx = await buildSubmittedFeature("route-codex-unobserved", { reviewerRunner: "codex" });
++  await bindRouteOwner(fx);
++  const presented = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
++  assert.equal(presented.status, 0, `present-plan over a Codex receipt must exit 0; stderr: ${presented.stderr}`);
++  assert.match(presented.stdout, /Reviewer model: \S+design-review-receipt-1\.json \(round 1, codex\): unobserved -- this runner has no host observation route; the receipt names unknown\./u);
++  assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
++  const requestPath = requestPathOf(posixSigningCommands(presented.stdout)[0]);
++  assert.equal("reviewerObservation" in JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0], false);
++});
++
+ test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {
+   const run = await routeRun();
+   if (skipForHostLimitation(t, run)) return;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index d40a1143b1bc3d51a2f8e6f26ac9d1dbed8e03b2..240187ce4f512f43d37e89cfb07ab5180b44e95f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13025,6 +13025,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         // K128 (PO decision 2026-10-23, batch 12, row 41): a receipt produced on the typed fallback route is named here, so the
+         // presented plan never passes a single-review fallback off as an independent native review.
+         for (const entry of approvalReview.reviewReceipts) {
++          // D247 (PO tile 2026-11-13, label per runner): each round names how its reviewer model is known, before the PO signs.
++          // Read from the receipt itself; the binding summary never carries it, so the signed bytes are unchanged.
++          if (entry.fallback === undefined) {
++            const line = designReviewObservationLine(dir, entry.path);
++            if (line !== null) console.log(line);
++          }
+           if (entry.fallback !== undefined) console.log(`Review route: ${entry.path} ran on the fallback-self-dispatch route (${entry.fallback.reasonCode}; requested ${entry.fallback.requestedRoute}, observed ${entry.fallback.observedIdentity}) -- a single-review fallback, not an independent native review.`);
+         }
+         console.log("Complete bounded design-workflow review (still pending PO approval):");
+@@ -16349,3 +16355,21 @@ export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry =
+       sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
+   } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE", error?.windowsAuthorityCause); } // AC-140: keep the typed source failure
+ }
++
++/**
++ * D247 (PO tile 2026-11-13, label per runner): the present-plan line that names how one review round's reviewer model is
++ * known -- observed by the host, or unobserved on a runner with no observation route. Read from the receipt file itself; an
++ * unreadable receipt prints nothing here (the entry gate has already refused anything that matters).
++ */
++function designReviewObservationLine(dir, receiptPath) {
++  try {
++    const parsed = parseDesignReviewReceipt(readFileSync(join(dir, receiptPath)));
++    if (!parsed.ok) return null;
++    const receipt = parsed.receipt;
++    const head = `Reviewer model: ${receiptPath} (round ${receipt.round}, ${receipt.reviewer.runner})`;
++    if (isHostObservedDesignReview(receipt)) return `${head}: ${receipt.reviewer.model}, ${receipt.reviewerObservation.assurance} -- observed by the host, not attested by the provider.`;
++    const why = DESIGN_REVIEW_OBSERVATION_RUNNERS.includes(receipt.reviewer.runner)
++      ? "not observed by the host" : `unobserved -- this runner has no host observation route; the receipt names ${receipt.reviewer.model}`;
++    return `${head}: ${why}.`;
++  } catch { return null; }
++}

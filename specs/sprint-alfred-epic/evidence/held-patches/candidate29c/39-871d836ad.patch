@@ -1,0 +1,251 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 8b361ed968a3db4c5acf3e7099ff528dc06be2dc..6b61efeca0b854865529082d6e216b90d9399bf7 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -384,7 +384,10 @@ if (ghDelivery.kind === "refused") emit(2, [
+ // K153 / G11: the read-only object readers (`rev-parse`, `rev-list`, `cat-file`, `ls-tree`) join the set, so a braced revision
+ // such as `"HEAD^{tree}"` inside double quotes (literal there) is proven a plain read instead of a hidden push target. Every
+ // other condition above is unchanged: an unquoted brace, a chain, a pipe and a push-classified substitution body still fail.
+-const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["commit", "grep", "log", "show", "diff", "status", "rev-parse", "rev-list", "cat-file", "ls-tree"]);
++// K-32 (Glossover, 29c): `add` joins the set, and one leading `--literal-pathspecs` is admitted before the subcommand, so the
++// Goldfish commit steps for a framework route path (`'src/app/(payload)/[...slug]/route.ts'`, single-quoted) are proven non-push.
++// A marker character still has to sit inside quotes; an unquoted one fails exactly as before.
++const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["add", "commit", "grep", "log", "show", "diff", "status", "rev-parse", "rev-list", "cat-file", "ls-tree"]);
+ const NON_PUSH_BODY_GIT_SUBCOMMANDS = new Set(["merge-base", "rev-parse", "log", "show", "diff", "status", "rev-list", "describe", "ls-files", "symbolic-ref"]);
+ const NON_PUSH_BODY_PROGRAMS = new Set(["date", "pwd", "whoami", "hostname", "uname", "basename", "dirname", "id"]);
+ const NON_PUSH_UNQUOTED_RE = /^[A-Za-z0-9_./:@%+,=^~-]$/u;
+@@ -462,7 +465,9 @@ function provenNonPushMarkerCandidate(text) {
+   }
+   if (cur !== null) words.push(cur);
+   if (words.length < 2 || words[0].quoted || words[0].text !== "git") return false;
+-  if (words[1].quoted || !NON_PUSH_MARKER_SUBCOMMANDS.has(words[1].text)) return false;
++  const literal = !words[1].quoted && words[1].text === "--literal-pathspecs" ? 1 : 0;
++  const subcommand = words[1 + literal];
++  if (subcommand === undefined || subcommand.quoted || !NON_PUSH_MARKER_SUBCOMMANDS.has(subcommand.text)) return false;
+   if (words.some((word) => word.text.startsWith("-O") || word.text.startsWith("--open-files-in-pager"))) return false;
+   return bodies.every(substitutionBodyIsPlain);
+ }
+diff --git a/plugins/pipeline-core/hooks/guard-push.test.mjs b/plugins/pipeline-core/hooks/guard-push.test.mjs
+index 36bad9553191dc330bb0f3c0228419d6e6d5bd8c..e38ec22d9eeb5031c8c2ec8b8ed9b90d0c00e60f 100644
+--- a/plugins/pipeline-core/hooks/guard-push.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.test.mjs
+@@ -2619,6 +2619,28 @@ function freshRepoIn(parentDir, name, { approvedMini = false } = {}) {
+   }
+ }
+ 
++// K-32 (Glossover, 29c): the Goldfish commit steps for a framework route path carry `( ) [ ]` inside single quotes and may lead with
++// --literal-pathspecs; they are a plain add or commit, never a push. Unquoted markers, another global flag and a chained push stay refused.
++{
++  const { dir } = freshRepo("k32-route-paths");
++  writeManifest(dir, manifestPush({ approval: "required" }));
++  for (const [id, command] of [
++    ["PG-K32-01", "git --literal-pathspecs add -- 'src/app/(payload)/cms-api/[...slug]/route.ts'"],
++    ["PG-K32-02", "git --literal-pathspecs commit -F scratch/commit-msg/T1.txt -- 'src/app/(payload)/cms-api/[...slug]/route.ts'"],
++    ["PG-K32-03", "git add -- 'src/app/(payload)/page.tsx'"],
++  ]) {
++    check(`${id} allow  exact-path add/commit of a quoted route path: ${command}`, command, dir, ALLOW, { stderrEmpty: true });
++  }
++  for (const [id, command] of [
++    ["PG-K32-04", "git --literal-pathspecs add -- src/app/(payload)/page.tsx"],
++    ["PG-K32-05", "git --literal-pathspecs push origin 'main:refs/heads/(x)'"],
++    ["PG-K32-06", "git --no-pager add -- 'src/app/(payload)/page.tsx'"],
++    ["PG-K32-07", "git --literal-pathspecs add -- 'src/(a).ts' && git push origin main:refs/heads/feature-test"],
++  ]) {
++    check(`${id} block  unquoted marker, other flag or push stays refused: ${command}`, command, dir, BLOCK);
++  }
++}
++
+ // ---- PG-N27-TAG: a tag on an already published commit passes; every other tag stays gated (D206, N27a) ------------------
+ // Trust assumption pinned here: a commit reachable from a LOCAL remote-tracking ref of the SAME remote name counts as published.
+ {
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-execution.mjs b/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
+index 7af1c54cae3a72a6bc2fc46071f4c771f8518f7c..cf788b779173226fe3e5d294605df44263a665fe 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-execution.mjs
+@@ -37,7 +37,7 @@ function committedMessage(root, commit, spawn) {
+   return boundary < 0 ? null : object.slice(boundary + 2);
+ }
+ function stagedBlob(root, path, spawn) {
+-  const output = git(root, ["ls-files", "--stage", "-z", "--", path], spawn);
++  const output = git(root, ["--literal-pathspecs", "ls-files", "--stage", "-z", "--", path], spawn); // K-32: `[ ]` is a filename, not a glob
+   if (output === null) return undefined;
+   const entries = output.split("\0").filter(Boolean);
+   if (entries.length === 0) return null;
+@@ -118,7 +118,7 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
+     || finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.length > 0) {
+     return fail(code("HOST-COMMIT-MESSAGE"));
+   }
+-  if (git(root, ["add", "-A", "--", ...admitted.paths], spawn) === null) return fail(code("HOST-COMMIT-STAGE-FAILED"));
++  if (git(root, ["--literal-pathspecs", "add", "-A", "--", ...admitted.paths], spawn) === null) return fail(code("HOST-COMMIT-STAGE-FAILED"));
+   const staged = paths(git(root, ["diff", "--cached", "--name-only", "-z"], spawn));
+   const unstaged = paths(git(root, ["diff", "--name-only", "-z"], spawn));
+   if (staged === null || unstaged === null || !same(staged, admitted.paths) || unstaged.some(path=>!nativePlan?.foreignPaths.includes(path))) {
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs b/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
+index f53ad92c2cd4fcfaffffe96cf415092ceed1e07e..a92ef69bc79d9c5302f5a5670f20f79250a5a009 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs
+@@ -168,7 +168,8 @@ test("AHE08 same-path content changed after admission cannot enter the host comm
+     baseline, final: { outcome: "succeeded", changedPaths: ["file.txt"] },
+     allowedPaths: ["file.txt"], taskId: "AGY-EXAMPLE-8",
+   }, { spawnSync(command, args, options) {
+-    if (args[2] === "add") writeFileSync(join(root, "file.txt"), "raced content\n");
++    // K-32: the stage call now leads with --literal-pathspecs, so the subcommand is found by name, not by position.
++    if (args.slice(2, 4).includes("add")) writeFileSync(join(root, "file.txt"), "raced content\n");
+     return spawnSync(command, args, options);
+   } });
+   assert.equal(result.ok, false);
+diff --git a/plugins/pipeline-core/lib/dispatch-record-strip-for-critic.mjs b/plugins/pipeline-core/lib/dispatch-record-strip-for-critic.mjs
+index b662f5a0b00370ee15ba9698ff3af36fdfa124c9..1d71f070e9257db33cea2c664d69764748653e72 100644
+--- a/plugins/pipeline-core/lib/dispatch-record-strip-for-critic.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record-strip-for-critic.mjs
+@@ -43,7 +43,8 @@ export const DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS = Object.freeze([
+ const SAFE_COMMIT = /^[a-f0-9]{7,40}$/u;
+ const SAFE_RULESET_DIGEST = /^(?:[a-f0-9]{7,40}|[a-f0-9]{64})$/u;
+ const SAFE_RULESET_PLUGIN_VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}\+(?:claude|codex|antigravity)\.\d{14}\.[a-f0-9]{8}$/u;
+-const SAFE_REPO_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u;
++// K-32: framework route folders (`[...slug]`, `(group)`) are safe path text too; the strip never hands a path to git.
++const SAFE_REPO_PATH = /^[A-Za-z0-9._@+()[\]-]+(?:\/[A-Za-z0-9._@+()[\]-]+)*$/u;
+ 
+ /**
+  * The house-style rationale separator inside a `report.changedFiles` bare-
+diff --git a/plugins/pipeline-core/lib/dispatch-record.mjs b/plugins/pipeline-core/lib/dispatch-record.mjs
+index 79d1325d8ba36278b2463b7498a36c8042904786..02011689db3198221a75ac1d2c03e3587ca18fad 100644
+--- a/plugins/pipeline-core/lib/dispatch-record.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record.mjs
+@@ -120,9 +120,12 @@ export function missingBriefingFields(record) {
+   return missing;
+ }
+ 
++// K-32 (Glossover Epic 2, 29c): `[ ] ( )` are ordinary filename characters in framework route folders (Next.js `[...slug]`,
++// `(group)`), and the host commit admits them. Every git call that takes such a path runs with --literal-pathspecs, so a bracket
++// is never read as a glob. `* ? { } $` and a backtick stay refused; a leading `:` is refused because git reads it as pathspec magic.
+ export function normalizeDispatchRecordPath(value, label = "dispatch record path") {
+   if (typeof value !== "string" || value.length === 0 || value.length > 512 || value.trim() !== value
+-    || value.startsWith("/") || value.includes("\\") || /[\0\r\n`$*?{}[\]()]/u.test(value)) fail("record-path", `${label} is not a literal repository-relative path`);
++    || value.startsWith("/") || value.startsWith(":") || value.includes("\\") || /[\0\r\n`$*?{}]/u.test(value)) fail("record-path", `${label} is not a literal repository-relative path`);
+   const parts = value.split("/");
+   if (parts.some((part) => part === "" || part === "." || part === "..")) fail("record-path", `${label} is not normalized`);
+   return value;
+diff --git a/plugins/pipeline-core/lib/dispatch-record.test.mjs b/plugins/pipeline-core/lib/dispatch-record.test.mjs
+index 5ea18df56a289473803121e3530adeae860126b5..ed3d2fb1dd122ed7bb606371bdb1ee92f59cd60b 100644
+--- a/plugins/pipeline-core/lib/dispatch-record.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record.test.mjs
+@@ -146,8 +146,12 @@ check("missing, unknown and malformed fields fail closed", () => {
+   ]) assert.throws(() => validateDispatchRecord(value));
+ });
+ check("computed, escaping and duplicate paths are rejected", () => {
+-  for (const path of ["../x", "/tmp/x", "src\\x", "src/$NAME", "src/$(pwd)", "src/*.mjs", "src//x"])
++  for (const path of ["../x", "/tmp/x", "src\\x", "src/$NAME", "src/$(pwd)", "src/*.mjs", "src//x", ":(top)src/x", "src/{a,b}", "src/a?.ts"])
+     assert.throws(() => normalizeDispatchRecordPath(path));
++  // K-32 (Glossover, 29c): framework route folders are literal paths; git calls take them with --literal-pathspecs.
++  for (const path of ["src/app/(payload)/cms-api/[...slug]/route.ts", "src/app/(group)/page.tsx", "src/[id].ts"])
++    assert.equal(normalizeDispatchRecordPath(path), path);
++  assert.deepEqual(declaredPaths({ report: { changedFiles: ["src/app/(payload)/cms-api/[...slug]/route.ts - the route"] } }), ["src/app/(payload)/cms-api/[...slug]/route.ts"]);
+   for (const changedFiles of [["../x"], ["src/$NAME"], ["src/x", { path: "src/x" }], [{ path: "src/x", extra: true }]])
+     assert.throws(() => validateDispatchRecord({ ...terminal(), report: { text: "Done.", changedFiles } }));
+ });
+diff --git a/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs b/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs
+index 2f8ab87d55e4d6bb116be0296038bfed1db59e47..59c30ff0741486be228113cf8e31be50b09b7038 100644
+--- a/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs
++++ b/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs
+@@ -45,11 +45,13 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
+     || finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.length > 0) {
+     return fail("GF-COMMAND-MESSAGE");
+   }
+-  const stageArgv = ["add", "--", ...normalized];
++  // K-32: a path with `[ ]` would be a glob for git; --literal-pathspecs stages and commits exactly the named files.
++  const literal = normalized.some((path) => /[[\]]/u.test(path)) ? ["--literal-pathspecs"] : [];
++  const stageArgv = [...literal, "add", "--", ...normalized];
+   // Ruling 150: the message-file route. guard-push refuses `-m` with a parenthesised `--trailer`, so the
+   // producer names the file (the agent writes it with its Write tool) and the commit step reads it with -F.
+   const messagePath = `scratch/commit-msg/${taskId}.txt`;
+-  const commitArgv = ["commit", "-F", messagePath, "--", ...normalized];
++  const commitArgv = [...literal, "commit", "-F", messagePath, "--", ...normalized];
+   const stage = singleLine(boundedCopySafeCommand({ executable: "git", argv: stageArgv, forceCopyCommand: true }), stageArgv);
+   const commit = singleLine(boundedCopySafeCommand({ executable: "git", argv: commitArgv, forceCopyCommand: true }), commitArgv);
+   return { ok: true, schema: GOLDFISH_COMMIT_COMMAND_FLOW_SCHEMA,
+diff --git a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+index 2fcfa004ac0095805d5fece030780e1f7a6936c9..cb5cb16271e1b822ef3933c26406007ba0a9c86c 100644
+--- a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+@@ -58,6 +58,21 @@ test("AC-185: each rendered step carries the single index.lock retry contract an
+     [{ retries: 1, then: "stop-and-report" }, { retries: 1, then: "stop-and-report" }]);
+ });
+ 
++test("K-32: a framework route path is admitted and both steps run with --literal-pathspecs; plain paths keep the old argv", () => {
++  const route = "src/app/(payload)/cms-api/[...slug]/route.ts";
++  const result = createGoldfishCommitCommandFlow({ ...input, paths: [route] });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.deepEqual(result.steps[0].argv, ["--literal-pathspecs", "add", "--", route]);
++  assert.deepEqual(result.steps[1].argv, ["--literal-pathspecs", "commit", "-F", result.messagePath, "--", route]);
++  for (const step of result.steps) {
++    const parsed = parseGuardCommand(step.command, "/fixture/repository");
++    assert.equal(parsed.parseStatus, "accepted", step.command);
++    assert.deepEqual(parsed.segments[0].argv, step.argv);
++  }
++  assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: ["src/app/(group)/page.tsx"] }).steps[0].argv[0], "add", "parentheses alone are no glob");
++  for (const path of [":(top)src/x.ts", "src/*.ts", "src/{a,b}.ts"]) assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: [path] }).code, "GF-COMMAND-PATH", path);
++});
++
+ test("legacy command flow refuses malformed paths, duplicate paths and unsafe message metadata", () => {
+   assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: ["src/regular.js", "src/regular.js"] }).code,
+     "GF-COMMAND-PATH-ORDER");
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+index 0491242babf4d40c56eac00a2179668c2460ace8..24cf013d14aca5b37d74c9f6c06ab8a4f5fdf29a 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+@@ -397,10 +397,11 @@ export function apply(options) {
+   writeFileSync(messageFile, buildMessage({ dispatchId: planned.dispatchId, stopFailure: planned.stopFailure }), "utf8");
+   // `git commit -- <path>` knows only tracked paths: new files get an intent-to-add entry by exact pathspec first (never `add -A`).
+   const fresh = untrackedPaths(planned.root).filter((p) => planned.paths.includes(p));
+-  if (fresh.length > 0) git(planned.root, ["add", "--intent-to-add", "--", ...fresh]);
+-  const committed = git(planned.root, ["commit", "-F", planned.messagePath, "--", ...planned.paths]);
++  // K-32: every pathspec is literal, so `[...slug]` names that folder and never a sibling a glob would match.
++  if (fresh.length > 0) git(planned.root, ["--literal-pathspecs", "add", "--intent-to-add", "--", ...fresh]);
++  const committed = git(planned.root, ["--literal-pathspecs", "commit", "-F", planned.messagePath, "--", ...planned.paths]);
+   if (!committed.ok) {
+-    if (fresh.length > 0) git(planned.root, ["reset", "-q", "--", ...fresh]); // refused leaves no staged state behind
++    if (fresh.length > 0) git(planned.root, ["--literal-pathspecs", "reset", "-q", "--", ...fresh]); // refused leaves no staged state behind
+     return { ...planned, status: "refused", code: "GHCR-COMMIT-FAILED", refusals: [refuse("GHCR-COMMIT-FAILED", committed.err.trim().split("\n").slice(-3).join(" | "),
+       "fix what the hook reported and run plan again; the message file is left in place")] };
+   }
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+index 3611798db333eda6b9016c1d0b12cbf9e41dc854..e3b9923d3d9f8e9dc8315e1308f818054fa456c5 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+@@ -106,6 +106,35 @@ test("apply: exactly one commit, three trailers last, pointer to the stop failur
+   } finally { cleanup(root); }
+ });
+ 
++test("K-32: a framework route folder ([...slug], (group)) lands literally; a sibling a glob would match is not committed", () => {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "ghcr-k32-")));
++  try {
++    git(root, "init", "-q");
++    git(root, "config", "user.name", "Fixture");
++    git(root, "config", "user.email", "fixture@example.invalid");
++    git(root, "config", "commit.gpgsign", "false");
++    writeFileSync(join(root, "README.md"), "base\n");
++    git(root, "add", "--", "README.md");
++    git(root, "commit", "-q", "-m", "base");
++    const head = git(root, "rev-parse", "HEAD");
++    const route = "src/app/(payload)/cms-api/[...slug]/route.ts";
++    const sibling = "src/app/(payload)/cms-api/s/route.ts"; // `[...slug]` read as a glob matches the folder `s`
++    for (const path of [route, sibling]) { mkdirSync(join(root, dirname(path)), { recursive: true }); writeFileSync(join(root, path), "export {};\n"); }
++    const dir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
++    mkdirSync(dir, { recursive: true });
++    writeFileSync(join(dir, "pending-claude-aaaaaaaa.json"), `${JSON.stringify({
++      schema: "pipeline.native-goldfish-host-state.v1", runner: "claude", sessionId: "s1", toolUseId: "toolu_1",
++      binding: { dispatchId: DISPATCH, candidateCommit: head, allowedPaths: [route] } }, null, 2)}\n`);
++    const plan = run(root, "plan").json;
++    assert.equal(plan?.status, "ready", JSON.stringify(plan));
++    assert.deepEqual(plan.paths, [route]);
++    const applied = run(root, "apply", "--dispatch-id", DISPATCH, "--expect-sha256", plan.next[plan.next.indexOf("--expect-sha256") + 1]);
++    assert.equal(applied.status, 0, applied.stderr + JSON.stringify(applied.json));
++    assert.deepEqual(git(root, "show", "--name-only", "--format=", "HEAD").split("\n"), [route], "exactly the bracket path, never the sibling");
++    assert.equal(git(root, "status", "--porcelain", "--untracked-files=all", "--", "src/app/(payload)/cms-api/s"), `?? ${sibling}`);
++  } finally { cleanup(root); }
++});
++
+ test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and stage, and the detail's own reason when the record has none", () => {
+   const recorded = fixture({ stopOver: { stage: "pending-read", reason: "NGHS-PENDING-MISSING" } });
+   try {

@@ -1,0 +1,68 @@
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 283f3885fd9c2f2f7b2dd49aa93706855bc2256a..108cd25dec3e93d0d2086459fdd7041be49440ef 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -23,7 +23,7 @@
+  * Refusals are typed. Library codes (DRR-*) pass through unchanged; this command adds DRC-USAGE,
+  * DRC-UNKNOWN-FLAG, DRC-FORBIDDEN-FLAG, DRC-PATH-UNSAFE, DRC-OUT-EXISTS, DRC-OUT-PARENT-MISSING,
+  * DRC-FILE-MISSING, DRC-FILE-UNSAFE, DRC-NO-RUNNER, DRC-CLOCK,
+- * DRC-REPO-INVALID, DRC-WRITE-FAILED and DRC-INTERNAL; `export-report` adds DRC-OBSERVATION-STORE,
++ * DRC-REPO-INVALID, DRC-WRITE-FAILED, DRC-OBSERVATION-REPLAYED and DRC-INTERNAL; `export-report` adds DRC-OBSERVATION-STORE,
+  * DRC-OBSERVATION-MISSING and DRC-OBSERVATION-AMBIGUOUS.
+  *
+  * Its pure counterpart is lib/design-review-receipt-write-guard.mjs, which recognises a receipt that
+@@ -150,6 +150,24 @@ function priorReceiptOfReport(repoReal, outPath, reportSha256, sources) {
+   return null;
+ }
+ 
++/**
++ * D247: one observed dispatch stamps one round. The receipt (the --previous one, or any in the target folder) that already
++ * carries this observation's digest, else null; a delta round that reuses an earlier round's report is then refused.
++ */
++function receiptClaimingObservation(repoReal, outPath, previous, resultSha256) {
++  const claims = (value) => value?.reviewerObservation?.resultSha256 === resultSha256;
++  if (previous !== null) {
++    try { if (claims(JSON.parse(Buffer.from(previous.bytes).toString("utf8")))) return previous.path; } catch { /* the library refuses a broken previous receipt */ }
++  }
++  const directory = dirname(outPath) === "." ? "" : `${dirname(outPath)}/`;
++  let names;
++  try { names = readdirSync(join(repoReal, ...directory.split("/").filter(Boolean))); } catch { return null; }
++  for (const name of names.filter((entry) => entry.endsWith(".json")).sort()) {
++    try { if (claims(JSON.parse(readFileSync(join(repoReal, ...directory.split("/").filter(Boolean), name), "utf8")))) return `${directory}${name}`; } catch { /* not a receipt */ }
++  }
++  return null;
++}
++
+ /**
+  * Produce a receipt from files on disk and write it with exclusive create.
+  * `deps.now` exists for tests; no command-line flag reaches them.
+@@ -263,6 +281,10 @@ export function createReceiptFromDisk(input, deps = {}) {
+       try { commonDir = typeof deps.commonDirFn === "function" ? deps.commonDirFn(repoReal) : resolveGitCommonDir(repoReal); } catch { commonDir = null; }
+       record = commonDir === null ? null : readDesignReviewObservation({ commonDir, resultSha256: returnedSha256 });
+     }
++    const claimed = record === null ? null : receiptClaimingObservation(repoReal, request.outPath, previous, returnedSha256);
++    if (claimed !== null) {
++      return refuse("DRC-OBSERVATION-REPLAYED", `the host observation of this review text (${returnedSha256.slice(0, 12)}...) already stamps ${claimed}. One observed review dispatch stamps one round: dispatch pipeline-core:readiness-reviewer again for this round, write its report with export-report, and pass the earlier receipt with --previous`);
++    }
+     if (record === null) reviewerObservation = { assurance: DESIGN_REVIEW_UNOBSERVED_ASSURANCE, modelsUsed: [], resultSha256: null };
+     else {
+       reviewerObservation = { assurance: record.assurance, modelsUsed: record.modelsUsed, resultSha256: returnedSha256 };
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index 18cdceea3a088f634ab23b6f921ae76781011c44..9a1f170949228e3c6165aac567d14fe64d26487e 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -556,6 +556,14 @@ test("D247: export-report writes the observed text, and create stamps the observ
+   assert.equal(receipt.reviewer.model, "claude-opus-4");
+   assert.deepEqual(receipt.reviewerObservation, { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sha("# Observed review\n\nVerdict: PASS\n") });
+   assert.equal("reviewerObservation" in summarizeDesignReviewReceipt({ path: RECEIPT1, bytes: readFileSync(join(repo, RECEIPT1)) }).summary, false, "the binding summary never carries it");
++  // One observed dispatch stamps one round: a delta round over the same report is refused, with or without --previous.
++  for (const over of [{ report: out, out: RECEIPT2, previous: RECEIPT1 }, { report: out, out: RECEIPT2 }]) {
++    const replayed = runMain(baseArgv(repo, over), CLAUDE, world.deps);
++    assert.equal(replayed.code, 2, JSON.stringify(over));
++    assert.equal(replayed.json.code, "DRC-OBSERVATION-REPLAYED");
++    assert.match(replayed.json.message, /design-review-1\.receipt\.json/u);
++    assert.equal(existsSync(join(repo, RECEIPT2)), false);
++  }
+ }));
+ 
+ test("D247: a sanitized report binds the observation through its unpublished original", withRepo(async (repo, t) => {

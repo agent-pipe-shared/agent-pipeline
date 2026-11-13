@@ -1,0 +1,206 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 8fe2d6ae48c07b0d41e5ca22467ee61cf085f53b..5cef23dbb1c982dfa654d8951dd005f81b7a854d 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4903,6 +4903,12 @@
+       "file": "plugins/pipeline-core/lib/spec-addendum-registration.test.mjs",
+       "invariantPinned": "register-feature-package.mjs --add-spec-addendum adds an approved Spec addendum and its approval record to the package only after checking the record path and digest name, the recomputed subject digest, the approval commit (its tree, an ancestor of HEAD), the addendum bytes at that commit and in the working tree, and a matching private approval; every refusal restores the manifest; the Goldfish briefing names each applied addendum as a context line and stops on an addendum that does not read back",
+       "nonOverlapNote": "Unique cases: the registration checks, the manifest restore and the briefing lines; spec-addendum.test.mjs pins the reader, critic-course-consumer-chain-walk.test.mjs the end-to-end course"
++    },
++    {
++      "name": "guard-gate-strength-private-state-tests",
++      "file": "plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs",
++      "invariantPinned": "The gate-strength guard refuses an agent's own Write or Edit into the pipeline-owned private state (.git/agent-pipeline/**), by the lexical target and by the real location behind a symlink, plans no override and lets ordinary paths through, including a folder named agent-pipeline outside .git",
++      "nonOverlapNote": "Unique hook-level suite (D247 follow-up) for the private-state write refusal; guard-gate-strength-review-receipt.test.mjs keeps the content-based receipt refusal"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs b/plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a6c03d01cd8f5ebd0b423011e2ab2bad93d275c6
+--- /dev/null
++++ b/plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs
+@@ -0,0 +1,74 @@
++// SPDX-License-Identifier: SUL-1.0
++// D247 follow-up at the guard: hooks/guard-gate-strength.mjs refuses an agent's own Write/Edit into the pipeline-owned
++// private state (.git/agent-pipeline/**), where the host records what it observed (a design review's model, readiness
++// receipts). A live probe on 2026-11-13 showed such a Write admitted; a record an agent can write proves nothing.
++// The guard is spawned as the host spawns it, in a fixture repository; the refusal plans no human-override ceremony.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++import { PRIVATE_STATE_AGENT_WRITE, privateStateWriteRefusal } from "../lib/private-state-write-guard.mjs";
++
++const GUARD = join(dirname(fileURLToPath(import.meta.url)), "guard-gate-strength.mjs");
++const roots = [];
++process.on("exit", () => { for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } } });
++
++function fixture() {
++  const root = mkdtempSync(join(tmpdir(), "gate-strength-private-"));
++  roots.push(root);
++  const init = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
++  assert.equal(init.status, 0, init.stderr);
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  return root;
++}
++
++function ask(root, toolName, toolInput) {
++  const result = spawnSync(process.execPath, [GUARD], {
++    input: JSON.stringify({ tool_name: toolName, tool_input: toolInput, cwd: root }),
++    encoding: "utf8",
++    cwd: root,
++    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
++  });
++  assert.equal(result.error, undefined, String(result.error));
++  return { status: result.status, stderr: result.stderr ?? "" };
++}
++
++const refused = (answer, label) => {
++  assert.equal(answer.status, 2, `${label}: ${answer.stderr}`);
++  assert.match(answer.stderr, new RegExp(PRIVATE_STATE_AGENT_WRITE, "u"), label);
++  assert.doesNotMatch(answer.stderr, /guard-human-override|Human override|human-authorized override/iu, `${label}: no override ceremony is offered`);
++};
++
++test("the predicate refuses .git/agent-pipeline targets, lexical or resolved, and nothing else", () => {
++  assert.equal(privateStateWriteRefusal({ target: "/r/.git/agent-pipeline/design-review-observations/x.json" })?.code, PRIVATE_STATE_AGENT_WRITE);
++  assert.equal(privateStateWriteRefusal({ target: "C:\\r\\.git\\agent-pipeline\\x.json" })?.code, PRIVATE_STATE_AGENT_WRITE);
++  assert.equal(privateStateWriteRefusal({ target: "/r/scratch/link/x.json", realTarget: "/r/.git/agent-pipeline/x.json" })?.code, PRIVATE_STATE_AGENT_WRITE);
++  for (const target of ["/r/scratch/agent-pipeline/x.json", "/r/.git/config", "/r/docs/.git-agent-pipeline.md", "/r/.gitx/agent-pipeline/x"]) {
++    assert.equal(privateStateWriteRefusal({ target, realTarget: target }), null, target);
++  }
++  assert.equal(privateStateWriteRefusal(), null);
++  assert.equal(privateStateWriteRefusal({ target: 5 }), null);
++});
++
++test("a Write or Edit into the private state is refused, also through a symlink, and nothing is written", () => {
++  const root = fixture();
++  const store = join(root, ".git", "agent-pipeline", "design-review-observations");
++  const forged = JSON.stringify({ schema: "pipeline.design-review-observation.v1", runner: "claude", assurance: "host-observed-tool-use" });
++  refused(ask(root, "Write", { file_path: join(store, `${"a".repeat(64)}.json`), content: forged }), "a forged observation");
++  refused(ask(root, "Write", { file_path: ".git/agent-pipeline/design-readiness/x.json", content: "{}" }), "a relative path");
++  mkdirSync(store, { recursive: true });
++  writeFileSync(join(store, "existing.json"), "{}");
++  refused(ask(root, "Edit", { file_path: join(store, "existing.json"), old_string: "{}", new_string: forged }), "an edit of an existing record");
++  symlinkSync(join(root, ".git"), join(root, "scratch", "g"));
++  refused(ask(root, "Write", { file_path: join(root, "scratch", "g", "agent-pipeline", "new", "x.json"), content: "{}" }), "a symlink into .git");
++  assert.equal(existsSync(join(store, `${"a".repeat(64)}.json`)), false);
++});
++
++test("ordinary writes pass, including a folder named agent-pipeline outside .git", () => {
++  const root = fixture();
++  assert.equal(ask(root, "Write", { file_path: join(root, "scratch", "note.md"), content: "x\n" }).status, 0);
++  assert.equal(ask(root, "Write", { file_path: join(root, "scratch", "agent-pipeline", "note.md"), content: "x\n" }).status, 0);
++});
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+index 24c21aeea0156ebe0086d0c522caa605340c50af..beaf958c75ec14c172a078cd1b3430e42c56a946 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+@@ -60,12 +60,13 @@ import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
+  * guard is a safety net, not a prison. It fails CLOSED only on the thing it exists for
+  * — a write to a listed path.
+  */
+-import { existsSync, readFileSync } from "node:fs";
++import { existsSync, readFileSync, realpathSync } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { writeTargetPath } from "../lib/tool-write-target.mjs";
+ import { designReviewReceiptWriteRefusal } from "../lib/design-review-receipt-write-guard.mjs";
++import { privateStateWriteRefusal } from "../lib/private-state-write-guard.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { parseYaml } from "../lib/yaml-lite.mjs";
+ import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
+@@ -553,6 +554,22 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
+     }
+   } catch { /* fall through to the path rules */ }
+ 
++  // D247 follow-up: an agent's own write never lands in the pipeline-owned private state (.git/agent-pipeline/**), where the
++  // host records what it observed (a design review's model, readiness receipts). Judged on the lexical target and on the real
++  // location of its deepest existing ancestor, so a symlink from an ordinary folder into .git does not hide it. No override.
++  try {
++    const target = absolute ?? resolve(projectDir, filePath);
++    let realTarget = null;
++    try {
++      let probe = target;
++      const rest = [];
++      while (!existsSync(probe) && dirname(probe) !== probe) { rest.unshift(relative(dirname(probe), probe)); probe = dirname(probe); }
++      realTarget = join(realpathSync(probe), ...rest);
++    } catch { realTarget = null; }
++    const refusal = privateStateWriteRefusal({ target, realTarget });
++    if (refusal) { process.stderr.write(`BLOCKED (guard-gate-strength): ${refusal.code}: ${refusal.message}\n`); process.exit(2); }
++  } catch { /* fail open, as the receipt check below */ }
++
+   // ALF-G4C: a design review receipt is produced by scripts/design-review-receipt.mjs and never written by hand. Decided on the
+   // RESULTING content (lib/design-review-receipt-write-guard.mjs), so it holds for any target path or extension. It sits before
+   // the `matched === null` early exit, which otherwise ends the run for every ordinary path. Fails open; no human-override
+diff --git a/plugins/pipeline-core/lib/design-review-receipt-write-guard.test.mjs b/plugins/pipeline-core/lib/design-review-receipt-write-guard.test.mjs
+index 0b86902bffa03a87419a8945de3501acf11de610..385c815a6e871d0f3d441f3fa966bdc968254a7c 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt-write-guard.test.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt-write-guard.test.mjs
+@@ -63,6 +63,12 @@ test("a receipt-schema object with extra fields is refused (hand-written receipt
+   assert.equal(refusalOf(JSON.stringify(extra, null, 2))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
+ });
+ 
++test("D247: a hand-made receipt claiming a host observation is refused like any other receipt", () => {
++  const forged = { ...producedReceipt().receipt, reviewerObservation: { assurance: "host-observed-tool-use", modelsUsed: ["claude-opus-4"], resultSha256: sha("report") } };
++  assert.equal(refusalOf(canonical(forged))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
++  assert.equal(refusalOf(JSON.stringify({ ...forged, reviewerObservation: { ...forged.reviewerObservation, assurance: "host-observed-child-transcript" } }, null, 2))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
++});
++
+ test("an object that carries only the schema is refused: the schema value alone decides", () => {
+   assert.equal(refusalOf(JSON.stringify({ schema: DESIGN_REVIEW_RECEIPT_SCHEMA }))?.code, DESIGN_REVIEW_RECEIPT_HAND_WRITTEN);
+ });
+diff --git a/plugins/pipeline-core/lib/private-state-write-guard.mjs b/plugins/pipeline-core/lib/private-state-write-guard.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c39917b38ffdbf839d9da36376ab17ef5a279d10
+--- /dev/null
++++ b/plugins/pipeline-core/lib/private-state-write-guard.mjs
+@@ -0,0 +1,44 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * D247 follow-up: an agent's own Write/Edit never lands in the pipeline-owned private state.
++ *
++ * `.git/agent-pipeline/**` holds what the plugin's hooks and producer scripts record about this
++ * repository: host observations of a design review (`design-review-observations/`), readiness host
++ * receipts, override requests and more. A record there is only worth something when no agent can
++ * write it, and the canon has always said so (`templates/prompts/goldfish-task.md`, the
++ * pipeline-start `scratch-and-directory.md` reference). A live probe on 2026-11-13 showed that a
++ * native Write into that tree was admitted. This predicate is the refusal.
++ *
++ * `privateStateWriteRefusal({ target, realTarget })` refuses when either the lexical absolute target
++ * or the real location of its deepest existing ancestor (a symlink into `.git` from an ordinary
++ * folder) lies inside a `.git/agent-pipeline` directory. The plugin's own scripts write there with
++ * the file system, never through an agent tool call, so this route is never needed for them.
++ *
++ * Pure: the caller passes both paths. Returns null when the write is none of this predicate's business.
++ */
++export const PRIVATE_STATE_AGENT_WRITE = "PRIVATE-STATE-AGENT-WRITE";
++
++const MESSAGE = "This write targets the pipeline-owned private state under .git/agent-pipeline/. "
++  + "Only the plugin's hooks and producer scripts write there; a record an agent could write would prove nothing "
++  + "(a design review observation, a readiness host receipt, an override request). Use scratch/ for notes and evidence, "
++  + "and the sanctioned command of the route for anything the pipeline records.";
++
++function insidePrivateState(path) {
++  if (typeof path !== "string" || path === "") return false;
++  const parts = path.split(/[\\/]+/u);
++  for (let i = 0; i + 1 < parts.length; i += 1) if (parts[i] === ".git" && parts[i + 1] === "agent-pipeline") return true;
++  return false;
++}
++
++/**
++ * @param {{ target?: unknown, realTarget?: unknown }} [input] absolute paths of the write target, lexical and resolved
++ * @returns {{ code: string, message: string } | null}
++ */
++export function privateStateWriteRefusal(input) {
++  try {
++    if (insidePrivateState(input?.target) || insidePrivateState(input?.realTarget)) return { code: PRIVATE_STATE_AGENT_WRITE, message: MESSAGE };
++    return null;
++  } catch {
++    return null;
++  }
++}

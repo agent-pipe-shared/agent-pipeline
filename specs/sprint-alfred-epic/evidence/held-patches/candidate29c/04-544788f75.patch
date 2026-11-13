@@ -1,0 +1,52 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 07c220337d3125666954b6ec05ce9d3f3bf8e501..335d483fa1607e65e895700775b0490d78a765f7 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -77,8 +77,8 @@ test("C29-C3 security-scan: an empty or unreadable v2 capability plan is named o
+   const scan = JSON.stringify({ scanners: [{ tool: "semgrep", status: "PASS", classification: "success" }] });
+   const verdict = (plan) => JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan, verdict: { blocking: false }, capabilityOutcomes: {}, controls: [] });
+   const withVerdict = (text) => rows(full({ readBytes: (p) => { if (p === "evidence/security-latest.json") return Buffer.from(scan); if (p === SEC_VERDICT && text !== null) return Buffer.from(text); throw new Error("absent"); } }))["security-scan"];
+-  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; v2 capability plan empty, reporting only: no capability control passed, open\)$/u);
+-  assert.match(withVerdict(null).evidence, /v2 scope unavailable: no security control shown as passed\)$/u);
++  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; v2 capability plan empty, reporting only: capability controls open\)$/u);
++  assert.match(withVerdict(null).evidence, /; v2 scope unavailable\)$/u);
+   const planned = withVerdict(verdict({ required: ["cap.sast"], optional: [] })).evidence;
+   assert.match(planned, /v2 verdict reporting only, exit by v1\)$/u); assert.doesNotMatch(planned, /plan empty|unavailable/u);
+ });
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index 6a83dd509b821e64d764e732c4f42cd1afa89ba6..f83a9fe80c31b1a57e6619328166d74bb300efca 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -327,7 +327,7 @@ export function closeSecurityScope(doc) {
+  * capability plan are said out loud as open, never left out, so a close report cannot read like every security control passed.
+  */
+ export function describeCloseSecurityScope(scope) {
+-  if (scope?.status !== "read") return `Security scope: unavailable (${scope?.reason ?? "no v2 security verdict"}); no security control is shown as passed.`;
++  if (scope?.status !== "read") return `Security scope: unavailable (${scope?.reason ?? "no v2 security verdict"}); what the security result covers is open.`;
+   const plan = scope.capabilityPlan.empty ? "empty" : `${scope.capabilityPlan.required} required, ${scope.capabilityPlan.optional} optional`;
+   const notRun = scope.checksNotRun.length === 0 ? "none" : scope.checksNotRun.map(({ check, outcome }) => `${check} (${outcome})`).join(", ");
+   const open = scope.capabilityPlan.empty ? " The v2 capability plan is empty, so no capability control counts as passed; it stays open." : "";
+@@ -337,8 +337,8 @@ export function describeCloseSecurityScope(scope) {
+ /** C29 (C3): the short scope note the close quality readback adds to its security row, read from the v2 verdict document. */
+ export function closeSecurityScopeNote(doc) {
+   const scope = closeSecurityScope(doc);
+-  if (scope.status !== "read") return "v2 scope unavailable: no security control shown as passed";
+-  if (scope.capabilityPlan.empty) return `v2 capability plan empty${scope.v2VerdictReportingOnly ? ", reporting only" : ""}: no capability control passed, open`;
++  if (scope.status !== "read") return "v2 scope unavailable";
++  if (scope.capabilityPlan.empty) return `v2 capability plan empty${scope.v2VerdictReportingOnly ? ", reporting only" : ""}: capability controls open`;
+   return scope.v2VerdictReportingOnly ? "v2 verdict reporting only, exit by v1" : null;
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index ae8030a094202c723d614b8a30565759dc4d540c..3a4ed74f26830af7015ccb3bbbdfacfedfedd099 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -1182,7 +1182,7 @@ test("R8: closed-local states what the security result covers, read from the v2
+     const none = oneShotClose(f.resumed, { runCommand: f.runner });
+     assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
+     assert.equal(none.securityScope.status, "unavailable");
+-    assert.match(none.message, /Security scope: unavailable \(the v2 security verdict could not be read\); no security control is shown as passed\./u); // C29 (C3): said, not left out.
++    assert.match(none.message, /Security scope: unavailable \(the v2 security verdict could not be read\); what the security result covers is open\./u); // C29 (C3): said, not left out.
+     mkdirSync(join(f.root, "evidence"), { recursive: true });
+     // The shape a real scan writes: scanners under capabilityOutcomes, only the checks without a capability under controls.
+     writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: ["cap.sast", "cap.secrets"], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },

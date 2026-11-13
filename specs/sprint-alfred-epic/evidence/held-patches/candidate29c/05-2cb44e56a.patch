@@ -1,0 +1,267 @@
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index a6fb0abcdd759ef1329b93788c5f4df4bbb7c7bf..4f97ad986b241bbc4898b98a1445a5d2ecf18906 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -35,7 +35,7 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
+ import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
+-import { awaitSignatureFields, commandText } from "../signed-proof-wait.mjs";
++import { awaitSignatureFields, commandText, PROOF_WAIT_CLASS, waitForSignedProof } from "../signed-proof-wait.mjs";
+ import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
+@@ -403,7 +403,8 @@ test("G20-30: the design approval's signing step names the exact proof path and
+   const waited = waitForProofCli(f.root, proofRel, 1);
+   assert.equal(waited.status, 2, waited.stderr);
+   assert.equal(waited.out.code, "PROOF-WAIT-TIMEOUT");
+-  assert.match(waited.out.repair, /sign-intent/u, "the one recovery is the signing command itself, then the same wait again");
++  assert.equal(waited.out.waitClass, "po-wait", "C29-C9: the CLI result agents and timelines read carries the PO-wait label"); assert.ok(Number.isSafeInteger(waited.out.waitedSeconds) && waited.out.waitedSeconds >= 0);
++  assert.match(waited.out.repair, /sign-intent/u, "the one recovery names the signing command the PO already has, then the same wait again");
+   assert.match(waited.out.repair, /proof-wait\.mjs/u);
+   const refusedPath = waitForProofCli(f.root, "../outside.json", 1);
+   assert.equal(refusedPath.status, 2);
+@@ -868,6 +869,23 @@ test("G20-76: awaitSignatureFields adds --subject after --timeout only when it i
+   assert.throws(() => awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: "nope" }), /subject/iu);
+ });
+ 
++test("C29-C9: the signature wait is silent and its time is PO wait: a timeout does not ask again, every result carries waitedSeconds and the po-wait label", () => {
++  // Codex run 3 (C9): 570 s of active waiting with repeated status messages. PO tile 2026-11-13: bounded wait, silent, labelled PO wait.
++  let clock = 1_000_000;
++  const now = () => clock; const pause = (ms) => { clock += ms; };
++  const proof = "scratch/critical-push-proof-0123456789ab.json";
++  const timeout = waitForSignedProof({ root: "/p", proof, timeoutSeconds: 3, now, pause, observe: () => ({ state: "absent" }) });
++  assert.equal(timeout.code, "PROOF-WAIT-TIMEOUT"); assert.equal(timeout.waitClass, PROOF_WAIT_CLASS); assert.equal(PROOF_WAIT_CLASS, "po-wait"); assert.equal(timeout.waitedSeconds, 3);
++  assert.match(timeout.repair, /already has the one signing command[\s\S]*do not repeat it and post no status message[\s\S]*proof-wait\.mjs/u);
++  assert.doesNotMatch(timeout.repair, /ask the PO/u, "a timeout never asks the PO again");
++  let seen = 0; clock = 2_000_000;
++  const present = waitForSignedProof({ root: "/p", proof, timeoutSeconds: 10, now, pause, observe: () => (++seen > 4 ? { state: "present" } : { state: "absent" }) });
++  assert.equal(present.status, "proof-present"); assert.equal(present.waitClass, "po-wait"); assert.equal(present.waitedSeconds, 2);
++  const fields = awaitSignatureFields({ root: "/p", proofPath: proof });
++  assert.match(fields.afterSigning, /silently: no status message and no repeated signing command between waits/u);
++  assert.match(fields.afterSigning, /is PO wait, never active agent time/u);
++});
++
+ test("G20-76: the shell grammar admits the proof wait with --subject only as a 64 hex value after --timeout", async () => {
+   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+   const root = join(DESIGN_REPO_ROOT, "scratch", ".proof-wait-fixture");
+diff --git a/plugins/pipeline-core/lib/signed-proof-wait.mjs b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+index d502e1feadf4626320e0c715fa46bda4c7ad981b..f69a9189f327bd1f9f6ad5af17d244b81d173f9a 100644
+--- a/plugins/pipeline-core/lib/signed-proof-wait.mjs
++++ b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+@@ -23,6 +23,8 @@ export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
+ // Greenfields 2026-11-08: 120 s ended every wait before a human had signed (8 and 39 minutes measured). Below the 600 s cap of a foreground shell call.
+ export const PROOF_WAIT_DEFAULT_SECONDS = 570;
+ export const PROOF_WAIT_MAX_SECONDS = 600;
++/** C29 (C9): the label every wait result carries; the time waited for a human signature is PO wait, never active agent time. */
++export const PROOF_WAIT_CLASS = "po-wait";
+ export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
+ export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../scripts/proof-wait.mjs", import.meta.url));
+ const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+@@ -129,7 +131,7 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
+       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
+       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
+     },
+-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again. Tell the PO which command to run, never that it happens automatically.`
++    afterSigning: `Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
+       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
+   };
+ }
+@@ -153,24 +155,32 @@ export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DE
+   if (subjectSha256 !== null && !isProofSubjectSha256(subjectSha256)) {
+     return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--subject must be 64 lowercase hex characters", repair: "pass the subject sha256 the signing step printed, unchanged, or leave --subject out" };
+   }
+-  const deadline = now() + timeoutSeconds * 1000;
++  const started = now();
++  const deadline = started + timeoutSeconds * 1000;
++  // C29 (Codex run 3, C9; PO tile 2026-11-13 "bounded wait, silent"): every result labels the time it waited as PO wait, so a timeline or
++  // report nets it out of agent time instead of counting it as active work.
++  const waited = () => ({ waitedSeconds: Math.max(0, Math.round((now() - started) / 1000)), waitClass: PROOF_WAIT_CLASS });
+   let last;
+   for (;;) {
+     last = observe(root, proof, subjectSha256);
+-    if (last.state === "present") return { status: "proof-present", proofPath: proof };
++    if (last.state === "present") return { status: "proof-present", proofPath: proof, ...waited() };
+     if (now() >= deadline) break;
+     pause(Math.min(500, Math.max(1, deadline - now())));
+   }
+   const sign = signCommandForProof(root, proof);
+   const again = text(proofWaitCommand(root, proof, timeoutSeconds, subjectSha256));
+   const critical = isCriticalMirrorProof(proof) ? `ask the PO once to run ${CRITICAL_SIGNING_STEP}` : null;
++  if (last.state !== "stale" && last.state !== "invalid") {
++    // C29 (C9): a timeout is not news. The signing command was handed over once before the wait; repeating it or posting a status
++    // message on every timeout is the toil the run showed (570 s of active waiting with repeated messages).
++    const handed = isCriticalMirrorProof(proof) ? CRITICAL_SIGNING_STEP : (sign === null ? "the signing step" : text(sign));
++    return { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, ...waited(), reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s; signing is a human step and the time waited is PO wait`,
++      repair: `the PO already has the one signing command (${handed}); do not repeat it and post no status message; wait silently again: ${again}` };
++  }
+   if (last.state === "stale") {
+-    return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
++    return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, ...waited(), reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
+       repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${critical ?? (sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
+   }
+-  return last.state === "invalid"
+-    ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
+-      repair: `${critical ?? (sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`)}; then run ${again}` }
+-    : { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s`,
+-      repair: `${critical ?? (sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
++  return { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, ...waited(), reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
++    repair: `${critical ?? (sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`)}; then run ${again}` };
+ }
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.mjs b/plugins/pipeline-core/scripts/usage-ledger.mjs
+index 4ce6952b0bf944188d4c08222a11dcabae218e80..089409ad71d08bb4c5a94e35612d28475b9bff77 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.mjs
+@@ -222,7 +222,20 @@ function detectTimelineFormat(records) {
+   return null;
+ }
+ 
+-// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code}.
++// C29 (Codex run 3, C9): a proof-wait.mjs result in a tool output carries the time it waited on a human signature, labelled po-wait.
++// That time sits inside an agent turn, so without this it would count as active run time. Only the closed schema line counts.
++function timelineProofWaitMs(text) {
++  if (typeof text !== "string" || !text.includes("pipeline.signed-proof-wait.v1")) return null;
++  for (const line of text.split(/\r?\n/u)) {
++    const trimmed = line.trim();
++    if (!trimmed.startsWith("{")) continue;
++    let value; try { value = JSON.parse(trimmed); } catch { continue; }
++    if (isTimelineObject(value) && value.schema === "pipeline.signed-proof-wait.v1" && value.waitClass === "po-wait" && Number.isSafeInteger(value.waitedSeconds) && value.waitedSeconds >= 0) return value.waitedSeconds * 1000;
++  }
++  return null;
++}
++
++// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code} | {kind:"po-wait", ms} (ms = the duration waited).
+ // `listed` = the response is printed in the per-response usage list; a time-only response just ends a turn.
+ function claudeTimelineEvents(records) {
+   const events = [];
+@@ -258,6 +271,8 @@ function claudeTimelineEvents(records) {
+           events.push({ kind: "human", ms, chars });
+         }
+         for (const block of results) {
++          const waitedMs = timelineProofWaitMs(timelineResultText(block.content));
++          if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
+           if (block.is_error !== true) continue;
+           const code = timelineRefusal(timelineResultText(block.content), false);
+           if (code) events.push({ kind: "refusal", code });
+@@ -299,6 +314,8 @@ function codexTimelineEvents(records) {
+     } else if (record.type === "response_item") {
+       if (payload.type === "message" && payload.role === "assistant") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
+       else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
++        const waitedMs = timelineProofWaitMs(timelineResultText(payload.output));
++        if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
+         const code = timelineRefusal(timelineResultText(payload.output), true);
+         if (code) events.push({ kind: "refusal", code });
+       }
+@@ -335,6 +352,8 @@ function antigravityStepTimelineEvents(records) {
+       events.push({ kind: "response", ms, listed: true, model: null, usage });
+     } else if (record.type === "GENERIC") {
+       const text = [record.error, record.content].filter((value) => typeof value === "string").join("\n");
++      const waitedMs = text === "" ? null : timelineProofWaitMs(text);
++      if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
+       const code = text === "" ? null : timelineRefusal(text, true);
+       if (code) events.push({ kind: "refusal", code });
+     }
+@@ -369,7 +388,9 @@ function buildTimeline(format, records, actor, malformed) {
+     }
+     return { ordinal: ordinal + 1, at: human.ms === null ? null : new Date(human.ms).toISOString(), chars: human.chars, durationMs, humanWaitAfterMs: waitAfterMs, last: !next };
+   });
+-  const humanWaitMs = observed && waitKnown ? waitTotal : null;
++  // C29 (C9): a wait on a human signature inside an agent turn is PO wait too; it is added to the human wait and shown on its own.
++  const signatureWaitMs = events.filter((event) => event.kind === "po-wait").reduce((sum, event) => sum + event.ms, 0);
++  const humanWaitMs = observed && waitKnown ? waitTotal + signatureWaitMs : null;
+   const refusals = {};
+   for (const event of events) if (event.kind === "refusal") refusals[event.code] = (refusals[event.code] ?? 0) + 1;
+   const refusalCount = Object.values(refusals).reduce((sum, count) => sum + count, 0);
+@@ -381,7 +402,7 @@ function buildTimeline(format, records, actor, malformed) {
+     schema: TIMELINE_SCHEMA, runner, malformedLines: malformed,
+     humanTurns: observed ? humanTurns : null, responses, refusals: observed ? refusals : null,
+     totals: {
+-      grossMs, humanWaitMs,
++      grossMs, humanWaitMs, signatureWaitMs: observed ? signatureWaitMs : null,
+       netMs: grossMs !== null && humanWaitMs !== null ? grossMs - humanWaitMs : null,
+       refusals: observed ? refusalCount : null, humanTurns: observed ? humanTurns.length : null,
+     },
+@@ -411,7 +432,7 @@ function renderTimeline(timeline) {
+   else for (const [code, count] of Object.entries(timeline.refusals).sort()) lines.push(`- ${code}: ${count}`);
+   if (timeline.malformedLines > 0) lines.push("", `Malformed lines skipped: ${timeline.malformedLines}`);
+   const totals = timeline.totals;
+-  lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
++  lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)}${totals.signatureWaitMs ? ` (of it signature wait ${secs(totals.signatureWaitMs)})` : ""} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
+   return lines.join("\n");
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.test.mjs b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+index 0d82bcce1773738ce0f8a3955adfe3c9de04ae7d..7d6d354e6ac7fe74967416cc740984be629865e0 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.test.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+@@ -342,7 +342,7 @@ test("usage-ledger --timeline --json emits pipeline.usage-timeline.v1 with the s
+     const data = JSON.parse(result.stdout);
+     assert.equal(data.schema, "pipeline.usage-timeline.v1");
+     assert.equal(data.runner, "claude");
+-    assert.deepEqual(data.totals, { grossMs: 90000, humanWaitMs: 60000, netMs: 30000, refusals: 1, humanTurns: 2 });
++    assert.deepEqual(data.totals, { grossMs: 90000, humanWaitMs: 60000, signatureWaitMs: 0, netMs: 30000, refusals: 1, humanTurns: 2 });
+     assert.deepEqual(data.refusals, { "GUARD-READ-SCOPE-OUTSIDE-ROOT": 1 });
+     assert.equal(data.humanTurns.length, 2);
+     assert.equal(data.humanTurns[0].chars, HUMAN_TEXT.length);
+@@ -377,7 +377,31 @@ test("usage-ledger --timeline (claude) skips compact summaries and system notifi
+     assert.equal(data.humanTurns.length, 3, "the compact summary and the task notification are not human turns");
+     assert.equal(data.humanTurns[0].durationMs, 50000, "the first turn runs through the system rows to its last answer");
+     assert.equal(data.humanTurns[1].humanWaitAfterMs, 0, "a message written before any answer leaves no wait");
+-    assert.deepEqual(data.totals, { grossMs: 121000, humanWaitMs: 60000, netMs: 61000, refusals: 0, humanTurns: 3 });
++    assert.deepEqual(data.totals, { grossMs: 121000, humanWaitMs: 60000, signatureWaitMs: 0, netMs: 61000, refusals: 0, humanTurns: 3 });
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++// C29 (Codex run 3, C9): the agent waited on a human signature inside its own turn; proof-wait labels that time po-wait, and the
++// timeline counts it as human wait (and names it) instead of active run time. A timeout result (is_error) and a present result both count.
++test("C29-C9 usage-ledger --timeline counts a proof-wait result's waited time as human wait, not as run time", () => {
++  const wait = (seconds, status) => JSON.stringify({ schema: "pipeline.signed-proof-wait.v1", status, proofPath: "scratch/p.json", waitedSeconds: seconds, waitClass: "po-wait" });
++  const { dir, file } = timelineFile([
++    claudeUser("2026-08-19T10:00:00.000Z", "push please"),
++    claudeAssistant("2026-08-19T10:00:05.000Z", "msg_a", { input_tokens: 1, output_tokens: 1 }),
++    claudeUser("2026-08-19T10:09:35.000Z", [{ type: "tool_result", tool_use_id: "toolu_w1", is_error: true, content: `Exit code 2\n${wait(570, "refused")}` }]),
++    claudeUser("2026-08-19T10:09:45.000Z", [{ type: "tool_result", tool_use_id: "toolu_w2", content: wait(10, "proof-present") }]),
++    claudeUser("2026-08-19T10:09:46.000Z", [{ type: "tool_result", tool_use_id: "toolu_x", content: "a document quoting pipeline.signed-proof-wait.v1 in prose" }]),
++    claudeAssistant("2026-08-19T10:10:00.000Z", "msg_b", { input_tokens: 1, output_tokens: 1 }),
++  ]);
++  try {
++    const result = run(["--timeline", file, "--json"]);
++    assert.equal(result.status, 0, result.stderr);
++    const data = JSON.parse(result.stdout);
++    assert.deepEqual(data.totals, { grossMs: 600000, humanWaitMs: 580000, signatureWaitMs: 580000, netMs: 20000, refusals: 0, humanTurns: 1 });
++    const text = run(["--timeline", file]);
++    assert.match(text.stdout, /human wait 580\.0 s \(of it signature wait 580\.0 s\) \| run time net 20\.0 s/u);
+   } finally {
+     rmSync(dir, { recursive: true, force: true });
+   }
+@@ -418,7 +442,7 @@ test("usage-ledger --timeline (codex rollout) counts provenance-user messages as
+     const data = JSON.parse(result.stdout);
+     assert.equal(data.humanTurns.length, 2, "the harness insert is not a human turn");
+     assert.equal(data.humanTurns[0].chars, 5);
+-    assert.deepEqual(data.totals, { grossMs: 30000, humanWaitMs: 20000, netMs: 10000, refusals: 0, humanTurns: 2 });
++    assert.deepEqual(data.totals, { grossMs: 30000, humanWaitMs: 20000, signatureWaitMs: 0, netMs: 10000, refusals: 0, humanTurns: 2 });
+   } finally {
+     rmSync(dir, { recursive: true, force: true });
+   }
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 21c9af11549233d3cdd3ab34a57f0a8027926fa7..af047f01b518cc94c5aff14273a90601f64f015e 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -2,9 +2,12 @@
+ 
+ Load this when a session reaches, explains, or is about to discuss the push
+ gate. Everything here is about the moment a **human** has to act; the session's
+-own job is to state it clearly and then wait. Waiting means ending the turn:
+-never re-run the driver, poll the proof or repeat the request, and answer an
+-automatic continuation with one line. A new commit voids the prepared approval.
++own job is to state it clearly once and then wait. Waiting means the step's own
++bounded `waitAction` (`proof-wait.mjs`), run silently: no status message and no
++repeated request between waits, never a re-run of the driver; after a
++`PROOF-WAIT-TIMEOUT` run the same wait again. The waited time is labelled PO
++wait (`waitClass: "po-wait"`), never active agent time. A new commit voids the
++prepared approval.
+ 
+ > **Changed under [ADR-0061](../../../../../docs/adr/0061-uniform-human-approval-ceremony.md).**
+ > In `signature` mode the human's part is now **one command, the word

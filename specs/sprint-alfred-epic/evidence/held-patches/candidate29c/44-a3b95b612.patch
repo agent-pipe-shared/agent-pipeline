@@ -1,0 +1,826 @@
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+index 0d195214520c485170c1ea421c9c80fd06ce7b3e..034d8be3efe1a26ca596e16cd33aeff9e0f7ea5a 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+@@ -23,6 +23,8 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
+ // ADR-0096: defined in this leaf module because lib/gate-definition-changes.mjs and the two scripts that import it form an import
+ // cycle; a module-level kind list must not read a binding the cycle has not initialised yet.
+ export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
++// ADR-0097: same reason (lib/maintenance-delivery.mjs imports it from here).
++export const MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND = "acknowledge-maintenance-red-check";
+ export const CRITICAL_ACTION_KINDS = Object.freeze([
+   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
+   "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
+@@ -30,6 +32,8 @@ export const CRITICAL_ACTION_KINDS = Object.freeze([
+   "spec-addendum",
+   // ADR-0096: the PO's acknowledgement of the unproven gate-definition changes of a feature range (lib/gate-definition-changes.mjs).
+   "acknowledge-gate-definition-changes",
++  // ADR-0097: the PO's acknowledgement that a maintenance check was red before the feature (lib/maintenance-delivery.mjs).
++  "acknowledge-maintenance-red-check",
+ ]);
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+index db50d6987b4fb493fa8f45147db7b586f9d70756..45d774e9ca57dc4678294249e661aba7ff5d54aa 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+@@ -48,7 +48,7 @@ check("CRITICAL_ACTION_KINDS holds the documented seven members in order", () =>
+   // G20-39 (PO 2026-11-07): acknowledge-caller-authored-critic is a deliberate new kind (the close-gate bridge); restated in place (QG-04).
+   // ADR-0095 (PO tiles 2026-11-13): spec-addendum is a deliberate new kind (the Spec correction inside implementation); restated in place (QG-04).
+   // ADR-0096 (PO tile L4 2026-11-13): acknowledge-gate-definition-changes is a deliberate new kind (the after-the-fact gate-change acknowledgement); restated in place (QG-04).
+-  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "spec-addendum", "acknowledge-gate-definition-changes"]);
++  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "spec-addendum", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"]);
+ });
+ check("a release-preflight request round-trips end to end, and cross-kind substitution stays refused", () => {
+   const rpSubject = { schema: "pipeline.release-preflight-consent-subject.v1", version: "1.2.3", base: { commit: "c".repeat(40), tree: "d".repeat(40) }, lifecycle: { featureId: "cyb-4", manifestPath: "lifecycle.json", manifestSha256: "e".repeat(64) }, retentionPolicySha256: "f".repeat(64) };
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index c85915926bdc8a38f548f1bb67bb6e5925ec1e04..5472683ba349dee56d1c1e976a244c76250ad1d6 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -203,6 +203,8 @@ const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-p
+   "spec-addendum": "specAddendumApproval",
+   // ADR-0096: the PO acknowledgement of a range's unproven gate-definition changes; read per feature by the close walk.
+   "acknowledge-gate-definition-changes": "gateChangeAcknowledgement",
++  // ADR-0097: the PO acknowledgement that a maintenance check was red before the feature; read per check by the item admission.
++  "acknowledge-maintenance-red-check": "maintenanceRedAcknowledgement",
+   // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
+   "release-preflight": "releasePreflightApproval" });
+ 
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.mjs b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..54ea8120e70e1eb0407e568a852f0057deb79e9b
+--- /dev/null
++++ b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+@@ -0,0 +1,318 @@
++/**
++ * ADR-0097 (D249, K-28): the maintenance delivery. A Goldfish item binding names `maintenance` instead of a criterion locator when it
++ * repairs a check that was red before the feature and that no criterion of the approved Spec covers. This module holds the parts the
++ * binding generator, the host admission and the PO acknowledgement share:
++ *
++ *   validMaintenanceBinding         the closed `pipeline.maintenance-binding.v1` object (no criterion, no proof reference: the host
++ *                                   derives the proof itself and never takes it from the briefing)
++ *   maintenanceCheckSha256          the identity of the one red check (canonical JSON of the check object)
++ *   maintenanceScopeRefusal         the narrow write scope: test- or tooling-shaped, never a gate-strength path, never under specs/
++ *   red observation                 written by the binding generator after running the check on the clean HEAD of the real checkout,
++ *                                   kept in private state under <git-common-dir>/agent-pipeline/maintenance/observations/
++ *   preApprovalRedReceipt           a sealed red Verify suite receipt at or before the plan-approval commit (the mechanical route)
++ *   maintenanceAcknowledgement      the PO's acknowledgement (kind acknowledge-maintenance-red-check), the fallback route
++ *   maintenanceRedProof             receipt first, then acknowledgement, else null
++ *
++ * Nothing here runs a check; the generator runs it and hands the result in.
++ */
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeSync, constants } from "node:fs";
++import { join } from "node:path";
++import { GATE_STRENGTH_PATHS } from "../hooks/guard-gate-strength.mjs";
++import { MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
++import { readPrivateApprovals } from "./critical-action-authorization.mjs";
++import { validateVerifySuiteReceipt } from "./verify-resume.mjs";
++import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
++import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
++
++export { MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND };
++export const MAINTENANCE_BINDING_SCHEMA = "pipeline.maintenance-binding.v1";
++export const MAINTENANCE_RED_OBSERVATION_SCHEMA = "pipeline.maintenance-red-observation.v1";
++export const MAINTENANCE_ACK_SUBJECT_SCHEMA = "pipeline.maintenance-red-check-subject.v1";
++/** The check form that names the project's top-level verify command; admitted only in a maintenance binding. */
++export const CONFIGURED_VERIFY_CHECK = "verify:configured";
++/** The label every acknowledged proof carries in the queue row, the Critic packet and the audit trail. */
++export const MAINTENANCE_ACK_LABEL = "red before the feature acknowledged by the PO";
++
++const SHA = /^[a-f0-9]{64}$/u;
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++const SAFE_SUITE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
++const MAX_RUNS = 512;
++
++const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++const sha256 = (value) => createHash("sha256").update(value).digest("hex");
++
++function canonical(value) {
++  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
++  if (object(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
++  return JSON.stringify(value);
++}
++
++/** The closed maintenance binding of an item delivery: exactly `{ schema }`. */
++export function validMaintenanceBinding(value) {
++  return object(value) && Object.keys(value).length === 1 && value.schema === MAINTENANCE_BINDING_SCHEMA;
++}
++
++/** True when the check object is the maintenance-only configured-verify form `{ id, path, verify: "configured", dependencies }`. */
++export function isConfiguredVerifyCheck(check) {
++  return object(check) && Object.hasOwn(check, "verify") && check.verify === "configured";
++}
++
++export function maintenanceCheckSha256(check) {
++  return sha256(canonical(check));
++}
++
++/** The Verify suite a check's red receipt is filed under, or null when the check form has no suite of its own. */
++export function maintenanceReceiptSuite(check) {
++  if (isConfiguredVerifyCheck(check)) return "configured-verify";
++  if (object(check) && typeof check.command === "string" && SAFE_SUITE.test(`project-${check.command}`)) return `project-${check.command}`;
++  return null;
++}
++
++const TEST_FILE = /(?:^|\/)[^/]+\.(?:test|spec)\.[A-Za-z0-9]+$/u;
++const TOOLING_SEGMENTS = new Set(["test", "tests", "__tests__", "fixtures", "scripts", "tools"]);
++
++function gateStrengthRule(path) {
++  const lower = path.toLowerCase();
++  return GATE_STRENGTH_PATHS.find((rule) => (rule.path.endsWith("/*")
++    ? lower.startsWith(rule.path.slice(0, -1).toLowerCase())
++    : lower === rule.path.toLowerCase())) ?? null;
++}
++
++/**
++ * The narrow write scope of a maintenance delivery (ADR-0097 Decision 2). Every path must be test- or tooling-shaped, outside the
++ * gate-strength table (which holds the ADR-0096 gate-definition set) and outside specs/ (the approved PRD, Spec and addenda).
++ * Being a dependency of the check is checked by the caller with the existing item-scope rule. `null` or a typed refusal.
++ */
++export function maintenanceScopeRefusal(writeScope) {
++  const refuse = (path, why) => ({ code: "SQ-MAINTENANCE-SCOPE", path,
++    reason: `${path} is outside a maintenance scope: ${why}`,
++    repair: "a maintenance delivery writes only test- or tooling-shaped paths (a *.test.* or *.spec.* file, or a path with a test, tests, __tests__, fixtures, scripts or tools segment) that the check depends on; a fix elsewhere needs a Spec criterion (design route)" });
++  if (!Array.isArray(writeScope) || writeScope.length === 0) return { code: "SQ-MAINTENANCE-SCOPE", path: null, reason: "the write scope is empty", repair: "name the test or tooling paths the fix changes" };
++  for (const path of writeScope) {
++    if (typeof path !== "string" || path === "") return refuse(String(path), "not a path");
++    const rule = gateStrengthRule(path);
++    if (rule !== null) return refuse(path, `it is the gate-strength path ${rule.id}, which decides how strong a gate is (ADR-0096)`);
++    if (path.toLowerCase().startsWith("specs/")) return refuse(path, "the approved PRD, Spec and their addenda are never changed by a maintenance delivery (ADR-0095)");
++    const segments = path.split("/").slice(0, -1);
++    if (!TEST_FILE.test(path) && !segments.some((segment) => TOOLING_SEGMENTS.has(segment))) return refuse(path, "it is neither a test file nor under a test, fixtures, scripts or tools folder");
++  }
++  return null;
++}
++
++/* ---- red observation (private state) ---- */
++
++export function maintenanceObservationDirectory(commonDir) {
++  return join(commonDir, "agent-pipeline", "maintenance", "observations");
++}
++
++function observationName(checkSha256, commit) {
++  return `${sha256(`${checkSha256}:${commit}`)}.json`;
++}
++
++/** The record the binding generator writes after running the check. Fields are validated; the file is created once (wx, 0600). */
++export function writeMaintenanceRedObservation({ commonDir, featureId, check, candidate, exitCode, signal = null, outputSha256, observedAt }) {
++  if (typeof commonDir !== "string" || commonDir === "" || typeof featureId !== "string" || featureId === "" || !object(check)
++    || !object(candidate) || !OID.test(candidate.commit ?? "") || !OID.test(candidate.tree ?? "")
++    || !(Number.isSafeInteger(exitCode) || exitCode === null) || !SHA.test(outputSha256 ?? "") || !Number.isFinite(Date.parse(observedAt ?? ""))) {
++    return { ok: false, code: "MAINTENANCE-OBSERVATION-INPUT" };
++  }
++  const checkSha256 = maintenanceCheckSha256(check);
++  const record = { schema: MAINTENANCE_RED_OBSERVATION_SCHEMA, featureId, check, checkSha256, candidate: { commit: candidate.commit, tree: candidate.tree },
++    exitCode, signal: typeof signal === "string" ? signal : null, red: exitCode !== 0 || typeof signal === "string", outputSha256, observedAt };
++  const directory = maintenanceObservationDirectory(commonDir);
++  const path = join(directory, observationName(checkSha256, candidate.commit));
++  try {
++    mkdirSync(directory, { recursive: true, mode: 0o700 });
++    if (lstatSync(directory).isSymbolicLink()) return { ok: false, code: "MAINTENANCE-OBSERVATION-UNSAFE" };
++    let fd;
++    try {
++      // A later run at the same commit replaces nothing: the first observation stands, so a green rerun cannot hide a red one or the reverse.
++      fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
++      const bytes = Buffer.from(`${JSON.stringify(record)}\n`);
++      let offset = 0;
++      while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
++      fsyncSync(fd);
++    } finally { if (fd !== undefined) closeSync(fd); }
++  } catch (error) {
++    if (error?.code !== "EEXIST") return { ok: false, code: "MAINTENANCE-OBSERVATION-WRITE" };
++    const existing = readMaintenanceRedObservation({ commonDir, check, candidate });
++    return existing === null ? { ok: false, code: "MAINTENANCE-OBSERVATION-UNREADABLE" } : { ok: true, record: existing, existing: true };
++  }
++  return { ok: true, record, existing: false };
++}
++
++/** The observation of exactly this check at exactly this candidate (commit and tree), or null. */
++export function readMaintenanceRedObservation({ commonDir, check, candidate }) {
++  if (typeof commonDir !== "string" || !object(check) || !object(candidate) || !OID.test(candidate.commit ?? "")) return null;
++  const checkSha256 = maintenanceCheckSha256(check);
++  const path = join(maintenanceObservationDirectory(commonDir), observationName(checkSha256, candidate.commit));
++  try {
++    const info = lstatSync(path);
++    if (!info.isFile() || info.isSymbolicLink()) return null;
++    const record = JSON.parse(readFileSync(path, "utf8"));
++    if (!object(record) || record.schema !== MAINTENANCE_RED_OBSERVATION_SCHEMA || record.checkSha256 !== checkSha256
++      || maintenanceCheckSha256(record.check) !== checkSha256 || record.candidate?.commit !== candidate.commit
++      || record.candidate?.tree !== candidate.tree || typeof record.red !== "boolean"
++      || record.red !== (record.exitCode !== 0 || typeof record.signal === "string")) return null;
++    return record;
++  } catch { return null; }
++}
++
++/** Every observation of the feature at this candidate (the acknowledgement subject lists the red ones). */
++export function listMaintenanceRedObservations({ commonDir, featureId, candidate }) {
++  const found = [];
++  let names = [];
++  try { names = readdirSync(maintenanceObservationDirectory(commonDir)).filter((name) => /^[a-f0-9]{64}\.json$/u.test(name)).sort(); } catch { return found; }
++  for (const name of names.slice(0, 4096)) {
++    let record;
++    try { record = JSON.parse(readFileSync(join(maintenanceObservationDirectory(commonDir), name), "utf8")); } catch { continue; }
++    if (!object(record) || record.featureId !== featureId || !object(record.check)) continue;
++    const confirmed = readMaintenanceRedObservation({ commonDir, check: record.check, candidate });
++    if (confirmed !== null && confirmed.featureId === featureId) found.push(confirmed);
++  }
++  return found;
++}
++
++/* ---- plan-approval anchor and the receipt route ---- */
++
++function gitRunner(root) {
++  return (args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 15000, maxBuffer: 8 * 1024 * 1024 });
++}
++const gitOk = (result) => result && !result.error && result.status === 0;
++
++/**
++ * The commit that recorded the plan approval: the oldest first-parent commit of HEAD that added the approval's anchor file (the
++ * accepted-contract envelope of a v9 approval, otherwise the design approval request). Null when it cannot be read.
++ */
++export function planApprovalCommit({ root, state, runGit = null }) {
++  const anchor = state?.planApproval?.acceptedContract?.path ?? state?.planPresentation?.designApprovalRequestPath ?? null;
++  if (typeof anchor !== "string" || anchor === "" || anchor.startsWith("/") || anchor.includes("..")) return null;
++  const git = runGit ?? gitRunner(root);
++  const listed = git(["log", "--first-parent", "--diff-filter=A", "--format=%H", "--", anchor]);
++  if (!gitOk(listed)) return null;
++  const commits = String(listed.stdout).trim().split("\n").filter((line) => OID.test(line));
++  return commits.length === 0 ? null : commits[commits.length - 1];
++}
++
++/**
++ * The mechanical route (ADR-0097 Decision 3): a sealed Verify suite receipt of the check's suite with a non-zero exit whose candidate
++ * commit is the plan-approval commit or one of its ancestors. `{ kind: "verify-receipt", ref, runId, commit, suite }` or null.
++ */
++export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit, runGit = null }) {
++  const suite = maintenanceReceiptSuite(check);
++  if (suite === null || typeof approvalCommit !== "string" || !OID.test(approvalCommit) || typeof commonDir !== "string") return null;
++  const runsRoot = join(commonDir, "agent-pipeline", "verify", "runs");
++  const artifact = sha256(suite);
++  const git = runGit ?? gitRunner(root);
++  let runs = [];
++  try { runs = readdirSync(runsRoot).filter((name) => SAFE_SUITE.test(name)).sort().reverse().slice(0, MAX_RUNS); } catch { return null; }
++  for (const runId of runs) {
++    let receipt;
++    try {
++      const path = join(runsRoot, runId, "receipts", `${artifact}.json`);
++      const info = lstatSync(path);
++      if (!info.isFile() || info.isSymbolicLink()) continue;
++      receipt = JSON.parse(readFileSync(path, "utf8"));
++    } catch { continue; }
++    if (!validateVerifySuiteReceipt(receipt).ok || receipt.suite !== suite || receipt.runId !== runId || receipt.exitCode === 0) continue;
++    const commit = receipt.candidate?.commit;
++    if (!OID.test(commit ?? "")) continue;
++    const before = commit === approvalCommit || gitOk(git(["merge-base", "--is-ancestor", commit, approvalCommit]));
++    if (before) return Object.freeze({ kind: "verify-receipt", ref: receipt.receiptSha256, runId, commit, suite });
++  }
++  return null;
++}
++
++/* ---- the acknowledgement route ---- */
++
++function subjectChecksDigest(checks) {
++  return sha256(canonical(checks));
++}
++
++/** The PO's acknowledgement covering this check of this feature and plan approval, or null. */
++export function maintenanceAcknowledgement({ commonDir, featureId, approvalSha256, checkSha256, readApprovals = readPrivateApprovals }) {
++  let envelopes = [];
++  try { envelopes = readApprovals(commonDir, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND); } catch { envelopes = []; }
++  for (const envelope of envelopes) {
++    const approval = envelope?.approval;
++    if (!object(approval) || approval.featureId !== featureId || approval.approvalSha256 !== approvalSha256 || !Array.isArray(approval.checks)) continue;
++    if (subjectChecksDigest(approval.checks) !== approval.checksSha256) continue;
++    if (!approval.checks.some((entry) => entry?.checkSha256 === checkSha256)) continue;
++    return Object.freeze({ kind: "po-acknowledgement", ref: approval.criticalProof?.proofSha256 ?? `${approval.approvedBy}@${approval.approvedAt}`,
++      mode: object(approval.criticalProof) ? "signature" : "chat-attributed-unattested", label: MAINTENANCE_ACK_LABEL });
++  }
++  return null;
++}
++
++/** Receipt first, then the PO's acknowledgement; null when neither proves the check red before the feature. */
++export function maintenanceRedProof({ commonDir, root, featureId, approvalSha256, approvalCommit, check, runGit = null, readApprovals }) {
++  const receipt = preApprovalRedReceipt({ commonDir, root, check, approvalCommit, runGit });
++  if (receipt !== null) return receipt;
++  return maintenanceAcknowledgement({ commonDir, featureId, approvalSha256, checkSha256: maintenanceCheckSha256(check), ...(readApprovals ? { readApprovals } : {}) });
++}
++
++/**
++ * The one subject builder of the PO's acknowledgement (the recording step and the signing terminal both call it): every red
++ * observation of the feature at the clean candidate whose check has no receipt and no acknowledgement yet.
++ * `{ ok: true, subject }` or `{ ok: false, code, detail }`.
++ */
++export function buildMaintenanceAcknowledgementSubject({ commonDir, root, featureId, approvalSha256, approvalCommit, candidate, runGit = null, readApprovals }) {
++  if (typeof featureId !== "string" || featureId === "" || !SHA.test(approvalSha256 ?? "")) return { ok: false, code: "MRA-NO-APPROVAL", detail: "the active feature has no eligible plan approval" };
++  const red = listMaintenanceRedObservations({ commonDir, featureId, candidate }).filter((record) => record.red);
++  const open = red.filter((record) => maintenanceRedProof({ commonDir, root, featureId, approvalSha256, approvalCommit, check: record.check, runGit, ...(readApprovals ? { readApprovals } : {}) }) === null);
++  if (open.length === 0) return { ok: false, code: "MRA-NOTHING-TO-ACKNOWLEDGE", detail: red.length === 0
++    ? "no red maintenance check is observed at the clean HEAD; generate the maintenance binding first (dispatch-briefing.mjs --maintenance), which runs and records the check"
++    : "every red maintenance check observed at the clean HEAD already has a proof" };
++  const checks = open.map((record) => ({ checkSha256: record.checkSha256, check: record.check, observedExitCode: record.exitCode }))
++    .sort((a, b) => (a.checkSha256 < b.checkSha256 ? -1 : a.checkSha256 > b.checkSha256 ? 1 : 0));
++  return { ok: true, subject: { schema: MAINTENANCE_ACK_SUBJECT_SCHEMA, featureId, approvalSha256, checksSha256: subjectChecksDigest(checks), checks } };
++}
++
++export function maintenanceChecksDigest(checks) { return subjectChecksDigest(checks); }
++
++/**
++ * The subject at the clean HEAD, read from the repository itself (the State, the plan approval and git): the one call the recording
++ * step and the signing terminal share. `{ ok: true, subject, candidate, featureId }` or `{ ok: false, code, detail }`.
++ */
++export function buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir, runGit = null, readApprovals, readState = null }) {
++  let state;
++  try { state = readState ? readState(root) : JSON.parse(readFileSync(resolveAuthorityArtifactPath("state", { rootDir: root }).path, "utf8")); }
++  catch { return { ok: false, code: "MRA-STATE-UNAVAILABLE", detail: "the project State could not be read" }; }
++  const featureId = state?.activeFeature?.id;
++  if (typeof featureId !== "string" || featureId === "") return { ok: false, code: "MRA-NO-FEATURE", detail: "the acknowledgement covers checks of the active feature; there is none" };
++  if (!object(state.planApproval)) return { ok: false, code: "MRA-NO-APPROVAL", detail: "the active feature has no plan approval" };
++  const git = runGit ?? gitRunner(root);
++  const status = git(["status", "--porcelain=v1", "--untracked-files=no"]);
++  if (!gitOk(status) || String(status.stdout).trim() !== "") return { ok: false, code: "MRA-DIRTY", detail: "the acknowledgement binds the clean HEAD; commit or restore the tracked changes first" };
++  const commit = git(["rev-parse", "--verify", "--quiet", "HEAD"]), tree = git(["rev-parse", "--verify", "--quiet", "HEAD^{tree}"]);
++  if (!gitOk(commit) || !gitOk(tree)) return { ok: false, code: "MRA-HEAD-UNAVAILABLE", detail: "HEAD could not be read" };
++  const candidate = { commit: String(commit.stdout).trim(), tree: String(tree.stdout).trim() };
++  const approvalSha256 = sha256CanonicalJson(state.planApproval);
++  const built = buildMaintenanceAcknowledgementSubject({ commonDir, root, featureId, approvalSha256, approvalCommit: planApprovalCommit({ root, state, runGit: git }), candidate, runGit: git, ...(readApprovals ? { readApprovals } : {}) });
++  return built.ok ? { ...built, candidate, featureId } : built;
++}
++
++/** The lines the signing terminal shows the PO before the signature. */
++export function maintenanceAcknowledgementConfirmationLines(subject) {
++  if (!object(subject) || !Array.isArray(subject.checks)) return [];
++  return [
++    `feature: ${subject.featureId}`,
++    ...subject.checks.slice(0, 16).map((entry) => `red check without a Spec criterion: ${describeMaintenanceCheck(entry.check)} (exit ${entry.observedExitCode ?? "signal"} at the clean HEAD)`),
++    "this acknowledgement states that these checks were already red before the feature; a maintenance dispatch may then repair them in test or tooling paths only. It is recorded as \"red before the feature acknowledged by the PO\"; the Critic still reviews the fix.",
++  ];
++}
++
++/** One short line naming a check. */
++export function describeMaintenanceCheck(check) {
++  if (isConfiguredVerifyCheck(check)) return "the configured verify command";
++  if (object(check) && typeof check.command === "string") return `command:${check.command}`;
++  if (object(check) && typeof check.document === "string") return `document:${check.document}`;
++  return object(check) && typeof check.path === "string" ? check.path : "unknown check";
++}
++
++export function maintenanceAcknowledgementRepair({ stateWriter = "pipeline-state.mjs" } = {}) {
++  return `no Verify receipt shows this check red at or before the plan approval; the PO acknowledges it once: run node ${stateWriter} approve-maintenance-red-check --by <the label the PO gives for this command>, `
++    + "which prints the PO's signing command (or records it at once in chat mode), then generate the binding again";
++}
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.test.mjs b/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..763d84600ae3cc60b66c5cd9205fe7e57d2dfdd0
+--- /dev/null
++++ b/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
+@@ -0,0 +1,131 @@
++// SPDX-License-Identifier: SUL-1.0
++// ADR-0097 (D249, K-28): the maintenance delivery's binding, scope, red observation and red-before proofs on real git histories.
++import test, { after } from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, buildMaintenanceAcknowledgementSubject,
++  describeMaintenanceCheck, maintenanceAcknowledgement, maintenanceCheckSha256, maintenanceChecksDigest, maintenanceReceiptSuite, maintenanceRedProof,
++  maintenanceScopeRefusal, planApprovalCommit, preApprovalRedReceipt, readMaintenanceRedObservation, validMaintenanceBinding,
++  writeMaintenanceRedObservation } from "./maintenance-delivery.mjs";
++import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
++import { sealVerifySuiteReceipt } from "./verify-resume.mjs";
++
++const roots = [];
++after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
++const sha = (text) => createHash("sha256").update(text).digest("hex");
++
++function repo() {
++  const dir = mkdtempSync(join(tmpdir(), "mdl-"));
++  roots.push(dir);
++  const git = (...args) => {
++    const result = spawnSync("git", ["-C", dir, "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
++    assert.equal(result.status, 0, `${args.join(" ")}: ${result.stderr}`);
++    return result.stdout.trim();
++  };
++  git("init", "-q", "-b", "main");
++  const put = (path, text) => { mkdirSync(join(dir, path, ".."), { recursive: true }); writeFileSync(join(dir, path), text); };
++  const commit = (message, paths) => { git("add", "--all", "--", ...paths); git("commit", "-q", "--no-verify", "-m", message); return git("rev-parse", "HEAD"); };
++  const head = () => ({ commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") });
++  return { dir, git, put, commit, head, common: join(dir, ".git") };
++}
++
++const commandCheck = { id: "docs", path: "project/pipeline.json", command: "docs", dependencies: ["project/pipeline.json", "tests/unit/docs.test.mjs"] };
++const configuredCheck = { id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json", "tests/unit/docs.test.ts"] };
++
++function receipt(r, { suite, commit, tree, exitCode, runId }) {
++  const sealed = sealVerifySuiteReceipt({ runId, candidate: { commit, tree }, suite, implementationSha256: sha("impl"),
++    inputs: { files: [{ path: "package.json", fileSha256: sha("pkg") }], nonFiles: [{ kind: "command", path: null, sha256: sha("cmd") }] },
++    environmentContractSha256: sha("env"), policySha256: sha("policy"), status: "completed", exitCode,
++    log: { path: `logs/${sha(suite)}.log`, fileSha256: sha("log"), byteLength: 3, truncated: false },
++    caseCompletion: null, startedAt: "2026-11-13T10:00:00.000Z", completedAt: "2026-11-13T10:01:00.000Z" });
++  const dir = join(r.common, "agent-pipeline", "verify", "runs", runId, "receipts");
++  mkdirSync(dir, { recursive: true });
++  writeFileSync(join(dir, `${sha(suite)}.json`), `${JSON.stringify(sealed)}\n`);
++  return sealed;
++}
++
++test("the kind is a critical action, the binding is closed and the receipt suite follows the check form", () => {
++  assert.ok(CRITICAL_ACTION_KINDS.includes(MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND));
++  assert.equal(validMaintenanceBinding({ schema: MAINTENANCE_BINDING_SCHEMA }), true);
++  for (const bad of [null, {}, { schema: "other" }, { schema: MAINTENANCE_BINDING_SCHEMA, proof: "x" }]) assert.equal(validMaintenanceBinding(bad), false, JSON.stringify(bad));
++  assert.equal(maintenanceReceiptSuite(commandCheck), "project-docs");
++  assert.equal(maintenanceReceiptSuite(configuredCheck), "configured-verify");
++  assert.equal(maintenanceReceiptSuite({ id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }), null);
++  assert.equal(describeMaintenanceCheck(configuredCheck), "the configured verify command");
++  assert.notEqual(maintenanceCheckSha256(commandCheck), maintenanceCheckSha256({ ...commandCheck, dependencies: [...commandCheck.dependencies, "tests/x.test.mjs"] }));
++});
++
++test("the scope admits test and tooling paths only, never a gate-strength path or the approved specs", () => {
++  assert.equal(maintenanceScopeRefusal(["tests/unit/docs.test.ts", "scripts/check-links.mjs", "src/a/__tests__/b.ts", "e2e/login.spec.ts", "test/fixtures/x.json"]), null);
++  for (const [path, why] of [["src/app.ts", /neither a test file/u], ["package.json", /neither a test file/u], ["vitest.config.ts", /neither a test file/u],
++    ["project/pipeline.json", /GS-10/u], ["pipeline.user.yaml", /GS-1\b/u], ["architecture/fitness-model.json", /GS-17/u],
++    ["specs/2026-10-26-epic2/spec.md", /ADR-0095/u], ["specs/x/tests/a.test.mjs", /ADR-0095/u]]) {
++    const refusal = maintenanceScopeRefusal(["tests/ok.test.mjs", path]);
++    assert.equal(refusal?.code, "SQ-MAINTENANCE-SCOPE", path);
++    assert.equal(refusal.path, path);
++    assert.match(refusal.reason, why, path);
++  }
++  assert.equal(maintenanceScopeRefusal([])?.code, "SQ-MAINTENANCE-SCOPE");
++});
++
++test("a red observation is written once per check and candidate, read back only for exactly that check, commit and tree", () => {
++  const r = repo();
++  r.put("README.md", "x\n"); r.commit("chore: one", ["README.md"]);
++  const candidate = r.head();
++  const written = writeMaintenanceRedObservation({ commonDir: r.common, featureId: "epic2", check: configuredCheck, candidate, exitCode: 1, outputSha256: sha("out"), observedAt: "2026-11-13T10:00:00.000Z" });
++  assert.equal(written.ok, true); assert.equal(written.record.red, true);
++  const again = writeMaintenanceRedObservation({ commonDir: r.common, featureId: "epic2", check: configuredCheck, candidate, exitCode: 0, outputSha256: sha("green"), observedAt: "2026-11-13T10:05:00.000Z" });
++  assert.equal(again.existing, true); assert.equal(again.record.exitCode, 1, "the first observation at a commit stands");
++  assert.equal(readMaintenanceRedObservation({ commonDir: r.common, check: configuredCheck, candidate }).red, true);
++  assert.equal(readMaintenanceRedObservation({ commonDir: r.common, check: commandCheck, candidate }), null, "another check");
++  assert.equal(readMaintenanceRedObservation({ commonDir: r.common, check: configuredCheck, candidate: { ...candidate, tree: sha("t").slice(0, 40) } }), null, "another tree");
++  assert.equal(writeMaintenanceRedObservation({ commonDir: r.common, featureId: "epic2", check: configuredCheck, candidate, exitCode: 1, outputSha256: "x", observedAt: "now" }).code, "MAINTENANCE-OBSERVATION-INPUT");
++});
++
++test("the receipt route: a red receipt at or before the plan-approval commit proves; a green one, a later one and another suite do not", () => {
++  const r = repo();
++  r.put("README.md", "x\n"); const early = r.commit("chore: early", ["README.md"]);
++  const earlyTree = r.git("rev-parse", "HEAD^{tree}");
++  r.put("specs/epic2/accepted-contract.json", "{}\n"); const approved = r.commit("chore: plan approval", ["specs/epic2/accepted-contract.json"]);
++  r.put("src/a.ts", "a\n"); const later = r.commit("feat: item", ["src/a.ts"]);
++  const laterTree = r.git("rev-parse", "HEAD^{tree}");
++  const state = { planApproval: { acceptedContract: { path: "specs/epic2/accepted-contract.json" } } };
++  assert.equal(planApprovalCommit({ root: r.dir, state }), approved);
++  assert.equal(planApprovalCommit({ root: r.dir, state: { planApproval: { acceptedContract: { path: "../x" } } } }), null);
++  receipt(r, { suite: "configured-verify", commit: later, tree: laterTree, exitCode: 1, runId: "run-3-later" });
++  receipt(r, { suite: "project-docs", commit: early, tree: earlyTree, exitCode: 1, runId: "run-2-other-suite" });
++  receipt(r, { suite: "configured-verify", commit: early, tree: earlyTree, exitCode: 0, runId: "run-1-green" });
++  assert.equal(preApprovalRedReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, approvalCommit: approved }), null, "only a later red and an earlier green");
++  const red = receipt(r, { suite: "configured-verify", commit: early, tree: earlyTree, exitCode: 2, runId: "run-0-red" });
++  const found = preApprovalRedReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, approvalCommit: approved });
++  assert.deepEqual({ ...found }, { kind: "verify-receipt", ref: red.receiptSha256, runId: "run-0-red", commit: early, suite: "configured-verify" });
++  assert.equal(preApprovalRedReceipt({ commonDir: r.common, root: r.dir, check: { id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }, approvalCommit: approved }), null, "a .test check has no suite");
++});
++
++test("the acknowledgement route and the subject: only red observations without a proof are listed; an acknowledgement covers its checks", () => {
++  const r = repo();
++  r.put("README.md", "x\n"); r.commit("chore: one", ["README.md"]);
++  const candidate = r.head();
++  const approvalSha256 = sha("approval");
++  writeMaintenanceRedObservation({ commonDir: r.common, featureId: "epic2", check: configuredCheck, candidate, exitCode: 1, outputSha256: sha("o"), observedAt: "2026-11-13T10:00:00.000Z" });
++  writeMaintenanceRedObservation({ commonDir: r.common, featureId: "epic2", check: commandCheck, candidate, exitCode: 0, outputSha256: sha("g"), observedAt: "2026-11-13T10:00:00.000Z" });
++  writeMaintenanceRedObservation({ commonDir: r.common, featureId: "other", check: { ...commandCheck, id: "x" }, candidate, exitCode: 1, outputSha256: sha("o"), observedAt: "2026-11-13T10:00:00.000Z" });
++  const none = () => [];
++  const built = buildMaintenanceAcknowledgementSubject({ commonDir: r.common, root: r.dir, featureId: "epic2", approvalSha256, approvalCommit: null, candidate, readApprovals: none });
++  assert.equal(built.ok, true, JSON.stringify(built));
++  assert.deepEqual(built.subject.checks.map((entry) => entry.checkSha256), [maintenanceCheckSha256(configuredCheck)], "the green check and the other feature's are not listed");
++  assert.equal(built.subject.checksSha256, maintenanceChecksDigest(built.subject.checks));
++  const envelope = { approval: { featureId: "epic2", approvalSha256, checks: built.subject.checks, checksSha256: built.subject.checksSha256, approvedBy: "PO", approvedAt: "2026-11-13T11:00:00.000Z", criticalProof: { proofSha256: sha("proof") } } };
++  const acks = () => [envelope];
++  const proof = maintenanceRedProof({ commonDir: r.common, root: r.dir, featureId: "epic2", approvalSha256, approvalCommit: null, check: configuredCheck, readApprovals: acks });
++  assert.deepEqual({ ...proof }, { kind: "po-acknowledgement", ref: sha("proof"), mode: "signature", label: MAINTENANCE_ACK_LABEL });
++  assert.equal(maintenanceAcknowledgement({ commonDir: r.common, featureId: "epic2", approvalSha256: sha("another approval"), checkSha256: maintenanceCheckSha256(configuredCheck), readApprovals: acks }), null, "another plan approval");
++  const tampered = () => [{ approval: { ...envelope.approval, checks: [...envelope.approval.checks, { checkSha256: sha("x"), check: {}, observedExitCode: 1 }] } }];
++  assert.equal(maintenanceAcknowledgement({ commonDir: r.common, featureId: "epic2", approvalSha256, checkSha256: sha("x"), readApprovals: tampered }), null, "a list that does not match its digest");
++  const nothing = buildMaintenanceAcknowledgementSubject({ commonDir: r.common, root: r.dir, featureId: "epic2", approvalSha256, approvalCommit: null, candidate, readApprovals: acks });
++  assert.equal(nothing.code, "MRA-NOTHING-TO-ACKNOWLEDGE");
++});
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 02c0d9c90cc4ac9717e270e47fe8bfd2fcebae14..6be4b56e8fc3c64639b6ce67b59b7c8b00e40bda 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -102,13 +102,15 @@ const INVENTORY = Object.freeze([
+ // path, not a third per-feature decision (candidate 29: 28e added the verb without classifying it here).
+ // `approve-gate-change-acknowledgement` (29c, ADR-0096) records the PO's acknowledgement of gate-definition changes that carry no
+ // other proof. A feature course that changes no gate definition, or changes one through its own route, never meets it.
++// `approve-maintenance-red-check` (29c, ADR-0097) records the PO's acknowledgement that a check without a Spec criterion was red
++// before the feature. A feature course whose Verify was green before it started never meets it.
+ // G20-42 (honest accounting, no case changed): a consumer project's release (the version tag after close and push) takes ONE PO release approval
+ // per RELEASE, not per feature: it is the existing `release-preflight` critical kind recorded by `release-preflight-cli.mjs` (chat run, or the PO's
+ // signature of the printed `authorize-critical --kind release-preflight` line). It adds no pipeline-state verb, so nothing here classifies it, and
+ // the per-feature count of the feature course stays two (plan approval, push approval); the release is a separate, last, per-release interaction.
+ const OFF_HAPPY_PATH_VERBS = Object.freeze([
+   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
+-  "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement",
++  "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement", "approve-maintenance-red-check",
+   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
+   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
+   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",
+diff --git a/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs b/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
+index 3d50e5489df7b94778ba0a33a3b600181ef3a485..f1008647c6c2ec120f8fe5b7420b4f407f19629e 100644
+--- a/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
++++ b/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
+@@ -39,6 +39,7 @@ import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, criticalAct
+ import { criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
+ import { buildGateChangeAcknowledgementSubject, gateDefinitionChangeReadback } from "../lib/gate-definition-changes.mjs";
++import { buildMaintenanceAcknowledgementSubjectAtHead, maintenanceRedProof, writeMaintenanceRedObservation } from "../lib/maintenance-delivery.mjs";
+ import { addSpecAddendum } from "../lib/feature-package-registration.mjs";
+ import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
+ import { PO_APPROVAL_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
+@@ -158,10 +159,11 @@ function verifyWritten({ result, expectedCandidate, expectedAction, trustPolicy,
+ 
+ test("the critical action kind list this suite is parametrized over is the closed set the product exports", () => {
+   assert.deepEqual([...CRITICAL_ACTION_KINDS].sort(), [
+-    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "deploy", "feature-package-reconcile",
++    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check", "deploy", "feature-package-reconcile",
+     "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "spec-addendum",
+   ], "a new kind must add its round trip here (and a note on which leg proves it), not slip in unproven");
+   // acknowledge-gate-definition-changes (ADR-0096): the library, printed and verb legs below, plus its consumer leg (approve-gate-change-acknowledgement).
++  // acknowledge-maintenance-red-check (ADR-0097): the library, printed and verb legs below (builder injected), plus its consumer leg (approve-maintenance-red-check).
+ });
+ 
+ for (const kind of CRITICAL_ACTION_KINDS) {
+@@ -327,6 +329,13 @@ function emitterInput(kind) {
+     const fixture = gateChangeRepository();
+     return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: {}, observed: fixture.head, dependencies: {} };
+   }
++  if (kind === "acknowledge-maintenance-red-check") {
++    // ADR-0097: the verb rebuilds the list through the one builder; it is injected here (its own suite runs it on a real repository).
++    const subject = { schema: "pipeline.maintenance-red-check-subject.v1", featureId: FEATURE_ID, approvalSha256: sha256("approval"),
++      checksSha256: sha256("checks"), checks: [{ checkSha256: sha256("check"), check: { id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json"] }, observedExitCode: 1 }] };
++    return { candidate: { ...CANDIDATE }, subject, extra: {}, observed: { ...CANDIDATE },
++      dependencies: { buildMaintenanceAcknowledgementSubjectFn: () => ({ ok: true, subject, candidate: { ...CANDIDATE }, featureId: FEATURE_ID }) } };
++  }
+   return { candidate: { ...CANDIDATE }, subject: { label: `verb ${kind}` }, extra: {}, observed: { ...CANDIDATE }, dependencies: {} };
+ }
+ 
+@@ -571,6 +580,42 @@ test("ADR-0096 consumer leg: acknowledge-gate-definition-changes -- the line app
+   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+ });
+ 
++test("ADR-0097 consumer leg: acknowledge-maintenance-red-check -- the line approve-maintenance-red-check prints is signed by the verb, the follow-up records it once, and the admission's proof reader then finds it", () => {
++  const root = fixtureRepository(consumerFiles({ "tests/unit/docs.test.ts": "it('links', () => {})\n" }));
++  const keys = keyDirectory();
++  const home = fixtureDir("home");
++  const common = join(root, ".git");
++  const head = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
++  const check = { id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json", "tests/unit/docs.test.ts"] };
++  const before = buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common });
++  assert.equal(before.code, "MRA-NOTHING-TO-ACKNOWLEDGE", "nothing is acknowledged before a red observation exists");
++  assert.equal(writeMaintenanceRedObservation({ commonDir: common, featureId: FEATURE_ID, check, candidate: head, exitCode: 1, outputSha256: sha256("red"), observedAt: new Date().toISOString() }).ok, true);
++  const built = buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common });
++  assert.equal(built.ok, true, JSON.stringify(built));
++  const verb = ["approve-maintenance-red-check", "--by", "PO"];
++
++  const first = runPipelineStateVerb(verb, { dir: root, home, keys });
++  assert.equal(first.code, 2, describeRun(first));
++  const printed = JSON.parse(first.lines.at(-1));
++  assert.equal(printed.status, "signature-required");
++  assert.deepEqual(printed.signatureCommand.subject, built.subject, "the printed subject is the one builder's list");
++  assert.match(first.stderr, /the configured verify command \(exit 1 at [a-f0-9]{12}\)/u, "the agent shows the PO the list before the signing line");
++
++  const prompts = [];
++  const signed = runPrintedArgv({ argv: printed.signatureCommand.argv.slice(1), keys, home, dependencies: { observeCandidate: () => head, readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } } });
++  assert.equal(signed.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
++  assert.match(prompts.join("\n"), /red check without a Spec criterion: the configured verify command/u, "the terminal shows the PO the same list");
++
++  const recorded = runPipelineStateVerb(printed.recordCommand.argv.slice(1), { dir: root, home, keys });
++  assert.equal(recorded.code, 0, describeRun(recorded));
++  assert.match(recorded.stdout, /Red maintenance check\(s\) acknowledged by "PO" \(signature\) for 1 check\(s\)/u);
++  const proof = maintenanceRedProof({ commonDir: common, root, featureId: FEATURE_ID, approvalSha256: built.subject.approvalSha256, approvalCommit: null, check });
++  assert.deepEqual([proof?.kind, proof?.mode, proof?.label], ["po-acknowledgement", "signature", "red before the feature acknowledged by the PO"]);
++  assert.equal(buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common }).code, "MRA-NOTHING-TO-ACKNOWLEDGE", "an acknowledged check is not listed again");
++  const replay = runPipelineStateVerb(printed.recordCommand.argv.slice(1), { dir: root, home, keys });
++  assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
++});
++
+ test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {
+   const keys = keyDirectory();
+   const home = fixtureDir("home");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 90f00ad9e163a16e7527f50e94fac1cbbd6fb122..a76ba1ab538b306580d639dabbbc4f770ba1edeb 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -458,7 +458,8 @@ import { criticalActionAuthority } from "../lib/critical-action-authorization-re
+ import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, specAddendumApprovalBytes, specAddendumApprovalPath } from "../lib/spec-addendum.mjs";
+ import { buildGateChangeAcknowledgementSubject } from "../lib/gate-definition-changes.mjs";
+-import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
++import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
++import { MAINTENANCE_ACK_LABEL, buildMaintenanceAcknowledgementSubjectAtHead, describeMaintenanceCheck } from "../lib/maintenance-delivery.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+@@ -811,7 +812,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "inspect", "update-public-handover", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "recapture-design-input", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+-  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement",
++  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement", "approve-maintenance-red-check",
+   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
+   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
+   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
+@@ -4892,7 +4893,7 @@ function externalPublicJson(dir, value) {
+ // kind, rejects symlinks and hard links, and pins its authority to this repository's
+ // private key-directory pointer before cryptographic verification.  It is therefore not
+ // a general in-repository-proof escape hatch, and every other kind remains external-only.
+-const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
++const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND]);
+ function localPushScratchJson(dir, value, expectedPath) {
+   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
+     return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
+@@ -4953,7 +4954,7 @@ function localMirrorScratchArtifacts(dir, flags, kind) {
+  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
+  * behaviour is byte-identical to before this addition.
+  */
+-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
++const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND]);
+ 
+ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
+   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
+@@ -10374,6 +10375,69 @@ function runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps }) {
+   return 0;
+ }
+ 
++/**
++ * ADR-0097 (D249, K-28): the PO's acknowledgement that the red maintenance checks observed at the clean HEAD were red before the
++ * feature, in the `gates.human_approval` mode. The list is built from the private red observations by the one builder the signing
++ * terminal uses too; checks with a pre-approval red Verify receipt are not listed. The item admission reads the record per check.
++ */
++function runApproveMaintenanceRedCheck({ dir, rest, base, now, deps }) {
++  const kind = MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND;
++  const refuse = (code, detail = "") => { console.error(`Error: approve-maintenance-red-check refused (${code}).${detail ? ` ${detail}` : ""}${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
++  const configured = criticalProofWaiverFor(dir, kind);
++  if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
++  const waived = configured.waived === true;
++  const proofOmitted = !["--proof-request", "--proof-authority", "--proof"].some((flag) => rest.includes(flag));
++  const parsed = parseExactFlags(rest, new Set(waived || proofOmitted ? ["by"] : ["by", "proof-request", "proof-authority", "proof"]));
++  const flags = parsed.value ?? {};
++  if (!parsed.ok || isBlank(flags.by)) {
++    console.error("Error: approve-maintenance-red-check requires --by (the label the PO gave for this command) and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
++    return 2;
++  }
++  const common = resolveCriticalApprovalCommonDir(dir);
++  if (common === null) return refuse("CRITICAL-APPROVAL-STORE-UNAVAILABLE");
++  let root;
++  try { root = realpathSync(resolve(dir)); } catch { return refuse("MRA-REPOSITORY"); }
++  const built = (deps.buildMaintenanceAcknowledgementSubjectFn ?? buildMaintenanceAcknowledgementSubjectAtHead)({ root, commonDir: common });
++  if (!built.ok) return refuse(built.code, built.detail);
++  const { subject, candidate, featureId } = built;
++  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
++  console.error(["PO ACKNOWLEDGEMENT OF PRE-EXISTING RED CHECKS -- these checks are red and no Spec criterion covers them:",
++    ...subject.checks.map((entry) => `  ${describeMaintenanceCheck(entry.check)} (exit ${entry.observedExitCode ?? "signal"} at ${candidate.commit.slice(0, 12)})`),
++    "  you state that each was already red before the feature; a maintenance dispatch then repairs it in test or tooling paths only, and the Critic reviews the fix."].join("\n"));
++  const approvedAt = now();
++  if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
++    try {
++      const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
++      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
++      const mirrorCommon = defaultGitCommonDir(dir);
++      const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
++      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
++      console.log(JSON.stringify({ schema: "pipeline.maintenance-red-check-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
++        signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
++        ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged and generate the maintenance binding again")}` }),
++        recordCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-maintenance-red-check", "--by", flags.by, "--proof-request", mirror?.request ?? "<proof-request>", "--proof-authority", mirror?.authority ?? "<proof-authority>", "--proof", mirror?.proof ?? "<proof>"],
++          note: mirror === null ? "run after the PO signed; the three proof paths are printed by the signing step" : "run unchanged once the proof is there; the three paths are the repository mirror the signing step writes" } }));
++    } catch { /* the refusal below still names the missing flags */ }
++    return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
++  }
++  const verified = verifyCriticalHumanProof({ dir, state: base, kind, candidate, subject, flags, now: approvedAt, required: true });
++  if (!verified.ok) return refuse(verified.code);
++  const priorConsumption = base.criticalProofConsumption;
++  if (priorConsumption !== undefined && (!Array.isArray(priorConsumption) || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) return refuse("CRITICAL-PROOF-CONSUMPTION-INVALID");
++  if (verified.proof !== null && ((Array.isArray(priorConsumption) ? priorConsumption : []).some((entry) => entry.proofSha256 === verified.proof.proofSha256)
++    || isCriticalProofConsumedPrivately(common, verified.proof.proofSha256))) return refuse("CRITICAL-PROOF-REPLAY");
++  const approval = { approvedBy: flags.by, approvedAt, forCommit: candidate.commit, forTree: candidate.tree, featureId, approvalSha256: subject.approvalSha256,
++    checksSha256: subject.checksSha256, checks: subject.checks, subjectSha256, label: MAINTENANCE_ACK_LABEL, criticalProof: verified.proof };
++  if (waived) {
++    approval.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
++    approval.humanApproval = chatAttributionRecord({ kind, by: flags.by });
++  } else if (verified.waived !== undefined) approval.criticalProofWaiver = verified.waived;
++  const stored = writeCriticalApproval({ gitCommonDir: common, kind, approval, consumedAt: approvedAt });
++  if (!stored.ok) return refuse(stored.code);
++  console.log(`Red maintenance check(s) acknowledged by "${flags.by}" (${verified.proof === null ? "chat-attributed-unattested" : "signature"}) for ${subject.checks.length} check(s) of feature ${featureId} at commit ${candidate.commit}; generate the maintenance binding again.`);
++  return 0;
++}
++
+ function runFeaturePackageWriteCommand(sub, argv, deps) {
+   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
+   if (sub === "feature-package-reconcile") {
+@@ -14802,6 +14866,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       return runApproveSpecAddendum({ dir, rest, base, now, deps });
+     case "approve-gate-change-acknowledgement":
+       return runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps });
++    case "approve-maintenance-red-check":
++      return runApproveMaintenanceRedCheck({ dir, rest, base, now, deps });
+ 
+     case "approve-deploy": {
+       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 6a7251696fba3026f89d54a5bc118c1c0dd39d7b..de4accd62dbc1e045878d68f0fd62f40f3dfee60 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -36,7 +36,8 @@ import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./cri
+ import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
+ import { buildGateChangeAcknowledgementSubject, gateChangeAcknowledgementConfirmationLines } from "../lib/gate-definition-changes.mjs";
+-import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
++import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
++import { buildMaintenanceAcknowledgementSubjectAtHead, maintenanceAcknowledgementConfirmationLines } from "../lib/maintenance-delivery.mjs";
+ import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
+ import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+ import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
+@@ -1104,7 +1105,7 @@ function suggestSubcommand(input, candidates) {
+  * governance-fork-disposition-style verification bypass concern either.
+  */
+ const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
+-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
++const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND]);
+ const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+ const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+ 
+@@ -1199,6 +1200,10 @@ export function parseHumanArgs(argv, dependencies = {}) {
+   if (values.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND && (command === "prepare-critical" || command === "authorize-critical") && values.subject !== undefined) {
+     return { error: `${USAGE}\n${GATE_CHANGE_ACKNOWLEDGEMENT_KIND} takes no --subject: the list is derived from the feature range at the clean HEAD.` };
+   }
++  // ADR-0097: the maintenance acknowledgement's subject is derived from the red observations at HEAD, never typed.
++  if (values.kind === MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND && (command === "prepare-critical" || command === "authorize-critical") && values.subject !== undefined) {
++    return { error: `${USAGE}\n${MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND} takes no --subject: the list is derived from the red maintenance observations at the clean HEAD.` };
++  }
+   // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
+   if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
+   if (values.kind === RESIDUAL_ACCEPTANCE_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
+@@ -2027,6 +2032,15 @@ function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, de
+     if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the feature range (expected ${computed})`);
+     args.subjectSha256 = computed;
+     subjectPreimage = built.subject;
++  } else if (args.kind === MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND) {
++    // ADR-0097: the one builder the recording step uses too; the candidate is the clean HEAD the red observations were made at.
++    const built = (dependencies.buildMaintenanceAcknowledgementSubjectFn ?? buildMaintenanceAcknowledgementSubjectAtHead)({ root: repository, commonDir: gitCommonDir });
++    if (!built.ok) fail(`critical approval request is invalid (${built.code}): ${built.detail}`);
++    if (built.candidate.commit !== candidate.commit || built.candidate.tree !== candidate.tree) fail("critical approval request is invalid (MRA-CANDIDATE): the red observations were not made at the clean HEAD");
++    const computed = criticalActionSubjectSha256({ kind: MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, candidate, subject: built.subject });
++    if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the red observations (expected ${computed})`);
++    args.subjectSha256 = computed;
++    subjectPreimage = built.subject;
+   } else {
+     subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
+   }
+@@ -2185,7 +2199,7 @@ export function authorizeCriticalPushCommand({
+  * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
+  * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
+  */
+-export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
++export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND]);
+ 
+ /**
+  * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
+@@ -2744,6 +2758,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+       ...criticAcknowledgementConfirmationLines(request.action.kind, subjectPreimage),
+       ...specAddendumConfirmationLines(request.action.kind, subjectPreimage),
+       ...(request.action.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND ? gateChangeAcknowledgementConfirmationLines(subjectPreimage) : []),
++      ...(request.action.kind === MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND ? maintenanceAcknowledgementConfirmationLines(subjectPreimage) : []),
+       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
+     ], dependencies, humanFacingLanguage);
+     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 1fd79a16c6b676c0d83ac6493fae9bb705c9bf0a..0712026f4761ac1efdffa85efd3924a1eac6307a 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -2528,7 +2528,21 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
+       } catch (error) { usage = /Usage:/u.test(String(error?.message ?? error)); }
+       assert.equal(usage, false, "prepare-critical composes acknowledge-caller-authored-critic (G20-39)");
+     }
+-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic"].includes(entry))) {
++    // `acknowledge-gate-definition-changes` (ADR-0096) and `acknowledge-maintenance-red-check` (ADR-0097) were added to
++    // CRITICAL_COMMAND_KINDS deliberately (PO tiles 2026-11-13) and derive their subject at the clean HEAD; excluded here (QG-04)
++    // and pinned positively: prepare-critical reaches their subject builder instead of refusing with Usage.
++    for (const kind of ["acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"]) {
++      let message = "";
++      try {
++        runHumanApproval([
++          "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
++          "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
++          "--kind", kind, "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
++        ], {});
++      } catch (error) { message = String(error?.message ?? error); }
++      assert.doesNotMatch(message, /Usage:/u, `prepare-critical composes ${kind}`);
++    }
++    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"].includes(entry))) {
+       assert.throws(() => runHumanApproval([
+         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",

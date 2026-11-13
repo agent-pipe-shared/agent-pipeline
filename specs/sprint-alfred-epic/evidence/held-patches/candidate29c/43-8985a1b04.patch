@@ -1,0 +1,43 @@
+diff --git a/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md b/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
+index dd8aa221a6dc2a7becb50a3e61c6598f5152e693..41b807913d89bcf8c76d732649df30764f250b2f 100644
+--- a/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
++++ b/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
+@@ -21,7 +21,7 @@ Every governed Goldfish dispatch binds to one criterion of the approved Spec: th
+    - `criterionLocator`: today's criterion binding;
+    - `maintenance` (`pipeline.maintenance-binding.v1`): a maintenance binding with no criterion.
+ 
+-   A maintenance binding has exactly one check, the red one. Any of the existing check forms may be used: a `.test` file, `command:<id>` (D195) or `document:<path>`. Its item id is `<spec folder>.maintenance`. `dispatch-briefing.mjs --maintenance --check <form>` generates it. A placeholder criterion is never used.
++   A maintenance binding has exactly one check, the red one. It may be a `.test` file, `command:<id>` (D195), or a new form `verify:configured`. The new form is the project's top-level `verify` command and exists only for maintenance bindings. A consumer whose calibration registers no `verifyImpact` ids has only this one. Its item id is `<spec folder>.maintenance`. `dispatch-briefing.mjs --maintenance --check <form>` generates it. A placeholder criterion is never used.
+ 2. **The write scope is narrow.** Each allowed path must meet all of these, or the host refuses with `SQ-MAINTENANCE-SCOPE`:
+    - it is a dependency of the check;
+    - it is not a gate-strength path (GS-1 to GS-17, which includes the ADR-0096 gate-definition set);
+@@ -30,14 +30,17 @@ Every governed Goldfish dispatch binds to one criterion of the approved Spec: th
+ 
+    Configuration files and `package.json` are excluded, because a verify command can live there. Widening the set is a PO decision.
+ 3. **Red before the feature, proven one of two ways.** The host derives the proof at admission and never takes it from the briefing.
+-   - **Verify receipt.** A sealed Verify suite receipt `project-<id>` for a `command:<id>` check shows a non-zero exit. Its candidate commit must be the plan-approval candidate commit or an ancestor of it.
++   - **Verify receipt.** A sealed Verify suite receipt shows a non-zero exit: `project-<id>` for a `command:<id>` check, `configured-verify` for `verify:configured`. Its candidate commit must be the plan-approval candidate commit or an ancestor of it.
+    - **PO acknowledgement.** Otherwise the PO acknowledges the red check once, as the critical-action kind `acknowledge-maintenance-red-check`, in the `gates.human_approval` mode (fail-closed to `signature`).
+      - The agent runs `pipeline-state.mjs approve-maintenance-red-check --check <form> --by <label>`. `--by` is only a label the PO gave for this command (EL-36).
+      - The subject binds the feature, the plan approval and the check.
+      - The record is labelled "red before the feature acknowledged by the PO".
+ 
+    With neither, the dispatch is refused with `SQ-MAINTENANCE-RED-UNPROVEN`, and the refusal names both routes.
+-4. **Red before, green after, in the real checkout.** `maintenance-red-check.mjs observe --root <root> --check <form>` runs the check on the clean HEAD of the real checkout, where the dependencies are installed. It records the result in private state: check, HEAD, tree, exit code and output digest. Admission requires a red observation at the dispatch's candidate commit (`SQ-MAINTENANCE-RED-UNOBSERVED`). After the delivery, the same check is the item check the host already runs, and it must be green for integration.
++4. **Red before, green after, in the real checkout.**
++   - **Red before.** Generating the binding (`dispatch-briefing.mjs --maintenance`) runs the check on the clean HEAD of the real checkout, where the dependencies are installed. It runs as an agent command, so no hook time limit applies. It records the result in private state: check, HEAD, tree, exit code and output digest. A green check is refused, since there is nothing to repair. Admission requires a red observation at the dispatch's candidate commit (`SQ-MAINTENANCE-RED-UNOBSERVED`).
++   - **Green after, for `.test` and `command:<id>` checks.** The check is the item check the host already runs after the delivery, and it must be green for integration.
++   - **Green after, for `verify:configured`.** The full Verify can outlast a hook. So the host does not run it at the delivery; it records the check as `deferred-to-close-verify`. Green is then the feature's own Verify, which the close requires anyway (`configured-verify` suite).
+ 
+    A run at an old commit in a fresh worktree is never used. Without installed dependencies it is red for the wrong reason, and that proves nothing.
+ 5. **Its own kind for the Critic and in the queue.** The queue row carries `delivery.maintenance` and no criterion. The Critic's shared slice adds the slice id, not a criterion id. The Critic packet names each maintenance slice of its range with its check and its proof kind, as data fields. They are not a list of claims to verify (ADR-0014).
+@@ -49,7 +52,8 @@ A pre-existing red check gets a sanctioned route that leaves the Spec, its crite
+ The price:
+ 
+ - A check without a Verify receipt from before the approval needs one PO signature.
+-- A `.ts` test has no `.test` check form; it needs a registered `command:<id>`.
++- A `.ts` test has no `.test` check form. It needs a registered `command:<id>`, or `verify:configured` with green only proven at the close.
++- `verify:configured` runs the whole Verify once for the red observation.
+ 
+ Known limits:
+ 

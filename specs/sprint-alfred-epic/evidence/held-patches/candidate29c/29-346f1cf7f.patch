@@ -1,0 +1,96 @@
+diff --git a/plugins/pipeline-core/lib/design-review-observation.mjs b/plugins/pipeline-core/lib/design-review-observation.mjs
+index 9e95821c4ec7df24c6e01378c03611e9045d323c..ea1fda32492168e22b124b9647ddf3f471f0a05c 100644
+--- a/plugins/pipeline-core/lib/design-review-observation.mjs
++++ b/plugins/pipeline-core/lib/design-review-observation.mjs
+@@ -131,9 +131,10 @@ export function recordDesignReviewObservation({ commonDir, runner, input, nowMs
+   try {
+     if (runner !== "claude") return { status: "not-applicable" };
+     const seen = observeClaudeDesignReview(input, { readHandbackFn, readModelsFn });
++    if (seen.status === "unobserved") { noteUnobserved(commonDir, seen.code, nowMs); return seen; }
+     if (seen.status !== "observed") return seen;
+     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+-    if (Buffer.byteLength(seen.text, "utf8") > MAX_TEXT_BYTES) return { status: "unobserved", code: "DRO-TEXT-TOO-LARGE" };
++    if (Buffer.byteLength(seen.text, "utf8") > MAX_TEXT_BYTES) { noteUnobserved(commonDir, "DRO-TEXT-TOO-LARGE", nowMs); return { status: "unobserved", code: "DRO-TEXT-TOO-LARGE" }; }
+     const modelsUsed = seen.modelsUsed.slice(-MAX_MODELS);
+     const resultSha256 = sha256(seen.text);
+     const record = { schema: DESIGN_REVIEW_OBSERVATION_SCHEMA, runner, assurance: seen.assurance, modelsUsed, resultSha256, observedAtMs: nowMs, text: seen.text };
+@@ -146,6 +147,31 @@ export function recordDesignReviewObservation({ commonDir, runner, input, nowMs
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++// A background stop's notice goes to the stderr of a hook that exits 0 and is easily lost; the latest reason a reviewer stop was
++// not observed is kept beside the records (code and time only, overwritten each time) so export-report can say why it found none.
++const LAST_UNOBSERVED = "last-unobserved.json";
++const DRO_CODE = /^DRO-[A-Z0-9-]{1,48}$/u;
++function noteUnobserved(commonDir, code, nowMs) {
++  try {
++    if (typeof commonDir !== "string" || commonDir === "" || !DRO_CODE.test(code)) return;
++    const dir = designReviewObservationDir(commonDir);
++    mkdirSync(dir, { recursive: true, mode: 0o700 });
++    const file = join(dir, LAST_UNOBSERVED);
++    if (existsSync(file) && lstatSync(file).isSymbolicLink()) return;
++    writeFileSync(file, `${JSON.stringify({ code, observedAtMs: nowMs })}\n`, { mode: 0o600 });
++  } catch { /* diagnostic only */ }
++}
++
++/** The latest reason a Claude reviewer stop was not observed on this device, or null. */
++export function readLastUnobservedDesignReview({ commonDir }) {
++  try {
++    const file = join(designReviewObservationDir(commonDir), LAST_UNOBSERVED);
++    if (!existsSync(file) || lstatSync(file).isSymbolicLink()) return null;
++    const value = JSON.parse(readFileSync(file, "utf8"));
++    return DRO_CODE.test(value?.code) && Number.isSafeInteger(value?.observedAtMs) ? { code: value.code, observedAtMs: value.observedAtMs } : null;
++  } catch { return null; }
++}
++
+ function validRecord(record, sha) {
+   return record?.schema === DESIGN_REVIEW_OBSERVATION_SCHEMA && record.runner === "claude" && record.resultSha256 === sha
+     && ["host-observed-tool-use", "host-observed-child-transcript"].includes(record.assurance)
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 108cd25dec3e93d0d2086459fdd7041be49440ef..d67cd1c9eeffae440970e0f48f3475740b645d4c 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -35,7 +35,7 @@ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFile
+ import { dirname, join, sep } from "node:path";
+ 
+ import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
+-import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation } from "../lib/design-review-observation.mjs";
++import { listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ 
+@@ -375,7 +375,11 @@ export function exportReportFromObservation(input, deps = {}) {
+     if (record === null) return refuse("DRC-OBSERVATION-MISSING", `no design review observation ${request.observation} is recorded on this device`);
+   } else {
+     const open = listUnexportedDesignReviewObservations({ commonDir });
+-    if (open.length === 0) return refuse("DRC-OBSERVATION-MISSING", "no unexported design review observation is recorded on this device. Only a Claude dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded records one (after an install or hook refresh: restart the session first); dispatch the review again");
++    if (open.length === 0) {
++      const last = readLastUnobservedDesignReview({ commonDir });
++      const why = last === null ? "" : ` The latest reviewer stop on this device was not observed: ${last.code} at ${new Date(last.observedAtMs).toISOString()}.`;
++      return refuse("DRC-OBSERVATION-MISSING", `no unexported design review observation is recorded on this device.${why} Only a Claude dispatch of pipeline-core:readiness-reviewer in a session whose plugin hooks are loaded records one (after an install or hook refresh: restart the session first); dispatch the review again`);
++    }
+     if (open.length > 1) {
+       return refuse("DRC-OBSERVATION-AMBIGUOUS", `${open.length} design review observations are unexported; name one with --observation: ${open.slice(0, 8).map((entry) => `${entry.resultSha256} (${entry.modelsUsed[entry.modelsUsed.length - 1]}, ${new Date(entry.observedAtMs).toISOString()}, ${Buffer.byteLength(entry.text, "utf8")} bytes)`).join("; ")}`);
+     }
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index 9a1f170949228e3c6165aac567d14fe64d26487e..b71937dddaf311c5827a1e85fba833dab04be49f 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -523,6 +523,17 @@ test("D247: a child transcript that is a symlink or holds no model is refused, n
+   assert.deepEqual(observeClaudeDesignReview(linked.stop("r")), { status: "unobserved", code: "DRO-TRANSCRIPT-UNSAFE" });
+ });
+ 
++test("D247: an unobserved reviewer stop leaves its reason, and export-report names it when it finds no observation", withRepo(async (repo, t) => {
++  const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
++  const world = observationWorld(t, []);
++  assert.deepEqual(recordDesignReviewObservation({ commonDir: world.commonDir, runner: "claude", input: world.stop("# r\n"), nowMs: Date.parse("2026-11-13T10:00:00.000Z") }),
++    { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" });
++  const missing = runMain(["export-report", "--repo", repo, "--out", "specs/feat-x/review/none.md"], CLAUDE, world.deps);
++  assert.equal(missing.json.code, "DRC-OBSERVATION-MISSING");
++  assert.match(missing.json.message, /The latest reviewer stop on this device was not observed: DRO-NO-TRANSCRIPT-MODEL at 2026-11-13T10:00:00\.000Z\./u);
++  assert.equal(existsSync(join(repo, "specs/feat-x/review/none.md")), false);
++}));
++
+ test("D247: a background reviewer's SubagentHandback is the observed text, never later trailing prose (PF-61/PF-70)", async (t) => {
+   const { observeClaudeDesignReview } = await import("../lib/design-review-observation.mjs");
+   const { readSubagentHandbackMessage } = await import("../lib/native-goldfish-host-finalizer.mjs");

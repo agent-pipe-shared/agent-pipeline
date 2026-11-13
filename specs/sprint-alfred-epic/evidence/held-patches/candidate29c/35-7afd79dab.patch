@@ -1,0 +1,149 @@
+diff --git a/plugins/pipeline-core/lib/protected-test-paths.mjs b/plugins/pipeline-core/lib/protected-test-paths.mjs
+index 2d9378898a6f9ca3529629fd56f3605fb373fed5..2fb5e4f7761c9909ae5bac302f6947ccb8cb12a9 100644
+--- a/plugins/pipeline-core/lib/protected-test-paths.mjs
++++ b/plugins/pipeline-core/lib/protected-test-paths.mjs
+@@ -129,12 +129,21 @@ const headOf = (rootDir, spawn) => {
+  * { admitted: false, stale: { path, writer, rerun } }: a writer armed this path with other bytes (the file changed after the
+  * writer wrote it); { admitted: false, spent: true, path, writer, rerun }: those exact bytes were armed and already committed.
+  */
+-export function writerCommitAdmission(rootDir, relPath, { spawn = spawnSync } = {}) {
++/**
++ * ADR-0096 (D248): the closed writer -> gate-strength id map. A gate-strength path is otherwise never armed (arming) and never
++ * admitted (the hook passes `gateRuleId`). The fitness model (GS-17) has exactly one writer, the materialization of the
++ * PO-approved architecture design; that approval is its authority.
++ */
++export const WRITER_GATE_STRENGTH_IDS = Object.freeze({ "pipeline-state.mjs materialize-architecture": Object.freeze(["GS-17"]) });
++
++export function writerCommitAdmission(rootDir, relPath, { spawn = spawnSync, gateRuleId = null } = {}) {
+   try {
+     const store = writerCommitStoreDir(rootDir, { spawn });
+     if (store === null || !existsSync(store)) return null;
+     const hits = [];
+     for (const { record } of writerCommitRecords(store)) {
++      // A gate-strength path is admitted only from a writer the closed map names for exactly that gate id.
++      if (gateRuleId !== null && !(WRITER_GATE_STRENGTH_IDS[record.writer] ?? []).includes(gateRuleId)) continue;
+       for (const entry of record.entries) if (entry?.path === relPath) hits.push({ record, entry });
+     }
+     if (hits.length === 0) return null;
+diff --git a/plugins/pipeline-core/lib/writer-commit-capability.mjs b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+index 65b4a2b1a7c72628328261a69cca87c11c1690da..b396a99296590e1c7be4bed83f788323b36322e6 100644
+--- a/plugins/pipeline-core/lib/writer-commit-capability.mjs
++++ b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+@@ -25,13 +25,14 @@ import { isAbsolute, join, relative, resolve } from "node:path";
+ import { gateStrengthRuleFor } from "../hooks/guard-gate-strength.mjs";
+ import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
+ import { loadShippedProtectedBaseline } from "./protected-baseline.mjs";
+-import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, writerCommitStoreDir, WRITER_COMMIT_SCHEMA } from "./protected-test-paths.mjs";
++import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, writerCommitStoreDir, WRITER_COMMIT_SCHEMA, WRITER_GATE_STRENGTH_IDS } from "./protected-test-paths.mjs";
+ 
+ const SHA256 = /^[a-f0-9]{64}$/u;
+ const KEY_FILE = "mac.key";
+ const WRITER_MESSAGE_FILE = "scratch/commit-msg/writer-output.txt";
+ const MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024;
+ const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
++export { WRITER_GATE_STRENGTH_IDS };
+ 
+ function writerCommitError(code, message, heal) {
+   const error = new Error(`${message}; heal: ${heal}`);
+@@ -87,13 +88,16 @@ export function armWriterCommitCapability({ rootDir, writer, rerun, files, nowMs
+   const staticIds = new Set(shipped.ok ? shipped.baseline.entries.map((entry) => entry.id) : []);
+   const { rules } = loadProtectedTestPathRules({ rootDir: root });
+   const armed = []; const excluded = []; const protectedPaths = [];
++  const writerGateIds = WRITER_GATE_STRENGTH_IDS[writer] ?? [];
+   for (const file of written) {
+     const rule = protectedTestPathRuleFor(rules, file.path);
+     let gate = null;
+     try { gate = gateStrengthRuleFor(file.path, root); } catch { gate = null; }
+-    if (gate || (rule && (staticIds.has(rule.id) || rule.id === "PB-BASELINE-UNAVAILABLE"))) { excluded.push(file.path); continue; }
++    // ADR-0096: the one writer of a gate definition may arm its own output, and only the gate ids the closed map names for it.
++    const ownGate = gate !== null && writerGateIds.includes(gate.id);
++    if ((gate && !ownGate) || (rule && (staticIds.has(rule.id) || rule.id === "PB-BASELINE-UNAVAILABLE"))) { excluded.push(file.path); continue; }
+     armed.push(file);
+-    if (rule) protectedPaths.push(file.path);
++    if (rule || ownGate) protectedPaths.push(file.path);
+   }
+   const paths = armed.map((file) => file.path).sort();
+   const message = commitSubject(writer);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 240187ce4f512f43d37e89cfb07ab5180b44e95f..47d2019f1a05ad6bcbde7ff4039ed69621053435 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -15308,7 +15308,8 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+ // G20-66: the sanctioned writers whose protected output (State, lifecycle, audit bundle, result) their own commit must be able
+ // to publish without a human-guard-override signature. After a successful run each arms the commit of exactly the files it
+ // wrote (lib/writer-commit-capability.mjs) and prints that commit as its next step on stderr.
+-export const WRITER_COMMIT_COMMANDS = new Set(["approve-plan", "close-feature"]);
++// ADR-0096: materialize-architecture writes the fitness model (GS-17) and arms that commit through the closed writer map.
++export const WRITER_COMMIT_COMMANDS = new Set(["approve-plan", "close-feature", "materialize-architecture"]);
+ 
+ export function run(argv = process.argv.slice(2), deps = {}) {
+   const sub = argv[0];
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index c7728ab54771711ca94d568df154b9d0a9e31e14..ccdcd8eed069bc3b6b4d2bb88315a65c185576d8 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -1152,6 +1152,7 @@ async function main() {
+   for (const relPath of paths) {
+     let rule = null;
+     try { rule = gateStrengthRuleFor(relPath, projectRoot); } catch { rule = null; }
++    const gateRuleId = rule ? rule.id : null; // ADR-0096: a writer commit admits a gate-strength path only for its mapped writer
+     if (!rule) {
+       try { rule = protectedTestPathRuleFor(testPathRules, relPath); } catch { rule = null; }
+     }
+@@ -1164,7 +1165,7 @@ async function main() {
+     // G20-66: the commit publishes exactly the bytes a sanctioned writer (approve-plan, close-feature, finish-feature) wrote and armed;
+     // an extra protected path, one changed byte or an already-spent capability is not admitted and stays a finding.
+     let writerVerdict = null;
+-    try { writerVerdict = typeof writerCommitAdmission === "function" ? writerCommitAdmission(projectRoot, relPath) : null; } catch { writerVerdict = null; }
++    try { writerVerdict = typeof writerCommitAdmission === "function" ? writerCommitAdmission(projectRoot, relPath, { gateRuleId }) : null; } catch { writerVerdict = null; }
+     if (writerVerdict && writerVerdict.admitted === true) { writerAdmitted.push(writerVerdict); continue; }
+     if (writerVerdict && writerVerdict.stale) {
+       writerNotes.push({ path: relPath, text: "PB-WRITER-COMMIT-STALE: " + relPath + " no longer holds the bytes " + writerVerdict.stale.writer + " armed for commit (it changed after the writer wrote it); repair: rerun the writer: " + writerVerdict.stale.rerun });
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+index d0e8813afeb2e52626d796df688f4bfee6cc3b08..87247b9653e0745dd0ab3b19e6a79700feeebc9a 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+@@ -1549,6 +1549,43 @@ test("G20-66: a changed bound byte is refused as stale and names the rerun of th
+   assert.doesNotMatch(old.stderr, /PB-WRITER-COMMIT-STALE/u);
+ });
+ 
++// ADR-0096 (D248): the fitness model (GS-17) is a gate-strength path; only its one writer, materialize-architecture, arms its commit.
++test("ADR-0096: materialize-architecture arms the fitness model (GS-17); another writer's capability for the same bytes and a boundary-policy change are refused", { timeout: commitTestTimeout(4) }, async () => {
++  const { armWriterCommitCapability } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "writer-commit-capability.mjs")).href);
++  const seeded = (prefix) => {
++    const { dir, git } = freshRepo(prefix);
++    mkdirSync(join(dir, "architecture"), { recursive: true });
++    writeFileSync(join(dir, "architecture", "fitness-model.json"), "{\"m\":1}\n");
++    writeFileSync(join(dir, "architecture", "boundary-policy.json"), "{\"p\":1}\n");
++    git("add", "architecture/fitness-model.json", "architecture/boundary-policy.json");
++    git("commit", "-q", "-m", "seed the architecture gate definitions (first appearance, no hook installed yet)");
++    installHook(dir);
++    writeFileSync(join(dir, "architecture", "fitness-model.json"), "{\"m\":2}\n");
++    return { dir, git };
++  };
++  const files = [{ path: "architecture/fitness-model.json", sha256: sha256Of("{\"m\":2}\n") }];
++  const own = seeded("adr96-own-writer");
++  const armed = armWriterCommitCapability({ rootDir: own.dir, writer: "pipeline-state.mjs materialize-architecture", rerun: "node pipeline-state.mjs materialize-architecture", files });
++  assert.equal(armed.status, "armed");
++  assert.deepEqual(armed.protectedPaths, ["architecture/fitness-model.json"]);
++  own.git("add", "architecture/fitness-model.json");
++  const admitted = commit(own.dir, "chore(pipeline): commit the materialize-architecture output");
++  assert.equal(admitted.code, 0, admitted.stderr);
++  const foreign = seeded("adr96-foreign-writer");
++  const excluded = armWriterCommitCapability({ rootDir: foreign.dir, writer: "pipeline-state.mjs approve-plan", rerun: WRITER_RERUN, files });
++  assert.deepEqual(excluded.excluded, ["architecture/fitness-model.json"], "another writer never arms a gate-strength path");
++  foreign.git("add", "architecture/fitness-model.json");
++  const refused = commit(foreign.dir, "chore(pipeline): the fitness model from the wrong writer");
++  assert.notEqual(refused.code, 0);
++  assert.match(refused.stderr, /GS-17/u);
++  const boundary = seeded("adr96-boundary");
++  writeFileSync(join(boundary.dir, "architecture", "boundary-policy.json"), "{\"p\":2}\n");
++  boundary.git("add", "architecture/boundary-policy.json");
++  const weakened = commit(boundary.dir, "chore: widen the boundary policy");
++  assert.notEqual(weakened.code, 0);
++  assert.match(weakened.stderr, /GS-16/u);
++});
++
+ test("G20-66: an unrelated commit between the write and the commit of the writer's bytes does not strand the capability (it is bound to bytes, not to HEAD)", { timeout: commitTestTimeout(2) }, async () => {
+   const { dir, git } = await writerRepo("g2066-head-moved");
+   writeFileSync(join(dir, "unrelated.txt"), "x\n");

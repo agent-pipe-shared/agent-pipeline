@@ -1,0 +1,448 @@
+diff --git a/plugins/pipeline-core/lib/close-commit-split.mjs b/plugins/pipeline-core/lib/close-commit-split.mjs
+index 74533650984668aaa92d34d3ecaea5663f898634..b79cadb32a16e995ffbcfc8316bf2091518d3307 100644
+--- a/plugins/pipeline-core/lib/close-commit-split.mjs
++++ b/plugins/pipeline-core/lib/close-commit-split.mjs
+@@ -34,14 +34,14 @@ export function isEvidencePath(path, featureId) {
+ }
+ 
+ /**
+- * C29 (Claude greenfield run 3, L1): a path of the product's code or tests, narrower than a "product" commit path: the feature's
+- * Spec and design text, docs, architecture, project calibration and agent configuration are not code, and a Critic round that
+- * changed only those cannot have corrected a finding in the code. Used by the Critic lineage to decide whether a passing later
+- * round may mark an earlier blocker or major as fixed.
++ * C29 (Claude greenfield run 3, L1; PO tile 2026-11-13: "a product path, not only evidence/administration"): a path whose change can
++ * correct a Critic finding. Not an evidence or administration path (above), and not under specs/: the Spec and design text of a
++ * package are corrected only through an approved Spec addendum (ADR-0095), which the lapsed-findings reader counts on its own. The run
++ * this closes passed a round that changed only the Spec, and its two earlier majors then read as fixed.
+  */
+-export function isProductCodePath(path, featureId) {
++export function isCorrectionPath(path, featureId) {
+   if (typeof path !== "string" || path === "" || isEvidencePath(path, featureId)) return false;
+-  return !/^(?:specs|docs|architecture|project|backlog|governance|telemetry|\.claude|\.codex|\.agents|\.gemini)\//u.test(path);
++  return !path.startsWith("specs/");
+ }
+ 
+ /** "evidence" or "product" for the paths one commit touches. */
+diff --git a/plugins/pipeline-core/lib/critic-lapsed-findings.mjs b/plugins/pipeline-core/lib/critic-lapsed-findings.mjs
+index 443da83d459022586ec051768246bc86b918034a..454ca522e804249c29f9a0bd5c8547cf249cc7ce 100644
+--- a/plugins/pipeline-core/lib/critic-lapsed-findings.mjs
++++ b/plugins/pipeline-core/lib/critic-lapsed-findings.mjs
+@@ -1,93 +1,149 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /**
+- * C29 (Claude greenfield run 3, L1; PO tile 2026-11-13, mechanical route): a blocker or major of an earlier Critic round that a later
+- * round marked fixed although no reviewed round after it changed product code or tests.
++ * C29 (Claude greenfield run 3, L1; PO tile 2026-11-13, mechanical route): an earlier Critic blocker or major that the course carries
++ * to the close without a correction anyone reviewed.
+  *
+  * The retained lineage marks every open finding of the parent "fixed" as soon as a later round passes (lib/critic-review-lineage.mjs).
+- * A delta round over the Spec, the design text or evidence alone can pass, and the earlier blocker then read as fixed without any
+- * correction of the code it named: the run closed a feature with two round-1 majors that no acceptance question named. This module
+- * reads the same retained course and names those findings; it never rewrites the lineage (its records are immutable and validated).
++ * A delta round over docs or evidence alone can pass, and the earlier blocker then read as fixed without any correction of what it
++ * named: the run closed a feature with two round-1 majors that no acceptance question named. This module reads the same retained course
++ * and names those findings; it never rewrites the lineage (its records are immutable and validated).
+  *
+- * A carried blocker/major counts as corrected when the round that marked it fixed, or any reviewed round after it, changed at least one
+- * product code or test path (lib/close-commit-split.mjs isProductCodePath). Otherwise it is LAPSED. A lapsed major is settled only by a
+- * PO residual acceptance of its origin round with the uncorrectable-past-authorship reason class; a lapsed blocker never.
++ * A finding of severity critical/high (blocker/major) of an earlier round is UNRESOLVED when
++ *   - a later round marked it fixed, and neither that round nor any reviewed round after it changed a product path outside the
++ *     Spec text, evidence and administration (lib/close-commit-split.mjs isCorrectionPath), or
++ *   - the latest round still carries it open (a later round that failed only on its own minors, accepted by the PO, ends the course).
++ * It is DISPOSITIONED instead when an applied, registered Spec addendum (ADR-0095, PO-approved) names it: that is the sanctioned
++ * correction of a Spec defect, and it changes no code. An unresolved major is SETTLED by a PO residual acceptance of its origin round
++ * with the uncorrectable-past-authorship reason class, verified through the configured approval mode; a blocker never.
+  *
+- * Read-only. The close stops on a lapsed finding that is not settled; the acceptance question names the settled ones.
++ * Read-only. The close stops on an unresolved finding that is not settled; the acceptance question names the settled ones.
+  */
+-import { isProductCodePath } from "./close-commit-split.mjs";
++import { spawnSync } from "node:child_process";
++import { join } from "node:path";
++import { isCorrectionPath } from "./close-commit-split.mjs";
++import { canonicalJson, readConsumedCandidateResult, sha256 } from "./critic-packet-preflight-read.mjs";
++import { sha256Canonical } from "./review-economy.mjs";
+ import { resolveRetainedCriticCourseRecords } from "./critic-course-admission.mjs";
+ import { loadResidualAcceptanceDepsForPacket } from "./critic-verify-readiness-read.mjs";
+ import { RESIDUAL_REASON_CLASS } from "./critic-verify-lifecycle.mjs";
++import { readSpecAddenda } from "./spec-addendum.mjs";
+ 
+ export const CRITIC_LAPSED_FINDINGS_SCHEMA = "pipeline.critic-lapsed-findings.v1";
+ const SEVERITY = Object.freeze({ critical: "blocker", high: "major" });
+ const REVIEWED = new Set(["no-findings", "findings"]);
+ const ORIGIN = /^CRF-([a-f0-9]{32})-\d+$/u;
+ 
++const entry = (finding, prior, reviewId, state) => Object.freeze({
++  findingId: finding.id,
++  severity: SEVERITY[prior.severity],
++  originPacketId: ORIGIN.exec(finding.id)?.[1] ?? null,
++  // The digest of the raw finding as its own round recorded it (the residual acceptance binds the same digest).
++  evidenceSha256: typeof prior.evidenceSha256 === "string" ? prior.evidenceSha256 : null,
++  state, // "marked-fixed-without-code" or "still-open"
++  reviewId,
++});
++
+ /**
+- * Pure: the lapsed blocker/major findings of an ordered (oldest first) retained course.
+- * @returns {Array<{findingId: string, severity: "blocker"|"major", originPacketId: string|null, evidenceSha256: string|null, markedFixedInReviewId: string}>}
++ * Pure: the unresolved blocker/major findings of an ordered (oldest first) retained course. `dispositioned` holds finding ids an applied
++ * Spec addendum names.
+  */
+-export function lapsedCriticFindings({ history, featureId }) {
+-  if (!Array.isArray(history)) return [];
++export function lapsedCriticFindings({ history, featureId, dispositioned = [] }) {
++  if (!Array.isArray(history) || history.length === 0) return [];
++  const settledByAddendum = new Set(dispositioned);
+   const codeRound = (record) => REVIEWED.has(record?.verdict?.status)
+-    && (record?.diff?.changedPaths ?? []).some((path) => isProductCodePath(path, featureId));
++    && (record?.diff?.changedPaths ?? []).some((path) => isCorrectionPath(path, featureId));
+   const lapsed = [];
+   for (let index = 1; index < history.length; index += 1) {
+     const parent = new Map((history[index - 1]?.findings ?? []).map((finding) => [finding.id, finding]));
+     for (const finding of history[index]?.findings ?? []) {
+       const prior = finding?.priorFindingId === null || finding?.priorFindingId === undefined ? null : parent.get(finding.priorFindingId);
+       if (finding?.status !== "fixed" || prior?.status !== "open" || !Object.hasOwn(SEVERITY, prior.severity)) continue;
+-      if (history.slice(index).some(codeRound)) continue;
+-      lapsed.push(Object.freeze({
+-        findingId: finding.id,
+-        severity: SEVERITY[prior.severity],
+-        originPacketId: ORIGIN.exec(finding.id)?.[1] ?? null,
+-        evidenceSha256: typeof finding.evidenceSha256 === "string" ? finding.evidenceSha256 : null,
+-        markedFixedInReviewId: history[index].reviewId,
+-      }));
++      if (settledByAddendum.has(finding.id) || history.slice(index).some(codeRound)) continue;
++      lapsed.push(entry(finding, prior, history[index].reviewId, "marked-fixed-without-code"));
++    }
++  }
++  const latest = history.at(-1);
++  if (history.length > 1) {
++    for (const finding of latest?.findings ?? []) {
++      if (finding?.status !== "open" || finding.priorFindingId === null || finding.priorFindingId === undefined
++        || !Object.hasOwn(SEVERITY, finding.severity) || settledByAddendum.has(finding.id)) continue;
++      lapsed.push(entry(finding, finding, latest.reviewId, "still-open"));
+     }
+   }
+   return lapsed;
+ }
+ 
+-/** True when a recorded PO residual acceptance of the finding's origin round settles it (a major with the reason class; a blocker never). */
+-export function lapsedFindingSettled(finding, { gitCommonDir, projectDir = null, loadFn = loadResidualAcceptanceDepsForPacket } = {}) {
++/**
++ * True when a recorded PO residual acceptance of the finding's origin round settles it: a major only, the reason class named, the
++ * finding's own digest in the accepted list, and the record verified through the configured approval mode. A blocker never.
++ */
++export function lapsedFindingSettled(finding, { gitCommonDir, projectDir = null, loadFn = loadResidualAcceptanceDepsForPacket, readRawFindingsFn = readOriginRawFindings } = {}) {
+   if (finding?.severity !== "major" || finding.originPacketId === null || finding.evidenceSha256 === null) return false;
++  // The lineage and the residual acceptance hash the same raw finding with different canonical forms: join through the origin round's raw finding.
++  const index = Number(/-(\d+)$/u.exec(finding.findingId)?.[1]) - 1;
++  const raw = (readRawFindingsFn({ gitCommonDir, packetId: finding.originPacketId }) ?? [])[index];
++  if (raw === undefined || sha256Canonical(raw) !== finding.evidenceSha256) return false;
++  const residualId = sha256(canonicalJson(raw));
+   const deps = loadFn({ gitCommonDir, projectDir, criticPacketId: finding.originPacketId });
+   const accepted = deps?.residualAcceptance;
+-  return accepted?.reasonClass === RESIDUAL_REASON_CLASS
+-    && Array.isArray(accepted.findings) && accepted.findings.some((row) => row?.id === finding.evidenceSha256);
++  if (accepted?.reasonClass !== RESIDUAL_REASON_CLASS || !Array.isArray(accepted.findings)
++    || !accepted.findings.some((row) => row?.id === residualId) || typeof deps.verifyResidualAcceptanceFn !== "function") return false;
++  const verdict = deps.verifyResidualAcceptanceFn({ acceptance: accepted, candidate: accepted.candidate, criticReceiptSha256: accepted.criticReceiptSha256,
++    findings: accepted.findings, reasonClass: accepted.reasonClass });
++  return verdict?.authorized === true;
++}
++
++/** The raw findings of a consumed Critic round, as its private packet holds them. */
++export function readOriginRawFindings({ gitCommonDir, packetId }) {
++  const findings = readConsumedCandidateResult({ controlRoot: join(gitCommonDir, "agent-pipeline", "critic-packets"), packetId }).result?.verdict?.findings;
++  return Array.isArray(findings) ? findings : [];
++}
++
++/** The finding ids the applied, registered Spec addenda of the package at `commit` name (ADR-0095). Unreadable: none. */
++export function addendumDispositionedFindingIds({ repoRoot, featureId, commit }) {
++  const show = (path) => {
++    const result = spawnSync("git", ["-C", repoRoot, "show", `${commit}:${path}`], { encoding: null, shell: false, timeout: 10_000, maxBuffer: 16 * 1024 * 1024 });
++    if (result.error || result.status !== 0) throw new Error("unreadable");
++    return result.stdout;
++  };
++  try {
++    const manifest = JSON.parse(show(`specs/${featureId}/lifecycle.json`).toString("utf8"));
++    const read = readSpecAddenda({ root: repoRoot, featureId, manifest, read: show });
++    return (read.applied ?? []).flatMap((addendum) => (Array.isArray(addendum.findingIds) ? addendum.findingIds : []));
++  } catch { return []; }
+ }
+ 
+ /**
+- * Read the retained course of `featureId` at `candidateCommit` and split its lapsed findings into open and settled.
++ * Read the retained course of `featureId` at `candidateCommit` and split its unresolved findings into open and settled.
+  * A course that cannot be read is `unavailable` (the close keeps its own course-evidence checks); never throws.
+  */
+-export function readLapsedCriticFindings({ repoRoot, featureId, candidateCommit, gitCommonDir, projectDir = null,
+-  resolveFn = resolveRetainedCriticCourseRecords, loadFn = loadResidualAcceptanceDepsForPacket } = {}) {
++export function readLapsedCriticFindings({ repoRoot, featureId, candidateCommit, gitCommonDir, projectDir = null, boundPacketId = null,
++  resolveFn = resolveRetainedCriticCourseRecords, loadFn = loadResidualAcceptanceDepsForPacket, dispositionedFn = addendumDispositionedFindingIds, readRawFindingsFn = readOriginRawFindings } = {}) {
++  const unavailable = (reason) => Object.freeze({ schema: CRITIC_LAPSED_FINDINGS_SCHEMA, status: "unavailable", reason: String(reason).slice(0, 200), open: [], settled: [] });
+   let history;
+-  try { history = resolveFn({ repoRoot, featureId, candidateCommit }).history; } catch (error) {
+-    return Object.freeze({ schema: CRITIC_LAPSED_FINDINGS_SCHEMA, status: "unavailable", reason: String(error?.message ?? error).slice(0, 200), open: [], settled: [] });
+-  }
++  try { history = resolveFn({ repoRoot, featureId, candidateCommit }).history; } catch (error) { return unavailable(error?.message ?? error); }
++  // A pre-check bound to a round whose lineage is not registered yet would judge the course without that round; the close's own check reads it later.
++  if (boundPacketId !== null && history.length > 0 && history.at(-1)?.request?.packetId !== boundPacketId) return unavailable("the bound Critic round is not the last registered round yet");
++  let dispositioned = [];
++  try { dispositioned = dispositionedFn({ repoRoot, featureId, commit: candidateCommit }); } catch { dispositioned = []; }
+   const open = [];
+   const settled = [];
+-  for (const finding of lapsedCriticFindings({ history, featureId })) {
++  for (const finding of lapsedCriticFindings({ history, featureId, dispositioned })) {
+     let ok = false;
+-    try { ok = lapsedFindingSettled(finding, { gitCommonDir, projectDir, loadFn }); } catch { ok = false; }
++    try { ok = lapsedFindingSettled(finding, { gitCommonDir, projectDir, loadFn, readRawFindingsFn }); } catch { ok = false; }
+     (ok ? settled : open).push(finding);
+   }
+   return Object.freeze({ schema: CRITIC_LAPSED_FINDINGS_SCHEMA, status: open.length > 0 ? "open" : "clear", open, settled });
+ }
+ 
+-/** One sentence per finding, for a stop text or the acceptance question. */
++/** One phrase per finding, for a stop text or the acceptance question. */
+ export function describeLapsedFinding(finding) {
+-  return `${finding.severity} ${finding.findingId}${finding.originPacketId === null ? "" : ` (raised in Critic round ${finding.originPacketId})`}`;
++  return `${finding.severity} ${finding.findingId}${finding.originPacketId === null ? "" : ` (raised in Critic round ${finding.originPacketId})`}${finding.state === "still-open" ? ", still open" : ", marked fixed by a round that changed only the Spec text, evidence or administration"}`;
+ }
+ 
+-/** The repair a close names for open lapsed findings. */
++/** The repair a close names for open unresolved findings. */
+ export function lapsedFindingsRepair({ open, stateWriter = "pipeline-state.mjs" }) {
+   const majors = open.filter((finding) => finding.severity === "major" && finding.originPacketId !== null);
+   const packets = [...new Set(majors.map((finding) => finding.originPacketId))];
+-  return `correct the named findings in the product code or tests through a dispatch and run a Critic delta round over that change; a later round that only changed the Spec, docs or evidence does not count as a correction. A blocker can never be accepted.${packets.length === 0 ? "" : ` A major that no commit can correct may instead be accepted by the PO in the PO's own attended step: ${packets.map((packet) => `node ${stateWriter} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class ${RESIDUAL_REASON_CLASS}`).join("; ")}.`}`;
++  return `correct the named findings through a dispatch and run a Critic delta round over that change: a change of the product (code, tests, configuration), or, for a defect of the Spec itself, an approved and registered Spec addendum that names the finding (ADR-0095); a later round that only changed the Spec text, evidence or administration does not count as a correction. A blocker can never be accepted.${packets.length === 0 ? "" : ` A major that no commit can correct may instead be accepted by the PO in the PO's own attended step: ${packets.map((packet) => `node ${stateWriter} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class ${RESIDUAL_REASON_CLASS}`).join("; ")}.`}`;
+ }
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index 86b894f3ee103ae9f4fc1cf55e29dcce8bf37432..3f7d8e8ab3caab18d7a398da0ffab17049d33176 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -1001,47 +1001,61 @@ console.log(`${n20Passed}/5 N20 checks passed.`);
+   console.log("PASS C27 lane origin");
+ }
+ 
+-// C29 (Claude greenfield run 3, L1): an earlier blocker/major marked fixed by a passing round that changed no product code or tests is lapsed.
++// C29 (Claude greenfield run 3, L1): an earlier blocker/major marked fixed by a passing round that changed only the Spec text, evidence or administration is lapsed.
+ {
+-  const { isProductCodePath } = await import("./close-commit-split.mjs");
++  const { isCorrectionPath, isEvidencePath } = await import("./close-commit-split.mjs");
+   const { lapsedCriticFindings, lapsedFindingSettled, readLapsedCriticFindings } = await import("./critic-lapsed-findings.mjs");
+   const feature = "feature-abc";
+-  assert.equal(isProductCodePath("src/app.js", feature), true);
+-  assert.equal(isProductCodePath("tests/app.test.js", feature), true);
+-  for (const path of [`specs/${feature}/spec.md`, `specs/${feature}/evidence/x.json`, "docs/guide.md", "architecture/map.md", "project/calibration.json", ".claude/settings.json", "audit-bundles/x/README.md", ""]) {
+-    assert.equal(isProductCodePath(path, feature), false, path);
++  for (const path of ["src/app.js", "tests/app.test.js", "docs/guide.md", "package.json"]) assert.equal(isCorrectionPath(path, feature), !isEvidencePath(path, feature), path);
++  assert.equal(isCorrectionPath("src/app.js", feature), true);
++  for (const path of [`specs/${feature}/spec.md`, `specs/${feature}/design/unit.json`, `specs/${feature}/evidence/x.json`, "audit-bundles/x/README.md", ""]) {
++    assert.equal(isCorrectionPath(path, feature), false, path);
+   }
+   const origin = "a".repeat(32);
+   const id = (n) => `CRF-${origin}-${n}`;
+   const round = (reviewId, status, changedPaths, findings) => ({ reviewId, verdict: { status }, diff: { changedPaths }, findings });
+-  const r1 = round("r1", "findings", ["src/app.js"], [
+-    { id: id(1), priorFindingId: null, severity: "high", status: "open", evidenceSha256: H("1") },
+-    { id: id(2), priorFindingId: null, severity: "critical", status: "open", evidenceSha256: H("2") },
+-    { id: id(3), priorFindingId: null, severity: "medium", status: "open", evidenceSha256: H("3") },
+-  ]);
++  const raws = ["major", "blocker", "minor"].map((severity) => ({ gap: `gap ${severity}`, risk: "r", severity, evidence: "src/app.js:1", spec_ref: "AC-1" }));
++  const { projectConsumedCriticFindings } = await import("./critic-verify-lifecycle.mjs");
++  const r1 = round("r1", "findings", ["src/app.js"], projectConsumedCriticFindings({ packetId: origin, findings: raws }).map((f) => ({ ...f })));
++  const [e1, e2] = r1.findings.map((f) => f.evidenceSha256);
+   const fixedAll = (reviewId, changedPaths, status = "no-findings") => round(reviewId, status, changedPaths, r1.findings.map((f) => ({ ...f, priorFindingId: f.id, status: "fixed" })));
+   // The Claude run's shape: round 2 changed only the Spec and passed; both earlier findings read as fixed.
+   const specOnly = lapsedCriticFindings({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])], featureId: feature });
+-  assert.deepEqual(specOnly.map((f) => [f.findingId, f.severity, f.originPacketId, f.markedFixedInReviewId]), [[id(1), "major", origin, "r2"], [id(2), "blocker", origin, "r2"]], "a minor never lapses");
++  assert.deepEqual(specOnly.map((f) => [f.findingId, f.severity, f.originPacketId, f.reviewId, f.state, f.evidenceSha256]), [[id(1), "major", origin, "r2", "marked-fixed-without-code", e1], [id(2), "blocker", origin, "r2", "marked-fixed-without-code", e2]], "a minor never lapses");
++  // ADR-0095: an applied Spec addendum naming the finding is its sanctioned correction.
++  assert.deepEqual(lapsedCriticFindings({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])], featureId: feature, dispositioned: [id(1)] }).map((f) => f.findingId), [id(2)]);
++  // A later round that failed only on its own minor (accepted by the PO) still carries the earlier major open: it is named too.
++  const carriedOpen = round("r2", "findings", ["src/app.js"], [...r1.findings.map((f) => ({ ...f, priorFindingId: f.id })), { id: `CRF-${"b".repeat(32)}-1`, priorFindingId: null, severity: "medium", status: "open", evidenceSha256: H("4") }]);
++  assert.deepEqual(lapsedCriticFindings({ history: [r1, carriedOpen], featureId: feature }).map((f) => [f.findingId, f.state]), [[id(1), "still-open"], [id(2), "still-open"]], "the round's own minor is its own acceptance's business");
+   assert.deepEqual(lapsedCriticFindings({ history: [r1, fixedAll("r2", ["src/app.js"])], featureId: feature }), [], "a passing round over code corrects");
+-  const r2 = fixedAll("r2", ["docs/guide.md"]);
++  assert.deepEqual(lapsedCriticFindings({ history: [r1, fixedAll("r2", ["config/app.yaml"])], featureId: feature }), [], "a product configuration change is a correction (PO tile: not only evidence/administration)");
++  assert.equal(lapsedCriticFindings({ history: [r1, fixedAll("r2", ["docs/guide.md"])], featureId: feature }).length, isEvidencePath("docs/guide.md", feature) ? 2 : 0, "docs follow the shared administration/documentation set");
++  const r2 = fixedAll("r2", [`specs/${feature}/evidence/x.json`]);
+   const r3 = round("r3", "no-findings", ["tests/app.test.js"], r2.findings.map((f) => structuredClone(f)));
+   assert.deepEqual(lapsedCriticFindings({ history: [r1, r2, r3], featureId: feature }), [], "a later reviewed code round counts");
+   const failed = round("r3", "failed", ["src/app.js"], r2.findings.map((f) => structuredClone(f)));
+   assert.equal(lapsedCriticFindings({ history: [r1, r2, failed], featureId: feature }).length, 2, "a failed round reviewed nothing");
+   assert.deepEqual(lapsedCriticFindings({ history: [r1], featureId: feature }), []);
+-  // Settling: only a major, only with the reason class, only for its own evidence digest.
++  // Settling: only a major, only with the reason class, only for its own raw finding, only when the record verifies.
++  // The residual acceptance hashes the raw finding with another canonical form than the lineage, so the join goes through the raw finding.
++  const { residualFindingId } = await import("./review-admission-read.mjs");
++  const [majorId, blockerId] = raws.map((raw) => residualFindingId(raw));
++  assert.notEqual(majorId, e1, "the two digests differ; a direct comparison would never settle anything");
+   const [major, blocker] = specOnly;
+-  const loadWith = (residualAcceptance) => () => (residualAcceptance === null ? null : { residualAcceptance });
++  const rawFn = () => raws;
++  const loadWith = (residualAcceptance, authorized = true) => () => (residualAcceptance === null ? null : { residualAcceptance, verifyResidualAcceptanceFn: () => ({ authorized, mode: "signature" }) });
+   const reason = "uncorrectable-past-authorship";
+-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("1"), severity: "major" }] }) }), true);
+-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith({ findings: [{ id: H("1"), severity: "major" }] }) }), false, "the reason class is needed");
+-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("9"), severity: "major" }] }) }), false);
+-  assert.equal(lapsedFindingSettled(major, { gitCommonDir: "/x", loadFn: loadWith(null) }), false);
+-  assert.equal(lapsedFindingSettled(blocker, { gitCommonDir: "/x", loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("2"), severity: "major" }] }) }), false, "a blocker is never settled");
++  const settle = (finding, acceptance, extra = {}) => lapsedFindingSettled(finding, { gitCommonDir: "/x", readRawFindingsFn: rawFn, loadFn: loadWith(acceptance, extra.authorized ?? true), ...(extra.readRawFindingsFn ? { readRawFindingsFn: extra.readRawFindingsFn } : {}) });
++  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }), true);
++  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }, { authorized: false }), false, "an acceptance that does not verify settles nothing");
++  assert.equal(settle(major, { findings: [{ id: majorId, severity: "major" }] }), false, "the reason class is needed");
++  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: e1, severity: "major" }] }), false, "the lineage digest is not the residual id");
++  assert.equal(settle(major, null), false);
++  assert.equal(settle(major, { reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }, { readRawFindingsFn: () => [raws[2]] }), false, "a raw finding whose digest is not the lineage's settles nothing");
++  assert.equal(settle(blocker, { reasonClass: reason, findings: [{ id: blockerId, severity: "blocker" }] }), false, "a blocker is never settled");
+   const read = readLapsedCriticFindings({ repoRoot: "/x", featureId: feature, candidateCommit: O("2"), gitCommonDir: "/x",
+-    resolveFn: () => ({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])] }),
+-    loadFn: loadWith({ reasonClass: reason, findings: [{ id: H("1"), severity: "major" }] }) });
++    resolveFn: () => ({ history: [r1, fixedAll("r2", [`specs/${feature}/spec.md`])] }), dispositionedFn: () => [], readRawFindingsFn: rawFn,
++    loadFn: loadWith({ reasonClass: reason, findings: [{ id: majorId, severity: "major" }] }) });
+   assert.equal(read.status, "open"); assert.deepEqual(read.open.map((f) => f.findingId), [id(2)]); assert.deepEqual(read.settled.map((f) => f.findingId), [id(1)]);
+   const unreadable = readLapsedCriticFindings({ repoRoot: "/x", featureId: feature, candidateCommit: O("2"), gitCommonDir: "/x", resolveFn: () => { throw new Error("CCA-HISTORY"); } });
+   assert.equal(unreadable.status, "unavailable"); assert.deepEqual(unreadable.open, []);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index fc717987b321d623e880d79c67f2602404b591d1..14fa1791fbd0749046674673945cf2f5bfa2148d 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -747,7 +747,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+     if (!addendumGate.ok) fail("CLOSE-SPEC-ADDENDUM-UNCOVERED", `feature close preparation is blocked by the Spec addenda: ${addendumGate.findings.slice(0, 5).join("; ")}${addendumGate.findings.length > 5 ? `; and ${addendumGate.findings.length - 5} more` : ""}`);
+     // C29 (Claude greenfield run 3, L1): an earlier blocker/major that a later round marked fixed with no reviewed code change since stays open for the close.
+     const lapsed = readLapsedCriticFindings({ repoRoot: root, featureId: observed.feature.id, candidateCommit: git(root, ["rev-parse", "HEAD"]), gitCommonDir: common, projectDir: root });
+-    if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: a later Critic round marked ${lapsed.open.length} earlier finding(s) fixed, but no reviewed round since changed product code or tests: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
++    if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: ${lapsed.open.length} blocker/major finding(s) of an earlier Critic round were never corrected in a reviewed round: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
+     // A missing slice queue says nothing about whether the whole candidate
+     // received independent review. Resolve the State and package contracts.
+     // The audit route below reads the consumed Critic packet and exact Verify
+@@ -1420,16 +1420,18 @@ try {
+     const controlRoot = join(standingCommon, "agent-pipeline", "critic-packets");
+     try {
+       const { receipt } = readConsumedCandidateReceipt({ controlRoot, packetId: parsed.values.packet });
++      // C29 (L1): a blocker/major of an earlier round that no reviewed round corrected stays open, whatever the bound round's own verdict.
++      let lapsed = null;
++      try { lapsed = readLapsedCriticFindings({ repoRoot: standingRoot, featureId: activeFeature(stateSnapshot(standingRoot).state).id, candidateCommit: git(standingRoot, ["rev-parse", "HEAD"]), gitCommonDir: standingCommon, projectDir: standingRoot, boundPacketId: parsed.values.packet }); } catch { lapsed = null; }
++      const earlier = lapsed?.status === "open" ? { earlierOpen: lapsed.open, earlierRepair: lapsedFindingsRepair({ open: lapsed.open }) } : {};
++      const settled = lapsed?.settled?.length > 0 ? { settled: lapsed.settled } : {};
+       if (receipt?.reviewPass === true) {
+-        // C29 (L1): the bound round passed; an earlier blocker/major it (or a round before it) marked fixed without a reviewed code change is still open.
+-        let lapsed = null;
+-        try { lapsed = readLapsedCriticFindings({ repoRoot: standingRoot, featureId: activeFeature(stateSnapshot(standingRoot).state).id, candidateCommit: git(standingRoot, ["rev-parse", "HEAD"]), gitCommonDir: standingCommon, projectDir: standingRoot }); } catch { lapsed = null; }
+-        if (lapsed?.status === "open") emit({ schema: "pipeline.close-critic-standing.v1", status: "earlier-findings-open", open: lapsed.open, settled: lapsed.settled, repair: lapsedFindingsRepair({ open: lapsed.open }) });
+-        else emit({ schema: "pipeline.close-critic-standing.v1", status: "passed", ...(lapsed?.settled?.length > 0 ? { settled: lapsed.settled } : {}) });
++        if (lapsed?.status === "open") emit({ schema: "pipeline.close-critic-standing.v1", status: "earlier-findings-open", open: lapsed.open, ...settled, repair: earlier.earlierRepair });
++        else emit({ schema: "pipeline.close-critic-standing.v1", status: "passed", ...settled });
+       } else {
+         const { findings } = readConsumedCandidateResult({ controlRoot, packetId: parsed.values.packet }).result.verdict;
+         const count = (severity) => findings.filter((finding) => finding?.severity === severity).length;
+-        emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor") });
++        emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor"), ...earlier, ...settled });
+       }
+     } catch { emit({ schema: "pipeline.close-critic-standing.v1", status: "unknown" }); }
+   } else if (command === "critic-addenda") {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index e2daccfb4aaed4911e65091862b013a0b0dac06d..190c3bc1e4b973ece25a532f7591a553996df988 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1724,6 +1724,43 @@ function parentLineageFixture({ afterRound = null } = {}) {
+   const c4 = correct("fix4"); const d4 = parentRegisterDiagnostic(root, featureId, c4, "r4");
+   return { root, featureId, specPath, genesis, c1, c2, c3, c4, evidence4: d4.diagnosticPath, head: d4.registration };
+ }
++test("C29 L1 on a real retained course: a passing round that changed only the Spec leaves the earlier majors unresolved; a later reviewed code round resolves them", async () => {
++  const { readLapsedCriticFindings } = await import("../lib/critic-lapsed-findings.mjs");
++  const fx = parentLineageFixture({ afterRound: 2 });
++  try {
++    const head = () => git(fx.root, ["rev-parse", "HEAD"]);
++    const lapsedAt = (commit) => readLapsedCriticFindings({ repoRoot: fx.root, featureId: fx.featureId, candidateCommit: commit, gitCommonDir: join(fx.root, ".git"), projectDir: fx.root });
++    // Before round 3 the course ends in the failed round 2, which carries round 1's major open (the close refuses a failed round anyway).
++    const before = lapsedAt(head());
++    assert.equal(before.status, "open", JSON.stringify(before));
++    assert.deepEqual(before.open.map((f) => [f.findingId, f.state, f.severity]), [[`CRF-${"9a".repeat(16)}-1`, "still-open", "major"]]);
++    // Round 3: only the Spec changes, and the round passes.
++    const manifestPath = `specs/${fx.featureId}/lifecycle.json`;
++    writeFileSync(join(fx.root, fx.specPath), `${readFileSync(join(fx.root, fx.specPath), "utf8")}Clarified wording only.\n`);
++    const manifest = JSON.parse(readFileSync(join(fx.root, manifestPath), "utf8"));
++    manifest.artifacts.find((a) => a.class === "spec").sha256 = sha256(readFileSync(join(fx.root, fx.specPath)));
++    writeFileSync(join(fx.root, manifestPath), JSON.stringify(manifest));
++    // Only these two paths: a sweeping `git add -A` would also take the fixture's root-level delta input, which counts as possible code.
++    const c3 = parentCommitPaths(fx.root, [fx.specPath, manifestPath], "clarify the spec");
++    const d3 = parentRegisterDiagnostic(fx.root, fx.featureId, c3, "r3"); const q3 = parentDeltaRequest(fx.root, ["clarify"]);
++    const f3 = parentRound(fx.root, { featureId: fx.featureId, taskId: "parent-task-3", packetId: "9c".repeat(16), base: fx.c2, candidate: c3, registrationCommit: q3.registration, deltaRequestPath: q3.added.deltaRequestPath, diagnosticPath: d3.diagnosticPath, verdict: PARENT_PASS });
++    parentCommitPaths(fx.root, parentWrittenLineage(fx.root, "9c".repeat(16), f3).commitPaths, "register lineage of round 3");
++    const afterSpecOnly = lapsedAt(head());
++    const boundTo = (packet) => readLapsedCriticFindings({ repoRoot: fx.root, featureId: fx.featureId, candidateCommit: head(), gitCommonDir: join(fx.root, ".git"), boundPacketId: packet }).status;
++    assert.equal(boundTo("9c".repeat(16)), "open", "a pre-check bound to the last registered round judges the course");
++    assert.equal(boundTo("9d".repeat(16)), "unavailable", "a pre-check bound to a round not registered yet leaves it to the close's own check");
++    assert.equal(afterSpecOnly.status, "open", JSON.stringify(afterSpecOnly));
++    assert.deepEqual(afterSpecOnly.open.map((f) => [f.findingId, f.state]).sort(), [[`CRF-${"9a".repeat(16)}-1`, "marked-fixed-without-code"], [`CRF-${"9b".repeat(16)}-1`, "marked-fixed-without-code"]]);
++    // Round 4 corrects the code and passes: the earlier majors are resolved.
++    const c4 = fx.correct("fix4");
++    const d4 = parentRegisterDiagnostic(fx.root, fx.featureId, c4, "r4"); const q4 = parentDeltaRequest(fx.root, ["fix-four"]);
++    const f4 = parentRound(fx.root, { featureId: fx.featureId, taskId: "parent-task-4", packetId: "9d".repeat(16), base: c3, candidate: c4, registrationCommit: q4.registration, deltaRequestPath: q4.added.deltaRequestPath, diagnosticPath: d4.diagnosticPath, verdict: PARENT_PASS });
++    parentCommitPaths(fx.root, parentWrittenLineage(fx.root, "9d".repeat(16), f4).commitPaths, "register lineage of round 4");
++    const afterCode = lapsedAt(head());
++    assert.equal(afterCode.status, "clear", JSON.stringify(afterCode));
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("K-30 a package under the feature id binding an approved Spec in its earlier dated folder admits the first course round, with the course flags and without", () => {
+   const featureId = "held-feature", prefix = `specs/${featureId}`, specPath = "specs/2026-01-01-held-feature/spec.md", manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
+   const root = mkdtempSync(join(tmpdir(), "cdp-k30-"));
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index a1161560eccce5a0b4be560a38c2d4757f7ae8a7..c4cbff422e65af2a1e45512856039e9ac389ed4c 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -414,11 +414,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         return stopResult("critic-standing", "ONESHOT-CRITIC-NOT-PASSED", `The Critic round ${packet} did not pass (${standing.blockers} blocker, ${standing.majors} major, ${standing.minors} minor) and no PO residual acceptance is on record, so this candidate cannot close. A statement in chat is not an acceptance.`,
+           `nothing was written; correct the findings through a dispatch, run a Critic delta round on the new candidate, then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <new-packet-id>. ${acceptance}`);
+       }
+-      // C29 (Claude greenfield run 3, L1): the bound round passed, but an earlier blocker/major was marked fixed by a round that changed no product code or tests.
+-      if (standing?.status === "earlier-findings-open" && Array.isArray(standing.open) && standing.open.length > 0) {
+-        const named = standing.open.map((finding) => `${finding.severity} ${finding.findingId}${finding.originPacketId ? ` (raised in Critic round ${finding.originPacketId})` : ""}`).join("; ");
+-        return stopResult("critic-standing", "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN", `The Critic round ${packet} passed, but ${standing.open.length} finding(s) of an earlier round were marked fixed by a round that changed no product code or tests, so they are still open: ${named}. A statement in chat is not an acceptance.`,
+-          `nothing was written; ${String(standing.repair ?? "correct the named findings through a dispatch and run a Critic delta round over the change").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <the new round's packet id, or ${packet} after a PO acceptance>.`);
++      // C29 (Claude greenfield run 3, L1): an earlier blocker/major was marked fixed by a round that changed only the Spec text, evidence or administration, or is still carried open.
++      // The same holds after a failed round the PO accepted for its own findings: an earlier finding it carried open is not part of that acceptance.
++      const earlierOpen = standing?.status === "earlier-findings-open" ? standing.open : standing?.status === "failed" ? standing.earlierOpen : null;
++      if (Array.isArray(earlierOpen) && earlierOpen.length > 0) {
++        const named = earlierOpen.map((finding) => `${finding.severity} ${finding.findingId}${finding.originPacketId ? ` (raised in Critic round ${finding.originPacketId})` : ""}${finding.state === "still-open" ? ", still open" : ", marked fixed by a round that changed only the Spec text, evidence or administration"}`).join("; ");
++        return stopResult("critic-standing", "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN", `The bound Critic round ${packet} stands, but ${earlierOpen.length} blocker/major finding(s) of an earlier round were never corrected in a reviewed round: ${named}. A statement in chat is not an acceptance.`,
++          `nothing was written; ${String(standing.repair ?? standing.earlierRepair ?? "correct the named findings through a dispatch and run a Critic delta round over the change").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <the new round's packet id, or ${packet} after a PO acceptance>.`);
+       }
+       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
+       if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index f0db99f213031ad5a6ab865cdc571a3abf007a8b..4df8f2b17b90d110f75f1d76147ab0b8a1941c3e 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -435,7 +435,7 @@ test("C29 L1: a passing round with an earlier blocker/major marked fixed without
+   try {
+     const stopped = oneShotClose(f.input, { runCommand: f.runner });
+     assert.equal(stopped.stage, "critic-standing"); assert.equal(stopped.stop.code, "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN");
+-    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\); blocker CRF-${origin}-2`, "u"));
++    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\), marked fixed by a round that changed only the Spec text, evidence or administration; blocker CRF-${origin}-2`, "u"));
+     assert.match(stopped.stop.reason, /A statement in chat is not an acceptance/u);
+     assert.match(stopped.stop.repair, /A blocker can never be accepted[\s\S]*approve-residual-acceptance --by <name> --critic-packet c{32} --reason-class uncorrectable-past-authorship/u);
+     assert.doesNotMatch(stopped.stop.repair, / node pipeline-state\.mjs /u, "the state writer is named by its path");
+@@ -444,6 +444,19 @@ test("C29 L1: a passing round with an earlier blocker/major marked fixed without
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("C29 L1: a failed round the PO accepted for its own minors does not carry an earlier major past the close", () => {
++  const origin = "c".repeat(32);
++  const earlierOpen = [{ findingId: `CRF-${origin}-1`, severity: "major", originPacketId: origin, evidenceSha256: "d".repeat(64), state: "still-open", reviewId: "r2" }];
++  const f = oneShotFixture({ continuity: true, resultBound: false, residualOnRecord: true, criticStanding: { status: "failed", blockers: 0, majors: 0, minors: 1, earlierOpen, earlierRepair: "correct the named findings ... A blocker can never be accepted." } });
++  try {
++    const stopped = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(stopped.stop.code, "ONESHOT-CRITIC-EARLIER-FINDINGS-OPEN", JSON.stringify(stopped).slice(0, 400));
++    assert.match(stopped.stop.reason, new RegExp(`major CRF-${origin}-1 \\(raised in Critic round ${origin}\\), still open`, "u"));
++    assert.match(stopped.stop.repair, /A blocker can never be accepted/u);
++    assert.deepEqual(f.calls, [], "nothing runs before the stop");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("C29 L1: an earlier major the PO accepted as uncorrectable is named in the acceptance question", () => {
+   const origin = "c".repeat(32);
+   const f = oneShotFixture({ acceptance: false, criticStanding: { status: "passed", settled: [{ findingId: `CRF-${origin}-1`, severity: "major", originPacketId: origin, evidenceSha256: "d".repeat(64), markedFixedInReviewId: "r2" }] } });

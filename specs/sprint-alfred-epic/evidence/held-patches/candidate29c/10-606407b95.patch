@@ -1,0 +1,274 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index bc8247dfdcdd92720c11355fc4df9322ca9de9c6..1f14d6d625c48b5f3dfa9d982cc0eccef0118019 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -96,6 +96,24 @@ function applyBound(runner, plan, values, code, subcommand) {
+   return applied;
+ }
+ 
++/**
++ * C29 (Codex run 3, C2): the secret check of the close's generated files under specs/<feature>/ and audit-bundles/<feature>/,
++ * run before the close's irreversible State transition (security-scan.mjs --close-postimages, exit 2 = must stop). Returns the
++ * blocking scan or null. Only an explicit blocking result stops: the full scan on the frozen candidate stays the binding gate.
++ */
++export function closePostimageScanStop(runner, root, featureId) {
++  if (typeof featureId !== "string" || featureId === "") return null;
++  const out = runner(process.execPath, [SECURITY_SCAN, "--root", root, "--close-postimages", featureId]);
++  let scan = null;
++  try { scan = JSON.parse(String(out?.stdout ?? "").trim().split("\n").at(-1)); } catch { scan = null; }
++  return out?.status === 2 && scan?.blocking === true ? scan : null;
++}
++export function closePostimageScanText(scan) {
++  const named = (scan.findings ?? []).slice(0, 10).map((finding) => `${finding.path}:${finding.line} (${finding.rule})`).join(", ");
++  return scan.status === "error" ? `The secret check of the close outputs could not run: ${scan.reason}.` : `The close outputs hold ${scan.findings.length} blocking secret finding(s): ${named}.`;
++}
++const POSTIMAGE_REPAIR = "a real secret: remove it from the source the file was generated from (dispatch briefing, record or evidence) so the regenerated output no longer holds it; a reviewed public value in a generated file: put that exact path and line on the ignore route the close-feature skill names (gitleaks-repair-ignore.mjs --prepare-gate, then --approve-new), and leave the modified .gitleaksignore uncommitted, it travels in the one close commit";
++
+ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact, auditRequest, criticVerifyLifecycle, continuityCloseRequest = null, lifecycleId = null, resumeLifecycleId = null } = {}, deps = {}) {
+   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
+   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
+@@ -213,6 +231,11 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+     || JSON.stringify(next?.argv) !== JSON.stringify(expectedCloseArgv)) {
+     fail("FINISH-CLOSE-ACTION", "Coordinator did not return its exact bound close-feature action.");
+   }
++  // C29 (C2): point B, after the audit bundle exists and before the State close; a rerun replays the prepared phase without rebuilding the bundle.
++  const postimageStop = closePostimageScanStop(runner, root, featureId);
++  if (postimageStop !== null) {
++    fail("FINISH-CLOSE-POSTIMAGE-SECRET", `${closePostimageScanText(postimageStop)} The feature is still open: nothing past the prepared close was written. Repair: ${POSTIMAGE_REPAIR}; then rerun: ${rerun}`);
++  }
+   const closed = armStage("close-feature", () => runner(next.executable, next.argv), (out) => out?.status === 0);
+   if (closed?.status !== 0) fail("FINISH-CLOSE", String(closed?.stderr ?? closed?.stdout ?? "State close failed.").trim() || "State close failed.");
+   return Object.freeze({ schema: "pipeline.finish-feature.v1", status: "closed", lifecycleId: id, featureId, coordinator: preparedApplied, closeOutput: String(closed.stdout ?? "").trim(), writerCommit: writerCommit() });
+@@ -620,6 +643,14 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       try { criticVerifyLifecycle = JSON.parse(readFileSync(resolve(root, auditRequestPath), "utf8")).criticVerifyLifecycleId; } catch { criticVerifyLifecycle = undefined; }
+       if (!/^[a-f0-9]{64}$/u.test(criticVerifyLifecycle ?? "")) return stopResult("resume", "ONESHOT-RESUME-REQUEST-MISSING", `The audit request ${auditRequestPath} written by the first call is missing or unreadable.`, `rerun without --resume-lifecycle-id to produce it again: ${rerunBase}`);
+     }
++    // C29 (C2): point A, before the close coordinator starts: the generated evidence (dispatch projection, Critic exports, acceptance, SBOM) is checked while nothing is irreversible.
++    if (typeof featureId === "string") {
++      stages.push("close-postimage-scan");
++      const postimageStop = closePostimageScanStop(runner, root, featureId);
++      if (postimageStop !== null) {
++        return stopResult("close-postimage-scan", "ONESHOT-CLOSE-POSTIMAGE-SECRET", closePostimageScanText(postimageStop), `nothing irreversible was written (the feature is still open). ${POSTIMAGE_REPAIR}; then rerun the identical command: ${rerun(resumeLifecycleId)}`, { postimageScan: postimageStop, ...(resumeLifecycleId === null ? {} : { resumeLifecycleId, next: rerun(resumeLifecycleId) }) });
++      }
++    }
+     stages.push("close");
+     let closed;
+     try {
+@@ -641,7 +672,9 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   const commitFacts = () => {
+     // not rawGit: its trim() would eat the leading space of the first " M" status entry
+     // C22: the calibrated handover is part of the one close commit when the close rewrote it (CGF-12).
+-    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : [])]);
++    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : []),
++      // C29 (C2): an ignore line added on the close's postimage stop travels in the same one close commit, so the freeze and the final scan see it.
++      ...(existsSync(resolve(root, ".gitleaksignore")) ? [".gitleaksignore"] : [])]);
+     const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
+     const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
+     paths.sort();
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 3a4ed74f26830af7015ccb3bbbdfacfedfedd099..9805a876f42cd7ad647302778044df4a41774b91 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -22,11 +22,14 @@ function closeAction(criticVerifyLifecycle) {
+     "--coordinator-lifecycle", "feature-abc", "--coordinator-sha256", "a".repeat(64),
+     "--critic-verify-lifecycle", criticVerifyLifecycle] };
+ }
++const POSTIMAGE_PASS = { status: 0, stdout: "{\"schema\":\"pipeline.close-postimage-scan.v1\",\"status\":\"pass\",\"blocking\":false,\"findings\":[]}\n", stderr: "" };
++const POSTIMAGE_BLOCK = { status: 2, stdout: "{\"schema\":\"pipeline.close-postimage-scan.v1\",\"status\":\"findings\",\"blocking\":true,\"findings\":[{\"rule\":\"generic-api-key\",\"path\":\"audit-bundles/feature-abc/dispatch-records/briefing-copy.json\",\"line\":7}]}\n", stderr: "" };
+ function fixture() {
+   const criticVerifyLifecycle = "b".repeat(64);
+   const calls = [];
+   let phase = 0;
+   const runner = (executable, argv) => {
++    if (argv.includes("--close-postimages")) return POSTIMAGE_PASS; // C29 (C2): the postimage secret check, not part of the call order asserted below
+     calls.push([executable, argv]);
+     if (argv[0].endsWith("pipeline-state.mjs")) return { status: 0, stdout: "Feature closed", stderr: "" };
+     const sub = argv[1];
+@@ -60,6 +63,18 @@ test("one-shot driver CAS-plans every close transition then invokes only the bou
+   assert.equal(f.calls.at(-1)[1][1], "close-feature");
+ });
+ 
++test("C29-C2: a blocking secret in the close outputs stops before the State close (point B); the feature stays open and the rerun resumes", () => {
++  const f = fixture();
++  const runner = (executable, argv) => (argv.includes("--close-postimages") ? POSTIMAGE_BLOCK : f.runner(executable, argv));
++  assert.throws(() => finishFeature({ rootDir: "/repo", by: "PO", architectureImpact: "no-architecture-impact", auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle, lifecycleId: "feature-abc" }, {
++    realpathSyncFn: value => value,
++    readFileSyncFn: () => JSON.stringify({ activeFeature: { id: "feature-abc" } }),
++    runCommand: runner,
++  }), (error) => error.code === "FINISH-CLOSE-POSTIMAGE-SECRET" && error.lifecycleId === "feature-abc"
++    && /briefing-copy\.json:7 \(generic-api-key\)/u.test(error.message) && /--resume-lifecycle-id feature-abc/u.test(error.message) && /gitleaks-repair-ignore\.mjs/u.test(error.message));
++  assert.equal(f.calls.some(([, argv]) => argv[1] === "close-feature"), false, "the State close never ran");
++});
++
+ test("resume from a checkpoint reuses the same lifecycle without repeating start or checkpoint effects", () => {
+   const f = fixture();
+   const runner = (executable, argv) => argv[1] === "inspect"
+@@ -79,6 +94,7 @@ test("resume of a prepared close uses only its recorded operation digest and one
+   const digest = "d".repeat(64);
+   const calls = [];
+   const runner = (executable, argv) => {
++    if (argv.includes("--close-postimages")) return POSTIMAGE_PASS;
+     calls.push(argv);
+     if (argv[1] === "inspect") return response({ identity: { lifecycleId: "feature-abc", featureId: "feature-abc" }, coordinator: { phase: "feature-close-prepared", architectureImpact: "no-architecture-impact", featureCloseAudit: { criticVerifyLifecycleId: f.criticVerifyLifecycle }, effects: [{ operationSha256: digest }] } });
+     if (argv[1] === "apply-transition") return response({ status: "replayed", stateSha256: "a".repeat(64), nextAction: closeAction(f.criticVerifyLifecycle) });
+@@ -260,7 +276,7 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+ // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
+ // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
+ // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
+-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null } = {}) {
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false } = {}) {
+   const independenceChecks = []; let retired = false;
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+@@ -286,6 +302,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
+     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
+     if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
++    if (script === "security-scan.mjs" && argv.includes("--close-postimages")) { calls.push("security-scan.mjs --close-postimages"); return postimageBlocking ? POSTIMAGE_BLOCK : POSTIMAGE_PASS; }
+     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
+     if (script === "verify-evidence-producer.mjs") {
+       if (verifyRed) return { status: 2, stdout: "", stderr: "verify-evidence-producer: VEP-FAILED: suite red\n" };
+@@ -327,13 +344,31 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+ }
+ const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
+ 
++test("C29-C2: a blocking secret in the generated close outputs stops the one-shot before the close coordinator starts (point A)", () => {
++  const f = oneShotFixture({ postimageBlocking: true });
++  try {
++    const result = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(result.status, "stopped", JSON.stringify(result).slice(0, 400));
++    assert.equal(result.stage, "close-postimage-scan");
++    assert.equal(result.stop.code, "ONESHOT-CLOSE-POSTIMAGE-SECRET");
++    assert.match(result.stop.reason, /briefing-copy\.json:7 \(generic-api-key\)/u);
++    assert.match(result.stop.repair, /nothing irreversible was written/u);
++    assert.equal(result.postimageScan.blocking, true);
++    assert.equal(f.calls.some((call) => call.startsWith("close-coordinator") || call === "pipeline-state close-feature"), false, "no close transition ran");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("P3: one command takes the active feature from the approved candidate to the printed commit, and signs and pushes nothing", () => {
+   const f = oneShotFixture();
+   try {
+     const result = oneShotClose(f.input, { runCommand: f.runner });
+     assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
++    assert.ok(result.stages.includes("close-postimage-scan"));
+     assert.deepEqual(f.calls, ["verify-evidence-producer.mjs", "register-feature-package.mjs", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply",
+-      "close-coordinator plan-start", "close-coordinator apply-start", "close-coordinator plan-transition", "close-coordinator apply-transition", "close-coordinator plan-transition", "close-coordinator apply-transition", "pipeline-state close-feature",
++      // C29 (C2): the close outputs are secret-checked before the coordinator starts (A) and again, with the audit bundle, before the State close (B).
++      "security-scan.mjs --close-postimages",
++      "close-coordinator plan-start", "close-coordinator apply-start", "close-coordinator plan-transition", "close-coordinator apply-transition", "close-coordinator plan-transition", "close-coordinator apply-transition",
++      "security-scan.mjs --close-postimages", "pipeline-state close-feature",
+       // P3: the one-shot reads the coordinator's phase once after the State close (inspect) before it finalizes the tracked effects; the stage order is otherwise as written.
+       "close-coordinator inspect", "close-coordinator plan-transition", "close-coordinator apply-transition"]);
+     assert.deepEqual(forbidden(f.calls), []);
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index 57068b43db6fbc810e660e5430b9c32a9657b28a..4afd28a682d448aa71a0d3836376438f48a7a3de 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -96,7 +96,7 @@
+  *
+  * CLI: `node plugins/pipeline-core/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
+  */
+-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ import { tmpdir } from "node:os";
+ import { basename, dirname, join, relative, resolve, sep } from "node:path";
+@@ -1347,6 +1347,72 @@ function printSummary(evidence, critical = false, exceptions = null) {
+ // CLI
+ // ---------------------------------------------------------------------------------------------
+ 
++/**
++ * C29 (Codex run 3, C2): the secret check of the close's own generated files BEFORE the close's irreversible state
++ * transition. The full scan runs only on the frozen candidate after the close commit, so a finding in a generated
++ * close artifact (a briefing copy in the audit bundle) used to surface after the state and the acceptance were written.
++ * This scans exactly the changed and untracked files under specs/<feature>/ and audit-bundles/<feature>/ (a copy
++ * under scratch/, with the root .gitleaksignore, so the reviewed ignore route applies unchanged) with the gitleaks
++ * adapter, and decides blocking the way the full scan does: a finding at a block_on severity or a scanner ERROR
++ * blocks unless the security gate mode is warn or off; a missing scanner is coverage (SKIPPED), not blocking.
++ * Output carries path, rule and line only, never a matched value.
++ */
++export async function scanClosePostimages({ rootDir, featureId, env = process.env, spawnFn, platform = process.platform, timeoutMs = DEFAULT_TIMEOUT_MS, gitStatusFn } = {}) {
++  const root = resolve(rootDir);
++  const authority = resolveProjectAuthorityPaths({ rootDir: root });
++  const authorityBlocked = new Set(["mixed", "invalid"]).has(authority.status);
++  const manifest = authorityBlocked ? null : loadManifestSafe(root, authority.status === "ready" ? { manifestRelPath: authority.manifest } : undefined);
++  const mode = resolveSecurityGateMode(manifest);
++  const blocks = mode !== "warn" && mode !== "off";
++  const blockOn = resolveBlockOn(manifest);
++  const base = { schema: "pipeline.close-postimage-scan.v1", featureId, mode };
++  if (!/^[A-Za-z0-9._-]{1,128}$/u.test(featureId ?? "")) return { ...base, status: "error", blocking: true, reason: "feature id is missing or invalid", scanned: 0, findings: [] };
++  if (authorityBlocked) return { ...base, status: "error", blocking: blocks, reason: `project authority is ${authority.status}`, scanned: 0, findings: [] };
++  const status = (gitStatusFn ?? ((args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false })))(["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", `specs/${featureId}`, `audit-bundles/${featureId}`]);
++  if (status?.status !== 0) return { ...base, status: "error", blocking: blocks, reason: "git status of the close outputs could not be read", scanned: 0, findings: [] };
++  const tokens = String(status.stdout ?? "").split("\0").filter((token) => token !== "");
++  const files = [];
++  for (let index = 0; index < tokens.length; index += 1) {
++    const code = tokens[index].slice(0, 2);
++    if (!code.includes("D")) files.push(tokens[index].slice(3));
++    if (/[RC]/u.test(code)) index += 1;
++  }
++  const scanned = [...new Set(files)].sort();
++  if (!isScannerEnabled(manifest, "gitleaks")) return { ...base, status: "not-enabled", blocking: false, scanned: scanned.length, findings: [] };
++  if (scanned.length === 0) return { ...base, status: "nothing-to-scan", blocking: false, scanned: 0, findings: [] };
++  let inst = gitleaksAdapter.isInstalled(env);
++  if (inst.installed) {
++    const assessed = assessTrustedExecutablePath(inst.path, { platform });
++    inst = assessed.ok ? { installed: true, path: assessed.path } : { installed: false, status: assessed.status };
++  }
++  if (!inst.installed && typeof env?.HOME === "string" && env.HOME.length > 0) {
++    const trusted = resolveTrustedSystemExecutable("gitleaks", { platform, homeDir: env.HOME });
++    if (trusted.ok) inst = { installed: true, path: trusted.path };
++  }
++  if (!inst.installed) return { ...base, status: "scanner-missing", blocking: false, scanned: scanned.length, findings: [] };
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  const copy = mkdtempSync(join(root, "scratch", "close-postimage-scan-"));
++  try {
++    for (const relativePath of [...scanned, ".gitleaksignore"]) {
++      const source = join(root, relativePath);
++      if (!existsSync(source) || !statSync(source).isFile()) continue;
++      const target = join(copy, relativePath);
++      mkdirSync(dirname(target), { recursive: true });
++      writeFileSync(target, readFileSync(source));
++    }
++    const runArgs = { rootDir: copy, config: { binaryPath: inst.path }, timeoutMs, env };
++    if (spawnFn) runArgs.spawnFn = spawnFn;
++    const result = await gitleaksAdapter.run(runArgs);
++    if (result.status === "ERROR") return { ...base, status: "error", blocking: blocks, reason: String(result.reason ?? "gitleaks error").slice(0, 300), scanned: scanned.length, findings: [] };
++    const retained = Array.isArray(result.findings) ? result.findings : [];
++    const findings = retained.map((finding) => ({ rule: finding.rule, path: finding.path, line: finding.line }));
++    const blocking = blocks && blockingFindings(retained, blockOn).length > 0;
++    return { ...base, status: findings.length > 0 ? "findings" : "pass", blocking, scanned: scanned.length, findings };
++  } finally {
++    rmSync(copy, { recursive: true, force: true });
++  }
++}
++
+ function parseArgs(argv) {
+   const opts = { root: process.cwd(), timeoutMs: DEFAULT_TIMEOUT_MS };
+   for (let i = 0; i < argv.length; i++) {
+@@ -1363,6 +1429,9 @@ function parseArgs(argv) {
+     } else if (a === "--out-dir") {
+       opts.outDir = argv[++i];
+       if (!opts.outDir || opts.outDir.startsWith("-")) throw new Error("--out-dir requires a directory under scratch/");
++    } else if (a === "--close-postimages") {
++      opts.closePostimages = argv[++i];
++      if (!opts.closePostimages || opts.closePostimages.startsWith("-")) throw new Error("--close-postimages requires the feature id");
+     } else if (a === "--remote") {
+       opts.remoteName = argv[++i];
+       if (!opts.remoteName || opts.remoteName.startsWith("-")) throw new Error("--remote requires a configured remote name");
+@@ -1393,6 +1462,14 @@ export async function main(argv = process.argv.slice(2)) {
+     return;
+   }
+ 
++  if (opts.closePostimages !== undefined) {
++    // C29 (C2): one JSON line; exit 2 when the close must stop before its state transition, else 0. Writes no evidence file.
++    const scan = await scanClosePostimages({ rootDir, featureId: opts.closePostimages, timeoutMs: opts.timeoutMs });
++    process.stdout.write(`${JSON.stringify(scan)}\n`);
++    process.exitCode = scan.blocking ? 2 : 0;
++    return;
++  }
++
+   let outDir = null;
+   if (opts.outDir !== undefined) {
+     // An analysis run: lexically strictly beneath <root>/scratch/ (no "..", no absolute escape); refused before anything is written.

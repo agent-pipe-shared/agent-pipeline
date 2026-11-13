@@ -1,0 +1,21 @@
+diff --git a/plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs b/plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs
+index 9ee0da220b23f8a5ceaba2d3f618039f7a9294bc..fd37a7e57b902efbc221b093470b04dfbef67df8 100644
+--- a/plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs
++++ b/plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs
+@@ -35,11 +35,14 @@ test("resume-hint inspect --root <root> is admitted by the catalogue and the she
+ });
+ 
+ test("only exactly `inspect --root <root>` is admitted; every other shape keeps its refusal", () => {
++  // Candidate 29 (AGY run 3, R7, commit ad059b943): `consume` and `query` in exactly `<verb> --root <root> --session-id <id>` record
++  // or read only whether this session received the card, and are admitted; every wider shape of them stays refused.
++  for (const verb of ["consume", "query"]) assert.equal(isSanctionedLifecycleCommand(`node ${resumeHint} ${verb} --root ${root} --session-id s1`, root), true, verb);
+   const refused = {
+     "capture": `node ${resumeHint} capture --root ${root} --card-file scratch/card.json`,
+     "discard": `node ${resumeHint} discard --root ${root}`,
+-    "consume": `node ${resumeHint} consume --root ${root} --session-id s1`,
+-    "query": `node ${resumeHint} query --root ${root} --session-id s1`,
++    "consume without a session": `node ${resumeHint} consume --root ${root}`,
++    "query with an extra flag": `node ${resumeHint} query --root ${root} --session-id s1 --feature-id f`,
+     "extra flag": `node ${resumeHint} inspect --root ${root} --feature-id f`,
+     "trailing word": `node ${resumeHint} inspect --root ${root} extra`,
+     "different root": `node ${resumeHint} inspect --root ${join(root, "other")}`,

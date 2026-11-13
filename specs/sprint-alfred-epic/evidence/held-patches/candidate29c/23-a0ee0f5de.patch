@@ -1,0 +1,58 @@
+diff --git a/plugins/pipeline-core/lib/design-review-observation.mjs b/plugins/pipeline-core/lib/design-review-observation.mjs
+index f5c35b674ca2981e6a7aa6c7cbf8690510fab65d..9e95821c4ec7df24c6e01378c03611e9045d323c 100644
+--- a/plugins/pipeline-core/lib/design-review-observation.mjs
++++ b/plugins/pipeline-core/lib/design-review-observation.mjs
+@@ -9,8 +9,8 @@
+  *    the returned text blocks) -> assurance `host-observed-tool-use`;
+  *  - background: the SubagentStop carries no model, so the models come from the child's own host-written transcript
+  *    (`<transcript without .jsonl>/subagents/agent-<agent_id>.jsonl`, `message.model` of its assistant records), the same
+- *    file the Goldfish stop already trusts for a SubagentHandback; the returned text is `last_assistant_message`, else the
+- *    child's last handback -> assurance `host-observed-child-transcript`.
++ *    file the Goldfish stop already trusts for a SubagentHandback; the returned text is the child's last SubagentHandback
++ *    message (what the parent receives), else `last_assistant_message` -> assurance `host-observed-child-transcript`.
+  * The hook reads the transcript itself, bounded, and keeps only the model ids and the returned text: nothing of it reaches
+  * the agent's context (PO 2026-11-13: without flooding the context).
+  *
+@@ -108,11 +108,14 @@ export function observeClaudeDesignReview(input, { readHandbackFn = null, readMo
+     const read = readModelsFn(input);
+     if (!read.ok) return { status: "unobserved", code: read.code };
+     if (read.models.length === 0) return { status: "unobserved", code: "DRO-NO-TRANSCRIPT-MODEL" };
+-    let text = typeof input.last_assistant_message === "string" && input.last_assistant_message.trim() !== "" ? input.last_assistant_message : null;
+-    if (text === null && typeof readHandbackFn === "function") {
++    // PF-61/PF-70: a background child ends with a SubagentHandback tool call, and that message is what the parent
++    // receives; last_assistant_message is then absent or later trailing prose. The handback wins whenever there is one.
++    let text = null;
++    if (typeof readHandbackFn === "function") {
+       const handback = readHandbackFn(input);
+       if (handback?.ok === true && typeof handback.message === "string" && handback.message.trim() !== "") text = handback.message;
+     }
++    if (text === null && typeof input.last_assistant_message === "string" && input.last_assistant_message.trim() !== "") text = input.last_assistant_message;
+     if (text === null) return { status: "unobserved", code: "DRO-NO-TEXT" };
+     return { status: "observed", assurance: "host-observed-child-transcript", modelsUsed: read.models, text };
+   }
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index 4e4d256c0793e9040e454d19763f84cc32807b37..18cdceea3a088f634ab23b6f921ae76781011c44 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -523,6 +523,21 @@ test("D247: a child transcript that is a symlink or holds no model is refused, n
+   assert.deepEqual(observeClaudeDesignReview(linked.stop("r")), { status: "unobserved", code: "DRO-TRANSCRIPT-UNSAFE" });
+ });
+ 
++test("D247: a background reviewer's SubagentHandback is the observed text, never later trailing prose (PF-61/PF-70)", async (t) => {
++  const { observeClaudeDesignReview } = await import("../lib/design-review-observation.mjs");
++  const { readSubagentHandbackMessage } = await import("../lib/native-goldfish-host-finalizer.mjs");
++  const world = observationWorld(t);
++  const file = join(world.stop("r").transcript_path.slice(0, -".jsonl".length), "subagents", "agent-a1.jsonl");
++  const handback = JSON.stringify({ type: "assistant", message: { role: "assistant", model: "claude-opus-4", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: "# Review\n\nVerdict: PASS\n" } }] } });
++  const trailing = JSON.stringify({ type: "assistant", message: { role: "assistant", model: "claude-opus-4", content: [{ type: "text", text: "Handed back." }] } });
++  writeFileSync(file, `${handback}\n${trailing}\n`);
++  const seen = observeClaudeDesignReview(world.stop("Handed back."), { readHandbackFn: readSubagentHandbackMessage });
++  assert.equal(seen.status, "observed");
++  assert.equal(seen.text, "# Review\n\nVerdict: PASS\n", "the parent receives the handback, so the handback is the report");
++  const noHandback = observationWorld(t);
++  assert.equal(observeClaudeDesignReview(noHandback.stop("# Plain\n"), { readHandbackFn: readSubagentHandbackMessage }).text, "# Plain\n", "without a handback the last message is the return");
++});
++
+ test("D247: export-report writes the observed text, and create stamps the observation and the observed model", withRepo(async (repo, t) => {
+   const { recordDesignReviewObservation } = await import("../lib/design-review-observation.mjs");
+   const world = observationWorld(t);
