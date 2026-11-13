@@ -71,7 +71,7 @@ const REASONS = Object.freeze({
   "PUSH-PROOF-BINDING-MISMATCH": "the recorded approval was given for a different remote or destination",
   "PUSH-PROOF-THREAT-MODEL": "the push threat model changed (or is unreadable) since the approval was signed",
   "PUSH-PROOF-KIND": "the recorded proof is not a push approval",
-  "PUSH-PROOF-EXPIRED": "the recorded approval has expired",
+  "PUSH-PROOF-EXPIRED": "the recorded approval has expired; run push-init.mjs again with the same --remote and --destination for a fresh signing command, have the PO sign it, then approve-push with the new proof",
   "PUSH-PROOF-SUBJECT-MISMATCH": "the signed subject does not match this commit, tree, remote and destination",
   "PUSH-PROOF-STATE-AUTHORITY": "the approved plan and spec authority needed to check the signature is missing",
   "PUSH-PROOF-INTENT-MISMATCH": "the approval was signed under a different plan or spec authority",

@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
-import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
+import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, criticalProofRefusalHint, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
 import { INTAKE_STAGING_DIRNAME, classifyOnboardingContinuity, inactiveLifecycleTransitionTimestamp } from "../lib/onboarding-continuity.mjs";
 import {
   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
@@ -3973,3 +3973,10 @@ n26Test("N26-h a residual-acceptance proof consumed only in the private approval
 
 assert.deepEqual(n26Failures, [], "N26 private approval store cases failed: " + n26Failures.join(" | "));
 console.log("N26 private approval store cases a..h complete.");
+
+// Candidate 29 (AGY run 3, R12): an expired proof names the way to a fresh signing command; a caller's own renewal text wins.
+assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED"), /signature window \(its --expires-at\) has passed/u);
+assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED"), /push-init\.mjs with the same --remote and --destination/u);
+assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED", " Run this command again."), /has passed, so it cannot be used\. Run this command again\.$/u);
+assert.equal(criticalProofRefusalHint("SOME-OTHER-CODE"), "");
+console.log("C29 R12 expired-proof hint complete.");

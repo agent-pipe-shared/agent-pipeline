@@ -10145,9 +10145,13 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
 // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
 // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
 /** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
-function criticalProofRefusalHint(code, renewal = "") {
+export function criticalProofRefusalHint(code, renewal = "") {
   if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
   if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return ` The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request.${renewal}`;
+  // Candidate 29 (AGY run 3, R12): a push signed in the evening and approved the next morning failed here without naming the way on.
+  if (code === "CRITICAL-ACTION-PROOF-EXPIRED") {
+    return ` The proof's signature window (its --expires-at) has passed, so it cannot be used.${renewal === "" ? " Run the step that printed the signing command again (for a push: push-init.mjs with the same --remote and --destination) to get a fresh signatureCommand, and have the PO sign that one." : renewal}`;
+  }
   return "";
 }
 

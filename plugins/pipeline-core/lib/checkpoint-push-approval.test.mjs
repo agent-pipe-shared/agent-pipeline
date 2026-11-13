@@ -308,6 +308,8 @@ try {
     const { root, threatModel } = fixture({ anchorKey: key });
     const record = approvalRecord({ key, threatModel });
     assertRefused(call(root, stateFor(record), { now: AFTER_EXPIRY }), "PUSH-PROOF-EXPIRED");
+    // Candidate 29 (AGY run 3, R12): the reason names the way to a fresh approval.
+    assert.match(call(root, stateFor(record), { now: AFTER_EXPIRY }).reason, /run push-init\.mjs again with the same --remote and --destination/u);
   });
 
   check("CPA7 an approval bound to another destination or another remote is refused", () => {
