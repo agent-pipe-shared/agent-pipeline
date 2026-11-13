@@ -18,10 +18,30 @@ const safePath = value => typeof value === "string" && value.length > 0 && !isAb
 // a hex key of 32..64 characters that the project itself publishes as the tracked file `public/<key>.txt` whose whole content is that
 // key (the IndexNow protocol). The proof is checked here, not claimed: a regular non-linked file, tracked by Git, identical content.
 // Any other credential-shaped value stays refused, and the refusal text names what is accepted.
-export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, or a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key";
+export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key, or (rule generic-api-key only) a public identifier such as app.results.v1 that the project's own tracked source code holds verbatim as a quoted string";
 const PUBLIC_KEY = /^[a-f0-9]{32,64}$/u;
-export function reviewedValueClass(rootDir, value, gitFn = spawnSync) {
+// Candidate 28e (Codex test run, PO decision 2026-11-13): a public application identifier (a storage key or namespace name such as
+// `app.results.v1`) is admitted for the rule generic-api-key only. The shape is closed: 2 to 8 segments joined by `.`, `_` or `-`, each a
+// lowercase word of 2 to 32 letters or a short version number (`v1`, `2`), at most 64 characters; a random token has no such shape. The
+// proof is checked, not claimed: the value stands verbatim inside quotes in a tracked file outside the Pipeline's own records.
+const IDENTIFIER_SEGMENT = /^(?:[a-z]{2,32}|v?\d{1,4})$/u;
+const IDENTIFIER_RECORD_PATHS = [":(exclude)specs", ":(exclude)audit-bundles", ":(exclude)evidence", ":(exclude)project", ":(exclude).claude", ":(exclude)scratch", ":(exclude)architecture", ":(exclude)docs", ":(exclude).gitleaksignore"];
+export function publicIdentifierShape(value) {
+  if (typeof value !== "string" || value.length < 5 || value.length > 64 || !/^[a-z0-9._-]+$/u.test(value)) return false;
+  const segments = value.split(/[._-]/u);
+  return segments.length >= 2 && segments.length <= 8 && segments.every((segment) => IDENTIFIER_SEGMENT.test(segment))
+    && segments.some((segment) => /^[a-z]{2,32}$/u.test(segment));
+}
+function publicIdentifierInTrackedSource(rootDir, value, gitFn) {
+  const quoted = [`'${value}'`, `"${value}"`, `\`${value}\``].flatMap((needle) => ["-e", needle]);
+  const found = gitFn("git", ["grep", "-l", "-F", ...quoted, "--", ".", ...IDENTIFIER_RECORD_PATHS], { cwd: rootDir, encoding: "utf8", shell: false });
+  return found.status === 0 && typeof found.stdout === "string" && found.stdout.trim() !== "";
+}
+export function reviewedValueClass(rootDir, value, gitFn = spawnSync, rule = null) {
   if (domain(value)) return "domain";
+  if (rule === "generic-api-key" && typeof rootDir === "string" && publicIdentifierShape(value)) {
+    try { return publicIdentifierInTrackedSource(rootDir, value, gitFn) ? "public-identifier" : null; } catch { return null; }
+  }
   if (typeof value !== "string" || !PUBLIC_KEY.test(value) || typeof rootDir !== "string") return null;
   try {
     const rel = `public/${value}.txt`;
@@ -75,7 +95,7 @@ function selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) {
 
 export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
   reviewedValue, spawnFn = spawnSync, env = process.env }) {
-  if (reviewedValueClass(rootDir, reviewedValue) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
+  if (reviewedValueClass(rootDir, reviewedValue, spawnSync, rule) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
   if (!safePath(path) || typeof rule !== "string" || !/^[a-z0-9][a-z0-9._-]*$/iu.test(rule)
     || !Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
     return { ok: false, reason: "invalid finding selector" };
@@ -133,7 +153,7 @@ export async function verifyReproductionGate({ gate, ...options }) {
 export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, reviewedValue, rawReport, observedReportSha256 }) {
   try {
     const configPath = resolveGitleaksConfigPath();
-    return reviewedValueClass(rootDir, reviewedValue) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
+    return reviewedValueClass(rootDir, reviewedValue, spawnSync, gate?.rule ?? null) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
       && digest(reviewedValue) === gate.valueSha256
       && (typeof rawReport === "string" ? selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) : observedReportSha256) === gate.reportSha256
       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256

@@ -113,6 +113,60 @@ test("the public-value class is closed: untracked, missing, differing or malform
   } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
 });
 
+// Candidate 28e (Codex test run, PO 2026-11-13): a public application identifier (a localStorage key name) that gitleaks reads as a
+// generic API key had no review route. It is reviewable for generic-api-key only, in a closed shape, and only when the project's own
+// tracked source holds it verbatim inside quotes; a copy in the Pipeline's own records (specs/, evidence, audit bundles) proves nothing.
+const IDENTIFIER = "sampleapp.results.v1";
+const RECORD_PATH = "specs/f/evidence/dispatch-projection.json";
+const identifierFixture = ({ source = "tracked", rule = RULE } = {}) => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-public-identifier-"));
+  gitIn(rootDir, "init", "-q");
+  mkdirSync(join(rootDir, "src/platform"), { recursive: true });
+  mkdirSync(join(rootDir, "specs/f/evidence"), { recursive: true });
+  writeFileSync(join(rootDir, RECORD_PATH), `{"text":"storageKey = '${IDENTIFIER}'."}\n`);
+  gitIn(rootDir, "add", RECORD_PATH);
+  if (source !== "none") writeFileSync(join(rootDir, "src/platform/results.js"), `var resultsNamespace = '${IDENTIFIER}';\n`);
+  if (source === "tracked") gitIn(rootDir, "add", "src/platform/results.js");
+  const binaryPath = join(rootDir, "scanner-binary");
+  writeFileSync(binaryPath, "synthetic binary identity");
+  const spawnFn = (_command, args) => {
+    const report = [{ File: join(rootDir, RECORD_PATH), RuleID: rule, StartLine: 1, StartColumn: 10, Secret: IDENTIFIER, Description: "Generic API Key" }];
+    writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(report));
+    return { status: 0, stdout: "", stderr: "", error: null };
+  };
+  return { rootDir, binaryPath, spawnFn, path: RECORD_PATH, rule, line: 1, column: 10, reviewedValue: IDENTIFIER };
+};
+
+test("C28e (Codex test run): a public identifier the tracked source holds verbatim is reviewable for generic-api-key and the gate verifies", async () => {
+  const f = identifierFixture();
+  try {
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE), "public-identifier");
+    const result = await reproduceReviewedFinding(f);
+    assert.equal(result.ok, true, result.reason);
+    assert.doesNotMatch(JSON.stringify(result.gate), /sampleapp/u, "the value itself never enters the gate");
+    assert.equal((await verifyReproductionGate({ ...f, gate: result.gate })).ok, true);
+    assert.match(REVIEWED_VALUE_REFUSAL, /public identifier/u);
+  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+});
+
+test("C28e (Codex test run): the public-identifier class is closed: other rule, untracked or record-only source, and token shapes stay refused", async () => {
+  for (const [label, options] of [["another rule", { rule: "aws-access-token" }], ["untracked source", { source: "untracked" }], ["only in the Pipeline's records", { source: "none" }]]) {
+    const f = identifierFixture(options);
+    try {
+      const refused = await reproduceReviewedFinding(f);
+      assert.equal(refused.ok, false, label);
+      assert.equal(refused.reason, REVIEWED_VALUE_REFUSAL, label);
+    } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+  }
+  const f = identifierFixture();
+  try {
+    for (const value of ["sampleapp", "Sampleapp.Results.V1", "k3j9x2q8.z7w4", "ab12cd34ef.results.v1", `${"a".repeat(30)}.${"b".repeat(30)}.v1`, "results.v1/../x", "1.2.3"]) {
+      assert.equal(reviewedValueClass(f.rootDir, value, spawnSync, RULE), null, `refused shape: ${value}`);
+    }
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER), null, "without the rule the identifier class does not apply");
+  } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+});
+
 // Candidate 16c (consumer finding): on a working root the report holds every finding of the tree in a changing order. The gate binds only
 // the selected finding, so a second scan with other, more, differently ordered findings still verifies, and a changed selected finding does not.
 test("the gate binds the selected finding, not the whole report: unrelated and reordered findings do not invalidate it", async () => {

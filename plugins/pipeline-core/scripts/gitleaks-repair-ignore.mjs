@@ -329,7 +329,7 @@ async function main() {
   const missing = required.filter((k) => args[k] === undefined);
   if (missing.length > 0) {
     console.error(`gitleaks-repair-ignore: missing required flag(s): ${missing.map((k) => `--${k}`).join(", ")}`);
-    console.error("usage: node gitleaks-repair-ignore.mjs --prepare-gate --path <relative> --rule <id> --line <n> --column <n> --gate-file <scratch-file> --reviewed-value-file <scratch-file> [--root <dir>] [--reason \"<why>\", required when the value is a public key published as tracked public/<key>.txt]; then use --approve-new --line <n> or --old-line <n> with the same selectors and gate/review flags");
+    console.error("usage: node gitleaks-repair-ignore.mjs --prepare-gate --path <relative> --rule <id> --line <n> --column <n> --gate-file <scratch-file> --reviewed-value-file <scratch-file> [--root <dir>] [--reason \"<why>\", required when the value is a public key published as tracked public/<key>.txt or a public identifier (generic-api-key) the tracked source holds verbatim]; then use --approve-new --line <n> or --old-line <n> with the same selectors and gate/review flags");
     process.exitCode = 1;
     return;
   }
@@ -350,15 +350,18 @@ async function main() {
   }
   // Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is admitted besides a plain
   // domain, but only with a written reason, which is printed so the chat confirmation and the close report can quote it.
-  const valueClass = reviewedValueClass(rootDir, reviewedValue);
+  // Candidate 28e (PO 2026-11-13): a public identifier the tracked source holds verbatim (rule generic-api-key only) takes the same reason.
+  const valueClass = reviewedValueClass(rootDir, reviewedValue, undefined, args.rule);
   if (valueClass === null) { console.error(`gitleaks-repair-ignore: ${REVIEWED_VALUE_REFUSAL}`); process.exitCode = 1; return; }
-  if (valueClass === "public-key-file") {
+  if (valueClass === "public-key-file" || valueClass === "public-identifier") {
     if (typeof args.reason !== "string" || args.reason.trim().length < 10) {
       console.error("gitleaks-repair-ignore: a public value needs --reason \"<why this value is public by design>\" (at least 10 characters)");
       process.exitCode = 1;
       return;
     }
-    console.log(`gitleaks-repair-ignore: public-by-design value (tracked public/<key>.txt matches); reason: ${args.reason.trim()}`);
+    console.log(valueClass === "public-key-file"
+      ? `gitleaks-repair-ignore: public-by-design value (tracked public/<key>.txt matches); reason: ${args.reason.trim()}`
+      : `gitleaks-repair-ignore: public identifier (the tracked source holds it verbatim as a quoted string); reason: ${args.reason.trim()}`);
   }
   if (args["prepare-gate"]) {
     const produced = await reproduceReviewedFinding({ rootDir, binaryPath, path: args.path,
