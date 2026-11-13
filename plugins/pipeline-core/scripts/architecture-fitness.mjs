@@ -186,6 +186,19 @@ export function extractJsImports(sourceCode) {
 }
 
 /**
+ * Candidate 29 (Glossover K-23): a module that names a path among its own verificationEntryPoints or publicContracts declares that surface,
+ * even when its ownedPaths do not cover it (an integration test or a browser spec beside the unit tests the module owns). Exactly one
+ * declaring module resolves the path; none or several leave it unresolved.
+ */
+function moduleDeclaringSurface(path, inventory) {
+  const moduleList = Array.isArray(inventory) ? inventory : (inventory?.modules || []);
+  const normalized = String(path).replace(/\\/g, "/").replace(/^\.\//u, "");
+  const declaring = moduleList.filter((mod) => [...(mod.verificationEntryPoints || []), ...(mod.publicContracts || [])]
+    .some((surface) => typeof surface === "string" && surface.replace(/\\/g, "/").replace(/^\.\//u, "") === normalized));
+  return declaring.length === 1 ? declaring[0] : null;
+}
+
+/**
  * Class 1: Module Identity & Ownership
  */
 export function evaluateModuleIdentityOwnership({ rootDir, inventory, candidatePaths = [] }) {
@@ -195,7 +208,7 @@ export function evaluateModuleIdentityOwnership({ rootDir, inventory, candidateP
   for (const p of candidatePaths) {
     if (p.startsWith("scratch/") || p.startsWith(".git/") || p.endsWith(".md")) continue;
     checked.push(p);
-    const mod = resolveModuleForPath(p, inventory);
+    const mod = resolveModuleForPath(p, inventory) ?? moduleDeclaringSurface(p, inventory);
     if (!mod) {
       violations.push({
         ruleId: "unresolved-module-path",

@@ -232,6 +232,21 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(invalid.violations[0].ruleId, "unresolved-module-path");
     });
 
+    it("Class 1: a module's own declared entry point or contract resolves to it outside its ownedPaths; several declarers do not (Glossover K-23)", () => {
+      const declared = [
+        { id: "assistant", ownedPaths: ["tests/unit/assistant/**"], verificationEntryPoints: ["tests/integration/assistant-routes.test.ts", "./tests/e2e-browser/assistant.spec.ts"], publicContracts: [] },
+        { id: "identity", ownedPaths: ["tests/unit/identity.test.ts"], verificationEntryPoints: ["tests/integration/shared.test.ts"], publicContracts: ["docs/contracts/identity.json"] },
+        { id: "other", ownedPaths: ["src/other/**"], verificationEntryPoints: ["tests/integration/shared.test.ts"], publicContracts: [] },
+      ];
+      const resolved = evaluateModuleIdentityOwnership({ rootDir: REPO_ROOT, inventory: declared,
+        candidatePaths: ["tests/integration/assistant-routes.test.ts", "tests/e2e-browser/assistant.spec.ts", "docs/contracts/identity.json", "tests/unit/assistant/a.test.ts"] });
+      assert.equal(resolved.outcome, OUTCOME_PASS, JSON.stringify(resolved.violations));
+      const unresolved = evaluateModuleIdentityOwnership({ rootDir: REPO_ROOT, inventory: declared,
+        candidatePaths: ["tests/integration/shared.test.ts", "tests/integration/undeclared.test.ts"] });
+      assert.equal(unresolved.outcome, OUTCOME_FINDING);
+      assert.deepEqual(unresolved.violations.map((v) => v.target), ["tests/integration/shared.test.ts", "tests/integration/undeclared.test.ts"]);
+    });
+
     it("Class 2: contract-presence-freshness verifies public contracts and detects missing/stale files", () => {
       const valid = evaluateContractPresenceFreshness({
         rootDir: REPO_ROOT,
