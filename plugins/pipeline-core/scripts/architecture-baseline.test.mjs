@@ -787,11 +787,16 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       const roundPath = "specs/e2e/evidence/critic-lineage-round-1.json";
       fs.writeFileSync(path.join(f.dir, earlierPath), earlierBytes);
       fs.writeFileSync(path.join(f.dir, roundPath), roundBytes);
+      const threatBytes = "# Threat model\n";
+      const threatPath = "specs/e2e/design/threat-model.md";
+      fs.mkdirSync(path.join(f.dir, "specs/e2e/design"), { recursive: true });
+      fs.writeFileSync(path.join(f.dir, threatPath), threatBytes);
       // As observed: the package still binds the PRD and Spec digests of the earlier approval (FTP-ARTIFACT-0/1 in the refusal).
       const others = current.artifacts.filter((entry) => entry !== envelope)
         .map((entry) => (entry.class === "prd" || entry.class === "spec" ? { ...entry, sha256: sha(`earlier ${entry.class}\n`) } : entry));
-      const listed = ({ state = "implementing", round = { path: roundPath, sha256: sha(roundBytes) } } = {}) => ({ ...current, state,
-        artifacts: [...others, { ...envelope, path: earlierPath, sha256: sha(earlierBytes) }, { ...envelope, ...round }] });
+      const threat = { class: "threat-model", path: threatPath, sha256: sha(threatBytes), authority: false, mutability: "immutable", retention: "retain" };
+      const listed = ({ state = "implementing", round = { path: roundPath, sha256: sha(roundBytes) }, threatSha256 = threat.sha256 } = {}) => ({ ...current, state,
+        artifacts: [...others, { ...threat, sha256: threatSha256 }, { ...envelope, path: earlierPath, sha256: sha(earlierBytes) }, { ...envelope, ...round }] });
       const refusedWith = (manifest, name) => {
         fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
         const before = fs.readFileSync(manifestPath);
@@ -803,12 +808,14 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       refusedWith(listed({ state: "verifying" }), "a package past implementation");
       refusedWith(listed({ round: { path: roundPath, sha256: sha("other bytes\n") } }), "an entry whose file no longer holds its recorded bytes");
       refusedWith(listed({ round: { path: "specs/other/evidence/critic-lineage-round-1.json", sha256: sha(roundBytes) } }), "an entry outside the feature's directory");
+      refusedWith(listed({ threatSha256: sha("another threat model\n") }), "a retained non-evidence entry whose file no longer holds its recorded bytes");
       for (const state of ["approved", "implementing"]) {
         fs.writeFileSync(manifestPath, `${JSON.stringify(listed({ state }), null, 2)}\n`);
         const rebuilt = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
         assert.equal(rebuilt.status, "registered", state);
         const evidence = JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.filter((entry) => entry.class === "candidate-evidence").map((entry) => entry.path);
         assert.deepEqual(evidence, [earlierPath, roundPath, envelope.path], `${state}: the earlier approval and the round's evidence are retained, the current approval registered`);
+        assert.deepEqual(JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.filter((entry) => entry.class === "threat-model"), [threat], `${state}: the threat model is retained with its own fields`);
         const sources = JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.filter((entry) => entry.class === "prd" || entry.class === "spec");
         for (const entry of sources) assert.equal(entry.sha256, sha(fs.readFileSync(path.join(f.dir, entry.path))), `${state}: ${entry.class} is rebound to the approved bytes`);
       }

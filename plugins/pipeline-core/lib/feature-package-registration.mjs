@@ -177,20 +177,29 @@ function resolveRigor(state) {
 // re-approved design met FPR-MANIFEST-CONFLICT with no route. A package that has not reached verification (state approved or implementing,
 // no candidate) is superseded by the new approval as well: every earlier candidate-evidence entry under the feature's directory is
 // retained with its recorded digest, provided its file still holds exactly those bytes.
+// The rebuild re-derives the PRD, the Spec, Acceptance, Result and the Critic review unit; every other entry of the superseded manifest
+// (candidate evidence, threat model, supply chain, plans, further design files) is retained with its own fields and recorded digest, or the
+// supersede is refused -- an entry is never dropped silently.
 const SUPERSEDABLE_STATES = Object.freeze(["approved", "implementing"]);
+const REDERIVED_CLASSES = new Set(["prd", "spec", "acceptance", "result"]);
 function supersededRegistrations(bytes, featureId, envelopePath, root = null) {
   let manifest;
   try { manifest = JSON.parse(bytes.toString("utf8")); } catch { return null; }
   if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== null || !Array.isArray(manifest.artifacts)) return null;
-  const evidence = manifest.artifacts.filter((entry) => entry?.class === "candidate-evidence");
+  const unitPath = criticReviewUnitPath(featureId);
+  const kept = manifest.artifacts.filter((entry) => !REDERIVED_CLASSES.has(entry?.class) && !(entry?.class === "design" && entry.path === unitPath));
+  const evidence = kept.filter((entry) => entry?.class === "candidate-evidence");
   const escaped = featureId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const earlier = new RegExp(`^specs/${escaped}/evidence/accepted-delivery-contract-[a-f0-9]{64}\\.json$`, "u");
-  if (evidence.length > 0 && evidence.every((entry) => typeof entry.path === "string" && earlier.test(entry.path) && entry.path !== envelopePath && SHA256.test(entry.sha256 ?? ""))) return evidence;
-  if (root === null || !SUPERSEDABLE_STATES.includes(manifest.state) || !evidence.some((entry) => typeof entry.path === "string" && earlier.test(entry.path))) return null;
+  const approvalsOnly = evidence.length > 0 && evidence.every((entry) => typeof entry.path === "string" && earlier.test(entry.path) && entry.path !== envelopePath && SHA256.test(entry.sha256 ?? ""));
+  if (approvalsOnly && kept.length === evidence.length) return kept;
+  if (root === null || !evidence.some((entry) => typeof entry.path === "string" && earlier.test(entry.path))) return null;
+  // A package with more than earlier approvals is superseded only before verification (state approved or implementing, no candidate).
+  if (!approvalsOnly && !SUPERSEDABLE_STATES.includes(manifest.state)) return null;
   const own = new RegExp(`^specs/${escaped}/`, "u");
-  const retained = evidence.every((entry) => typeof entry.path === "string" && repositoryRelative(entry.path) && own.test(entry.path) && entry.path !== envelopePath
+  const retained = kept.every((entry) => object(entry) && typeof entry.path === "string" && repositoryRelative(entry.path) && own.test(entry.path) && entry.path !== envelopePath
     && SHA256.test(entry.sha256 ?? "") && (() => { const seen = inspect(root, entry.path); return seen.kind === "file" && digest(seen.bytes) === entry.sha256; })());
-  return retained ? evidence : null;
+  return retained ? kept : null;
 }
 
 /** Sources the PO's approval binds, from the envelope that was itself re-derived from the retained approval. */
@@ -309,7 +318,11 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   if (!rigor) return refused("FPR-RIGOR-UNRESOLVED", "the State yields neither a submitted profile nor a retained rigor floor to map to a rigor level");
 
   const artifacts = entries.map((entry) => ({ class: entry.class, path: entry.path, sha256: digest(entry.bytes), authority: entry.authority, mutability: entry.mutability, retention: entry.retention }));
-  for (const entry of superseded ?? []) artifacts.push({ class: "candidate-evidence", path: entry.path, sha256: entry.sha256, authority: false, mutability: "immutable", retention: "retain" });
+  for (const entry of superseded ?? []) {
+    artifacts.push(entry.class === "candidate-evidence"
+      ? { class: "candidate-evidence", path: entry.path, sha256: entry.sha256, authority: false, mutability: "immutable", retention: "retain" }
+      : { class: entry.class, path: entry.path, sha256: entry.sha256, authority: entry.authority, mutability: entry.mutability, retention: entry.retention, ...(Object.hasOwn(entry, "amendment") ? { amendment: entry.amendment } : {}) });
+  }
   artifacts.push({ class: "candidate-evidence", path: envelopePath, sha256: digest(envelopeBytes), authority: false, mutability: "immutable", retention: "retain" });
   const manifest = { schema: FEATURE_PACKAGE_SCHEMA, feature: { id: featureId, rigor: rigor.rigor }, state: lifecycle.status, artifacts, candidate: null, supersedes: null };
   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
