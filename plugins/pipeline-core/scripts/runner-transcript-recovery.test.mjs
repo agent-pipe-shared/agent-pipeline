@@ -308,7 +308,7 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
 
     // Data-minimising: counts, digests and timestamps only.
     assert.deepEqual(Object.keys(result).sort(), [
-      "childSessions", "completeness", "effort", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
+      "childSessions", "completeness", "effort", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "outsideChildren", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
       "segments", "sessionId", "status", "turns", "unknownChildren", "unparsedLineCount", "usage",
     ]);
     // Justification (CGF-14, restated in place, nothing weakened): the key set is still pinned; `effort` is the one new key, the per-answer
@@ -621,6 +621,40 @@ test("C29-C1: a spawned child with no session file is counted as unknown and mak
     assert.equal(result.completeness, "partial");
     assert.equal(result.metadataComplete, false);
     assert.equal(JSON.stringify(result).includes(C1_MISSING), false, "only the count leaves, never the unknown id");
+  });
+});
+
+test("C29-C1: a child known only by its own parent link beyond the bound is opened; a session wholly beyond the bound is found", () => {
+  withExportFixture(({ project, codexHome }) => {
+    // The parent sorts oldest; its child names no agent id in the parent and sorts between the parent and the bound.
+    codexSegment(codexHome, c1Rollout("01", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:00:00") });
+    codexSegment(codexHome, c1Rollout("03", C1_CHILD), {
+      cwd: project, sessionId: C1_CHILD, metaTimestamp: stamp("05:00:04"),
+      metaExtra: { source: { subagent: { thread_spawn: { parent_thread_id: C1_PARENT, depth: 1 } } } },
+    });
+    c1Filler(codexHome, project, "08", 1);
+    c1Filler(codexHome, project, "07", 2);
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: C1_PARENT, env: { CODEX_HOME: codexHome }, limits: { maxCandidates: 2 } });
+    assert.equal(result.status, "available", "the session beyond the bound is found by name although no listed file matches it");
+    assert.deepEqual(result.childSessions.map((child) => child.childId), [C1_CHILD]);
+    assert.deepEqual(result.incompleteReasons, []);
+    assert.equal(result.completeness, "complete");
+  });
+});
+
+test("C29-C1: a spawned child whose session file belongs to another repository is counted as outside, not unknown", () => {
+  withExportFixture(({ project, foreign, codexHome }) => {
+    codexSegment(codexHome, c1Rollout("05", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:00:00"), records: c1Spawn("s1", C1_CHILD) });
+    codexSegment(codexHome, c1Rollout("06", C1_CHILD), {
+      cwd: foreign, sessionId: C1_CHILD, metaTimestamp: stamp("05:00:04"),
+      metaExtra: { source: { subagent: { thread_spawn: { parent_thread_id: C1_PARENT, depth: 1 } } } },
+    });
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: C1_PARENT, env: { CODEX_HOME: codexHome } });
+    assert.deepEqual(result.childSessions, []);
+    assert.equal(result.outsideChildren, 1);
+    assert.equal(result.unknownChildren, 0);
+    assert.ok(result.incompleteReasons.includes("child-outside-repository"));
+    assert.equal(result.completeness, "partial");
   });
 });
 

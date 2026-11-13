@@ -228,7 +228,7 @@ function claimedSessionConflict({ runner, excludeSession, env = process.env, hos
   return null;
 }
 
-function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir, limits } = {}) {
+function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir, limits, allowEmpty = false } = {}) {
   if (runner !== CODEX_RUNNER) return { unavailable: unavailable(runner ?? "unknown", "runner-transcript-source-unavailable") };
   if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
     return { unavailable: unavailable(runner, "current-session-identity-unavailable") };
@@ -246,7 +246,8 @@ function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env =
     .sort((left, right) => right.mtimeMs - left.mtimeMs
       || (left.sessionId < right.sessionId ? -1 : left.sessionId > right.sessionId ? 1 : 0)
       || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
-  if (candidates.length === 0) {
+  // allowEmpty (C29 C1, export only): the name index may still find the session beyond the bound; the caller types the empty case.
+  if (candidates.length === 0 && !allowEmpty) {
     return { unavailable: unavailable(runner, "no-prior-project-matching-transcript") };
   }
   return { candidates, boundReached: enumeration.boundReached === true };
@@ -786,8 +787,11 @@ function exportCandidates(options, sessionId = null) {
   // Codex, Antigravity and unknown runners resolve through the Codex adapter, which types every non-Codex
   // runner as `runner-transcript-source-unavailable`; only Claude has a second adapter.
   if (options.runner === CLAUDE_RUNNER) return claudeProjectCandidates(options);
-  const found = priorProjectMatchingCandidates(options);
-  return found.unavailable || sessionId === null ? found : withCodexNameIndex(found, options, sessionId);
+  if (sessionId === null) return priorProjectMatchingCandidates(options);
+  const found = priorProjectMatchingCandidates({ ...options, allowEmpty: true });
+  if (found.unavailable) return found;
+  const indexed = withCodexNameIndex(found, options, sessionId);
+  return indexed.candidates.length === 0 ? { unavailable: unavailable(options.runner, "no-prior-project-matching-transcript") } : indexed;
 }
 
 /**
@@ -809,13 +813,23 @@ function withCodexNameIndex(found, options, sessionId) {
     .map((filePath) => candidateMetadata(filePath, projectIdentity))
     .filter((candidate) => candidate !== null && candidate.sessionId === sessionId);
   // The bound stays reached unless the name walk is whole AND every file beyond the bound names its own session (a UUID
-  // suffix): only then can no unopened file belong to this session. Same sorted walk, so the first maxCandidates paths are
-  // exactly the ones the candidate enumeration saw.
+  // suffix): only then can no unopened file be a segment of this session. Same sorted walk, so the first maxCandidates paths
+  // are exactly the ones the candidate enumeration saw.
   const beyond = nameIndex.paths.slice(options.limits?.maxCandidates ?? MAX_CANDIDATES);
-  const resolved = nameIndex.complete && beyond.every((filePath) => CODEX_ROLLOUT_NAME.test(basename(filePath)));
+  // A child may be known only through its own parent_thread_id (no agent id in the parent). It cannot predate its parent, so
+  // every rollout file beyond the bound that sorts after the session's oldest segment is opened and authenticated as well.
+  const sessionNames = [...found.candidates.filter((candidate) => candidate.sessionId === sessionId), ...added]
+    .map((candidate) => basename(candidate.filePath)).filter((name) => CODEX_ROLLOUT_NAME.test(name)).sort();
+  const oldest = sessionNames[0] ?? null;
+  const addedPaths = new Set(added.map((candidate) => candidate.filePath));
+  const later = oldest === null ? [] : beyond
+    .filter((filePath) => !known.has(filePath) && !addedPaths.has(filePath) && CODEX_ROLLOUT_NAME.test(basename(filePath)) && basename(filePath) > oldest)
+    .map((filePath) => candidateMetadata(filePath, projectIdentity))
+    .filter((candidate) => candidate !== null && candidate.sessionId !== options.excludeSession);
+  const resolved = nameIndex.complete && oldest !== null && beyond.every((filePath) => CODEX_ROLLOUT_NAME.test(basename(filePath)));
   return {
     ...found,
-    candidates: [...found.candidates, ...added],
+    candidates: [...found.candidates, ...added, ...later],
     boundReached: found.boundReached === true && !resolved,
     nameIndex,
   };
@@ -970,11 +984,12 @@ function childResult(children, flags) {
     ...(flags.skippedRecords ? ["child-records-skipped"] : []),
     ...(flags.nested ? ["nested-workflow-children-not-listed"] : []),
     ...((flags.unknownChildren ?? 0) > 0 ? ["child-segment-not-found"] : []),
+    ...((flags.outsideChildren ?? 0) > 0 ? ["child-outside-repository"] : []),
   ];
-  return { value: sortedChildren(children), incompleteReasons: reasons, unknownChildren: flags.unknownChildren ?? 0 };
+  return { value: sortedChildren(children), incompleteReasons: reasons, unknownChildren: flags.unknownChildren ?? 0, outsideChildren: flags.outsideChildren ?? 0 };
 }
 
-const typedChildren = (reason) => ({ value: reason, incompleteReasons: [], unknownChildren: 0 });
+const typedChildren = (reason) => ({ value: reason, incompleteReasons: [], unknownChildren: 0, outsideChildren: 0 });
 
 /**
  * Claude: the parent's own tool_use / tool_result blocks locate the child in the parent's turns through the meta toolUseId.
@@ -1085,7 +1100,11 @@ function codexChildSessions({ found, sessionId, records, turnView, projectIdenti
     .map((filePath) => candidateMetadata(filePath, projectIdentity)).filter((candidate) => candidate !== null);
   const candidates = [...(found?.candidates ?? []), ...located];
   const spawned = candidates.filter((candidate) => candidate.spawn?.parentId === sessionId && candidate.sessionId !== sessionId);
-  const unknownChildren = [...spawnedIds].filter((id) => !spawned.some((candidate) => candidate.sessionId === id)).length;
+  // Same split as audit-current (C1a): a missing child whose session file exists by name but does not authenticate for this
+  // project worked elsewhere (outsideChildren); one with no file at all is unknown.
+  const missing = [...spawnedIds].filter((id) => !spawned.some((candidate) => candidate.sessionId === id));
+  const outsideChildren = missing.filter((id) => namedFor(found?.nameIndex ?? null, id).length > 0).length;
+  const unknownChildren = missing.length - outsideChildren;
   const byChild = new Map();
   for (const candidate of spawned) byChild.set(candidate.sessionId, [...(byChild.get(candidate.sessionId) ?? []), candidate]);
   const spawnCalls = new Map();
@@ -1112,7 +1131,7 @@ function codexChildSessions({ found, sessionId, records, turnView, projectIdenti
     });
     return { start: turnView.turnAt[startRecord], end: turnView.turnAt[lastRecord] };
   };
-  const flags = { rejected: 0, boundReached: false, skippedRecords: false, nested: false, unknownChildren };
+  const flags = { rejected: 0, boundReached: false, skippedRecords: false, nested: false, unknownChildren, outsideChildren };
   const children = [];
   for (const [childId, segments] of [...byChild.entries()].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))) {
     if (children.length + flags.rejected >= MAX_CHILD_SESSIONS) { flags.boundReached = true; break; }
@@ -1299,6 +1318,7 @@ function describeExport({ runner, sessionId, snapshots, options, found }) {
     childSessions: children.value,
     // C29 (C1): children the session spawned whose own session file was not found; complete needs 0.
     unknownChildren: children.unknownChildren ?? 0,
+    outsideChildren: children.outsideChildren ?? 0,
     turns: turnView.turns,
     effort: extractRunnerEffort(runner, mergedRecords, children.value),
     segmentCount: parsed.length,
