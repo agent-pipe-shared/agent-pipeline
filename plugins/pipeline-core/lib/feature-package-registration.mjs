@@ -306,8 +306,24 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   let reviewUnit;
   if (unitSeen.kind === "other") return refused("FPR-ARTIFACT-INVALID", `${unitPath} exists but is not a regular file; it is never replaced`, { path: unitPath, manifestPath });
   if (unitSeen.kind === "file") {
-    entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
-    reviewUnit = { status: "found", path: unitPath };
+    // C28e (PO decision 2026-11-13): a unit this registrar generated for an earlier approval names that Spec's criterion ids. When the
+    // approved Spec now names other ids, the found unit would skip a new criterion and block the Critic batch on a dropped one
+    // (CGB-REVIEW-UNIT-BINDING); it is rendered anew. A unit of any other shape (a hand-written multi-item unit) is kept as found.
+    let found = null;
+    try { found = JSON.parse(unitSeen.bytes.toString("utf8")); } catch { found = null; }
+    const rendered = renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef: primaryMainRef(root) });
+    const fresh = rendered.ok ? JSON.parse(rendered.bytes.toString("utf8")) : null;
+    const generatedShape = object(found) && found.schema === CRITIC_REVIEW_UNIT_SCHEMA && found.kind === "independent-delivery"
+      && Array.isArray(found.logicalWorkIds) && found.logicalWorkIds.length === 1 && found.logicalWorkIds[0] === featureId && Array.isArray(found.criterionIds);
+    const stale = fresh !== null && generatedShape
+      && (found.specPath !== specPath || JSON.stringify([...found.criterionIds].sort()) !== JSON.stringify(fresh.criterionIds));
+    if (stale) {
+      entries.push({ class: "design", path: unitPath, bytes: rendered.bytes, generated: true, replaces: unitSeen.bytes, ...REVIEW_UNIT_ARTIFACT });
+      reviewUnit = { status: "re-rendered", path: unitPath, previousCriterionIds: found.criterionIds, criterionIds: fresh.criterionIds };
+    } else {
+      entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
+      reviewUnit = { status: "found", path: unitPath };
+    }
   } else {
     const rendered = renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef: primaryMainRef(root) });
     if (rendered.ok) entries.push({ class: "design", path: unitPath, bytes: rendered.bytes, generated: true, ...REVIEW_UNIT_ARTIFACT });
@@ -328,17 +344,24 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   // 6. Exclusive creates only (never overwrite): the generated documents first, the manifest last. Any later failure undoes exactly what was created here.
-  const created = [], createdDirectories = [];
+  const created = [], createdDirectories = [], replaced = [];
   const rollback = () => {
     for (const path of created.reverse()) { try { unlinkSync(join(root, path)); } catch { /* a file this call just created */ } }
     for (const path of createdDirectories.reverse()) { try { rmdirSync(path); } catch { /* a directory this call just created */ } }
+    for (const [path, previous] of replaced.reverse()) { try { writeFileSync(join(root, path), previous); } catch { /* the bytes are in Git */ } }
     if (superseded !== null) { try { writeFileSync(join(root, manifestPath), existing); } catch { /* the bytes are in Git */ } }
   };
+  // A re-rendered review unit replaces the found file through a temporary file; the rollback writes the found bytes back.
+  const replacing = new Map(entries.filter((entry) => entry.replaces).map((entry) => [entry.path, entry.replaces]));
   for (const [path, content] of [...entries.filter((entry) => entry.generated).map((entry) => [entry.path, entry.bytes]), [manifestPath, bytes]]) {
     try {
       const directory = dirname(join(root, path));
       if (!existsSync(directory)) { mkdirSync(directory, { mode: 0o755 }); createdDirectories.push(directory); }
-      if (path === manifestPath && superseded !== null) {
+      if (replacing.has(path)) {
+        const temporary = `${join(root, path)}.registering-${process.pid}`;
+        writeFileSync(temporary, content, { flag: "wx", mode: 0o644 });
+        renameSync(temporary, join(root, path)); replaced.push([path, replacing.get(path)]);
+      } else if (path === manifestPath && superseded !== null) {
         const temporary = `${join(root, path)}.registering-${process.pid}`;
         writeFileSync(temporary, content, { flag: "wx", mode: 0o644 });
         renameSync(temporary, join(root, path));
@@ -364,7 +387,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
     found: entries.filter((entry) => !entry.generated && (entry.class === "acceptance" || entry.class === "result" || entry.class === "design")).map(summary),
     reviewUnit,
     choices: {
-      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found; a Spec with no criterion id gets none (reviewUnit names why)",
+      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found, except a generated single-course unit whose criterion ids or Spec path no longer match the approved Spec, which is rendered anew (reviewUnit.status re-rendered); a Spec with no criterion id gets none (reviewUnit names why)",
       state: `${lifecycle.status} (the plan lifecycle status; the topology requires prd, spec, acceptance, result and candidate-evidence for it)`,
       rigor: `${rigor.rigor} (${rigor.source}: ${rigor.basis}; judgment call, no shipped source defines the profile-to-level mapping)`,
       prd: "authority:true, mutable, active (the approved bytes are already bound by the signed envelope; the topology fixes no mutability for this class)",

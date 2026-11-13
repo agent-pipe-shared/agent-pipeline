@@ -821,6 +821,44 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       }
     });
 
+    // C28e (PO decision 2026-11-13): a re-approved Spec with other criterion ids met the unit generated for the earlier approval, and the
+    // Critic batch refused the dropped id (CGB-REVIEW-UNIT-BINDING). A generated single-course unit is rendered anew; a hand-written one is kept.
+    it("7.13d a re-approval re-renders a generated review unit whose criterion ids no longer match the approved Spec; a hand-written unit is kept", async () => {
+      const { f } = await fixtureWalk({ predecessorSidecar: false });
+      const REGISTER = path.join(here, "register-feature-package.mjs");
+      const manifestPath = path.join(f.dir, "specs/e2e/lifecycle.json");
+      const current = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      const envelope = current.artifacts.find((entry) => entry.class === "candidate-evidence");
+      const earlierBytes = "earlier approval\n";
+      const earlierPath = `specs/e2e/evidence/accepted-delivery-contract-${sha(earlierBytes)}.json`;
+      fs.writeFileSync(path.join(f.dir, earlierPath), earlierBytes);
+      const unitPath = "specs/e2e/design/critic-review-unit.json";
+      const unitFile = path.join(f.dir, unitPath);
+      const fresh = JSON.parse(fs.readFileSync(unitFile, "utf8"));
+      assert.ok(fresh.criterionIds.length > 0, "the fixture's Spec names criterion ids");
+      const supersede = () => fs.writeFileSync(manifestPath, `${JSON.stringify({ ...current, state: "implementing",
+        artifacts: current.artifacts.map((entry) => (entry === envelope ? { ...entry, path: earlierPath, sha256: sha(earlierBytes) } : entry)) }, null, 2)}\n`);
+      const unitEntry = () => JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.find((entry) => entry.path === unitPath);
+
+      fs.writeFileSync(unitFile, `${JSON.stringify({ ...fresh, criterionIds: ["AC-999"] }, null, 2)}\n`);
+      supersede();
+      const rebuilt = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
+      assert.equal(rebuilt.status, "registered");
+      assert.equal(rebuilt.reviewUnit.status, "re-rendered");
+      assert.deepEqual(rebuilt.reviewUnit.previousCriterionIds, ["AC-999"]);
+      assert.deepEqual(JSON.parse(fs.readFileSync(unitFile, "utf8")).criterionIds, fresh.criterionIds, "the unit binds the approved Spec's ids again");
+      assert.equal(unitEntry().sha256, sha(fs.readFileSync(unitFile)), "the manifest binds the re-rendered bytes");
+      assert.ok(!fs.readdirSync(path.dirname(unitFile)).some((name) => name.includes(".registering-")), "no temporary file is left");
+
+      const handBytes = `${JSON.stringify({ ...fresh, logicalWorkIds: ["e2e-a", "e2e-b"], criterionIds: ["AC-999"] }, null, 2)}\n`;
+      fs.writeFileSync(unitFile, handBytes);
+      supersede();
+      const kept = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
+      assert.equal(kept.reviewUnit.status, "found", "a multi-item unit is the author's, never rendered anew");
+      assert.equal(fs.readFileSync(unitFile, "utf8"), handBytes);
+      assert.equal(unitEntry().sha256, sha(handBytes));
+    });
+
     it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {
       const root = makeRoot();
       assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
