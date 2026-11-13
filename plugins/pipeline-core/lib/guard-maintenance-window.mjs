@@ -951,6 +951,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/sbom-lockfile-readers.mjs",
   // Candidate 28e (GMWKC01): the tool registry and the deferral module scripts/toolchain-preflight.mjs imports.
   "plugins/pipeline-core/lib/toolchain-registry.mjs", "plugins/pipeline-core/lib/toolchain-deferrals.mjs",
+  // Candidate 29a (GMWKC01): the leaf modules candidate 28e's Spec addendum and PO-only reopen-design added to kernel imports
+  // (lib/guard-devplan-policy.mjs, lib/guard/denial-route.mjs, lib/feature-package-registration.mjs, lib/critic-course-admission.mjs,
+  // scripts/pipeline-state.mjs, scripts/po-human-approval.mjs).
+  "plugins/pipeline-core/lib/reopen-design-po-step.mjs", "plugins/pipeline-core/lib/spec-addendum.mjs",
+  "plugins/pipeline-core/lib/feature-id.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

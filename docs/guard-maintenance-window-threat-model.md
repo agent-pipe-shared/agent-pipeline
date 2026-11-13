@@ -820,6 +820,19 @@ floor would admit a scanner version the close cannot drive, and a deferral read 
 hide a missing scanner, which is why neither can be lifted by a window. A deferral never reaches
 the plan or close check: `lib/security-close-status.mjs` reads the preflight result, not the report.
 
+Candidate 28e also added the Spec addendum and made `reopen-design` the PO's own step, and the
+kernel imports three leaf modules for them; candidate 29a lists them. The lifecycle guard
+(`lib/guard-devplan-policy.mjs`, `lib/guard/denial-route.mjs`) imports
+`plugins/pipeline-core/lib/reopen-design-po-step.mjs`, the one wording of the PO-only reopen;
+`lib/feature-package-registration.mjs`, `lib/critic-course-admission.mjs`,
+`scripts/pipeline-state.mjs` and `scripts/po-human-approval.mjs` import
+`plugins/pipeline-core/lib/spec-addendum.mjs`, the reader of the approved addenda; and
+`scripts/pipeline-state.mjs` imports `plugins/pipeline-core/lib/feature-id.mjs`, the feature id
+grammar. All three import no first-party module. A loosened reopen wording could point an agent
+at the void of the design approval, an addendum reader that skipped its approval check would
+apply an unapproved Spec correction, and a looser id grammar could address another feature's
+state, which is why none of them can be lifted by a window.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
