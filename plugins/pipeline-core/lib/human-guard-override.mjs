@@ -3471,6 +3471,35 @@ function validatedCapability(paths, path) {
   return value;
 }
 
+/**
+ * ADR-0096 (D248): the consumed override capabilities of this device, each authenticated by its MAC, as the bounded facts the
+ * close's gate-definition walk needs. Read-only: it creates no directory and no key; a missing store or key answers [] and an
+ * unreadable or unauthenticated file is skipped (the walk then finds no proof for that change, which is the safe side).
+ */
+export function readConsumedOverrideCapabilities({ commonDir } = {}) {
+  if (typeof commonDir !== "string" || commonDir === "") return [];
+  const base = join(commonDir, "agent-pipeline", "human-guard-overrides");
+  const paths = { base, capabilities: join(base, "capabilities"), key: join(base, "audit.key") };
+  if (!existsSync(paths.capabilities) || !existsSync(paths.key)) return [];
+  let names = [];
+  try { names = readdirSync(paths.capabilities).filter((name) => name.endsWith(".json")).sort().slice(0, 4096); } catch { return []; }
+  const found = [];
+  for (const name of names) {
+    let capability;
+    try { capability = validatedCapability(paths, join(paths.capabilities, name)); } catch { continue; }
+    if (capability.status !== "consumed" || !Array.isArray(capability.eligiblePaths)) continue;
+    found.push(Object.freeze({
+      planSha256: capability.planSha256,
+      eligiblePaths: capability.eligiblePaths.filter((entry) => typeof entry === "string"),
+      head: typeof capability.repository?.head === "string" ? capability.repository.head : null,
+      mode: capability.humanApproval?.mode ?? null,
+      signedCandidate: capability.signedCandidate ?? null,
+      consumedAt: capability.consumedAt,
+    }));
+  }
+  return found;
+}
+
 function hasAuthorizedAuditEntry(paths, capability) {
   const entries = verifiedAuditEntries(paths, key(paths));
   return entries.some(({ event }) => event?.type === "authorized"
