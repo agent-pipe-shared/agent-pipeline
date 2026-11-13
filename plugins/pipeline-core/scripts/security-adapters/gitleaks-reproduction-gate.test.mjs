@@ -140,7 +140,9 @@ const identifierFixture = ({ source = "tracked", rule = RULE } = {}) => {
 test("C28e (Codex test run): a public identifier the tracked source holds verbatim is reviewable for generic-api-key and the gate verifies", async () => {
   const f = identifierFixture();
   try {
-    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE), "public-identifier");
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, RECORD_PATH), "public-identifier");
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, "src/platform/results.js"), null, "a finding in source code is fixed in the code, never reviewed as a public identifier");
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE), null, "without the finding's path the class does not apply");
     const result = await reproduceReviewedFinding(f);
     assert.equal(result.ok, true, result.reason);
     assert.doesNotMatch(JSON.stringify(result.gate), /sampleapp/u, "the value itself never enters the gate");
@@ -161,9 +163,10 @@ test("C28e (Codex test run): the public-identifier class is closed: other rule, 
   const f = identifierFixture();
   try {
     for (const value of ["sampleapp", "Sampleapp.Results.V1", "k3j9x2q8.z7w4", "ab12cd34ef.results.v1", `${"a".repeat(30)}.${"b".repeat(30)}.v1`, "results.v1/../x", "1.2.3"]) {
-      assert.equal(reviewedValueClass(f.rootDir, value, spawnSync, RULE), null, `refused shape: ${value}`);
+      assert.equal(reviewedValueClass(f.rootDir, value, spawnSync, RULE, RECORD_PATH), null, `refused shape: ${value}`);
     }
-    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER), null, "without the rule the identifier class does not apply");
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, null, RECORD_PATH), null, "without the rule the identifier class does not apply");
+    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, "specs/f/evidence/../../src/platform/results.js"), null, "a dot-dot path is no record");
   } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
 });
 

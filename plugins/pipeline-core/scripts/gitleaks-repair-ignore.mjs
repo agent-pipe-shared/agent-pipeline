@@ -351,7 +351,7 @@ async function main() {
   // Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is admitted besides a plain
   // domain, but only with a written reason, which is printed so the chat confirmation and the close report can quote it.
   // Candidate 28e (PO 2026-11-13): a public identifier the tracked source holds verbatim (rule generic-api-key only) takes the same reason.
-  const valueClass = reviewedValueClass(rootDir, reviewedValue, undefined, args.rule);
+  const valueClass = reviewedValueClass(rootDir, reviewedValue, undefined, args.rule, args.path);
   if (valueClass === null) { console.error(`gitleaks-repair-ignore: ${REVIEWED_VALUE_REFUSAL}`); process.exitCode = 1; return; }
   if (valueClass === "public-key-file" || valueClass === "public-identifier") {
     if (typeof args.reason !== "string" || args.reason.trim().length < 10) {

@@ -18,7 +18,7 @@ const safePath = value => typeof value === "string" && value.length > 0 && !isAb
 // a hex key of 32..64 characters that the project itself publishes as the tracked file `public/<key>.txt` whose whole content is that
 // key (the IndexNow protocol). The proof is checked here, not claimed: a regular non-linked file, tracked by Git, identical content.
 // Any other credential-shaped value stays refused, and the refusal text names what is accepted.
-export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key, or (rule generic-api-key only) a public identifier such as app.results.v1 that the project's own tracked source code holds verbatim as a quoted string";
+export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key, or (rule generic-api-key only, for a finding in a Pipeline record under specs/<feature>/evidence/ or audit-bundles/) a public identifier such as app.results.v1 that the project's own tracked source code holds verbatim as a quoted string";
 const PUBLIC_KEY = /^[a-f0-9]{32,64}$/u;
 // Candidate 28e (Codex test run, PO decision 2026-11-13): a public application identifier (a storage key or namespace name such as
 // `app.results.v1`) is admitted for the rule generic-api-key only. The shape is closed: 2 to 8 segments joined by `.`, `_` or `-`, each a
@@ -37,9 +37,14 @@ function publicIdentifierInTrackedSource(rootDir, value, gitFn) {
   const found = gitFn("git", ["grep", "-l", "-F", ...quoted, "--", ".", ...IDENTIFIER_RECORD_PATHS], { cwd: rootDir, encoding: "utf8", shell: false });
   return found.status === 0 && typeof found.stdout === "string" && found.stdout.trim() !== "";
 }
-export function reviewedValueClass(rootDir, value, gitFn = spawnSync, rule = null) {
+// The class is admitted only for a finding in one of the Pipeline's own records (feature evidence, an audit bundle): that is where the
+// identifier was copied from the source and flagged after the source had been scanned clean. A finding in source code keeps the existing
+// route (fix the code); a word-shaped passphrase hard-coded in source is never reviewable as a public identifier.
+const PIPELINE_RECORD_PATH = /^(?:specs\/[a-z0-9][a-z0-9-]*\/evidence\/|audit-bundles\/)[^\0]+$/u;
+export function reviewedValueClass(rootDir, value, gitFn = spawnSync, rule = null, findingPath = null) {
   if (domain(value)) return "domain";
-  if (rule === "generic-api-key" && typeof rootDir === "string" && publicIdentifierShape(value)) {
+  if (rule === "generic-api-key" && typeof rootDir === "string" && publicIdentifierShape(value)
+    && typeof findingPath === "string" && PIPELINE_RECORD_PATH.test(findingPath) && !findingPath.split("/").includes("..")) {
     try { return publicIdentifierInTrackedSource(rootDir, value, gitFn) ? "public-identifier" : null; } catch { return null; }
   }
   if (typeof value !== "string" || !PUBLIC_KEY.test(value) || typeof rootDir !== "string") return null;
@@ -95,7 +100,7 @@ function selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) {
 
 export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
   reviewedValue, spawnFn = spawnSync, env = process.env }) {
-  if (reviewedValueClass(rootDir, reviewedValue, spawnSync, rule) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
+  if (reviewedValueClass(rootDir, reviewedValue, spawnSync, rule, path) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
   if (!safePath(path) || typeof rule !== "string" || !/^[a-z0-9][a-z0-9._-]*$/iu.test(rule)
     || !Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
     return { ok: false, reason: "invalid finding selector" };
@@ -153,7 +158,7 @@ export async function verifyReproductionGate({ gate, ...options }) {
 export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, reviewedValue, rawReport, observedReportSha256 }) {
   try {
     const configPath = resolveGitleaksConfigPath();
-    return reviewedValueClass(rootDir, reviewedValue, spawnSync, gate?.rule ?? null) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
+    return reviewedValueClass(rootDir, reviewedValue, spawnSync, gate?.rule ?? null, gate?.path ?? null) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
       && digest(reviewedValue) === gate.valueSha256
       && (typeof rawReport === "string" ? selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) : observedReportSha256) === gate.reportSha256
       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256
