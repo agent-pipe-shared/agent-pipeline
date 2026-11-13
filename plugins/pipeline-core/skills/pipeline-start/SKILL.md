@@ -223,7 +223,7 @@ Load each reference only at its stated condition. A new-session model readback
 and a ready architecture readback each load their matching reference at that
 step; later implementation or Critic work loads its reference when reached:
 
-- `references/onboarding-recovery.md` for a non-ready status, the consent scope, restart, kickoff, handoff, host boundary, copy commands;
+- `references/onboarding-recovery.md` for a non-ready status, the consent scope, an open required-tool finding, restart, kickoff, handoff, host boundary, copy commands;
 - `references/local-plugin-attestation.md` for Claude/Antigravity `plugin-attestation-required` with no action;
 - `references/model-role-codex-claude.md` / `references/model-role-antigravity.md` for that runner's model readback;
 - `references/scratch-and-directory.md` for temporary-file cleanup, ignored evidence, a new durable directory;

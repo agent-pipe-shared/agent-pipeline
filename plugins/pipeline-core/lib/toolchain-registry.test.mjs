@@ -13,6 +13,7 @@ import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport } f
 import { buildHandle } from "../scripts/tool-identity.mjs";
 import { scannerEntryReadiness } from "./security-close-status.mjs";
 import { runToolchainDefer } from "../scripts/toolchain-defer.mjs";
+import { ONBOARDING_CONSENT_COVERED_STEPS, coveringStepForArgv, onboardingConsentQuestion } from "./onboarding-consent-scope.mjs";
 
 const home = () => mkdtempSync(join(tmpdir(), "toolchain-registry-"));
 const deps = (dir) => ({ homedirFn: () => dir, realpathSyncFn: (path) => path, now: () => new Date("2026-11-12T20:00:00.000Z") });
@@ -124,6 +125,18 @@ test("a deferred scanner stays attended: the finding names its class, its docume
     const refusal = scannerEntryReadiness({ results: [{ tool: "semgrep", status: "binary_missing", guidance: "" }] }, { critical: true });
     assert.equal(refusal.refusals.length, 1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("the onboarding consent names every required tool, and only the deferral record is a covered action", () => {
+  const step = ONBOARDING_CONSENT_COVERED_STEPS.find((entry) => entry.id === "toolchain");
+  assert.ok(step, "the consent lists the tool check");
+  const names = { node: "Node.js", git: "Git", openssl: "OpenSSL" };
+  for (const entry of TOOLCHAIN_REGISTRY.filter((candidate) => ["required", "required-to-sign"].includes(candidate.class))) {
+    for (const language of ["en", "de"]) assert.ok(step[language].includes(names[entry.id] ?? entry.id), `${language}: ${entry.id}`);
+  }
+  assert.equal(coveringStepForArgv(["toolchain-defer.mjs", "--tool", "semgrep"])?.id, "toolchain");
+  assert.equal(coveringStepForArgv(["toolchain-preflight.mjs", "--repair", "git-hooks"]), null, "no installer or other script is covered by it");
+  for (const language of ["en", "de"]) assert.ok(onboardingConsentQuestion({ language }).text.length <= 2600, language);
 });
 
 test("a scanner the check could not observe (a sandbox) asks for no install", async () => {

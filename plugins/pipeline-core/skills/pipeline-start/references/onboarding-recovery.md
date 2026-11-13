@@ -53,6 +53,25 @@ you will wait for a yes. Never volunteer whether the Pipeline fits the task;
 that call is the human's — if asked, state cost/benefit neutrally, not a
 recommendation.
 
+## Required tools: install together, or record a deferral
+
+`docs/toolchain.md` of the plugin (generated from `lib/toolchain-registry.mjs`)
+lists every tool the Pipeline needs. After the consent is recorded, and at a
+later start while one is still open, read the `scanner-*` findings of
+`environmentReadiness` whose `repair.toolClass` is `required` (and
+`signing-toolchain` on the machine where the PO signs). For each open one that
+is not `repair.deferred`, show the human the tool, its purpose and the route for
+their platform from the section `repair.installDoc` names, and ask once: install
+now, or later. **Install now:** the human runs the route in their own terminal
+(in Claude with the `!` prefix); you never run an installer and never use `sudo`.
+Then rerun the readiness report. **Later:** run
+`node <plugin-root>/scripts/toolchain-defer.mjs --tool <id> --answer "<their answer, word for word>"`
+and tell them what stays blocked: a project calibrated critical refuses the
+missing scanner at plan approval and at the close. A deferral is never a pass,
+so a deferred finding is not asked about again but stays named. A finding of
+status `unknown` (the check could not look, for example from a sandbox) is no
+reason to install anything: rerun the report in the human's own terminal.
+
 ## Host boundary and copy commands for a human
 
 Treat
