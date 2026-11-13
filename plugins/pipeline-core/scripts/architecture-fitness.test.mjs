@@ -408,6 +408,19 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(navigation(["docs/adr/0004-tenancy-model.md", "schemas/y.json"]).violations[0].ruleId, "architecture-map-stale");
     });
 
+    it("Class 7: a docs/adr/ token that is no file and no numbered ADR name is no navigation target; an existing draft or a planned numbered ADR still is (Glossover K-23)", () => {
+      const adrInventory = [
+        { id: "documentation", ownedPaths: ["docs/adr/**"], publicContracts: [], adrReferences: [] },
+        { id: "app", ownedPaths: ["src/**"], publicContracts: [], adrReferences: ["docs/adr/0004-tenancy-model.md"] },
+      ];
+      const navigation = (touchedContracts) => evaluateNavigationCurrency({ rootDir: REPO_ROOT, inventory: adrInventory, touchedContracts });
+      assert.equal(navigation(["docs/adr/00NN-", "docs/adr/draft-", "docs/adr/draft-ai-content-assistant.md", "docs/adr/0004-tenancy-model.md"]).outcome, OUTCOME_PASS,
+        "prose fragments and a draft name with no file are skipped");
+      assert.equal(navigation(["docs/adr/draft-authority-carry-forward-and-signed-reconcile-commit.md"]).outcome, OUTCOME_FINDING,
+        "an existing draft ADR nobody references is still stale");
+      assert.equal(navigation(["docs/adr/9999-planned-not-written.md"]).outcome, OUTCOME_FINDING, "a planned numbered ADR still needs its map reference (AC-127)");
+    });
+
     it("Class 8: parallel-overlap checks concurrent write surfaces", () => {
       const disjoint = evaluateParallelOverlap({
         concurrentDispatches: [

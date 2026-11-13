@@ -647,9 +647,21 @@ export function evaluateNavigationCurrency({ rootDir, inventory, candidatePaths 
     return [...adrReferences].some((reference) => reference.startsWith(prefix));
   };
 
+  // Candidate 29 (Glossover K-23): a docs/adr/ token that is neither a file on disk nor named like a numbered ADR (a prose fragment
+  // such as "docs/adr/00NN-" or "docs/adr/draft-", or a draft name the PRD mentions historically after the ADR was numbered) is no
+  // navigation target, so the map cannot be stale against it. A numbered ADR the plan names is checked even before it is written
+  // (AC-127), a prefix form (trailing "/" or "*") keeps the rule above, and an existing ADR file nobody references is still checked.
+  const NUMBERED_ADR = /^\d{3,}-[^/]+\.md$/u;
+  const adrFileAbsent = (touched) => {
+    const target = normalizeRef(touched);
+    if (!target.startsWith("docs/adr/") || target.endsWith("/") || target.includes("*") || typeof rootDir !== "string") return false;
+    if (NUMBERED_ADR.test(target.slice(target.lastIndexOf("/") + 1))) return false;
+    try { return !fs.lstatSync(path.join(rootDir, target)).isFile(); } catch { return true; }
+  };
+
   // Check if any touched contract is missing from concept files
   for (const tc of touchedContracts) {
-    if (adrReferenceCovers(tc)) continue;
+    if (adrReferenceCovers(tc) || adrFileAbsent(tc)) continue;
     const owningMod = resolveModuleForPath(tc, inventory);
     if (owningMod && !(owningMod.publicContracts || []).includes(tc)) {
       isStale = true;
