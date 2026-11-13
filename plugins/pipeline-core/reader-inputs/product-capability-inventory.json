@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "7e701b7292c2be2f00eeeebc5fbf54b5aa867d4f",
-    "tree": "ba9e771c90e1a317c72b98b36b683c926e48f720"
+    "commit": "d9416017e168f5ab8d20ccc87dfc1db8c996c4ff",
+    "tree": "0c82ac63ca26190f66556e1e8b59387fec237db8"
   },
   "criticReview": {
     "status": "required-before-publication",
