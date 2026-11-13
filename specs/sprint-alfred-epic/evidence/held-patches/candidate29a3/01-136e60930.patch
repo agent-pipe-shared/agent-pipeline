@@ -1,0 +1,64 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.mjs b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+index 83a100666923f169a1cf2ce31aef0969be150b9b..6e96c1805afa3143d69c38759622350b986dbe98 100755
+--- a/plugins/pipeline-core/scripts/architecture-fitness.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+@@ -659,9 +659,24 @@ export function evaluateNavigationCurrency({ rootDir, inventory, candidatePaths
+     try { return !fs.lstatSync(path.join(rootDir, target)).isFile(); } catch { return true; }
+   };
+ 
++  // Candidate 29 (Glossover K-23): materialization writes the accepted record to docs/adr/NNNN-<slug>.md and keeps
++  // docs/adr/draft-<slug>.md on disk as history (create-adr.mjs), and the map references the numbered record, never the
++  // draft. A touched draft is therefore current once a module lists the numbered ADR of the same slug and that file exists.
++  // A draft with no accepted record referenced by the map stays stale.
++  const isFile = (relative) => { try { return fs.lstatSync(path.join(rootDir, relative)).isFile(); } catch { return false; } };
++  const draftSupersededByReferencedAdr = (touched) => {
++    const target = normalizeRef(touched);
++    const slug = /^docs\/adr\/draft-([^/]+)\.md$/u.exec(target)?.[1];
++    if (slug === undefined || typeof rootDir !== "string") return false;
++    return [...adrReferences].some((reference) => {
++      const name = /^docs\/adr\/(\d{3,})-([^/]+)\.md$/u.exec(reference);
++      return name !== null && name[2] === slug && isFile(reference);
++    });
++  };
++
+   // Check if any touched contract is missing from concept files
+   for (const tc of touchedContracts) {
+-    if (adrReferenceCovers(tc) || adrFileAbsent(tc)) continue;
++    if (adrReferenceCovers(tc) || adrFileAbsent(tc) || draftSupersededByReferencedAdr(tc)) continue;
+     const owningMod = resolveModuleForPath(tc, inventory);
+     if (owningMod && !(owningMod.publicContracts || []).includes(tc)) {
+       isStale = true;
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+index f2b4bf7b91f89a7332515040337e13b60923325a..5a296968b220a1ff113e3405ac50de57cf561484 100644
+--- a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+@@ -421,6 +421,29 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
+       assert.equal(navigation(["docs/adr/9999-planned-not-written.md"]).outcome, OUTCOME_FINDING, "a planned numbered ADR still needs its map reference (AC-127)");
+     });
+ 
++    it("Class 7: an existing draft ADR is current once the map references the numbered ADR of the same slug and that file exists (Glossover K-23)", () => {
++      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-draft-"));
++      try {
++        fs.mkdirSync(path.join(rootDir, "architecture", "map"), { recursive: true });
++        fs.writeFileSync(path.join(rootDir, "architecture", "map", "index.md"), "# Map\n");
++        fs.mkdirSync(path.join(rootDir, "docs", "adr"), { recursive: true });
++        for (const name of ["draft-content-assistant.md", "0015-content-assistant.md", "draft-image-storage.md", "draft-other.md"]) {
++          fs.writeFileSync(path.join(rootDir, "docs", "adr", name), "# ADR\n");
++        }
++        const inventory = [
++          { id: "documentation", ownedPaths: ["docs/adr/**"], publicContracts: [], adrReferences: [] },
++          { id: "app", ownedPaths: ["src/**"], publicContracts: [], adrReferences: ["docs/adr/0015-content-assistant.md", "docs/adr/0018-image-storage.md"] },
++        ];
++        const navigation = (touchedContracts) => evaluateNavigationCurrency({ rootDir, inventory, touchedContracts });
++        assert.equal(navigation(["docs/adr/draft-content-assistant.md"]).outcome, OUTCOME_PASS, "the draft of a referenced, existing numbered ADR is current");
++        assert.equal(navigation(["docs/adr/draft-image-storage.md"]).outcome, OUTCOME_FINDING, "a referenced numbered ADR that is not on disk does not cover its draft");
++        assert.equal(navigation(["docs/adr/draft-other.md"]).outcome, OUTCOME_FINDING, "a draft with no numbered ADR in the map stays stale");
++        assert.equal(navigation(["docs/adr/draft-content-assistant.md", "docs/adr/draft-other.md"]).outcome, OUTCOME_FINDING);
++      } finally {
++        fs.rmSync(rootDir, { recursive: true, force: true });
++      }
++    });
++
+     it("Class 8: parallel-overlap checks concurrent write surfaces", () => {
+       const disjoint = evaluateParallelOverlap({
+         concurrentDispatches: [
