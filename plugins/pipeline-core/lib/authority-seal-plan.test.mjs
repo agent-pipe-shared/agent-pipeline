@@ -138,7 +138,7 @@ test("LB4-8 the seal plan digest enters the signed binding additively: no plan, 
   const source = (path, bytes) => ({ path, sha256: sha(Buffer.from(bytes)) });
   const sources = { prd: source(PLAN, "prd"), spec: source(SPEC, "spec"), companions: COMPANIONS.map((path) => source(path, path)) };
   const report = source(REPORT, "report");
-  const made = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources, reviewer: { runner: "claude", model: "claude-opus-4" }, report, openFindingIds: [], reviewedAt: AT });
+  const made = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: report.sha256 }, report, openFindingIds: [], reviewedAt: AT });
   assert.ok(made.ok, made.code);
   const receipts = [{ path: RECEIPT, bytes: made.bytes }];
   const plain = createDesignApprovalBinding({ featureId: FEATURE, receipts, currentSources: sources });
@@ -227,7 +227,7 @@ function buildDraft(name, { reviewOf } = {}) {
     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
   }
   const source = (path) => ({ path, sha256: sha(read(path)) });
-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: [...COMPANIONS.map(source), ...(reviewOf === "with-input" ? [source(INPUT)] : [])] }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: [...COMPANIONS.map(source), ...(reviewOf === "with-input" ? [source(INPUT)] : [])] }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
   write(RECEIPT, Buffer.from(review.bytes));
   gitOk("add", "--", PLAN, SPEC, INPUT, ...COMPANIONS, REPORT, RECEIPT, "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", "docs/adr/.gitkeep", NEUTRAL_MANIFEST);

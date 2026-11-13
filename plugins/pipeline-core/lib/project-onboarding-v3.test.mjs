@@ -663,6 +663,7 @@ function materializeDesignReviewReceiptFixture({ rootDir, featureId, planPath, s
     previous: null,
     sources: { prd: sourceFor(planPath), spec: sourceFor(specPath), companions: companionPaths.map(sourceFor) },
     reviewer: { runner: "claude", model: "claude-opus-4" },
+    reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reportPath).sha256 },
     report: sourceFor(reportPath),
     openFindingIds: [],
     reviewedAt: new Date(Date.UTC(2026, 9, 9, 9, 0, round)).toISOString(),

@@ -158,7 +158,7 @@ function buildConsumer(name) {
     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
   }
   const source = (path) => ({ path, sha256: sha256(read(path)) });
-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
   write(RECEIPT, Buffer.from(review.bytes));
   const publicKey = generateKeyPairSync("ed25519").publicKey.export({ type: "spki", format: "pem" });

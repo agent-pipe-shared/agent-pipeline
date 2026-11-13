@@ -1453,6 +1453,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         featureId, previous: null,
         sources: { prd: sourceFor(prdPath), spec: sourceFor(`${sourceBase}/spec.md`), companions: [fixtureSources[1][0], fixtureSources[2][0]].map(sourceFor) },
         reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(reviewReportPath),
+        reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reviewReportPath).sha256 },
         openFindingIds: [], reviewedAt: "2026-10-09T09:00:00.000Z",
       });
       assert.equal(createdReceipt.ok, true, `${runner}: fixture review receipt refused: ${createdReceipt.code}`);

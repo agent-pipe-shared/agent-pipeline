@@ -298,7 +298,7 @@ function buildDefaultModeDesignPresentation() {
     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
   }
   const source = (path) => ({ path, sha256: designDigest(read(path)) });
-  const review = createDesignReviewReceipt({ featureId: feature, previous: null, sources: { prd: source(plan), spec: source(spec), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(reportPath), openFindingIds: [], reviewedAt: DESIGN_AT });
+  const review = createDesignReviewReceipt({ featureId: feature, previous: null, sources: { prd: source(plan), spec: source(spec), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(reportPath).sha256 }, report: source(reportPath), openFindingIds: [], reviewedAt: DESIGN_AT });
   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
   write(receiptPath, Buffer.from(review.bytes));
   // The PO key: encrypted, so production prints the disclosure and asks for no typed confirmation (the passphrase seam answers OpenSSL).

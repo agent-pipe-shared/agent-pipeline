@@ -322,7 +322,7 @@ function provisionApprovedImplementationFixture(parent) {
     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
   }
   const source = (path) => ({ path, sha256: digestHex(read(path)) });
-  const review = createDesignReviewReceipt({ featureId: LIFECYCLE_FEATURE, previous: null, sources: { prd: source(LIFECYCLE_PLAN), spec: source(LIFECYCLE_SPEC), companions: LIFECYCLE_COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(LIFECYCLE_REPORT), openFindingIds: [], reviewedAt: LIFECYCLE_AT });
+  const review = createDesignReviewReceipt({ featureId: LIFECYCLE_FEATURE, previous: null, sources: { prd: source(LIFECYCLE_PLAN), spec: source(LIFECYCLE_SPEC), companions: LIFECYCLE_COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(LIFECYCLE_REPORT).sha256 }, report: source(LIFECYCLE_REPORT), openFindingIds: [], reviewedAt: LIFECYCLE_AT });
   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
   write(LIFECYCLE_RECEIPT, Buffer.from(review.bytes));
   // Only the PUBLIC half of a throwaway key is used: the policy needs a trust anchor, no proof is ever signed.

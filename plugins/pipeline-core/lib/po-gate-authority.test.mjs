@@ -918,6 +918,7 @@ function submitFixturePlan(primary, authority, profile) {
     previous: null,
     sources: { prd: sourceFor(planPath), spec: sourceFor(specPath), companions: companionPaths.map(sourceFor) },
     reviewer: { runner: "claude", model: "claude-opus-4" },
+    reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reportPath).sha256 },
     report: sourceFor(reportPath),
     openFindingIds: [],
     reviewedAt: "2026-10-09T09:00:00.000Z",

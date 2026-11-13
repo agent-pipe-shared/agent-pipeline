@@ -141,7 +141,7 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
     writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
   }
   const source = (path) => ({ path, sha256: sha256(read(path)) });
-  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
+  const review = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source(REPORT).sha256 }, report: source(REPORT), openFindingIds: [], reviewedAt: AT });
   assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
   write(RECEIPT, Buffer.from(review.bytes));
   // A throwaway key: its public half is the trust anchor; in signature mode its private half stands in for the PO's
@@ -192,7 +192,7 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
     write(PLAN, read(PLAN).toString("utf8").replace(sha256(oldSpec), sha256(newSpec)));
     write(SPEC, newSpec);
     write("specs/e2e/review/design-review-2.md", "# Synthetic round-2 review\nVerdict: pass.\n");
-    const review2 = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source("specs/e2e/review/design-review-2.md"), openFindingIds: [], reviewedAt: AT });
+    const review2 = createDesignReviewReceipt({ featureId: FEATURE, previous: null, sources: { prd: source(PLAN), spec: source(SPEC), companions: COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: source("specs/e2e/review/design-review-2.md").sha256 }, report: source("specs/e2e/review/design-review-2.md"), openFindingIds: [], reviewedAt: AT });
     assert.ok(review2.ok, `SETUP actual round-2 review producer: ${review2.code}`);
     write("specs/e2e/review/design-review-receipt-2.json", Buffer.from(review2.bytes));
     gitOk("add", "--", PLAN, SPEC, "specs/e2e/review/design-review-2.md", "specs/e2e/review/design-review-receipt-2.json");

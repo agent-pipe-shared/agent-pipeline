@@ -205,6 +205,7 @@ async function routeFixture(t, { ignored = null } = {}) {
     featureId: ROUTE_FEATURE, previous: null,
     sources: { prd: sourceFor(ROUTE_PLAN), spec: sourceFor(ROUTE_SPEC), companions: [ROUTE_DESIGN, ROUTE_TRACE].map(sourceFor) },
     reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(ROUTE_REPORT),
+    reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(ROUTE_REPORT).sha256 },
     openFindingIds: [], reviewedAt: "2026-10-09T09:00:00.000Z",
   });
   assert.equal(created.ok, true, JSON.stringify(created));

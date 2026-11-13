@@ -119,7 +119,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
   if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:join(common,'agent-pipeline')});
   mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
   const source=path=>({path,sha256:hash(bytes(f,path))});
-  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
+  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
   assert(review.ok,'SETUP actual review producer: '+review.code);write(f,RECEIPT,Buffer.from(review.bytes));
   const keys=generateKeyPairSync('ed25519');f.publicKey=keys.publicKey.export({type:'spki',format:'pem'});f.keyReference='synthetic-p16-key';f.signDigest=value=>sign(null,Buffer.from(value),keys.privateKey).toString('base64');
   writeJson(f,'project/critical-human-proof.json',{schema:'pipeline.critical-human-proof-policy.v3',requiredKinds:['push'],waivedKinds:[],trustAnchors:[{keyReference:f.keyReference,publicKeySha256:hash(f.publicKey)}]});
