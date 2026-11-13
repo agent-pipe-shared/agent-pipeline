@@ -29,6 +29,8 @@ import { parseCriticDispatchPreflightArgs } from "../../scripts/critic-dispatch-
 import { addCriticDeltaRequest } from "../feature-package-registration.mjs";
 import { produceCriticDiagnostic } from "../critic-diagnostic-producer.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
+import { MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA } from "../maintenance-delivery.mjs";
+import { sealVerifySuiteReceipt } from "../verify-resume.mjs";
 import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../plan-spec-state-v2.mjs";
 
 const CLI = process.env.G20_CLOSE_CLI ?? fileURLToPath(new URL("../../scripts/close-coordinator.mjs", import.meta.url));
@@ -558,6 +560,67 @@ test("(g) a slice whose commit carries no Dispatch trailer is not commit-recorde
   assert.deepEqual(planned.body.courseAuthorship,
     { schema: "pipeline.close-course-authorship.v1", dispatchRecord: [], orchestratorCommit: [], unrecorded: ["TASK-BG"] });
   assert.equal(invokeAction(planned.body.nextAction).body.status, "applied");
+});
+
+// ADR-0097 (K-28): a maintenance slice that repairs the configured verify was admitted with that row deferred to the close, so the
+// close requires a sealed green configured-verify receipt after the slice's red base and inside the candidate.
+const maintenanceSlice = (id, baseCommit) => ({
+  id, title: `slice ${id}`, state: "ready", dependsOn: [], writeScope: ["src/repair.mjs"], readScope: ["specs/feature/spec.md"],
+  tier: "implementor", commitMode: "host-commit", loadClass: "light",
+  delivery: { itemId: "feature.maint-verify", baseCommit, maintenance: { schema: MAINTENANCE_BINDING_SCHEMA },
+    checks: [{ id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json"] }],
+    redProof: { kind: "po-acknowledgement", ref: "a".repeat(64), mode: "chat-attributed-unattested", label: MAINTENANCE_ACK_LABEL },
+    approvalSha256: "e".repeat(64) },
+});
+/** After the fixture commit (the red base): the course with one maintenance slice and the repair commit. Returns nothing. */
+const maintenanceRepaired = (root) => {
+  const base = git(root, ["rev-parse", "HEAD"]);
+  writeFileSync(join(root, COURSE_PATH), json(itemCourse([maintenanceSlice("MAINT-VERIFY", base)])));
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "repair.mjs"), "export const repaired = true;\n");
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "fix(verify): repair the configured verify"]);
+};
+function configuredVerifyReceipt(root, { commit, exitCode, runId }) {
+  const suite = "configured-verify";
+  const tree = git(root, ["rev-parse", `${commit}^{tree}`]);
+  const sealed = sealVerifySuiteReceipt({ runId, candidate: { commit, tree }, suite, implementationSha256: sha("impl"),
+    inputs: { files: [{ path: "package.json", fileSha256: sha("pkg") }], nonFiles: [{ kind: "command", path: null, sha256: sha("cmd") }] },
+    environmentContractSha256: sha("env"), policySha256: sha("policy"), status: "completed", exitCode,
+    log: { path: `logs/${sha(suite)}.log`, fileSha256: sha("log"), byteLength: 3, truncated: false },
+    caseCompletion: null, startedAt: "2026-11-13T10:00:00.000Z", completedAt: "2026-11-13T10:01:00.000Z" });
+  const dir = join(root, ".git", "agent-pipeline", "verify", "runs", runId, "receipts");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${sha(suite)}.json`), `${JSON.stringify(sealed)}\n`);
+}
+
+test("(k28) the maintenance course fixture is a valid slice queue", () => {
+  const validated = validateSliceQueue(itemCourse([maintenanceSlice("MAINT-VERIFY", "f".repeat(40))]));
+  assert.equal(validated.ok, true, JSON.stringify(validated.errors));
+});
+
+test("(k28) a configured-verify maintenance slice without a green receipt after its red base refuses the close, naming the repair", () => {
+  const repo = checkpointed("k28", {}, maintenanceRepaired);
+  const base = git(repo.root, ["rev-parse", "HEAD~1"]);
+  // Neither a green receipt at the red base nor a red one after the repair is the green-after proof.
+  configuredVerifyReceipt(repo.root, { commit: base, exitCode: 0, runId: "run-1-green-at-base" });
+  configuredVerifyReceipt(repo.root, { commit: git(repo.root, ["rev-parse", "HEAD"]), exitCode: 1, runId: "run-2-red-after" });
+  const before = repo.snapshot();
+  const refused = repo.planPrepared();
+  assert.equal(refused.status, 2, JSON.stringify(refused.body));
+  assert.equal(refused.body.code, "CLOSE-MAINTENANCE-VERIFY-NOT-GREEN", JSON.stringify(refused.body));
+  assert.match(refused.body.message, /MAINT-VERIFY/u);
+  assert.match(refused.body.message, /verify-evidence-producer\.mjs --root <repo-root> --mode candidate/u);
+  assert.deepEqual(repo.snapshot(), before, "a refused close preparation must leave State and the coordinator byte-identical");
+});
+
+test("(k28) a sealed green configured-verify receipt at the repaired candidate lifts the maintenance refusal", () => {
+  const repo = checkpointed("k28-green", {}, maintenanceRepaired);
+  configuredVerifyReceipt(repo.root, { commit: git(repo.root, ["rev-parse", "HEAD"]), exitCode: 0, runId: "run-1-green-after" });
+  const planned = repo.planPrepared();
+  assert.notEqual(planned.body.code, "CLOSE-MAINTENANCE-VERIFY-NOT-GREEN", JSON.stringify(planned.body));
+  assert.equal(planned.status, 0, JSON.stringify(planned.body));
+  assert.equal(planned.body.phase, "feature-close-prepared");
 });
 
 // ---------------------------------------------------------------------------------------------------------------------------------

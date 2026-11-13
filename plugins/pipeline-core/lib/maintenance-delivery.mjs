@@ -219,14 +219,12 @@ export function planApprovalCommit({ root, state, runGit = null }) {
  * The mechanical route (ADR-0097 Decision 3): a sealed Verify suite receipt of the check's suite with a non-zero exit whose candidate
  * commit is the plan-approval commit or one of its ancestors. `{ kind: "verify-receipt", ref, runId, commit, suite }` or null.
  */
-export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit, runGit = null }) {
-  const suite = maintenanceReceiptSuite(check);
-  if (suite === null || typeof approvalCommit !== "string" || !OID.test(approvalCommit) || typeof commonDir !== "string") return null;
+/** Every sealed, valid receipt of one Verify suite, newest run first (at most MAX_RUNS runs are read). */
+function* sealedSuiteReceipts(commonDir, suite) {
   const runsRoot = join(commonDir, "agent-pipeline", "verify", "runs");
   const artifact = sha256(suite);
-  const git = runGit ?? gitRunner(root);
   let runs = [];
-  try { runs = readdirSync(runsRoot).filter((name) => SAFE_SUITE.test(name)).sort().reverse().slice(0, MAX_RUNS); } catch { return null; }
+  try { runs = readdirSync(runsRoot).filter((name) => SAFE_SUITE.test(name)).sort().reverse().slice(0, MAX_RUNS); } catch { return; }
   for (const runId of runs) {
     let receipt;
     try {
@@ -235,13 +233,58 @@ export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit, 
       if (!info.isFile() || info.isSymbolicLink()) continue;
       receipt = JSON.parse(readFileSync(path, "utf8"));
     } catch { continue; }
-    if (!validateVerifySuiteReceipt(receipt).ok || receipt.suite !== suite || receipt.runId !== runId || receipt.exitCode === 0) continue;
-    const commit = receipt.candidate?.commit;
-    if (!OID.test(commit ?? "")) continue;
+    if (!validateVerifySuiteReceipt(receipt).ok || receipt.suite !== suite || receipt.runId !== runId || !OID.test(receipt.candidate?.commit ?? "")) continue;
+    yield receipt;
+  }
+}
+
+export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit, runGit = null }) {
+  const suite = maintenanceReceiptSuite(check);
+  if (suite === null || typeof approvalCommit !== "string" || !OID.test(approvalCommit) || typeof commonDir !== "string") return null;
+  const git = runGit ?? gitRunner(root);
+  for (const receipt of sealedSuiteReceipts(commonDir, suite)) {
+    if (receipt.exitCode === 0) continue;
+    const commit = receipt.candidate.commit;
     const before = commit === approvalCommit || gitOk(git(["merge-base", "--is-ancestor", commit, approvalCommit]));
-    if (before) return Object.freeze({ kind: "verify-receipt", ref: receipt.receiptSha256, runId, commit, suite });
+    if (before) return Object.freeze({ kind: "verify-receipt", ref: receipt.receiptSha256, runId: receipt.runId, commit, suite });
   }
   return null;
+}
+
+/**
+ * Green after the maintenance delivery (ADR-0097 Decision 4) for a check the host could not run at finalize (verify:configured): a
+ * sealed GREEN receipt of the check's suite whose commit lies strictly after the slice's base commit (where the check was observed
+ * red) and is contained in the close candidate. `{ kind: "verify-receipt", ref, runId, commit, suite }` or null.
+ */
+export function greenAfterDeliveryReceipt({ commonDir, root, check, baseCommit, candidateCommit, runGit = null }) {
+  const suite = maintenanceReceiptSuite(check);
+  if (suite === null || typeof commonDir !== "string" || !OID.test(baseCommit ?? "") || !OID.test(candidateCommit ?? "")) return null;
+  const git = runGit ?? gitRunner(root);
+  for (const receipt of sealedSuiteReceipts(commonDir, suite)) {
+    const commit = receipt.candidate.commit;
+    if (receipt.exitCode !== 0 || commit === baseCommit) continue;
+    if (!gitOk(git(["merge-base", "--is-ancestor", baseCommit, commit]))) continue;
+    if (commit !== candidateCommit && !gitOk(git(["merge-base", "--is-ancestor", commit, candidateCommit]))) continue;
+    return Object.freeze({ kind: "verify-receipt", ref: receipt.receiptSha256, runId: receipt.runId, commit, suite });
+  }
+  return null;
+}
+
+/**
+ * The close's green-after walk over the delivery course: every maintenance slice that is not cancelled and whose check the host
+ * deferred (verify:configured) needs greenAfterDeliveryReceipt. Returns the slice ids still lacking one.
+ */
+export function maintenanceSlicesLackingGreenVerify({ commonDir, root, slices, candidateCommit, runGit = null }) {
+  const lacking = [];
+  for (const slice of Array.isArray(slices) ? slices : []) {
+    const delivery = slice?.delivery;
+    if (slice?.state === "cancelled" || !object(delivery) || !Object.hasOwn(delivery, "maintenance") || !Array.isArray(delivery.checks)) continue;
+    for (const check of delivery.checks) {
+      if (!isConfiguredVerifyCheck(check)) continue;
+      if (greenAfterDeliveryReceipt({ commonDir, root, check, baseCommit: delivery.baseCommit, candidateCommit, runGit }) === null) lacking.push(slice.id);
+    }
+  }
+  return lacking;
 }
 
 /* ---- the acknowledgement route ---- */

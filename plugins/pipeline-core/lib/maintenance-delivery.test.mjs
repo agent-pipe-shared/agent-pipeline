@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { CONFIGURED_VERIFY_CHECK, MAINTENANCE_ACK_LABEL, MAINTENANCE_BINDING_SCHEMA, maintenanceCheckSpelling, parseMaintenanceCheckSpelling,MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, buildMaintenanceAcknowledgementSubject,
   describeMaintenanceCheck, maintenanceAcknowledgement, maintenanceCheckSha256, maintenanceChecksDigest, maintenanceReceiptSuite, maintenanceRedProof,
   maintenanceScopeRefusal, planApprovalCommit, preApprovalRedReceipt, readMaintenanceRedObservation, validMaintenanceBinding,
-  writeMaintenanceRedObservation } from "./maintenance-delivery.mjs";
+  writeMaintenanceRedObservation, greenAfterDeliveryReceipt, maintenanceSlicesLackingGreenVerify } from "./maintenance-delivery.mjs";
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
 import { sealVerifySuiteReceipt } from "./verify-resume.mjs";
 
@@ -145,4 +145,37 @@ test("the acknowledgement route and the subject: only red observations without a
   assert.equal(maintenanceAcknowledgement({ commonDir: r.common, featureId: "epic2", approvalSha256, checkSha256: sha("x"), readApprovals: tampered }), null, "a list that does not match its digest");
   const nothing = buildMaintenanceAcknowledgementSubject({ commonDir: r.common, root: r.dir, featureId: "epic2", approvalSha256, approvalCommit: null, candidate, readApprovals: acks });
   assert.equal(nothing.code, "MRA-NOTHING-TO-ACKNOWLEDGE");
+});
+
+test("green after the delivery: the close needs a sealed green configured-verify receipt after the red base and inside the candidate", () => {
+  const r = repo();
+  r.put("README.md", "x\n"); const base = r.commit("chore: red base", ["README.md"]);
+  const baseTree = r.git("rev-parse", "HEAD^{tree}");
+  r.put("tests/unit/docs.test.ts", "fixed\n"); const repaired = r.commit("test: repair", ["tests/unit/docs.test.ts"]);
+  const repairedTree = r.git("rev-parse", "HEAD^{tree}");
+  r.put("src/b.ts", "b\n"); const candidate = r.commit("feat: more", ["src/b.ts"]);
+  r.git("checkout", "-q", "-b", "side", base);
+  r.put("side.txt", "s\n"); const side = r.commit("chore: side branch", ["side.txt"]);
+  const sideTree = r.git("rev-parse", "HEAD^{tree}");
+  r.git("checkout", "-q", "main");
+  const slices = [
+    { id: "MAINT-1", state: "ready", delivery: { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA }, baseCommit: base, checks: [configuredCheck] } },
+    { id: "MAINT-TEST", state: "ready", delivery: { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA }, baseCommit: base, checks: [{ id: "t", path: "tests/a.test.mjs", dependencies: ["tests/a.test.mjs"] }] } },
+    { id: "MAINT-CANCELLED", state: "cancelled", delivery: { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA }, baseCommit: base, checks: [configuredCheck] } },
+    { id: "ITEM", state: "ready", delivery: { criteria: ["AC-1"], baseCommit: base, checks: [commandCheck] } },
+  ];
+  const lacking = () => maintenanceSlicesLackingGreenVerify({ commonDir: r.common, root: r.dir, slices, candidateCommit: candidate });
+  assert.deepEqual(lacking(), ["MAINT-1"], "only a live maintenance slice of the configured verify needs it; the host ran the .test check");
+  receipt(r, { suite: "configured-verify", commit: base, tree: baseTree, exitCode: 0, runId: "run-1-green-at-base" });
+  receipt(r, { suite: "configured-verify", commit: side, tree: sideTree, exitCode: 0, runId: "run-2-green-off-candidate" });
+  receipt(r, { suite: "configured-verify", commit: repaired, tree: repairedTree, exitCode: 1, runId: "run-3-red-after" });
+  receipt(r, { suite: "project-docs", commit: repaired, tree: repairedTree, exitCode: 0, runId: "run-4-other-suite" });
+  assert.deepEqual(lacking(), ["MAINT-1"], "green at the red base itself, green outside the candidate, red after, and another suite do not count");
+  const green = receipt(r, { suite: "configured-verify", commit: repaired, tree: repairedTree, exitCode: 0, runId: "run-5-green-after" });
+  assert.deepEqual(lacking(), []);
+  assert.deepEqual({ ...greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: candidate }) },
+    { kind: "verify-receipt", ref: green.receiptSha256, runId: "run-5-green-after", commit: repaired, suite: "configured-verify" });
+  assert.equal(greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: side }).runId, "run-2-green-off-candidate",
+    "for the side candidate only its own green counts, never the main line's");
+  assert.equal(greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: base }), null, "a candidate that contains no green commit after the base");
 });

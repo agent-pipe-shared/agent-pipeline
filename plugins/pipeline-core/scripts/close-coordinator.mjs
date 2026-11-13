@@ -41,6 +41,7 @@ import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { describeLapsedFinding, lapsedFindingsRepair, readLapsedCriticFindings } from "../lib/critic-lapsed-findings.mjs";
 import { describeGateDefinitionChange, gateChangeAcknowledgementRepair, gateDefinitionChangeReadback, specDirectoryOf } from "../lib/gate-definition-changes.mjs";
 import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
+import { maintenanceSlicesLackingGreenVerify } from "../lib/maintenance-delivery.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
@@ -644,6 +645,13 @@ function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = fa
     if (scheduled.length > 0) {
       fail("CLOSE-CRITIC-SLICE-SCHEDULED", `feature close preparation is blocked: Critic slice ${scheduled.join(", ")} of the delivery course is still scheduled (no terminal dispatch record); repair: run the Critic review and record its evidence in the slice's dispatch record, or cancel the Critic slice through the sanctioned slice-queue route, then plan the transition again`);
     }
+  }
+  // ADR-0097 (K-28): the host could not run a maintenance delivery's configured verify at finalize (it recorded the row
+  // deferredTo close-verify), so the close requires it green: a sealed green configured-verify receipt after the slice's red base,
+  // inside this candidate. A pure read of the Verify receipts, on the audited and the plain route alike.
+  const lackingGreen = maintenanceSlicesLackingGreenVerify({ commonDir: gitCommonDir(root), root, slices, candidateCommit: git(root, ["rev-parse", "HEAD"]) });
+  if (lackingGreen.length > 0) {
+    fail("CLOSE-MAINTENANCE-VERIFY-NOT-GREEN", `feature close preparation is blocked: maintenance slice ${lackingGreen.join(", ")} repairs the configured verify command, and no sealed green configured-verify receipt exists at a commit after its red base commit and inside this candidate (ADR-0097); repair: make the project verify green, then run a Verify in which the configured-verify suite runs (node <plugin-root>/scripts/verify-evidence-producer.mjs --root <repo-root> --mode candidate when the calibration registers no verifyImpact areas; otherwise --mode release --out scratch/maintenance-configured-verify.json, which keeps the candidate evidence in place), then plan the transition again`);
   }
   let authorship;
   try { authorship = classifyCourseAuthorship({ root, slices, candidateCommit: git(root, ["rev-parse", "HEAD"]) }); }
