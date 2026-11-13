@@ -320,7 +320,7 @@ rules:
               - pattern: (ObjectInputStream $O).readUnshared()
               - pattern: new ObjectInputStream(...).readObject()
           - pattern-not-inside: |
-              $RT $M(...) {
+              $C(...) {
                 ...
                 $X.setObjectInputFilter(...);
                 ...
@@ -358,14 +358,15 @@ rules:
     languages: [java]
     severity: ERROR
     message: >-
-      An XML parser factory is created without switching off DOCTYPE declarations or external entities in the same method, so a
-      document can read local files or reach internal hosts (XXE). Set disallow-doctype-decl (or the StAX SUPPORT_DTD false) right
-      after creating the factory.
+      An XML parser factory is created without switching off DOCTYPE declarations, external entities or external DTD access in the same
+      method or constructor, so a document can read local files or reach internal hosts (XXE). Set disallow-doctype-decl (StAX:
+      SUPPORT_DTD false) or ACCESS_EXTERNAL_DTD "" right after creating the factory.
     metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: MEDIUM}
     paths:
       exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
         "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
         "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
+    # $C(...) { ... } matches a method and a constructor alike (measured), so hardening in either counts.
     patterns:
       - pattern-either:
           - pattern: DocumentBuilderFactory.newInstance()
@@ -373,33 +374,51 @@ rules:
           - pattern: XMLInputFactory.newInstance()
           - pattern: XMLInputFactory.newFactory()
       - pattern-not-inside: |
-          $RT $M(...) {
+          $C(...) {
             ...
             $F.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             ...
           }
       - pattern-not-inside: |
-          $RT $M(...) {
+          $C(...) {
             ...
             $F.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             ...
           }
       - pattern-not-inside: |
-          $RT $M(...) {
+          $C(...) {
             ...
             $F.setFeature("http://xml.org/sax/features/external-general-entities", false);
             ...
           }
       - pattern-not-inside: |
-          $RT $M(...) {
+          $C(...) {
             ...
             $F.setProperty(XMLInputFactory.SUPPORT_DTD, false);
             ...
           }
       - pattern-not-inside: |
-          $RT $M(...) {
+          $C(...) {
             ...
             $F.setProperty("javax.xml.stream.supportDTD", false);
+            ...
+          }
+      - pattern-not-inside: |
+          $C(...) {
+            ...
+            $F.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+            ...
+          }
+      - pattern-not-inside: |
+          $C(...) {
+            ...
+            $F.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            ...
+          }
+      - pattern-not-inside: |
+          $C(...) {
+            ...
+            $F.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
             ...
           }
   - id: pipeline-java-path-traversal
@@ -424,23 +443,42 @@ rules:
           - metavariable-regex:
               metavariable: $A
               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
+          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
+          - metavariable-regex:
+              metavariable: $T
+              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
           - pattern: $P
       - pattern: (HttpServletRequest $REQ).getParameter(...)
       - pattern: (HttpServletRequest $REQ).getParameterValues(...)
       - pattern: (HttpServletRequest $REQ).getHeader(...)
       - pattern: (HttpServletRequest $REQ).getPathInfo()
+    # The sink is the file ACCESS, not the building of a path: a path built with Paths.get/resolve and then checked to stay under the base
+    # (the containment check this message recommends) is cleaned by that check before it reaches an access.
     pattern-sinks:
-      - pattern: new File(...)
-      - pattern: new FileInputStream(...)
-      - pattern: new FileOutputStream(...)
-      - pattern: new FileReader(...)
-      - pattern: new FileWriter(...)
-      - pattern: new RandomAccessFile(...)
-      - pattern: Paths.get(...)
-      - pattern: Path.of(...)
-      - pattern: (Path $BASE).resolve(...)
+      - patterns:
+          - pattern-either:
+              - pattern: new FileInputStream($P, ...)
+              - pattern: new FileOutputStream($P, ...)
+              - pattern: new FileReader($P, ...)
+              - pattern: new FileWriter($P, ...)
+              - pattern: new RandomAccessFile($P, ...)
+              - pattern: Files.$FN($P, ...)
+          - focus-metavariable: $P
+      - patterns:
+          - pattern: (File $F).$ACCESS(...)
+          - metavariable-regex:
+              metavariable: $ACCESS
+              regex: ^(delete|renameTo|createNewFile|mkdirs|listFiles)$
+          - focus-metavariable: $F
     pattern-sanitizers:
       - pattern: FilenameUtils.getName(...)
+      - by-side-effect: true
+        patterns:
+          - pattern-either:
+              - pattern: $X.startsWith(...)
+              - pattern: $X.getCanonicalPath().startsWith(...)
+              - pattern: $X.toRealPath(...).startsWith(...)
+          - focus-metavariable: $X
   - id: pipeline-java-ssrf
     languages: [java]
     severity: ERROR
@@ -463,6 +501,10 @@ rules:
           - metavariable-regex:
               metavariable: $A
               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
+          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
+          - metavariable-regex:
+              metavariable: $T
+              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
           - pattern: $P
       - pattern: (HttpServletRequest $REQ).getParameter(...)
       - pattern: (HttpServletRequest $REQ).getParameterValues(...)
@@ -657,6 +699,10 @@ rules:
               regex: ^(Controller|ControllerBase|ApiController|PageModel)$
           - pattern-inside: |
               public $RT $M(..., $T $P, ...) { ... }
+          # A number, a flag, a Guid, a date or a CancellationToken cannot carry ..\ or a host name.
+          - metavariable-regex:
+              metavariable: $T
+              regex: '^(?!(?:int|long|short|byte|uint|ulong|ushort|sbyte|bool|decimal|double|float|Guid|DateTime|DateTimeOffset|DateOnly|TimeOnly|TimeSpan|CancellationToken)\??$)'
           - pattern: $P
       - pattern: Request.Query[...]
       - pattern: Request.Form[...]
@@ -670,11 +716,17 @@ rules:
       - pattern: new FileStream(...)
       - pattern: new StreamReader(...)
       - pattern: new StreamWriter(...)
-      - pattern: new FileInfo(...)
       - pattern: Directory.$FN(...)
       - pattern: PhysicalFile(...)
     pattern-sanitizers:
       - pattern: Path.GetFileName(...)
+      # The containment check the message recommends: a full path checked to start with the base directory.
+      - by-side-effect: true
+        patterns:
+          - pattern-either:
+              - pattern: $X.StartsWith(...)
+              - pattern: Path.GetFullPath($X).StartsWith(...)
+          - focus-metavariable: $X
   - id: pipeline-csharp-ssrf
     languages: [csharp]
     severity: ERROR
@@ -696,6 +748,10 @@ rules:
               regex: ^(Controller|ControllerBase|ApiController|PageModel)$
           - pattern-inside: |
               public $RT $M(..., $T $P, ...) { ... }
+          # A number, a flag, a Guid, a date or a CancellationToken cannot carry ..\ or a host name.
+          - metavariable-regex:
+              metavariable: $T
+              regex: '^(?!(?:int|long|short|byte|uint|ulong|ushort|sbyte|bool|decimal|double|float|Guid|DateTime|DateTimeOffset|DateOnly|TimeOnly|TimeSpan|CancellationToken)\??$)'
           - pattern: $P
       - pattern: Request.Query[...]
       - pattern: Request.Form[...]
@@ -902,13 +958,26 @@ rules:
               - pattern: os.remove($P)
               - pattern: os.unlink($P)
               - pattern: shutil.rmtree($P, ...)
-              - pattern: Path($P)
-              - pattern: pathlib.Path($P)
           - focus-metavariable: $P
+      # A pathlib.Path built from the value is not yet an access; reading, writing or deleting through it is.
+      - patterns:
+          - pattern: $F.$ACCESS(...)
+          - metavariable-regex:
+              metavariable: $ACCESS
+              regex: ^(read_text|read_bytes|write_text|write_bytes|open|unlink|rmdir|touch|rename|replace)$
+          - focus-metavariable: $F
     pattern-sanitizers:
       - pattern: os.path.basename(...)
       - pattern: secure_filename(...)
       - pattern: werkzeug.utils.secure_filename(...)
+      # The containment check the message recommends: the resolved path checked to stay under the base directory.
+      - by-side-effect: true
+        patterns:
+          - pattern-either:
+              - pattern: $X.startswith(...)
+              - pattern: $X.is_relative_to(...)
+              - pattern: os.path.commonpath([..., $X, ...])
+          - focus-metavariable: $X
   - id: pipeline-python-ssrf
     languages: [python]
     severity: ERROR
@@ -1092,6 +1161,11 @@ rules:
     pattern-sanitizers:
       - pattern: filepath.Base(...)
       - pattern: path.Base(...)
+      # The containment check the message recommends: the cleaned path checked to stay under the base directory.
+      - by-side-effect: true
+        patterns:
+          - pattern: strings.HasPrefix($X, ...)
+          - focus-metavariable: $X
   - id: pipeline-go-ssrf
     languages: [go]
     severity: ERROR
@@ -1262,9 +1336,10 @@ rules:
               - pattern: request.$ATTR
               - pattern: ctx.$ATTR
               - pattern: ctx.request.$ATTR
+          # req.file / req.files (upload middleware) are left out: their .path is the server's own temporary file.
           - metavariable-regex:
               metavariable: $ATTR
-              regex: ^(query|params|body|cookies|headers|files|file)$
+              regex: ^(query|params|body|cookies|headers)$
     pattern-sinks:
       - patterns:
           - pattern-either:
@@ -1275,13 +1350,23 @@ rules:
               metavariable: $FN
               regex: ^(readFile|readFileSync|createReadStream|writeFile|writeFileSync|createWriteStream|appendFile|appendFileSync|unlink|unlinkSync|rm|rmSync|open|openSync|readdir|readdirSync|copyFile|copyFileSync|rename|renameSync)$
           - focus-metavariable: $P
+      # sendFile with a root option refuses a path that leaves the root, so only the root-less form is a sink.
       - patterns:
           - pattern-either:
               - pattern: $RES.sendFile($P, ...)
               - pattern: $RES.download($P, ...)
+          - pattern-not: |
+              $RES.sendFile($P, {..., root: $R, ...}, ...)
+          - pattern-not: |
+              $RES.download($P, $N, {..., root: $R, ...}, ...)
           - focus-metavariable: $P
     pattern-sanitizers:
       - pattern: path.basename(...)
+      # The containment check the message recommends: the resolved path checked to stay under the base directory.
+      - by-side-effect: true
+        patterns:
+          - pattern: $X.startsWith(...)
+          - focus-metavariable: $X
   - id: pipeline-js-ssrf
     languages: [javascript, typescript]
     severity: ERROR
@@ -1474,6 +1559,18 @@ rules:
             $F.setProperty(XMLInputFactory.SUPPORT_DTD, false)
             ...
           }
+      - pattern-not-inside: |
+          fun $M(...): $RT {
+            ...
+            $F.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+            ...
+          }
+      - pattern-not-inside: |
+          fun $M(...) {
+            ...
+            $F.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+            ...
+          }
   - id: pipeline-kotlin-path-traversal
     languages: [kotlin]
     severity: ERROR
@@ -1500,24 +1597,46 @@ rules:
           - metavariable-regex:
               metavariable: $A
               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
+          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
+          - metavariable-regex:
+              metavariable: $T
+              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
           - pattern: $P
       - pattern: $REQ.getParameter(...)
       - pattern: $CALL.request.queryParameters[...]
       - pattern: $CALL.parameters[...]
+    # The sink is the file ACCESS, not the building of a path (File(...), resolve): a path checked to stay under the base is cleaned by
+    # that check before it reaches an access.
     pattern-sinks:
       - patterns:
           - pattern-either:
-              - pattern: File($P)
-              - pattern: File($BASE, $P)
-              - pattern: FileInputStream($P)
-              - pattern: FileOutputStream($P)
-              - pattern: Paths.get(..., $P, ...)
-              - pattern: Path.of(..., $P, ...)
-              - pattern: $BASE.resolve($P)
+              - pattern: FileInputStream($P, ...)
+              - pattern: FileOutputStream($P, ...)
+              - pattern: FileReader($P, ...)
+              - pattern: FileWriter($P, ...)
+              - pattern: Files.$FN($P, ...)
           - focus-metavariable: $P
+      - patterns:
+          - pattern: $F.$ACCESS(...)
+          - metavariable-regex:
+              metavariable: $ACCESS
+              regex: ^(readBytes|readText|readLines|writeText|writeBytes|appendText|appendBytes|delete|deleteRecursively|inputStream|outputStream|bufferedReader|bufferedWriter|reader|writer|forEachLine|useLines|copyTo|renameTo)$
+          - focus-metavariable: $F
     pattern-sanitizers:
       - pattern: FilenameUtils.getName(...)
       - pattern: File(...).name
+      # A URL is not a file path (URL(...).readText() is the SSRF rule's business).
+      - pattern: URL(...)
+      - pattern: URI(...)
+      - pattern: URI.create(...)
+      - by-side-effect: true
+        patterns:
+          - pattern-either:
+              - pattern: $X.startsWith(...)
+              - pattern: $X.canonicalPath.startsWith(...)
+              - pattern: $X.canonicalFile.startsWith(...)
+              - pattern: $X.normalize().startsWith(...)
+          - focus-metavariable: $X
   - id: pipeline-kotlin-ssrf
     languages: [kotlin]
     severity: ERROR
@@ -1544,6 +1663,10 @@ rules:
           - metavariable-regex:
               metavariable: $A
               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
+          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
+          - metavariable-regex:
+              metavariable: $T
+              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
           - pattern: $P
       - pattern: $REQ.getParameter(...)
       - pattern: $CALL.request.queryParameters[...]
@@ -1560,7 +1683,8 @@ rules:
               - pattern: $C.postForObject($U, ...)
               - pattern: $C.exchange($U, ...)
               - pattern: $C.uri($U, ...)
-              - pattern: $C.get($U)
+              - pattern: Request.Builder().url($U)
+              - pattern: $C.get(urlString = $U)
           - metavariable-regex:
               metavariable: $U
               regex: '^(?!"https?://[^"/$]+/)'
@@ -1678,8 +1802,18 @@ rules:
           [..., 'verify_peer' => false, ...]
       - pattern: |
           [..., 'verify_peer_name' => false, ...]
+      # 'verify' => false only counts as an HTTP client option (Guzzle, Laravel's Http); the key is too common in other arrays.
       - pattern: |
-          [..., 'verify' => false, ...]
+          new Client([..., 'verify' => false, ...])
+      - pattern: |
+          new \GuzzleHttp\Client([..., 'verify' => false, ...])
+      - pattern: |
+          $C->request($M, $U, [..., 'verify' => false, ...])
+      - pattern: |
+          $C->$VERB($U, [..., 'verify' => false, ...])
+      - pattern: |
+          Http::withOptions([..., 'verify' => false, ...])
+      - pattern: Http::withoutVerifying()
   - id: pipeline-php-xxe
     languages: [php]
     severity: ERROR
@@ -1731,6 +1865,18 @@ rules:
           - focus-metavariable: $P
     pattern-sanitizers:
       - pattern: basename(...)
+      # The containment check the message recommends: the realpath checked to stay under the base directory. Matched as "used after an if
+      # whose condition tests it", because the common form ($real === false || !str_starts_with($real, $base)) defeats a side-effect
+      # sanitizer at the || (measured).
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  if (<... str_starts_with($X, ...) ...>) { ... }
+                  ...
+              - pattern-inside: |
+                  if (<... strpos($X, ...) ...>) { ... }
+                  ...
+          - pattern: $X
   - id: pipeline-php-ssrf
     languages: [php]
     severity: ERROR
@@ -1924,6 +2070,11 @@ rules:
           - focus-metavariable: $P
     pattern-sanitizers:
       - pattern: File.basename(...)
+      # The containment check the message recommends: the expanded path checked to stay under the base directory.
+      - by-side-effect: true
+        patterns:
+          - pattern: $X.start_with?(...)
+          - focus-metavariable: $X
   - id: pipeline-ruby-ssrf
     languages: [ruby]
     severity: ERROR

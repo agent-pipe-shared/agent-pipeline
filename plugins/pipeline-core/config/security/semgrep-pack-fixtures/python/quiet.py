@@ -65,3 +65,14 @@ def checksum(data):
 
 def strong(data):
     return hashlib.sha256(data).hexdigest()
+
+
+BASE = "/srv/files"
+
+
+@app.route("/contained")
+def contained():
+    full = os.path.realpath(os.path.join(BASE, request.args.get("name")))
+    if not full.startswith(BASE + os.sep):
+        return "", 400
+    return open(full).read()

@@ -57,3 +57,18 @@ function digest($data)
 {
     return hash('sha256', $data);
 }
+
+function routes()
+{
+    return ['path' => '/orders', 'verify' => false, 'methods' => ['GET']];
+}
+
+function contained()
+{
+    $base = '/srv/files/';
+    $full = realpath($base . $_GET['name']);
+    if ($full === false || !str_starts_with($full, $base)) {
+        return null;
+    }
+    return file_get_contents($full);
+}

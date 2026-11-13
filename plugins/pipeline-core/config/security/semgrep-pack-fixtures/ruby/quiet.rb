@@ -48,4 +48,13 @@ class CatalogController < ApplicationController
   def digest
     Digest::SHA256.hexdigest(params[:data])
   end
+
+  BASE = "/srv/files/"
+
+  def contained
+    full = File.expand_path(params[:name], BASE)
+    return head(:bad_request) unless full.start_with?(BASE)
+
+    send_file full
+  end
 end

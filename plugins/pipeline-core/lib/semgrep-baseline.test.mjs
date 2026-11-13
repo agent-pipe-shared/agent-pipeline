@@ -158,3 +158,61 @@ test("the real chain: a new Semgrep finding blocks, a finding older than the fea
     rmSync(join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`), { recursive: true, force: true });
   }
 });
+
+// C28e (ADR-0094): the same chain with the plugin's shipped pack and its taint rules. One Java controller holds an older path-traversal finding
+// that the feature moves down, and the feature adds an SSRF finding to the same file: exactly the new one blocks, and the two passes agree.
+const JAVA_LEGACY = [
+  "package demo;",
+  "import java.nio.file.*;",
+  "import org.springframework.web.bind.annotation.*;",
+  "import org.springframework.web.client.RestTemplate;",
+  "@RestController",
+  "public class Files2 {",
+  "  RestTemplate rest;",
+  "  @GetMapping(\"/file\")",
+  "  public byte[] read(@RequestParam String name) throws Exception {",
+  "    return Files.readAllBytes(Paths.get(\"/srv/files\", name));",
+  "  }",
+];
+test("the real chain with the shipped language pack: a feature-introduced taint finding blocks, the older one in the same file is listed", { skip: semgrepAvailable ? false : "semgrep is not installed" }, async () => {
+  const root = makeRepo();
+  try {
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n\ngates:\n  security:\n    mode: blocking\n    type: automated\n\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n");
+    mkdirSync(join(root, "src", "main", "java", "demo"), { recursive: true });
+    const javaFile = join(root, "src", "main", "java", "demo", "Files2.java");
+    writeFileSync(javaFile, `${[...JAVA_LEGACY, "}"].join("\n")}\n`);
+    writeState(root, { activeFeature: { id: "probe-feature" } }, ".claude");
+    const base = commitAll(root, "legacy controller");
+    mkdirSync(join(root, "specs", "probe-feature"), { recursive: true });
+    writeFileSync(join(root, "specs", "probe-feature", "spec.md"), "# spec\n");
+    commitAll(root, "feature start");
+    const feature = [
+      ...JAVA_LEGACY.slice(0, 7),
+      "  // the feature adds a proxy endpoint above the old one",
+      "  @GetMapping(\"/fetch\")",
+      "  public String fetch(@RequestParam(\"url\") String target) {",
+      "    return rest.getForObject(target, String.class);",
+      "  }",
+      ...JAVA_LEGACY.slice(7),
+      "}",
+    ];
+    writeFileSync(javaFile, `${feature.join("\n")}\n`);
+    commitAll(root, "feature work with a new taint finding");
+    const evidenceDir = join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`);
+    const { evidence, exitCode } = await runSecurityScan({ rootDir: root, env: process.env, timeoutMs: 240000, evidenceOutDir: evidenceDir });
+    const record = evidence.execution.semgrepBaseline;
+    const semgrep = evidence.scanners.find((s) => s.tool === "semgrep");
+    assert.equal(semgrep?.ruleSet?.source, "plugin-default", JSON.stringify(semgrep?.ruleSet));
+    assert.equal(record.status, "applied", JSON.stringify(record));
+    assert.equal(record.commit, base);
+    assert.deepEqual(record.existing.map((entry) => `${entry.rule.split(".").at(-1)} ${entry.file}:${entry.line}`), ["pipeline-java-path-traversal src/main/java/demo/Files2.java:15"]);
+    assert.equal(record.newCount, 1, JSON.stringify(record));
+    assert.deepEqual(blockingFindings(evidence.findings, ["critical", "high"], record).map((f) => `${f.rule.split(".").at(-1)}:${f.line}`), ["pipeline-java-ssrf:11"]);
+    assert.equal(exitCode, 2, "the new taint finding blocks");
+    assert.equal(git(root, "worktree", "list", "--porcelain").split("\n").filter((line) => line.startsWith("worktree ")).length, 1, "no worktree is left behind");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`), { recursive: true, force: true });
+  }
+});

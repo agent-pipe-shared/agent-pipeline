@@ -42,4 +42,30 @@ class Quiet(private val jdbc: JdbcTemplate) {
     }
 
     fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
+
+    private val base = File("/srv/files").canonicalFile
+
+    @GetMapping("/contained")
+    fun contained(@RequestParam name: String): ByteArray {
+        val f = File(base, name).canonicalFile
+        if (!f.startsWith(base)) {
+            throw SecurityException("outside the base directory")
+        }
+        return f.readBytes()
+    }
+
+    @GetMapping("/order/{id}")
+    fun order(@PathVariable id: String, repo: Map<String, String>, resolver: Resolver): String? {
+        val name = resolver.resolve(id)
+        return repo.get(id) + name
+    }
+
+    @GetMapping("/invoice/{id}")
+    fun invoice(@PathVariable id: Long): ByteArray {
+        return File(base, "$id.pdf").readBytes()
+    }
+}
+
+interface Resolver {
+    fun resolve(key: String): String
 }

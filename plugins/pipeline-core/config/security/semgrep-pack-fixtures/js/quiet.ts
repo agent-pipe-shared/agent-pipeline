@@ -49,3 +49,23 @@ app.get("/item", async (req, res) => {
 export function digest(data: string) {
   return crypto.createHash("sha256").update(data).digest("hex");
 }
+
+const BASE = "/srv/files";
+
+app.get("/contained", (req, res) => {
+  const full = path.resolve(BASE, req.query.name as string);
+  if (!full.startsWith(BASE + path.sep)) {
+    res.status(400).end();
+    return;
+  }
+  res.send(fs.readFileSync(full));
+});
+
+app.get("/static/:name", (req, res) => {
+  res.sendFile(req.params.name, { root: BASE });
+});
+
+app.post("/upload", (req: any, res) => {
+  fs.unlinkSync(req.file.path);
+  res.end();
+});

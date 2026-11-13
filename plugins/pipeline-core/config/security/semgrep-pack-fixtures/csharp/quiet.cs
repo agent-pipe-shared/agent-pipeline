@@ -68,5 +68,23 @@ namespace Demo
         {
             return SHA256.HashData(data);
         }
+
+        private const string BaseDir = "/srv/files/";
+
+        public IActionResult Contained(string name)
+        {
+            var full = Path.GetFullPath(Path.Combine(BaseDir, name));
+            if (!full.StartsWith(BaseDir, StringComparison.Ordinal))
+            {
+                return BadRequest();
+            }
+            return File(System.IO.File.ReadAllBytes(full), "application/octet-stream");
+        }
+
+        public IActionResult Invoice(int id, Guid tenant, CancellationToken cancellationToken)
+        {
+            var bytes = System.IO.File.ReadAllBytes(Path.Combine(BaseDir, tenant.ToString(), $"{id}.pdf"));
+            return File(bytes, "application/pdf");
+        }
     }
 }

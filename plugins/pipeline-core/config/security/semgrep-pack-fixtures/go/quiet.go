@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func FindUser(db *sql.DB, name string) (*sql.Rows, error) {
@@ -48,4 +49,16 @@ func Item(w http.ResponseWriter, r *http.Request) {
 
 func Digest(data []byte) [32]byte {
 	return sha256.Sum256(data)
+}
+
+const base = "/srv/files/"
+
+func Contained(w http.ResponseWriter, r *http.Request) {
+	full := filepath.Clean(filepath.Join(base, r.URL.Query().Get("name")))
+	if !strings.HasPrefix(full, base) {
+		http.Error(w, "outside", http.StatusBadRequest)
+		return
+	}
+	data, _ := os.ReadFile(full)
+	w.Write(data)
 }

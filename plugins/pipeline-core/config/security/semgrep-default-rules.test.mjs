@@ -201,12 +201,13 @@ if (!binary) {
   record("language pack: no language rule fires on any quiet file", quietAny.length === 0, JSON.stringify(quietAny));
 
   // Case 5 (C28e): test code is excluded from the ERROR rules. The same firing fixtures under test-shaped names produce no ERROR finding of the
-  // language pack; weak-crypto (WARNING, no exclude) may still appear and blocks nothing.
+  // language pack. weak-crypto (WARNING, no exclude) is the positive control: it must still fire in every copy, which proves the copy was scanned
+  // at all. Semgrep's own built-in ignore list already skips test/, tests/ and *_test.go entirely (measured 2026-11-12), so the copies use the
+  // names only the pack's own excludes cover, and Go (whose only convention is *_test.go) is not among them.
   const exclDir = join(scratch, "excluded");
   const exclCopies = [
     ["java", "hits.java", join("src", "main", "OrderServiceTest.java")],
     ["csharp", "hits.cs", join("Orders.Tests", "OrdersControllerTests.cs")],
-    ["go", "hits.go", join("orders", "orders_test.go")],
     ["python", "hits.py", join("app", "test_orders.py")],
     ["js", "hits.ts", join("web", "orders.spec.ts")],
     ["ruby", "hits.rb", join("spec", "orders_spec.rb")],
@@ -222,6 +223,21 @@ if (!binary) {
   try { exclParsed = JSON.parse(exclRun.stdout ?? ""); } catch { /* asserted below */ }
   const exclErrors = (exclParsed?.results ?? []).filter((r) => LANG_ID.test(r.check_id.split(".").pop()) && r.extra?.severity === "ERROR");
   record("language pack: test-shaped paths carry no ERROR finding of the language pack", exclParsed !== null && exclErrors.length === 0, JSON.stringify(exclErrors.map((r) => `${r.path}:${r.start?.line} ${r.check_id.split(".").pop()}`)));
+  for (const [lang, , target] of exclCopies) {
+    const control = (exclParsed?.results ?? []).filter((r) => r.check_id.endsWith(`pipeline-${lang}-weak-crypto`) && r.path.replaceAll("\\", "/").endsWith(target.replaceAll("\\", "/")));
+    record(`language pack: ${target} was scanned (its weak-crypto WARNING fires), so its missing ERROR findings are the exclude`, control.length > 0, "the copy was not scanned at all");
+  }
+
+  // Case 6 (C28e): the excludes anchor to the scanned root, not to a directory above it. A project that itself lives under a directory named
+  // tests/ keeps its blocking rules (the adapter scans the absolute root with the root as cwd, as here).
+  const anchoredRoot = join(scratch, "tests", "proj");
+  mkdirSync(join(anchoredRoot, "src", "main", "java"), { recursive: true });
+  copyFileSync(join(FIXTURE_DIR, "java", "hits.java"), join(anchoredRoot, "src", "main", "java", "App.java"));
+  const anchoredRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, anchoredRoot], { cwd: anchoredRoot, encoding: "utf8", env, shell: false, maxBuffer: 64 * 1024 * 1024 });
+  let anchoredParsed = null;
+  try { anchoredParsed = JSON.parse(anchoredRun.stdout ?? ""); } catch { /* asserted below */ }
+  const anchoredErrors = (anchoredParsed?.results ?? []).filter((r) => /pipeline-java-/u.test(r.check_id) && r.extra?.severity === "ERROR");
+  record("language pack: a project under a directory named tests/ keeps every Java ERROR rule", new Set(anchoredErrors.map((r) => r.check_id.split(".").pop())).size === langIds.filter((id) => id.startsWith("pipeline-java-") && !id.endsWith("weak-crypto")).length, JSON.stringify(anchoredErrors.map((r) => r.check_id.split(".").pop())));
 
   try { rmSync(scratch, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
 }
