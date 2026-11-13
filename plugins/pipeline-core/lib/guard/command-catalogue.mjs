@@ -222,6 +222,9 @@ const RECEIPT_OUT = /^(?:specs|evidence|docs)\/[A-Za-z0-9._/-]{1,200}\.json$/u;
 const FINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
 const REQUESTED_ROUTE = /^[A-Za-z0-9][\x21-\x7e]{0,127}$/u;
 const OBSERVED_IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,127}$/u;
+// K128/D247: the typed fallback route is the only one that may name a requested route and an observed identity, and it names its
+// reason code; the same pattern scripts/design-review-receipt.mjs checks.
+const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
 const GIT_REVISION = /^[A-Za-z0-9][A-Za-z0-9._/~^@-]{0,127}$/u;
 const GIT_OBJECT_ID = /^[a-f0-9]{7,64}$/u;
 
@@ -290,6 +293,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
         "--original-report": input,
         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
+        "--fallback-reason-code": (value) => FALLBACK_REASON_CODE.test(value),
       },
     });
   } catch { return false; }

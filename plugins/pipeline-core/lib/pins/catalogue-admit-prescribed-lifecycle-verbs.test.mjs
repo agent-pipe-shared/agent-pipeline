@@ -469,7 +469,10 @@ test("D64 design-review receipt production: the documented forms are admitted, d
     bothAdmit(scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report2, "--prd", r.prd, "--spec", r.spec,
       "--previous", `specs/${f.featureId}/review/receipt-1.json`, "--open-finding", "F-1", "--open-finding", "F-2", "--companion", f.sources.design.path,
       "--requested-route", "claude-sonnet-5-5", "--observed-identity", "claude-sonnet-5-5", "--out", r.out), f, "delta round with companions and findings");
+    // K128/D247: the script takes a requested route and an observed identity only on the typed fallback route, which names its reason code.
+    bothAdmit(receiptCreate(f, r, { "--requested-route": "duty.critic_normal", "--observed-identity": "unknown", "--fallback-reason-code": "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER" }), f, "typed fallback round");
     const refusals = [
+      ["a fallback reason code that is not a code", receiptCreate(f, r, { "--requested-route": "duty.critic_normal", "--fallback-reason-code": "no carrier" })],
       ["a flag that supplies a derived value", receiptCreate(f, r, { "--reviewed-at": "2026-10-22T00:00:00.000Z" })],
       ["a digest flag", receiptCreate(f, r, { "--sha256": "a".repeat(64) })],
       ["foreign repo", receiptCreate(f, r, { "--repo": join(f.root, "..") })],
