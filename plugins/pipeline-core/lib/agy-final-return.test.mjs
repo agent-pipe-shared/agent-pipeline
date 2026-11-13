@@ -87,8 +87,11 @@ test("AFR07 accepts v4-sized multiline reports but rejects private paths before 
 test("AFR08 refuses paths that v4 authorship would reject or read as another path", () => {
   assert.deepEqual(validate(envelope({ ...final, changedPaths: ["src/name-with-dash.mjs"] })).changedPaths,
     ["src/name-with-dash.mjs"]);
+  // K-32: a framework route path with brackets and parentheses is a literal path the host stages with --literal-pathspecs.
+  assert.deepEqual(validate(envelope({ ...final, changedPaths: ["src/app/(payload)/cms-api/[...slug]/route.ts"] })).changedPaths,
+    ["src/app/(payload)/cms-api/[...slug]/route.ts"]);
   for (const changedPaths of [["src/file name.mjs"], ["src/file.mjs - description"],
-    ["src/file.mjs,"], ["src/$FILE"], ["src/file[1].mjs"], ["src/file?.mjs"],
+    ["src/file.mjs,"], ["src/$FILE"], ["src/file*.mjs"], ["src/file?.mjs"], ["src/{a,b}.mjs"],
     ["src/file.mjs;"], ["src/`generated`.mjs"]]) {
     assert.equal(validate(envelope({ ...final, changedPaths })).code, "AGY-FINAL-SHAPE-INVALID");
   }
