@@ -293,6 +293,7 @@
           "docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md",
           "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md",
           "docs/adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md",
+          "docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md",
           "docs/adr/README.md"
         ]
       },
