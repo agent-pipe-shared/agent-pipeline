@@ -307,8 +307,11 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   if (unitSeen.kind === "other") return refused("FPR-ARTIFACT-INVALID", `${unitPath} exists but is not a regular file; it is never replaced`, { path: unitPath, manifestPath });
   if (unitSeen.kind === "file") {
     // C28e (PO decision 2026-11-13): a unit this registrar generated for an earlier approval names that Spec's criterion ids. When the
-    // approved Spec now names other ids, the found unit would skip a new criterion and block the Critic batch on a dropped one
-    // (CGB-REVIEW-UNIT-BINDING); it is rendered anew. A unit of any other shape (a hand-written multi-item unit) is kept as found.
+    // approved Spec now names other ids and no Critic round has run yet, it is rendered anew, so the first round binds the approved ids.
+    // Once a round is retained, the course is bound to the unit's bytes (the declaration commit, CCA/CGB-REVIEW-UNIT-BINDING) and every
+    // later round must carry the same acceptance ids (CRL-V2-CARRY-COVERAGE): the unit is then kept and reported as bound to the course.
+    // A unit of any other shape (a hand-written multi-item unit) is kept as found.
+    const courseStarted = (superseded ?? []).some((entry) => entry.class === "candidate-evidence" && LINEAGE_FILE.test(entry.path));
     let found = null;
     try { found = JSON.parse(unitSeen.bytes.toString("utf8")); } catch { found = null; }
     const rendered = renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef: primaryMainRef(root) });
@@ -317,9 +320,14 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
       && Array.isArray(found.logicalWorkIds) && found.logicalWorkIds.length === 1 && found.logicalWorkIds[0] === featureId && Array.isArray(found.criterionIds);
     const stale = fresh !== null && generatedShape
       && (found.specPath !== specPath || JSON.stringify([...found.criterionIds].sort()) !== JSON.stringify(fresh.criterionIds));
-    if (stale) {
+    if (stale && !courseStarted) {
       entries.push({ class: "design", path: unitPath, bytes: rendered.bytes, generated: true, replaces: unitSeen.bytes, ...REVIEW_UNIT_ARTIFACT });
       reviewUnit = { status: "re-rendered", path: unitPath, previousCriterionIds: found.criterionIds, criterionIds: fresh.criterionIds };
+    } else if (stale) {
+      entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
+      reviewUnit = { status: "stale-bound-to-course", path: unitPath, criterionIds: found.criterionIds, approvedCriterionIds: fresh.criterionIds,
+        reason: "a Critic round of this feature is retained; its course is bound to the review unit's bytes and acceptance ids, so the unit is kept. "
+          + "Criteria the approved Spec added are not covered by this course: review them in a new feature (rigor 1, its own PRD and Spec) or ask the PO how to proceed." };
     } else {
       entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
       reviewUnit = { status: "found", path: unitPath };
@@ -387,7 +395,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
     found: entries.filter((entry) => !entry.generated && (entry.class === "acceptance" || entry.class === "result" || entry.class === "design")).map(summary),
     reviewUnit,
     choices: {
-      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found, except a generated single-course unit whose criterion ids or Spec path no longer match the approved Spec, which is rendered anew (reviewUnit.status re-rendered); a Spec with no criterion id gets none (reviewUnit names why)",
+      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found, except a generated single-course unit whose criterion ids or Spec path no longer match the approved Spec, which is rendered anew before the first Critic round (reviewUnit.status re-rendered) and kept once a round is retained (stale-bound-to-course); a Spec with no criterion id gets none (reviewUnit names why)",
       state: `${lifecycle.status} (the plan lifecycle status; the topology requires prd, spec, acceptance, result and candidate-evidence for it)`,
       rigor: `${rigor.rigor} (${rigor.source}: ${rigor.basis}; judgment call, no shipped source defines the profile-to-level mapping)`,
       prd: "authority:true, mutable, active (the approved bytes are already bound by the signed envelope; the topology fixes no mutability for this class)",

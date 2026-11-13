@@ -821,9 +821,10 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       }
     });
 
-    // C28e (PO decision 2026-11-13): a re-approved Spec with other criterion ids met the unit generated for the earlier approval, and the
-    // Critic batch refused the dropped id (CGB-REVIEW-UNIT-BINDING). A generated single-course unit is rendered anew; a hand-written one is kept.
-    it("7.13d a re-approval re-renders a generated review unit whose criterion ids no longer match the approved Spec; a hand-written unit is kept", async () => {
+    // C28e (PO decision 2026-11-13): a re-approved Spec with other criterion ids met the unit generated for the earlier approval, so the first
+    // Critic round would bind the earlier ids. Before any round, a generated single-course unit is rendered anew; once a round is retained the
+    // course is bound to the unit (CCA/CGB-REVIEW-UNIT-BINDING, CRL-V2-CARRY-COVERAGE) and it is kept and reported; a hand-written one is kept.
+    it("7.13d a re-approval re-renders a generated review unit whose criterion ids no longer match the approved Spec before the first Critic round; a retained round or a hand-written unit keeps it", async () => {
       const { f } = await fixtureWalk({ predecessorSidecar: false });
       const REGISTER = path.join(here, "register-feature-package.mjs");
       const manifestPath = path.join(f.dir, "specs/e2e/lifecycle.json");
@@ -836,8 +837,8 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       const unitFile = path.join(f.dir, unitPath);
       const fresh = JSON.parse(fs.readFileSync(unitFile, "utf8"));
       assert.ok(fresh.criterionIds.length > 0, "the fixture's Spec names criterion ids");
-      const supersede = () => fs.writeFileSync(manifestPath, `${JSON.stringify({ ...current, state: "implementing",
-        artifacts: current.artifacts.map((entry) => (entry === envelope ? { ...entry, path: earlierPath, sha256: sha(earlierBytes) } : entry)) }, null, 2)}\n`);
+      const supersede = (extra = []) => fs.writeFileSync(manifestPath, `${JSON.stringify({ ...current, state: "implementing",
+        artifacts: [...current.artifacts.map((entry) => (entry === envelope ? { ...entry, path: earlierPath, sha256: sha(earlierBytes) } : entry)), ...extra] }, null, 2)}\n`);
       const unitEntry = () => JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.find((entry) => entry.path === unitPath);
 
       fs.writeFileSync(unitFile, `${JSON.stringify({ ...fresh, criterionIds: ["AC-999"] }, null, 2)}\n`);
@@ -857,6 +858,22 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.equal(kept.reviewUnit.status, "found", "a multi-item unit is the author's, never rendered anew");
       assert.equal(fs.readFileSync(unitFile, "utf8"), handBytes);
       assert.equal(unitEntry().sha256, sha(handBytes));
+
+      // A retained Critic round binds the course to the unit: kept byte-identical and reported, never rendered anew.
+      const staleBytes = `${JSON.stringify({ ...fresh, criterionIds: ["AC-999"] }, null, 2)}\n`;
+      fs.writeFileSync(unitFile, staleBytes);
+      const lineageBytes = "{\"round\":1}\n";
+      const lineagePath = `specs/e2e/evidence/critic-lineage-${sha(lineageBytes)}.json`;
+      fs.writeFileSync(path.join(f.dir, lineagePath), lineageBytes);
+      supersede([{ class: "candidate-evidence", path: lineagePath, sha256: sha(lineageBytes), authority: false, mutability: "immutable", retention: "retain" }]);
+      const bound = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
+      assert.equal(bound.status, "registered");
+      assert.equal(bound.reviewUnit.status, "stale-bound-to-course");
+      assert.deepEqual(bound.reviewUnit.criterionIds, ["AC-999"]);
+      assert.deepEqual(bound.reviewUnit.approvedCriterionIds, fresh.criterionIds);
+      assert.match(bound.reviewUnit.reason, /new feature/u);
+      assert.equal(fs.readFileSync(unitFile, "utf8"), staleBytes, "the course-bound unit is never replaced");
+      assert.equal(unitEntry().sha256, sha(staleBytes));
     });
 
     it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {
