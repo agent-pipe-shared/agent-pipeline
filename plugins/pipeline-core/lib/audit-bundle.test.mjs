@@ -237,7 +237,8 @@ function dispatchRecord(taskId, extra = {}) {
   return { record: { taskId, schema: "pipeline.dispatch-record.v4", runner: "claude", agentType: "goldfish-deep", model: "claude-sonnet-5-5", effort: "high", rulesetSha: "r".repeat(64), dispatcher: "elephant", candidateCommit: "a".repeat(40), commits: [], outcome: "succeeded", outcomeClassification: { kind: "authored-commit" }, resultSha256: null, report: { changedFiles: ["plugins/pipeline-core/lib/x.mjs"] }, ...extra } };
 }
 const FEATURE_ID = "release-evidence";
-test("C28 the projection carries each briefing text with its digest, redacts what must not travel, and names every gap per dispatch", () => {
+// C28e (Codex test run, PO 2026-11-13): the projection no longer carries briefing text; a found briefing is `digest-only` with its source digest.
+test("C28 / C28e the projection carries each found briefing as its digest only, never its text, and names every gap per dispatch", () => {
   const plain = "## Briefing\nTouch only plugins/pipeline-core/lib/x.mjs.\n"; const pathy = "Read /home/someone/src/repo/file.md and C:\\Users\\someone\\x.txt first.\n"; const secret = `token ghp_${"A".repeat(30)} here\n`;
   const briefings = new Map([
     ["D-PLAIN", [{ sha256: sha(plain), path: "scratch/a.md", text: plain, itemId: `${FEATURE_ID}.one` }]],
@@ -249,11 +250,10 @@ test("C28 the projection carries each briefing text with its digest, redacts wha
   const projection = projectCloseDispatches({ featureId: FEATURE_ID, records, briefings });
   const by = Object.fromEntries(projection.dispatches.map((entry) => [entry.taskId, entry]));
   assert.deepEqual(Object.keys(by).sort(), ["D-ATTESTED", "D-NONE", "D-PATH", "D-PLAIN", "D-SECRET"], "a dispatch whose briefing names another feature's item is not this feature's");
-  assert.deepEqual({ status: by["D-PLAIN"].briefing.status, text: by["D-PLAIN"].briefing.text, sourceSha256: by["D-PLAIN"].briefing.sourceSha256, textSha256: by["D-PLAIN"].briefing.textSha256 }, { status: "carried", text: plain, sourceSha256: sha(plain), textSha256: sha(plain) });
-  const masked = by["D-PATH"].briefing;
-  assert.equal(masked.status, "redacted"); assert.equal(masked.sourceSha256, sha(pathy), "the digest of the original bytes is kept"); assert.equal(masked.textSha256, sha(masked.text), "the digest of what is carried is its own");
-  assert.notEqual(masked.sourceSha256, masked.textSha256); assert.doesNotMatch(masked.text, /home\/someone|Users/u); assert.match(masked.text, /<host-path>/u);
-  assert.deepEqual({ status: by["D-SECRET"].briefing.status, code: by["D-SECRET"].briefing.code, text: by["D-SECRET"].briefing.text, sourceSha256: by["D-SECRET"].briefing.sourceSha256 }, { status: "gap", code: "BRIEFING-CREDENTIAL-SHAPE", text: null, sourceSha256: sha(secret) });
+  for (const [taskId, text] of [["D-PLAIN", plain], ["D-PATH", pathy], ["D-SECRET", secret]]) {
+    assert.deepEqual(by[taskId].briefing, { status: "digest-only", code: null, sourceSha256: sha(text), textSha256: null, text: null }, `${taskId}: only the digest of the briefing bytes`);
+  }
+  assert.ok(!JSON.stringify(projection).includes("Touch only"), "no briefing text is anywhere in the projection");
   assert.deepEqual({ status: by["D-ATTESTED"].briefing.status, code: by["D-ATTESTED"].briefing.code, sourceSha256: by["D-ATTESTED"].briefing.sourceSha256 }, { status: "gap", code: "BRIEFING-TEXT-UNAVAILABLE", sourceSha256: "9".repeat(64) });
   assert.deepEqual({ status: by["D-NONE"].briefing.status, code: by["D-NONE"].briefing.code }, { status: "gap", code: "BRIEFING-NOT-FOUND" });
   assert.doesNotThrow(() => denyPrivateAbsolutePaths(projection, "projection"), "no absolute host path is anywhere in the projection");
@@ -276,6 +276,10 @@ test("C28 the bundle carries the dispatch projection as one evidence item, verif
   assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /Dispatch projection/u);
   assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
   // A producer that bound a text to a digest it does not hash to, or carried an absolute path, is caught offline even though the artifact digest is consistent with the manifest.
+  // A bundle a former close wrote with a carried text still verifies (C28e keeps the older statuses readable).
+  const legacy = structuredClone(projection); legacy.dispatches[0].briefing = { status: "carried", code: null, sourceSha256: sha(text), textSha256: sha(text), text };
+  const fourth = fixture(); await buildAuditBundle({ repositoryRoot: fourth.root, outputPath: "bundle", plan: projectionBundle(fourth, legacy) });
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(fourth.root, "bundle") })).status, "verified", "a legacy carried projection verifies");
   const broken = structuredClone(projection); broken.dispatches[0].briefing.text = "Another text.\n";
   const inconsistent = projectionBundle(fixture(), broken); const second = fixture(); const badPlan = projectionBundle(second, broken);
   assert.ok(inconsistent.evidence.items.length === 1 && badPlan.evidence.items.length === 1);

@@ -914,7 +914,8 @@ test("C28: the close writes the redacted dispatch projection into the feature's 
     assert.equal(closed.status, "commit-required");
     const path = "specs/feature-abc/evidence/dispatch-projection.json";
     const projection = JSON.parse(readFileSync(join(f.root, path), "utf8"));
-    assert.equal(projection.schema, "pipeline.close-dispatch-projection.v1"); assert.equal(projection.dispatches[0].briefing.status, "redacted"); assert.ok(!JSON.stringify(projection).includes("/home/someone"));
+    // C28e (Codex test run, PO 2026-11-13): the briefing travels as its digest only, never as text.
+    assert.equal(projection.schema, "pipeline.close-dispatch-projection.v1"); assert.equal(projection.dispatches[0].briefing.status, "digest-only"); assert.equal(projection.dispatches[0].briefing.text, null); assert.ok(!JSON.stringify(projection).includes("/home/someone"));
     assert.equal(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8")).evidence.dispatchProjectionPath, path);
     assert.ok(closed.commit.paths.includes(path), `the projection travels in the one close commit: ${closed.commit.paths}`);
   } finally { rmSync(f.root, { recursive: true, force: true }); }

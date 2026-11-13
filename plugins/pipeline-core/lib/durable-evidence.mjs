@@ -23,7 +23,6 @@ import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { denyPrivateAbsolutePaths, isTerminalOutcome, maskPrivateAbsolutePaths, validateDispatchRecord } from "./dispatch-record.mjs";
-import { evaluateCredentialHygiene } from "./provenance-attestation.mjs";
 import { traceHumanApprovals } from "./human-approval-trace.mjs";
 import { canonical } from "./po-approval-proof.mjs";
 
@@ -157,18 +156,16 @@ function scanBriefings(root) {
 // A text that cannot be carried is a typed gap per dispatch with the digest of the original bytes, never an omission. The private-identifier deny set of the neutral-leakage policy is built
 // from the local machine by a script of its own and is not reachable here: the notes name that as not covered.
 export const CLOSE_DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1";
-const PROJECTION_MAX_DISPATCHES = 200; const BRIEFING_TEXT_MAX_BYTES = 200_000;
+const PROJECTION_MAX_DISPATCHES = 200;
 const maskDeep = (value) => (typeof value === "string" ? maskPrivateAbsolutePaths(value) : Array.isArray(value) ? value.map(maskDeep) : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, maskDeep(entry)])) : value);
 function projectedBriefing(record, hits) {
   if (hits.length > 1) return { status: "gap", code: "BRIEFING-AMBIGUOUS", sourceSha256: null, textSha256: null, text: null };
   const hit = hits[0];
   if (hit === undefined) { const attested = digest(record.attestation?.briefingSha256); return { status: "gap", code: attested === null ? "BRIEFING-NOT-FOUND" : "BRIEFING-TEXT-UNAVAILABLE", sourceSha256: attested, textSha256: null, text: null }; }
-  const gap = (code) => ({ status: "gap", code, sourceSha256: hit.sha256, textSha256: null, text: null });
-  if (Buffer.byteLength(hit.text, "utf8") > BRIEFING_TEXT_MAX_BYTES) return gap("BRIEFING-TOO-LARGE");
-  if (!evaluateCredentialHygiene(hit.text).ok) return gap("BRIEFING-CREDENTIAL-SHAPE");
-  const text = maskPrivateAbsolutePaths(hit.text);
-  try { denyPrivateAbsolutePaths(text, "briefing"); } catch { return gap("BRIEFING-PRIVATE-PATH-REMAINS"); }
-  return { status: text === hit.text ? "carried" : "redacted", code: null, sourceSha256: hit.sha256, textSha256: sha(text), text };
+  // C28e (Codex test run, PO 2026-11-13): the briefing text is no longer copied into this tracked file. A briefing quotes the Spec and the
+  // code, so its copy here raised a gitleaks finding (a public storage key name) AFTER the candidate had been scanned clean, in a file the
+  // project cannot change and with no review route. The digest of the briefing bytes stays the durable, verifiable reference.
+  return { status: "digest-only", code: null, sourceSha256: hit.sha256, textSha256: null, text: null };
 }
 /** `records` are validated terminal dispatch records (`{ record }`), `briefings` the map `scanBriefings` returns. A dispatch whose briefing names another feature's item is not this feature's. */
 export function projectCloseDispatches({ featureId, records = [], briefings = new Map() } = {}) {

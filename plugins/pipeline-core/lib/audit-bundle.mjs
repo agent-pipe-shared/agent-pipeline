@@ -204,14 +204,17 @@ const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-rec
 const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override" });
 // C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
 // and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
-const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap"]);
+// C28e (Codex test run, PO 2026-11-13): a close now writes `digest-only` (no text, the source digest only); bundles with carried or redacted texts still verify.
+const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap", "digest-only"]);
 function dispatchProjectionHolds(bytes) {
   const value = jsonOrNull(bytes);
   if (value === null || typeof value !== "object" || value.schema !== DISPATCH_PROJECTION_SCHEMA || !Array.isArray(value.dispatches) || !Array.isArray(value.gaps)) return false;
   try { denyPrivateAbsolutePaths(value, "projection"); } catch { return false; }
   if (/PRIVATE KEY/u.test(bytes.toString("utf8"))) return false;
   return value.dispatches.every((entry) => entry !== null && typeof entry === "object" && typeof entry.taskId === "string" && entry.record !== null && typeof entry.record === "object" && entry.briefing !== null && typeof entry.briefing === "object"
-    && BRIEFING_STATUSES.has(entry.briefing.status) && (entry.briefing.status === "gap" ? entry.briefing.text === null && entry.briefing.textSha256 === null : typeof entry.briefing.text === "string" && entry.briefing.textSha256 === digest(Buffer.from(entry.briefing.text, "utf8"))));
+    && BRIEFING_STATUSES.has(entry.briefing.status) && (entry.briefing.status === "gap" ? entry.briefing.text === null && entry.briefing.textSha256 === null
+      : entry.briefing.status === "digest-only" ? entry.briefing.text === null && entry.briefing.textSha256 === null && /^[a-f0-9]{64}$/u.test(entry.briefing.sourceSha256 ?? "")
+        : typeof entry.briefing.text === "string" && entry.briefing.textSha256 === digest(Buffer.from(entry.briefing.text, "utf8"))));
 }
 const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
 const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
