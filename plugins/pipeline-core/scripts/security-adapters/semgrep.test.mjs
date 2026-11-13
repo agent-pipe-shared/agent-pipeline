@@ -15,7 +15,16 @@ import test from "node:test";
 import path from "node:path";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { name, CAPABILITY_CONTRACT_V2, run } from "./semgrep.mjs";
+import { name, CAPABILITY_CONTRACT_V2, run, shippedRuleId } from "./semgrep.mjs";
+
+// C28e (Codex test run): a shipped rule is recorded by its own id, without the dotted install directory Semgrep puts in front of it.
+test("C28e (Codex test run): a shipped rule id loses the dotted install-directory prefix; any other id stays as reported", () => {
+  assert.equal(shippedRuleId("home.someone..codex.plugins.cache.agent-pipeline-local.pipeline-core.0.7.0codex.20261112203150.1333a1b.security.semgrep.pipeline-default-dom-injection-sink"), "pipeline-default-dom-injection-sink");
+  assert.equal(shippedRuleId("pipeline-default-dom-injection-sink"), "pipeline-default-dom-injection-sink");
+  assert.equal(shippedRuleId("javascript.lang.security.audit.eval-detected"), "javascript.lang.security.audit.eval-detected");
+  assert.equal(shippedRuleId("team.rules.pipeline-default-x.custom"), "team.rules.pipeline-default-x.custom", "not a shipped id when anything follows");
+  assert.equal(shippedRuleId(undefined), null);
+});
 
 // ---------------------------------------------------------------------------
 // SEM-T -- partial-parsing warnings are degraded coverage, not a scanner error.

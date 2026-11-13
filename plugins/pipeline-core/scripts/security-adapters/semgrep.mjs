@@ -96,6 +96,17 @@ function spawnFailure(error) {
   };
 }
 
+/**
+ * C28e (Codex test run): Semgrep prefixes a local rule file's ids with that file's directory, dotted (`home.<user>..codex.plugins...
+ * pipeline-default-dom-injection-sink`), so the evidence named the local home directory and changed with every install. A shipped
+ * rule is recorded by its own id; any other id stays as Semgrep reports it.
+ */
+export function shippedRuleId(checkId) {
+  if (typeof checkId !== "string" || checkId === "") return null;
+  const at = checkId.lastIndexOf("pipeline-default-");
+  return at > 0 && checkId[at - 1] === "." && /^pipeline-default-[a-z0-9-]+$/u.test(checkId.slice(at)) ? checkId.slice(at) : checkId;
+}
+
 function mapSemgrepSeverity(extraSeverity) {
   if (extraSeverity === "ERROR") return "high";
   if (extraSeverity === "WARNING") return "medium";
@@ -270,7 +281,7 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
   const findings = parsed.results.map((r) => ({
     tool: name,
     severity: mapSemgrepSeverity(r?.extra?.severity),
-    rule: r?.check_id ?? "unknown-rule",
+    rule: shippedRuleId(r?.check_id) ?? "unknown-rule",
     path: r?.path ?? null,
     line: typeof r?.start?.line === "number" ? r.start.line : null,
     msg: r?.extra?.message ?? r?.check_id ?? "semgrep finding",
