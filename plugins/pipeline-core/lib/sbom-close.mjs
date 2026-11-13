@@ -172,8 +172,11 @@ export function observeSbomInputs({ tracked, read }) {
   const lockDirs = new Map(); // lockfile name -> directories holding it
   for (const path of paths) { const name = baseName(path); if (LOCKFILE_NAMES.has(name)) { if (!lockDirs.has(name)) lockDirs.set(name, new Set()); lockDirs.get(name).add(dirOf(path)); } }
   const legacyGradleLocks = new Set(paths.filter((path) => /(?:^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/u.test(path)).map((path) => dirOf(dirOf(dirOf(path)))));
-  const lockCovers = (needs, dir) => needs.some((name) => ancestors(dir).some((candidate) => lockDirs.get(name)?.has(candidate)))
-    || (needs.includes("gradle.lockfile") && ancestors(dir).some((candidate) => legacyGradleLocks.has(candidate)));
+  // C28e: a Gradle or NuGet lockfile belongs to exactly one project (`--write-locks` on the root locks only the root project), so it covers
+  // only the build or project file in its own directory; the workspace lockfiles of the other ecosystems also cover the directories below.
+  const PER_PROJECT = new Set(["gradle.lockfile", "packages.lock.json"]);
+  const lockCovers = (needs, dir) => needs.some((name) => (PER_PROJECT.has(name) ? [dir] : ancestors(dir)).some((candidate) => lockDirs.get(name)?.has(candidate)))
+    || (needs.includes("gradle.lockfile") && legacyGradleLocks.has(dir));
   const unsupportedDirs = new Set(paths.filter((path) => UNSUPPORTED_NAMES.has(baseName(path))).map(dirOf));
   const record = (path, label, parsed) => {
     findings.push(...parsed.issues);
@@ -185,11 +188,16 @@ export function observeSbomInputs({ tracked, read }) {
     if (UNSUPPORTED_NAMES.has(name)) { findings.push(finding("unsupported", SBOM_LIFECYCLE_CODES.unsupported, path, `no reader exists yet for ${name}`)); continue; }
     const chosen = readerFor(path);
     if (chosen !== null) {
-      const text = read(path);
-      if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
-      // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one.
-      if (name === "bom.json") { let probe = null; try { probe = JSON.parse(text); } catch { probe = null; } if (probe?.bomFormat !== "CycloneDX") continue; }
-      inputs.push({ path, sha256: sha256(text) });
+      const raw = read(path);
+      if (typeof raw !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
+      const text = raw.replace(/^﻿/u, ""); // C28e: Windows tools write a UTF-8 byte-order mark; the digest below still binds the raw bytes
+      // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one. C28e: a bom.json that
+      // is not JSON at all is invalid, never skipped (skipping it made a pom report "no CycloneDX file covers" for a damaged one).
+      if (name === "bom.json") {
+        let probe; try { probe = JSON.parse(text); } catch (error) { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, `the file is not readable as JSON: ${String(error.message).slice(0, 160)}`)); continue; }
+        if (probe?.bomFormat !== "CycloneDX") continue;
+      }
+      inputs.push({ path, sha256: sha256(raw) });
       let parsed;
       try { parsed = chosen.reader(text, path); } catch (error) { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, `the file is not readable as ${chosen.label}: ${String(error.message).slice(0, 160)}`)); continue; }
       if (parsed.maven !== undefined) { poms.push({ path, parsed }); continue; }
@@ -203,7 +211,7 @@ export function observeSbomInputs({ tracked, read }) {
     if (lockCovers(needs, dir) || ancestors(dir).some((candidate) => unsupportedDirs.has(candidate)) || (name === "pyproject.toml" && paths.some((other) => baseName(other) === "requirements.txt" && dirOf(other) === dir))) continue;
     const text = read(path);
     if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
-    if (manifestDeclaresDependencies(name, text)) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
+    if (manifestDeclaresDependencies(name, text.replace(/^﻿/u, ""))) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
   }
   // Maven: a pom lists its direct dependencies only. It is complete when a CycloneDX file in its directory or an ancestor lists every one of
   // them (by version where the pom fixes one); otherwise it is partial and names what is missing, so a stale CycloneDX file does not pass.
@@ -228,8 +236,8 @@ export function sbomFindingHelp(item) {
   if (item.state === "unsupported") return `Add a reader: one function from the file's text to { ecosystem, name, version, purl, scope } components, registered by file name in SBOM_READERS (plugins/pipeline-core/lib/sbom-close.mjs), with a test in sbom-close.test.mjs. Until it exists, generate the SBOM with your own tool and have the PO sign the override.`;
   if (item.state === "partial") {
     const name = baseName(String(item.path ?? ""));
-    if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (for example the cyclonedx-maven-plugin with outputName bom, so the file is bom.json), commit it next to pom.xml or in a parent directory (target/ and build/ are not read), make sure it lists every direct dependency of this pom, and run the close again. Otherwise the PO signs the override.";
-    if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking (dependencyLocking { lockAllConfigurations() }), write the locks (gradle dependencies --write-locks), commit gradle.lockfile, and run the close again.";
+    if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (the cyclonedx-maven-plugin, goal makeAggregateBom or makeBom, writes bom.json into target/ by default, which the close does not read: set outputDirectory to ${project.basedir}), commit it next to pom.xml or in a parent directory, make sure it lists every direct dependency of this pom outside the test scope, and run the close again. Otherwise the PO signs the override.";
+    if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking for every project (allprojects { dependencyLocking { lockAllConfigurations() } }), write the locks of each project (gradle dependencies --write-locks runs for the root project only; run it per subproject or with a task that resolves all configurations), commit each project's gradle.lockfile next to its build file, and run the close again.";
     if (PROJECT_FILE.test(name)) return "Enable the NuGet lockfile (<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>), restore once, commit packages.lock.json next to the project file, and run the close again.";
     return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
   }

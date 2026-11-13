@@ -47,6 +47,7 @@ function yarnEntries(text) {
   return entries;
 }
 const unquote = (value) => value.replace(/^"(.*)"$/u, "$1");
+const safePathname = (url) => { try { return new URL(url).pathname; } catch { return ""; } };
 const yarnProp = (props, key) => { for (const line of props) { const match = new RegExp(`^ {2}"?${key}"?:? (.+)$`, "u").exec(line); if (match) return unquote(match[1].trim()); } return null; };
 
 export function parseYarnLock(text, path) {
@@ -66,13 +67,17 @@ export function parseYarnLock(text, path) {
     const { name } = descriptorName(first);
     const version = yarnProp(entry.props, "version");
     if (v1) {
-      const range = descriptorName(first).range;
+      // C28e: the DESCRIPTOR decides, not the tarball URL's shape. A semver range or dist-tag is resolved from a registry, whatever path the
+      // registry serves its tarballs under (GitHub Packages has no `/-/`); a protocol, a URL or an owner/repo shorthand is not.
+      // `name@npm:^1` is the registry protocol spelled out; `alias@npm:real@^1` and `alias@npm:@scope/real@^1` name the real package first.
+      let range = descriptorName(first).range;
+      if (/^npm:/u.test(range)) { const target = range.slice(4); range = target.includes("@") ? descriptorName(target).range : target; }
       const resolved = yarnProp(entry.props, "resolved");
       if (/^link:/u.test(range)) continue;
-      if (resolved === null && /^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
-      if (typeof version !== "string" || version === "") throw new Error(`${name}: entry without a version`);
-      if (resolved === null || !/\/-\/[^/]+\.tgz(?:#.*)?$/u.test(resolved)) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
-      const real = /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(new URL(resolved).pathname)?.[1];
+      if (/^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
+      if (/^[a-z][a-z0-9+.-]*:/iu.test(range) || range.includes("/")) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
+      if (typeof version !== "string" || !SEMVER.test(version)) throw new Error(`${name}: entry without a version`);
+      const real = resolved === null ? undefined : /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(safePathname(resolved))?.[1];
       out.push(npm(real === undefined ? name : decodeURIComponent(real), version));
       continue;
     }
@@ -102,9 +107,12 @@ function pnpmSections(doc) {
   }
   return sections;
 }
-function pnpmKey(key, major) {
+function pnpmKey(rawKey, major) {
   // 9.x: name@version ; 6.x: /name@version(peers) ; 5.x: /name/version_peers. A key outside these forms names no registry package.
-  if (major === 9) { const at = key.indexOf("@", key.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: key.slice(0, at), version: key.slice(at + 1).replace(/\(.*$/u, "") }; }
+  if (major === 9) { const at = rawKey.indexOf("@", rawKey.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: rawKey.slice(0, at), version: rawKey.slice(at + 1).replace(/\(.*$/u, "") }; }
+  // C28e: before 9.x a package from a registry other than the default is keyed by that registry's host (`npm.corp.example/name/1.0.0`);
+  // the host is dropped (never written). A tarball URL or a git host key keeps a non-semver last part and stays partial.
+  const key = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?\//iu.test(rawKey) ? rawKey.slice(rawKey.indexOf("/")) : rawKey;
   if (!key.startsWith("/")) return null;
   if (major === 6) { const body = key.slice(1); const at = body.indexOf("@", body.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: body.slice(0, at), version: body.slice(at + 1).replace(/\(.*$/u, "") }; }
   const parts = key.slice(1).split("/"); const version = parts.pop()?.replace(/_.*$/u, ""); return parts.length === 0 ? null : { name: parts.join("/"), version };
@@ -254,12 +262,17 @@ const xmlText = (block, tag) => new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`, 
  */
 export function readPomDependencies(text) {
   if (!/<project[\s/>]/u.test(text)) throw new Error("not a Maven pom");
-  const body = text.replace(/<!--[\s\S]*?-->/gu, "").replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/gu, "").replace(/<build>[\s\S]*?<\/build>/gu, "").replace(/<parent>[\s\S]*?<\/parent>/gu, "");
+  // C28e: a profile's dependencies are not part of the default build, so the build's CycloneDX file never lists them; they are not direct.
+  const uncommented = text.replace(/<!--[\s\S]*?-->/gu, "").replace(/<profiles>[\s\S]*?<\/profiles>/gu, "");
+  const body = uncommented.replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/gu, "").replace(/<build>[\s\S]*?<\/build>/gu, "").replace(/<parent>[\s\S]*?<\/parent>/gu, "");
   const properties = new Map();
-  for (const block of text.replace(/<!--[\s\S]*?-->/gu, "").match(/<properties>[\s\S]*?<\/properties>/gu) ?? []) for (const match of block.matchAll(/<([A-Za-z0-9_.-]+)>\s*([^<]*?)\s*<\/\1>/gu)) properties.set(match[1], match[2]);
-  const own = body.replace(/<dependencies>[\s\S]*?<\/dependencies>/gu, "").replace(/<profiles>[\s\S]*?<\/profiles>/gu, "");
-  const parent = /<parent>([\s\S]*?)<\/parent>/u.exec(text.replace(/<!--[\s\S]*?-->/gu, ""))?.[1] ?? "";
-  for (const [key, value] of [["project.groupId", xmlText(own, "groupId") ?? xmlText(parent, "groupId")], ["project.artifactId", xmlText(own, "artifactId")], ["project.version", xmlText(own, "version") ?? xmlText(parent, "version")]]) if (value !== undefined) properties.set(key, value);
+  for (const block of uncommented.match(/<properties>[\s\S]*?<\/properties>/gu) ?? []) for (const match of block.matchAll(/<([A-Za-z0-9_.-]+)>\s*([^<]*?)\s*<\/\1>/gu)) properties.set(match[1], match[2]);
+  const own = body.replace(/<dependencies>[\s\S]*?<\/dependencies>/gu, "");
+  const parent = /<parent>([\s\S]*?)<\/parent>/u.exec(uncommented)?.[1] ?? "";
+  for (const [key, value] of [
+    ["project.groupId", xmlText(own, "groupId") ?? xmlText(parent, "groupId")], ["project.artifactId", xmlText(own, "artifactId")], ["project.version", xmlText(own, "version") ?? xmlText(parent, "version")],
+    ["project.parent.groupId", xmlText(parent, "groupId")], ["project.parent.artifactId", xmlText(parent, "artifactId")], ["project.parent.version", xmlText(parent, "version")],
+  ]) if (value !== undefined) properties.set(key, value);
   const resolve = (value) => { if (value === undefined) return null; const resolved = value.replace(/\$\{([^}]+)\}/gu, (whole, key) => properties.get(key) ?? whole); return /\$\{|[[\]()]|,/u.test(resolved) || resolved === "" ? null : resolved; };
   return (body.match(/<dependency>[\s\S]*?<\/dependency>/gu) ?? []).map((block) => {
     const rawGroup = xmlText(block, "groupId"); const rawArtifact = xmlText(block, "artifactId");
@@ -274,11 +287,23 @@ export function parsePomXml(text, path) {
   const direct = readPomDependencies(text);
   return { components: dedupe(direct.filter((entry) => entry.version !== null).map((entry) => component("maven", "maven", entry.name, entry.version, entry.scope))), issues: [], maven: { path, direct } };
 }
-/** Which direct dependencies of a pom a CycloneDX file does not list: by name and version, or by name alone when the pom names no version. */
+/**
+ * Which direct dependencies of a pom a CycloneDX file does not list: by name and version, or by name alone when the pom names no version.
+ * C28e: a test-scope dependency is not required, because the cyclonedx-maven-plugin leaves the test scope out by default
+ * (includeTestScope=false); a name part this pom cannot resolve (a property of the parent pom or of the build, e.g. a Scala binary
+ * version suffix) matches any value in that part. Known limit: a version the parent or an imported BOM manages is matched by name only,
+ * so a CycloneDX file from before a parent bump still covers the pom; nothing offline can see the new managed version.
+ */
 export function mavenCoverage(direct, cycloneComponents) {
-  const listed = new Set(); const names = new Set();
-  for (const entry of cycloneComponents) if (entry.ecosystem === "maven") { listed.add(`${entry.name}@${entry.version}`); names.add(entry.name); }
-  return direct.filter((entry) => (entry.version === null ? !names.has(entry.name) : !listed.has(`${entry.name}@${entry.version}`))).map((entry) => `${entry.name}${entry.version === null ? "" : `@${entry.version}`}`);
+  const maven = cycloneComponents.filter((entry) => entry.ecosystem === "maven");
+  const listed = new Set(maven.map((entry) => `${entry.name}@${entry.version}`));
+  const namePattern = (name) => new RegExp(`^${name.split(/\$\{[^}]+\}/u).map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("[^/]+")}$`, "u");
+  const covered = (entry) => {
+    if (entry.version !== null) return listed.has(`${entry.name}@${entry.version}`);
+    const pattern = namePattern(entry.name);
+    return maven.some((listedEntry) => pattern.test(listedEntry.name));
+  };
+  return direct.filter((entry) => entry.scope !== "dev" && !covered(entry)).map((entry) => `${entry.name}${entry.version === null ? "" : `@${entry.version}`}`);
 }
 
 // ---------------------------------------------------------------------------------------------------------------- .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++

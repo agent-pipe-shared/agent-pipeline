@@ -366,7 +366,8 @@ test("pom.xml: direct dependencies outside management, build and comments; versi
   assert.deepEqual(purls(parsePomXml(POM, "pom.xml")), ["pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0", "pkg:maven/com.example/svc-api@1.0.0"]);
   const listed = parseCycloneDx(FULL_CDX, "bom.json").components;
   assert.deepEqual(mavenCoverage(direct, listed), []);
-  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "junit/junit")), ["junit/junit"]);
+  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "junit/junit")), [], "the cyclonedx-maven-plugin leaves the test scope out by default, so a test dependency is not required");
+  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "org.springframework.boot/spring-boot-starter-web")), ["org.springframework.boot/spring-boot-starter-web"]);
   assert.deepEqual(mavenCoverage(direct, listed.map((c) => (c.name === "com.fasterxml.jackson.core/jackson-databind" ? { ...c, version: "2.15.0" } : c))), ["com.fasterxml.jackson.core/jackson-databind@2.16.0"], "a stale CycloneDX file does not cover a pinned version");
   assert.throws(() => readPomDependencies("<projects/>"), /not a Maven pom/u);
 });
@@ -537,11 +538,69 @@ test("a Maven pom is partial unless a CycloneDX file in its directory or above l
   assert.deepEqual(alone.findings.map((f) => [f.state, f.path]), [["partial", "pom.xml"]]);
   assert.match(alone.findings[0].reason, /no CycloneDX file of the build covers/u); assert.match(sbomFindingHelp(alone.findings[0]), /cyclonedx-maven-plugin/u);
   assert.deepEqual(observe({ "svc/pom.xml": POM, "bom.json": FULL_CDX }).findings, [], "a CycloneDX file above the pom covers it");
-  const stale = observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "junit")) });
-  assert.match(stale.findings[0].reason, /does not list 1 direct dependency of this pom \(junit\/junit\)/u);
+  const stale = observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "jackson-databind")) });
+  assert.match(stale.findings[0].reason, /does not list 1 direct dependency of this pom \(com\.fasterxml\.jackson\.core\/jackson-databind@2\.16\.0\)/u);
+  assert.deepEqual(observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "junit")) }).findings, [], "a CycloneDX file without the test scope covers the pom");
   assert.deepEqual(observe({ "pom.xml": POM, "svc/bom.json": FULL_CDX }).findings.map((f) => f.path), ["pom.xml"], "a CycloneDX file below the pom does not cover it");
   const notCdx = observe({ "pom.xml": POM, "bom.json": JSON.stringify({ name: "a bill of materials of another kind" }) });
   assert.deepEqual(notCdx.inputs.map((i) => i.path), ["pom.xml"], "a bom.json that is no CycloneDX document is no input");
+});
+
+test("C28e: a profile's dependencies are not direct; parent properties resolve; an unresolved name part matches any value", () => {
+  const withProfile = POM.replace("  </dependencies>\n  <build>", "  </dependencies>\n  <profiles><profile><id>it</id><dependencies><dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><version>1.19.3</version></dependency></dependencies></profile></profiles>\n  <build>");
+  assert.notEqual(withProfile, POM);
+  assert.deepEqual(readPomDependencies(withProfile), readPomDependencies(POM), "the default build's CycloneDX file never lists a profile's dependencies");
+  const child = `<project><parent><groupId>com.example</groupId><artifactId>platform</artifactId><version>4.0.0</version></parent><artifactId>svc</artifactId><dependencies>
+    <dependency><groupId>\${project.parent.groupId}</groupId><artifactId>platform-core</artifactId><version>\${project.parent.version}</version></dependency>
+    <dependency><groupId>com.typesafe.akka</groupId><artifactId>akka-actor_\${scala.binary.version}</artifactId><version>2.8.5</version></dependency>
+  </dependencies></project>`;
+  const direct = readPomDependencies(child);
+  assert.deepEqual(direct.map((d) => [d.name, d.version]), [["com.example/platform-core", "4.0.0"], ["com.typesafe.akka/akka-actor_${scala.binary.version}", null]]);
+  assert.deepEqual(purls(parsePomXml(child, "pom.xml")), ["pkg:maven/com.example/platform-core@4.0.0"], "a name this pom cannot resolve is never a component");
+  const listed = (names) => parseCycloneDx(cdx(names.map(([group, artifact, version]) => mavenComponent(group, artifact, version))), "bom.json").components;
+  assert.deepEqual(mavenCoverage(direct, listed([["com.example", "platform-core", "4.0.0"], ["com.typesafe.akka", "akka-actor_2.13", "2.8.5"]])), []);
+  assert.deepEqual(mavenCoverage(direct, listed([["com.example", "platform-core", "4.0.0"], ["com.typesafe.akka", "akka-stream_2.13", "2.8.5"]])), ["com.typesafe.akka/akka-actor_${scala.binary.version}"], "the wildcard covers one name part, not another artifact");
+});
+
+test("C28e: a Gradle or NuGet lockfile covers only its own project; a bom.json that is not JSON is invalid", () => {
+  const gradleBuild = "dependencies {\n  implementation 'com.google.guava:guava:32.1.3-jre'\n}\n";
+  const gradle = observe({ "build.gradle": gradleBuild, "gradle.lockfile": GRADLE_LOCK, "app/build.gradle": gradleBuild, "lib/build.gradle": gradleBuild, "lib/gradle.lockfile": GRADLE_LOCK });
+  assert.deepEqual(gradle.findings.map((f) => [f.state, f.path]), [["partial", "app/build.gradle"]], "the root lockfile does not lock a subproject");
+  assert.match(sbomFindingHelp(gradle.findings[0]), /--write-locks runs for the root project only/u);
+  const csproj = '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup></Project>';
+  const nuget = observe({ "packages.lock.json": NUGET_LOCK, "Root.csproj": csproj, "svc/Service.csproj": csproj });
+  assert.deepEqual(nuget.findings.map((f) => [f.state, f.path]), [["partial", "svc/Service.csproj"]]);
+  const damaged = observe({ "pom.xml": POM, "bom.json": "{ \"bomFormat\": \"CycloneDX\", " });
+  assert.deepEqual(damaged.findings.map((f) => [f.state, f.path]), [["invalid", "bom.json"], ["partial", "pom.xml"]], "a damaged CycloneDX file is named, never silently skipped");
+});
+
+test("C28e: private registries without the default tarball path, aliases to scoped packages, owner/repo shorthands", () => {
+  const github = `# yarn lockfile v1\n\n\n"@owner/pkg@^1.0.0":\n  version "1.0.0"\n  resolved "https://npm.pkg.github.com/download/@owner/pkg/1.0.0/0123456789abcdef"\n\n"ui-alias@npm:@corp/ui@^2.0.0":\n  version "2.1.0"\n  resolved "https://registry.yarnpkg.com/@corp/ui/-/ui-2.1.0.tgz"\n\nmine@owner/mine#abc:\n  version "0.0.1"\n  resolved "https://codeload.github.com/owner/mine/tar.gz/abc"\n`;
+  const v1 = parseYarnLock(github, "yarn.lock");
+  assert.deepEqual(purls(v1), ["pkg:npm/%40owner/pkg@1.0.0", "pkg:npm/%40corp/ui@2.1.0"], "GitHub Packages serves tarballs without /-/; the descriptor's range decides");
+  assert.deepEqual(states(v1), ["partial"]); assert.doesNotMatch(JSON.stringify(v1), /:\/\/|codeload|npm\.pkg/u);
+  const pnpm6 = "lockfileVersion: '6.0'\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui@2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
+  const pnpm5 = "lockfileVersion: 5.4\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui/2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
+  for (const [label, text] of [["pnpm 6", pnpm6], ["pnpm 5", pnpm5]]) {
+    const result = parsePnpmLock(text, "pnpm-lock.yaml");
+    assert.deepEqual(purls(result), ["pkg:npm/%40corp/ui@2.1.0"], `${label}: a key that starts with the registry host is a registry package`);
+    assert.deepEqual(result.issues, []); noUrl(result, label);
+  }
+});
+
+test("C28e: a UTF-8 byte-order mark and CRLF line ends read exactly like the plain file; the digest binds the raw bytes", () => {
+  const files = { "yarn.lock": YARN_V1, "a/yarn.lock": YARN_BERRY, "b/pnpm-lock.yaml": PNPM_9, "c/pnpm-lock.yaml": PNPM_6, "d/pnpm-lock.yaml": PNPM_5, "e/bun.lock": BUN_LOCK,
+    "Cargo.lock": CARGO_LOCK, "poetry.lock": POETRY_LOCK, "f/uv.lock": UV_LOCK, "gradle.lockfile": GRADLE_LOCK, "packages.lock.json": NUGET_LOCK, "Gemfile.lock": GEMFILE_LOCK,
+    "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK, "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX,
+    "g/conan.lock": JSON.stringify({ version: "0.5", requires: ["zlib/1.3#x"], build_requires: [], python_requires: [] }, null, 2),
+    "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
+  const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `﻿${text.replace(/\r?\n/gu, "\r\n")}`]));
+  const plain = observe(files); const crlf = observe(windows);
+  assert.ok(plain.components.length >= 25);
+  assert.deepEqual(crlf.components, plain.components);
+  assert.deepEqual(crlf.findings, plain.findings);
+  assert.deepEqual(crlf.inputs.map((i) => i.path), plain.inputs.map((i) => i.path));
+  assert.ok(crlf.inputs.every((input, index) => input.sha256 !== plain.inputs[index].sha256), "the input digest is of the raw file, byte-order mark included");
 });
 
 test("a lockfile a reader cannot read is invalid, never skipped; a whole close of every format writes no URL into the SBOM", () => {
