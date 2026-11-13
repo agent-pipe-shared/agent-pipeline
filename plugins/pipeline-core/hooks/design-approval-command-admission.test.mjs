@@ -62,8 +62,10 @@ const cases = [
       ['approve-plan', '--bootstrap-acknowledgement-receipt', `scratch/bootstrap-plan-acknowledgement-receipt-${'c'.repeat(64)}.json`],
       ['approve-plan', '--by', 'Public reviewer', '--design-workflow-approval-request', legacy]]) admission(args, root, true);
   }) },
-  { id: 'DAGA006', name: 'reject third and duplicate review receipt paths', run: () => fixture(({ root }) => {
-    for (const args of [present(receipt1, receipt2, 'reviews/round-3.json'), present(receipt1, receipt1)]) admission(args, root, false);
+  // L3 (D246): delta rounds until pass, so a third round is admitted; a duplicate and a chain above the structural bound (64) are not.
+  { id: 'DAGA006', name: 'admit a third review round, reject duplicate review receipt paths and a chain above the structural bound', run: () => fixture(({ root }) => {
+    admission(present(receipt1, receipt2, 'reviews/round-3.json'), root, true);
+    for (const args of [present(receipt1, receipt1), present(...Array.from({ length: 65 }, (_, i) => `reviews/round-${i + 1}.json`))]) admission(args, root, false);
   }) },
   { id: 'DAGA007', name: 'reject missing duplicate blank oversize and flag-form attribution', run: () => fixture(({ root }) => {
     for (const base of [present(receipt1), approve(request)]) {
