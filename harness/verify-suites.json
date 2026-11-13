@@ -4909,6 +4909,12 @@
       "file": "plugins/pipeline-core/hooks/guard-gate-strength-private-state.test.mjs",
       "invariantPinned": "The gate-strength guard refuses an agent's own Write or Edit into the pipeline-owned private state (.git/agent-pipeline/**), by the lexical target and by the real location behind a symlink, plans no override and lets ordinary paths through, including a folder named agent-pipeline outside .git",
       "nonOverlapNote": "Unique hook-level suite (D247 follow-up) for the private-state write refusal; guard-gate-strength-review-receipt.test.mjs keeps the content-based receipt refusal"
+    },
+    {
+      "name": "gate-definition-changes-tests",
+      "file": "plugins/pipeline-core/lib/gate-definition-changes.test.mjs",
+      "invariantPinned": "The close's gate-definition walk (ADR-0096) lists every add, change and deletion of a gate-definition file in the feature range against the first parent, skips an exempt-field-only pipeline.user.yaml edit, and derives each proof: first appearance, committed materialization of the fitness model, the labelled configure-verify record, a consumed override for its next change of the path only, or the PO acknowledgement naming that exact change; a re-creation after a deletion and an unacknowledged later change stay unproven",
+      "nonOverlapNote": "Unique unit suite on real git histories for the walk and its proof derivation; pre-commit-hook-install.test.mjs pins the commit-time refusal of GS-16/GS-17"
     }
   ]
 }

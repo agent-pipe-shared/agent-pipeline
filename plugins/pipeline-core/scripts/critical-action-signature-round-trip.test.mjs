@@ -38,6 +38,7 @@ import { AUTHORIZE_CRITICAL_COMMAND_KINDS, prepareAuthorizeCriticalLine, runHuma
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
+import { buildGateChangeAcknowledgementSubject, gateDefinitionChangeReadback } from "../lib/gate-definition-changes.mjs";
 import { addSpecAddendum } from "../lib/feature-package-registration.mjs";
 import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
 import { PO_APPROVAL_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
@@ -157,9 +158,10 @@ function verifyWritten({ result, expectedCandidate, expectedAction, trustPolicy,
 
 test("the critical action kind list this suite is parametrized over is the closed set the product exports", () => {
   assert.deepEqual([...CRITICAL_ACTION_KINDS].sort(), [
-    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "deploy", "feature-package-reconcile",
+    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "deploy", "feature-package-reconcile",
     "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "spec-addendum",
   ], "a new kind must add its round trip here (and a note on which leg proves it), not slip in unproven");
+  // acknowledge-gate-definition-changes (ADR-0096): the library, printed and verb legs below, plus its consumer leg (approve-gate-change-acknowledgement).
 });
 
 for (const kind of CRITICAL_ACTION_KINDS) {
@@ -320,6 +322,11 @@ function emitterInput(kind) {
     const fixture = specAddendumRepository();
     return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: { addendum: SPEC_ADDENDUM_PATH }, observed: fixture.head, dependencies: fixture.readers };
   }
+  if (kind === "acknowledge-gate-definition-changes") {
+    // ADR-0096: the verb rebuilds the list from the real feature range at the clean HEAD (one weakened manifest after its first appearance).
+    const fixture = gateChangeRepository();
+    return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: {}, observed: fixture.head, dependencies: {} };
+  }
   return { candidate: { ...CANDIDATE }, subject: { label: `verb ${kind}` }, extra: {}, observed: { ...CANDIDATE }, dependencies: {} };
 }
 
@@ -347,6 +354,18 @@ function specAddendumRepository() {
     readReceipt: readers.readConsumedCandidateReceiptFn, readResult: readers.readConsumedCandidateResultFn });
   assert.equal(built.ok, true, JSON.stringify(built));
   return { root, head, subject: built.subject, readers };
+}
+
+/** A consumer repository whose feature range holds one gate-definition change without a proof: the manifest weakened after its first appearance. */
+function gateChangeRepository() {
+  const root = fixtureRepository(consumerFiles({ "project/pipeline.yaml": "gates: {}\n" }));
+  commitFiles(root, { "project/pipeline.yaml": "gates:\n  push:\n    approval: none\n" }, "chore: weaken the push gate");
+  const head = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
+  const built = buildGateChangeAcknowledgementSubject({ root, featureId: FEATURE_ID, commonDir: join(root, ".git") });
+  assert.equal(built.ok, true, JSON.stringify(built));
+  assert.deepEqual(built.candidate, head);
+  assert.deepEqual(built.subject.changes.map((change) => `${change.path}:${change.change}`), ["project/pipeline.yaml:M"]);
+  return { root, head, subject: built.subject };
 }
 
 for (const kind of PRINTED_KINDS) {
@@ -518,6 +537,38 @@ test("ADR-0095 consumer leg: spec-addendum -- the line approve-spec-addendum pri
   // The registration step finds the private approval the verb stored (same store, same subject digest, commit, time and proof).
   const registered = addSpecAddendum({ root: fixture.root, state: { activeFeature: { id: FEATURE_ID } }, approvalPath: recordPath });
   assert.equal(registered.status, "spec-addendum-added", JSON.stringify(registered));
+});
+
+test("ADR-0096 consumer leg: acknowledge-gate-definition-changes -- the line approve-gate-change-acknowledgement prints is signed by the verb, the follow-up records it once, and the close's readback then counts it", () => {
+  const fixture = gateChangeRepository();
+  const keys = keyDirectory();
+  const home = fixtureDir("home");
+  const common = join(fixture.root, ".git");
+  assert.equal(gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: FEATURE_ID, commonDir: common }).status, "unproven", "before: the weakened manifest has no proof");
+  const verb = ["approve-gate-change-acknowledgement", "--by", "PO"];
+
+  const first = runPipelineStateVerb(verb, { dir: fixture.root, home, keys });
+  assert.equal(first.code, 2, describeRun(first));
+  const printed = JSON.parse(first.lines.at(-1));
+  assert.equal(printed.status, "signature-required");
+  assert.deepEqual(printed.signatureCommand.subject, fixture.subject, "the printed subject is the one builder's list");
+  assert.match(first.stderr, /project\/pipeline\.yaml changed in [a-f0-9]{12}/u, "the agent shows the PO the list before the signing line");
+
+  const prompts = [];
+  const signed = runPrintedArgv({ argv: printed.signatureCommand.argv.slice(1), keys, home, dependencies: { observeCandidate: () => fixture.head, readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } } });
+  assert.equal(signed.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+  assert.deepEqual(signed.candidate, fixture.head, "the signed candidate is the clean HEAD of the range");
+  assert.match(prompts.join("\n"), /gate-definition change without a proof: project\/pipeline\.yaml changed/u, "the terminal shows the PO the same list");
+
+  const follow = printed.recordCommand.argv;
+  const recorded = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys });
+  assert.equal(recorded.code, 0, describeRun(recorded));
+  assert.match(recorded.stdout, /Gate-definition changes acknowledged by "PO" \(signature\) for 1 change\(s\)/u);
+  const after = gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: FEATURE_ID, commonDir: common });
+  assert.equal(after.status, "proven", JSON.stringify(after.unproven));
+  assert.deepEqual([after.changes.at(-1).proof.kind, after.changes.at(-1).proof.label], ["po-acknowledgement", "acknowledged after the fact"]);
+  const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys });
+  assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
 });
 
 test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {

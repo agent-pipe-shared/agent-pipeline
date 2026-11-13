@@ -195,7 +195,10 @@ function consumerFixture(log, identity) {
   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", current().planPresentation.designApprovalRequestPath]);
   assert.equal(current().planApproval.schema, "pipeline.plan-approval.v9");
   // G20-51 (candidate 20b): materialize-architecture registers the feature package itself and names its files in the commit step.
-  const materialized = JSON.parse(lifecycle(["materialize-architecture"]).at(-1));
+  // ADR-0096: the writer now also names the commit it armed (the fitness model, GS-17) after its JSON readback.
+  const materializeLines = lifecycle(["materialize-architecture"]);
+  assert.ok(materializeLines.some((line) => /writer commit capability/u.test(line)), "materialize-architecture arms the commit of what it wrote");
+  const materialized = JSON.parse(materializeLines.findLast((line) => line.startsWith("{")));
   assert.equal(materialized.featurePackage?.status, "registered", `materialize-architecture registers the package: ${JSON.stringify(materialized).slice(0, 600)}`);
   const setPhaseLogs = lifecycle(["set-phase", "--phase", "implementation"]).join("\n");
   // G20-54 (candidate 20b): set-phase names the package step, and points at the verification tiers "below" only when they follow.

@@ -6,7 +6,8 @@
  *
  * Sources, in the order the human-approval trace enumerates them:
  *   - the plan approval's signed design approval, kept in the State;
- *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit.
+ *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit;
+ *   - the PO's acknowledgement of gate-definition changes (ADR-0096) of the active feature.
  * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is an
  * envelope whose proof is not a verifiable public proof object. A gap never blocks the close.
  *
@@ -23,6 +24,7 @@ import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
 
 const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
 const CRITIC_ACKNOWLEDGEMENT_KIND = "acknowledge-caller-authored-critic"; // spelled here: importing lib/critic-acknowledgement.mjs closes an import cycle through the State writer
+const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes"; // spelled here for the same reason (lib/gate-definition-changes.mjs)
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; } };
 
@@ -38,8 +40,11 @@ export function collectAuditProofs({ common, candidate, state, criticPacketId = 
   if (object(design) && design.mode === "signature") take("plan-approval", design.proof, "state:planApproval");
   if (typeof common === "string" && common !== "" && object(candidate)) {
     // C21E: the PO acknowledgement of a caller-authored Critic signs the REVIEWED candidate, which the close candidate has moved past, so it is found by its packet.
-    const belongs = (kind, approval) => (kind === CRITIC_ACKNOWLEDGEMENT_KIND ? approval.packetId === criticPacketId : approval.forCommit === candidate.commit);
-    for (const kind of criticPacketId === null ? STORE_KINDS : [...STORE_KINDS, CRITIC_ACKNOWLEDGEMENT_KIND]) {
+    // ADR-0096: the PO's acknowledgement of gate-definition changes signs the HEAD of its day; the close candidate may have moved past it, so it is found by its feature.
+    const featureId = typeof state?.activeFeature?.id === "string" ? state.activeFeature.id : null;
+    const belongs = (kind, approval) => (kind === CRITIC_ACKNOWLEDGEMENT_KIND ? approval.packetId === criticPacketId
+      : kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND ? featureId !== null && approval.featureId === featureId : approval.forCommit === candidate.commit);
+    for (const kind of [...STORE_KINDS, ...(criticPacketId === null ? [] : [CRITIC_ACKNOWLEDGEMENT_KIND]), ...(featureId === null ? [] : [GATE_CHANGE_ACKNOWLEDGEMENT_KIND])]) {
       const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); let names = [];
       try { names = readdirSync(directory).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort().slice(0, 256); } catch { names = []; }
       for (const name of names) {

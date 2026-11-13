@@ -28,15 +28,17 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
+import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
 import { join } from "node:path";
 import { GATE_STRENGTH_FIELD_EXEMPTIONS, GATE_STRENGTH_PATHS, changedGateStrengthDottedPaths } from "../hooks/guard-gate-strength.mjs";
 import { featureRangeBase } from "./close-commit-split.mjs";
+import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
 import { readPrivateApprovals } from "./critical-action-authorization.mjs";
 import { readConsumedOverrideCapabilities } from "./human-guard-override.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 
 export const GATE_DEFINITION_CHANGES_SCHEMA = "pipeline.gate-definition-changes.v1";
-export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
+export { GATE_CHANGE_ACKNOWLEDGEMENT_KIND };
 export const GATE_DEFINITION_IDS = Object.freeze(["GS-1", "GS-2", "GS-3", "GS-4", "GS-5", "GS-7", "GS-10", "GS-11", "GS-12", "GS-13", "GS-14", "GS-16", "GS-17"]);
 export const CONFIGURE_VERIFY_LABEL = "confirmed via runner prompt, not signed";
 export const ACKNOWLEDGEMENT_LABEL = "acknowledged after the fact";
@@ -44,13 +46,16 @@ const MAX_CHANGES = 4096;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-const RULES = GATE_STRENGTH_PATHS.filter((rule) => GATE_DEFINITION_IDS.includes(rule.id) && !rule.path.endsWith("/*"));
+// Built on first use: hooks/guard-gate-strength.mjs reaches this module back through an import cycle, so its table may not be
+// initialised while this module evaluates.
+let rules = null;
+const gateDefinitionRules = () => (rules ??= GATE_STRENGTH_PATHS.filter((rule) => GATE_DEFINITION_IDS.includes(rule.id) && !rule.path.endsWith("/*")));
 
 /** The gate-definition rule of a repository-relative path, or null (same case-insensitive match as the write guard). */
 export function gateDefinitionRuleFor(path) {
   if (typeof path !== "string" || path === "") return null;
   const normalized = path.toLowerCase();
-  return RULES.find((rule) => rule.path.toLowerCase() === normalized) ?? null;
+  return gateDefinitionRules().find((rule) => rule.path.toLowerCase() === normalized) ?? null;
 }
 
 function gitRunner(rootDir) {
@@ -76,9 +81,19 @@ function onlyExemptFields(git, rule, parent, commit, path) {
  * Every gate-definition change of the feature range. `{ status: "listed", base, head, changes: [{ commit, parent, path, change, blobSha256,
  * ruleId }] }` or `{ status: "unavailable", reason }`. `change` is A, M or D; a deleted file has `blobSha256: null`.
  */
-export function listGateDefinitionChanges({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
+export function listGateDefinitionChanges({ rootDir, featureId, head = "HEAD", runGit = null, specDirectory = null } = {}) {
   const git = runGit ?? gitRunner(rootDir);
-  const range = featureRangeBase({ rootDir, featureId, head, runGit: (args) => git(args) });
+  let range = featureRangeBase({ rootDir, featureId, head, runGit: (args) => git(args) });
+  // K-25/K-30 consumers keep an approved Spec in a dated folder (specs/<date>-<slug>/): the range then starts at the first commit of
+  // that folder, the same first-parent rule applied to the directory the approved Spec lives in.
+  if (range.status !== "found" && typeof specDirectory === "string" && /^specs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(specDirectory)) {
+    const first = git(["log", "--first-parent", "--reverse", "--format=%H", head, "--", specDirectory]);
+    const oid = ok(first) ? String(first.stdout).split("\n").map((line) => line.trim()).find((line) => OID.test(line)) : undefined;
+    if (oid !== undefined) {
+      const parent = git(["rev-parse", "--verify", "--quiet", `${oid}^`]);
+      range = { status: "found", first: oid, base: ok(parent) && OID.test(String(parent.stdout).trim()) ? String(parent.stdout).trim() : null };
+    }
+  }
   if (range.status !== "found") return Object.freeze({ status: "unavailable", reason: range.reason });
   const headCommit = git(["rev-parse", "--verify", "--quiet", `${head}^{commit}`]);
   if (!ok(headCommit) || !OID.test(String(headCommit.stdout).trim())) return Object.freeze({ status: "unavailable", reason: "HEAD could not be read" });
@@ -105,6 +120,23 @@ export function listGateDefinitionChanges({ rootDir, featureId, head = "HEAD", r
   }
   changes.reverse(); // oldest first
   return Object.freeze({ status: "listed", base: range.base, head: String(headCommit.stdout).trim(), changes });
+}
+
+/** The `specs/<folder>` directory of an approved Spec path (the range fallback for a dated Spec folder), or null. */
+export function specDirectoryOf(specPath) {
+  const match = typeof specPath === "string" ? /^(specs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127})\/[^/]+$/u.exec(specPath) : null;
+  return match ? match[1] : null;
+}
+
+/**
+ * The Spec directory of the active feature from the project's pipeline state (approved Spec path first, then the continuity
+ * authority's), or null. The close, the recording step and the signing terminal all fall back to it, so they read the same range.
+ */
+export function specDirectoryFromState(root) {
+  try {
+    const state = JSON.parse(readFileSync(resolveAuthorityArtifactPath("state", { rootDir: root }).path, "utf8"));
+    return specDirectoryOf(state?.planApproval?.poGateAuthority?.specPath ?? state?.continuity?.authority?.spec?.path);
+  } catch { return null; }
 }
 
 /** The acknowledgement's sorted change list and its digest; the one canonical form the subject, the record and the walk compare. */
@@ -202,10 +234,10 @@ function readAcknowledgements(commonDir, featureId) {
  * The readback the close, inspect, the bundle and the Critic input share. `{ schema, status: "proven"|"unproven"|"unavailable", base,
  * head, changes: [{ ...change, proof }], unproven: [change] }`. `excludeAcknowledgements` builds the list an acknowledgement must name.
  */
-export function gateDefinitionChangeReadback({ rootDir, featureId, commonDir, head = "HEAD", runGit = null, excludeAcknowledgements = false,
+export function gateDefinitionChangeReadback({ rootDir, featureId, commonDir, head = "HEAD", runGit = null, excludeAcknowledgements = false, specDirectory = null,
   readOverrides = readConsumedOverrideCapabilities, readConfigureVerify = readConfigureVerifyReady, readAcks = readAcknowledgements } = {}) {
   const git = runGit ?? gitRunner(rootDir);
-  const listed = listGateDefinitionChanges({ rootDir, featureId, head, runGit: git });
+  const listed = listGateDefinitionChanges({ rootDir, featureId, head, runGit: git, specDirectory });
   if (listed.status !== "listed") return Object.freeze({ schema: GATE_DEFINITION_CHANGES_SCHEMA, status: "unavailable", reason: listed.reason, changes: [], unproven: [] });
   const context = { git, overrides: listed.changes.length === 0 ? [] : readOverrides({ commonDir }),
     configureVerify: listed.changes.length === 0 ? [] : readConfigureVerify(commonDir),
@@ -213,6 +245,38 @@ export function gateDefinitionChangeReadback({ rootDir, featureId, commonDir, he
   const changes = listed.changes.map((change) => Object.freeze({ ...change, proof: deriveGateChangeProof(change, context) }));
   const unproven = changes.filter((change) => change.proof === null);
   return Object.freeze({ schema: GATE_DEFINITION_CHANGES_SCHEMA, status: unproven.length === 0 ? "proven" : "unproven", base: listed.base, head: listed.head, changes, unproven });
+}
+
+/**
+ * The one subject builder of the PO's acknowledgement: the recording step (`pipeline-state.mjs approve-gate-change-acknowledgement`)
+ * and the signing terminal (`po-human-approval.mjs authorize-critical --kind acknowledge-gate-definition-changes`) both call it, so
+ * they cannot disagree about the list. The list is every change of the range without another proof (an earlier acknowledgement is
+ * ignored, so a new one names everything still needing one); the candidate is HEAD. `{ ok: true, subject, candidate }` or
+ * `{ ok: false, code, detail }`.
+ */
+export function buildGateChangeAcknowledgementSubject({ root, featureId, commonDir, runGit = null, readOverrides, readConfigureVerify, specDirectory = null } = {}) {
+  const git = runGit ?? gitRunner(root);
+  const readback = gateDefinitionChangeReadback({ rootDir: root, featureId, commonDir, runGit: git, excludeAcknowledgements: true,
+    specDirectory: specDirectory ?? specDirectoryFromState(root),
+    ...(readOverrides ? { readOverrides } : {}), ...(readConfigureVerify ? { readConfigureVerify } : {}) });
+  if (readback.status === "unavailable") return { ok: false, code: "GCA-RANGE-UNAVAILABLE", detail: `the feature range could not be read (${readback.reason})` };
+  if (readback.unproven.length === 0) return { ok: false, code: "GCA-NOTHING-TO-ACKNOWLEDGE", detail: "every gate-definition change of the range already has a proof" };
+  const tree = git(["rev-parse", "--verify", "--quiet", `${readback.head}^{tree}`]);
+  if (!ok(tree) || !OID.test(String(tree.stdout).trim())) return { ok: false, code: "GCA-RANGE-UNAVAILABLE", detail: "the tree of HEAD could not be read" };
+  const { list, sha256: changesSha256 } = gateChangeListDigest(readback.unproven);
+  return { ok: true, candidate: { commit: readback.head, tree: String(tree.stdout).trim() },
+    subject: { schema: "pipeline.gate-change-acknowledgement-subject.v1", featureId, rangeBase: readback.base, changesSha256, changes: list } };
+}
+
+/** The lines the signing terminal shows the PO before the signature. */
+export function gateChangeAcknowledgementConfirmationLines(subject) {
+  if (!object(subject) || !Array.isArray(subject.changes)) return [];
+  return [
+    `feature: ${subject.featureId}, range from ${subject.rangeBase === null ? "the start of history" : String(subject.rangeBase).slice(0, 12)}`,
+    ...subject.changes.slice(0, 40).map((change) => `gate-definition change without a proof: ${change.path} ${change.change === "D" ? "deleted" : change.change === "A" ? "added" : "changed"} in ${change.commit.slice(0, 12)}`),
+    ...(subject.changes.length > 40 ? [`and ${subject.changes.length - 40} more (changes digest ${subject.changesSha256})`] : []),
+    "this acknowledgement states that you have seen exactly these changes of how strong a gate is; it is recorded as acknowledged after the fact, it does not judge whether each change is sound, and a later change needs a new acknowledgement.",
+  ];
 }
 
 /** One line per change for a refusal, the inspect readback and the Critic input. */

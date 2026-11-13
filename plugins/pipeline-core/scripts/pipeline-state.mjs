@@ -457,6 +457,8 @@ import {
 import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, specAddendumApprovalBytes, specAddendumApprovalPath } from "../lib/spec-addendum.mjs";
+import { buildGateChangeAcknowledgementSubject } from "../lib/gate-definition-changes.mjs";
+import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {parse} from 'node:path';
@@ -809,7 +811,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "inspect", "update-public-handover", "rebind-approval",
   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "recapture-design-input", "seal-plan-approval",
   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
-  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum",
+  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
@@ -4890,7 +4892,7 @@ function externalPublicJson(dir, value) {
 // kind, rejects symlinks and hard links, and pins its authority to this repository's
 // private key-directory pointer before cryptographic verification.  It is therefore not
 // a general in-repository-proof escape hatch, and every other kind remains external-only.
-const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND]);
+const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
 function localPushScratchJson(dir, value, expectedPath) {
   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
     return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
@@ -4951,7 +4953,7 @@ function localMirrorScratchArtifacts(dir, flags, kind) {
  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
  * behaviour is byte-identical to before this addition.
  */
-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND]);
+const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
 
 function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
@@ -10305,6 +10307,73 @@ function runApproveSpecAddendum({ dir, rest, base, now, deps }) {
   return 0;
 }
 
+/**
+ * ADR-0096 (D248): the PO's acknowledgement of the gate-definition changes of the active feature's range that carry no other proof,
+ * in the `gates.human_approval` mode (signature proof, or a chat-attributed record with the label the PO gave). The list is derived
+ * from the range at the clean HEAD by the one builder the signing terminal uses too; the private approval store keeps it and the
+ * close walk reads it, labelled "acknowledged after the fact".
+ */
+function runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps }) {
+  const kind = GATE_CHANGE_ACKNOWLEDGEMENT_KIND;
+  const refuse = (code, detail = "") => { console.error(`Error: approve-gate-change-acknowledgement refused (${code}).${detail ? ` ${detail}` : ""}${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
+  const configured = criticalProofWaiverFor(dir, kind);
+  if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
+  const waived = configured.waived === true;
+  const proofOmitted = !["--proof-request", "--proof-authority", "--proof"].some((flag) => rest.includes(flag));
+  const parsed = parseExactFlags(rest, new Set(waived || proofOmitted ? ["by"] : ["by", "proof-request", "proof-authority", "proof"]));
+  const flags = parsed.value ?? {};
+  if (!parsed.ok || isBlank(flags.by)) {
+    console.error("Error: approve-gate-change-acknowledgement requires --by (the label the PO gave for this command) and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
+    return 2;
+  }
+  const featureId = base.activeFeature?.id;
+  if (typeof featureId !== "string" || featureId === "") return refuse("GCA-NO-FEATURE", "the acknowledgement covers the range of the active feature; there is none");
+  const common = resolveCriticalApprovalCommonDir(dir);
+  if (common === null) return refuse("CRITICAL-APPROVAL-STORE-UNAVAILABLE");
+  let root;
+  try { root = realpathSync(resolve(dir)); } catch { return refuse("GCA-REPOSITORY"); }
+  const built = (deps.buildGateChangeAcknowledgementSubjectFn ?? buildGateChangeAcknowledgementSubject)({ root, featureId, commonDir: common });
+  if (!built.ok) return refuse(built.code, built.detail);
+  const { subject, candidate } = built;
+  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
+  console.error(["PO ACKNOWLEDGEMENT OF GATE-DEFINITION CHANGES -- these changes of how strong a gate is carry no other proof:",
+    ...subject.changes.slice(0, 40).map((change) => `  ${change.path} ${change.change === "D" ? "deleted" : change.change === "A" ? "added" : "changed"} in ${change.commit.slice(0, 12)}`),
+    ...(subject.changes.length > 40 ? [`  and ${subject.changes.length - 40} more`] : []),
+    `  candidate: ${candidate.commit}`, "  the record says acknowledged after the fact; the Critic still reviews the content, and a later change needs a new acknowledgement."].join("\n"));
+  const approvedAt = now();
+  if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
+    try {
+      const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
+      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
+      const mirrorCommon = defaultGitCommonDir(dir);
+      const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
+      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
+      console.log(JSON.stringify({ schema: "pipeline.gate-change-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
+        signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
+        ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged and the identical close command again")}` }),
+        recordCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-gate-change-acknowledgement", "--by", flags.by, "--proof-request", mirror?.request ?? "<proof-request>", "--proof-authority", mirror?.authority ?? "<proof-authority>", "--proof", mirror?.proof ?? "<proof>"],
+          note: mirror === null ? "run after the PO signed; the three proof paths are printed by the signing step" : "run unchanged once the proof is there; the three paths are the repository mirror the signing step writes" } }));
+    } catch { /* the refusal below still names the missing flags */ }
+    return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
+  }
+  const verified = verifyCriticalHumanProof({ dir, state: base, kind, candidate, subject, flags, now: approvedAt, required: true });
+  if (!verified.ok) return refuse(verified.code);
+  const priorConsumption = base.criticalProofConsumption;
+  if (priorConsumption !== undefined && (!Array.isArray(priorConsumption) || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) return refuse("CRITICAL-PROOF-CONSUMPTION-INVALID");
+  if (verified.proof !== null && ((Array.isArray(priorConsumption) ? priorConsumption : []).some((entry) => entry.proofSha256 === verified.proof.proofSha256)
+    || isCriticalProofConsumedPrivately(common, verified.proof.proofSha256))) return refuse("CRITICAL-PROOF-REPLAY");
+  const approval = { approvedBy: flags.by, approvedAt, forCommit: candidate.commit, forTree: candidate.tree, featureId, rangeBase: subject.rangeBase,
+    changesSha256: subject.changesSha256, changes: subject.changes, subjectSha256, label: "acknowledged after the fact", criticalProof: verified.proof };
+  if (waived) {
+    approval.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
+    approval.humanApproval = chatAttributionRecord({ kind, by: flags.by });
+  } else if (verified.waived !== undefined) approval.criticalProofWaiver = verified.waived;
+  const stored = writeCriticalApproval({ gitCommonDir: common, kind, approval, consumedAt: approvedAt });
+  if (!stored.ok) return refuse(stored.code);
+  console.log(`Gate-definition changes acknowledged by "${flags.by}" (${verified.proof === null ? "chat-attributed-unattested" : "signature"}) for ${subject.changes.length} change(s) of feature ${featureId} up to commit ${candidate.commit}; run the identical close command again.`);
+  return 0;
+}
+
 function runFeaturePackageWriteCommand(sub, argv, deps) {
   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
   if (sub === "feature-package-reconcile") {
@@ -14731,6 +14800,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       return runApproveCriticAcknowledgement({ dir, rest, base, now, deps });
     case "approve-spec-addendum":
       return runApproveSpecAddendum({ dir, rest, base, now, deps });
+    case "approve-gate-change-acknowledgement":
+      return runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps });
 
     case "approve-deploy": {
       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the

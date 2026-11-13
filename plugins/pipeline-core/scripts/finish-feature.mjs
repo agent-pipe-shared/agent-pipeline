@@ -448,6 +448,14 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         const dirtyNote = dirty.length === 0 ? "" : `first commit the ${dirty.length} uncommitted path(s) or move them out of the work tree, because the signing command refuses a dirty tree (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}); `;
         return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${dirtyNote}record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
       }
+      // ADR-0096 (Claude test run 3, L4): a gate-definition change without a proof is named before Verify; its PO acknowledgement also needs a clean tree and the current HEAD.
+      let gateChanges = null;
+      try { gateChanges = command(runner, process.execPath, [COORDINATOR, "gate-changes", "--root", root], "ONESHOT-GATE-CHANGES"); } catch { gateChanges = null; /* the close keeps its own check */ }
+      if (gateChanges?.status === "unproven" && Array.isArray(gateChanges.unproven)) {
+        const listed = gateChanges.unproven.slice(0, 8).join("; ");
+        return stopResult("gate-changes", "CLOSE-GATE-CHANGE-UNPROVEN", `${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${listed}${gateChanges.unproven.length > 8 ? "; ..." : ""}.`,
+          `nothing was written; ${String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then rerun the identical command: ${rerun(again)}`);
+      }
       // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
       let addenda = null;
       try { addenda = command(runner, process.execPath, [COORDINATOR, "critic-addenda", "--root", root], "ONESHOT-CRITIC-ADDENDA"); } catch { addenda = null; /* the close keeps its own check */ }
@@ -624,8 +632,19 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       stages.push("sbom");
       for (const file of sbom.files) { mkdirSync(dirname(resolve(root, file.path)), { recursive: true }); writeFileSync(resolve(root, file.path), file.text); }
       const sbomRecordPath = sbom.recordPath;
+      // ADR-0096 (Decision 6): the proven list of gate-definition changes, read again at the candidate the bundle names, travels in the one close commit.
+      // A list that cannot be read here is left out; the close's own check still refuses an unproven or unreadable range.
+      let gateChangesRecordPath = null;
+      try {
+        const listed = command(runner, process.execPath, [COORDINATOR, "gate-changes", "--root", root], "ONESHOT-GATE-CHANGES");
+        if (listed?.status === "proven" && listed.record?.schema === "pipeline.gate-definition-changes.v1") {
+          const target = `${evidenceDir}/gate-changes.json`;
+          mkdirSync(dirname(resolve(root, target)), { recursive: true }); writeFileSync(resolve(root, target), `${JSON.stringify(listed.record, null, 2)}\n`);
+          gateChangesRecordPath = target; stages.push("gate-changes");
+        }
+      } catch { gateChangesRecordPath = null; }
       stages.push("audit-request");
-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }), sbomRecordPath } });
+      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }), sbomRecordPath, ...(gateChangesRecordPath === null ? {} : { gateChangesRecordPath }) } });
       if (state.continuity !== null && typeof state.continuity === "object") {
         let current = state;
         if (state.continuity.queueHead?.nextAction !== "close") {

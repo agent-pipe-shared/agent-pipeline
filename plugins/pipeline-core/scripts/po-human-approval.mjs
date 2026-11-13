@@ -35,6 +35,8 @@ import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRe
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
+import { buildGateChangeAcknowledgementSubject, gateChangeAcknowledgementConfirmationLines } from "../lib/gate-definition-changes.mjs";
+import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
 import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
@@ -1102,7 +1104,7 @@ function suggestSubcommand(input, candidates) {
  * governance-fork-disposition-style verification bypass concern either.
  */
 const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND]);
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
@@ -1192,6 +1194,10 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (values.kind === SPEC_ADDENDUM_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
     if (values.subject !== undefined) return { error: `${USAGE}\n${SPEC_ADDENDUM_KIND} takes no --subject: the subject is derived from the addendum named by --addendum.` };
     if (!/^specs\/[a-z0-9][a-z0-9._-]{0,62}\/spec-addendum-(0[1-9]|[1-9][0-9])\.md$/u.test(values.addendum ?? "")) return { error: `${USAGE}\n${SPEC_ADDENDUM_KIND} requires --addendum specs/<feature>/spec-addendum-<NN>.md.` };
+  }
+  // ADR-0096: the gate-change acknowledgement's subject is derived from the feature range at HEAD, never typed.
+  if (values.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND && (command === "prepare-critical" || command === "authorize-critical") && values.subject !== undefined) {
+    return { error: `${USAGE}\n${GATE_CHANGE_ACKNOWLEDGEMENT_KIND} takes no --subject: the list is derived from the feature range at the clean HEAD.` };
   }
   // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
   if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
@@ -2012,6 +2018,15 @@ function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, de
     if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the addendum (expected ${computed})`);
     args.subjectSha256 = computed;
     subjectPreimage = built.subject;
+  } else if (args.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND) {
+    // ADR-0096: the one builder the recording step uses too; the candidate is the clean HEAD of the feature range.
+    const built = (dependencies.buildGateChangeAcknowledgementSubjectFn ?? buildGateChangeAcknowledgementSubject)({ root: repository, featureId, commonDir: gitCommonDir });
+    if (!built.ok) fail(`critical approval request is invalid (${built.code}): ${built.detail}`);
+    if (built.candidate.commit !== candidate.commit || built.candidate.tree !== candidate.tree) fail("critical approval request is invalid (GCA-CANDIDATE): the acknowledged range does not end at the clean HEAD");
+    const computed = criticalActionSubjectSha256({ kind: GATE_CHANGE_ACKNOWLEDGEMENT_KIND, candidate, subject: built.subject });
+    if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the feature range (expected ${computed})`);
+    args.subjectSha256 = computed;
+    subjectPreimage = built.subject;
   } else {
     subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
   }
@@ -2170,7 +2185,7 @@ export function authorizeCriticalPushCommand({
  * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
  * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
  */
-export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND]);
+export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND]);
 
 /**
  * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
@@ -2728,6 +2743,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       ...residualAcceptanceConfirmationLines(request.action.kind, subjectPreimage),
       ...criticAcknowledgementConfirmationLines(request.action.kind, subjectPreimage),
       ...specAddendumConfirmationLines(request.action.kind, subjectPreimage),
+      ...(request.action.kind === GATE_CHANGE_ACKNOWLEDGEMENT_KIND ? gateChangeAcknowledgementConfirmationLines(subjectPreimage) : []),
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });

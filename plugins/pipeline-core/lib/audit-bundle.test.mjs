@@ -291,6 +291,27 @@ test("C28 the bundle carries the dispatch projection as one evidence item, verif
   const unreadable = planWith(fixture(), { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/absent.json" } });
   assert.deepEqual(unreadable.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:gap:UNREADABLE"]);
 });
+// ADR-0096 (D248): the close's list of gate-definition changes is its own bundle section, carried only when every change is proven and the list ends at the candidate.
+function gateChangesBundle(input, record) {
+  mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/gate-changes.json"), `${JSON.stringify(record)}\n`);
+  return planWith(input, { candidate: CANDIDATE, evidence: { gateChangesRecordPath: "evidence/gate-changes.json" } });
+}
+test("ADR-0096 the bundle carries the gate-definition change list, codes a labelled proof, and refuses an unproven or foreign list", async () => {
+  const change = (proof) => ({ commit: "a".repeat(40), parent: "b".repeat(40), path: "project/pipeline.json", change: "M", blobSha256: "c".repeat(64), ruleId: "GS-11", proof });
+  const record = (changes, extra = {}) => ({ schema: "pipeline.gate-definition-changes.v1", status: "proven", base: null, head: CANDIDATE.commit, changes, unproven: [], ...extra });
+  const input = fixture();
+  const signed = gateChangesBundle(input, record([change({ kind: "human-guard-override", ref: "e".repeat(64), label: null })]));
+  assert.deepEqual(signed.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:carried:null"], "only the named item: no approval item is invented");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan: signed });
+  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /## Gate-definition changes/u);
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
+  const labelled = gateChangesBundle(fixture(), record([change({ kind: "po-acknowledgement", ref: "f".repeat(64), label: "acknowledged after the fact" })]));
+  assert.deepEqual(labelled.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:carried:GATE-CHANGE-LABELLED"]);
+  const unproven = gateChangesBundle(fixture(), record([change(null)], { status: "unproven", unproven: [change(null)] }));
+  assert.deepEqual(unproven.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:gap:UNREADABLE"], "an unproven list never reaches a bundle as carried");
+  const foreign = gateChangesBundle(fixture(), record([], { head: "9".repeat(40) }));
+  assert.deepEqual(foreign.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["gate-changes:gap:OTHER-CANDIDATE"]);
+});
 // C28c (PO decision 2026-11-11): the SBOM the close records is its own bundle section: the record, then the two documents it names, bound by digest and re-checked offline.
 const LOCK = JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/left-pad": { version: "1.3.0" } } });
 function sbomBundle(input, files, mutate = (value) => value) {

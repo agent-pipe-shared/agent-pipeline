@@ -276,8 +276,8 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false } = {}) {
-  const independenceChecks = []; let retired = false;
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false } = {}) {
+  const independenceChecks = []; const gateChangeChecks = []; let retired = false;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
@@ -302,6 +302,10 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
     if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
+    // ADR-0096: the read-only gate-change readback; a proven range carries its record, which the close writes into the evidence.
+    if (script === "close-coordinator.mjs" && sub === "gate-changes") { gateChangeChecks.push(flag(argv, "--root")); return json(gateChangesUnproven
+      ? { schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: ["GS-1 pipeline.user.yaml changed in 0123456789ab: no proof"], repair: "the PO acknowledges the unproven gate-definition changes once for this range: run node pipeline-state.mjs approve-gate-change-acknowledgement --by <the label the PO gives for this command>, which prints the PO's signing command" }
+      : { schema: "pipeline.close-gate-changes.v1", status: "proven", changes: 0, record: { schema: "pipeline.gate-definition-changes.v1", status: "proven", base: null, head: git("rev-parse", "HEAD").trim(), changes: [], unproven: [] } }); }
     if (script === "security-scan.mjs" && argv.includes("--close-postimages")) { calls.push("security-scan.mjs --close-postimages"); return postimageBlocking ? POSTIMAGE_BLOCK : POSTIMAGE_PASS; }
     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
     if (script === "verify-evidence-producer.mjs") {
@@ -340,7 +344,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     throw new Error(`unexpected ${script} ${sub}`);
   };
-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
+  return { root, git, calls, independenceChecks, gateChangeChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
@@ -477,6 +481,26 @@ test("C21C: a missing PO acknowledgement of a caller-authored Critic stops befor
     assert.deepEqual(f.independenceChecks, [f.packetId]); assert.deepEqual(f.calls, [], "Verify, the package and the close must not run");
     for (const name of ["audit-request.json", "verify-candidate.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ADR-0096: an unproven gate-definition change stops the one-shot before Verify with the acknowledgement as its repair; a proven range travels in the audit request", () => {
+  const f = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stage, "gate-changes"); assert.equal(stopped.stop.code, "CLOSE-GATE-CHANGE-UNPROVEN");
+    assert.match(stopped.stop.reason, /pipeline\.user\.yaml changed in 0123456789ab/u);
+    assert.match(stopped.stop.repair, /approve-gate-change-acknowledgement --by/u);
+    assert.match(stopped.stop.repair, /rerun the identical command/u);
+    assert.deepEqual(f.gateChangeChecks, [f.root]); assert.deepEqual(f.calls, [], "no Verify, package or close stage ran");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const g = oneShotFixture();
+  try {
+    oneShotClose(g.input, { runCommand: g.runner });
+    const request = JSON.parse(readFileSync(join(g.root, "specs/feature-abc/evidence/audit-request.json"), "utf8"));
+    assert.equal(request.evidence.gateChangesRecordPath, "specs/feature-abc/evidence/gate-changes.json");
+    assert.equal(JSON.parse(readFileSync(join(g.root, request.evidence.gateChangesRecordPath), "utf8")).schema, "pipeline.gate-definition-changes.v1");
+  } finally { rmSync(g.root, { recursive: true, force: true }); }
 });
 
 test("C21E: the acknowledgement stop names the uncommitted paths before the PO is asked to sign, and says nothing on a clean tree", () => {

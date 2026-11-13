@@ -22,7 +22,7 @@ function evidenceSection(manifest) {
   if (!Object.hasOwn(manifest, "evidence")) return "";
   const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
   // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
-  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection" && !entry.item.startsWith("sbom")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
+  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection" && !entry.item.startsWith("sbom") && entry.item !== "gate-changes"); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
   // C28: the dispatch projection is its own section, printed after the reports.
   const projections = manifest.evidence.items.filter((entry) => entry.item === "dispatch-projection");
   const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
@@ -31,7 +31,10 @@ function evidenceSection(manifest) {
   const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (JavaScript, Python, Go, Rust, JVM, .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++ and committed CycloneDX files) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means the PO signed an override of a blocked state; the record names every finding it covered and the signing key, and the signed request and proof travel in the bundle (\`AB-SBOM-OVERRIDE\` is the verifier's finding when the signature or its binding does not hold; whether the key is the project's is decided at the close, so compare the key reference with the project's policy): the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
-  return `${approvalText}${reportText}${projectionText}${sbomText}`;
+  // ADR-0096: the gate-definition changes of the feature range, each with the proof that admitted it.
+  const gates = manifest.evidence.items.filter((entry) => entry.item === "gate-changes");
+  const gateText = gates.length === 0 ? "" : `\n## Gate-definition changes\n\nEvery change of a file that decides how strong a gate is (verify command, calibration, manifest, guard and boundary policy, fitness model, push-approval mode, trust anchors) in this feature's range, with the proof that admitted it. \`GATE-CHANGE-LABELLED\` means at least one proof is not a signature: \`confirmed via runner prompt, not signed\` (configure-verify) or \`acknowledged after the fact\` (the PO's acknowledgement). The record lists each one; the Critic reviews the content of each change.\n\n${gates.map(line).join("\n")}\n`;
+  return `${approvalText}${reportText}${projectionText}${sbomText}${gateText}`;
 }
 // C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
 // The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
@@ -200,8 +203,18 @@ function followUpFindings(root, manifest) {
   return findings;
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document", "sbom-override"]);
-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override" });
+const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document", "sbom-override", "gate-changes"]);
+const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override", gateChanges: "gate-changes" });
+// ADR-0096: the close's list of every gate-definition change of the feature range with the proof that admitted it (lib/gate-definition-changes.mjs).
+const GATE_CHANGES_SCHEMA = "pipeline.gate-definition-changes.v1";
+const GATE_PROOF_KINDS = new Set(["first-appearance", "trust-anchor-bootstrap", "materialization", "configure-verify", "human-guard-override", "po-acknowledgement"]);
+function gateChangesRecordHolds(record) {
+  return record !== null && typeof record === "object" && record.schema === GATE_CHANGES_SCHEMA && record.status === "proven" && Array.isArray(record.changes) && Array.isArray(record.unproven) && record.unproven.length === 0
+    && record.changes.every((change) => change !== null && typeof change === "object" && OID.test(change.commit ?? "") && typeof change.path === "string" && /^[AMD]$/u.test(change.change ?? "")
+      && change.proof !== null && typeof change.proof === "object" && GATE_PROOF_KINDS.has(change.proof.kind));
+}
+/** The item code of a carried gate-change list: null when every proof is a signature or a structural fact, GATE-CHANGE-LABELLED when one carries a label. */
+const gateChangesCode = (record) => (record.changes.some((change) => typeof change.proof.label === "string" && change.proof.label !== "") ? "GATE-CHANGE-LABELLED" : null);
 // C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
 // and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
 // C28e (Codex test run, PO 2026-11-13): a close now writes `digest-only` (no text, the source digest only); bundles with carried or redacted texts still verify.
@@ -242,7 +255,7 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
  */
 function collectEvidence(root, candidate, evidence, firstIndex) {
   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath"]);
+  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath", "gateChangesRecordPath"]);
   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
   const reports = evidence.criticReports;
@@ -257,7 +270,8 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
   if (evidence.dispatchProjectionPath !== undefined && typeof evidence.dispatchProjectionPath !== "string") fail("AB-EVIDENCE-INPUT");
   // C28c: the same for the SBOM record the close names.
   if (evidence.sbomRecordPath !== undefined && typeof evidence.sbomRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
-  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined)) {
+  if (evidence.gateChangesRecordPath !== undefined && typeof evidence.gateChangesRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
+  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined && evidence.gateChangesRecordPath === undefined)) {
   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
   else {
     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
@@ -325,6 +339,12 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
         else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.sbomOverride, `${directory}override-${part}.json`, file.sha256) });
       }
     }
+  }
+  if (evidence.gateChangesRecordPath !== undefined) {
+    const file = readEvidenceFile(root, evidence.gateChangesRecordPath); const record = file && jsonOrNull(file.bytes);
+    if (file === null || !gateChangesRecordHolds(record)) gap("gate-changes", "UNREADABLE");
+    else if (record.head !== candidate.commit) gap("gate-changes", "OTHER-CANDIDATE");
+    else items.push({ item: "gate-changes", status: "carried", code: gateChangesCode(record), bundlePath: carry(EVIDENCE_CLASSES.gateChanges, evidence.gateChangesRecordPath, file.sha256) });
   }
   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
 }

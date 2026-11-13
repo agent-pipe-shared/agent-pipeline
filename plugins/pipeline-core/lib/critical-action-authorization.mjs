@@ -201,6 +201,8 @@ const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-p
   "acknowledge-caller-authored-critic": "criticAcknowledgement",
   // ADR-0095: the PO approval of one Spec addendum (lib/spec-addendum.mjs); read per addendum, not through the slot overlay.
   "spec-addendum": "specAddendumApproval",
+  // ADR-0096: the PO acknowledgement of a range's unproven gate-definition changes; read per feature by the close walk.
+  "acknowledge-gate-definition-changes": "gateChangeAcknowledgement",
   // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
   "release-preflight": "releasePreflightApproval" });
 

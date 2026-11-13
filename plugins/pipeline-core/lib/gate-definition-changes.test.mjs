@@ -7,8 +7,8 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, describeGateDefinitionChange, gateChangeListDigest, gateDefinitionChangeReadback,
-  gateDefinitionRuleFor } from "./gate-definition-changes.mjs";
+import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, buildGateChangeAcknowledgementSubject, describeGateDefinitionChange,
+  gateChangeAcknowledgementConfirmationLines, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
 
 const roots = [];
 after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -126,4 +126,39 @@ test("no range is a typed unavailable readback, never a pass", () => {
   const r = repo();
   const result = gateDefinitionChangeReadback({ rootDir: r.dir, featureId: "other", commonDir: join(r.dir, ".git"), ...none });
   assert.equal(result.status, "unavailable");
+});
+
+test("a dated Spec folder sets the range from its first commit; the folder of a Spec path is read strictly", () => {
+  assert.equal(specDirectoryOf("specs/2026-11-01-shop-epic/spec.md"), "specs/2026-11-01-shop-epic");
+  for (const path of ["specs/spec.md", "../specs/a/spec.md", "specs/a/b/spec.md", "docs/a/spec.md", null]) assert.equal(specDirectoryOf(path), null, String(path));
+  const r = repo();
+  r.put("architecture/boundary-policy.json", "{\"allow\":[]}\n"); r.commit("feat: baseline before the epic", ["architecture/boundary-policy.json"]);
+  r.put("specs/2026-11-01-shop-epic/spec.md", "spec\n"); r.commit("docs: dated epic spec", ["specs/2026-11-01-shop-epic/spec.md"]);
+  r.put("architecture/boundary-policy.json", "{\"allow\":[\"*\"]}\n"); const widened = r.commit("chore: widen inside the epic", ["architecture/boundary-policy.json"]);
+  const plain = gateDefinitionChangeReadback({ rootDir: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), ...none });
+  assert.equal(plain.status, "unavailable", "the feature id names no folder");
+  const dated = gateDefinitionChangeReadback({ rootDir: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), specDirectory: "specs/2026-11-01-shop-epic", ...none });
+  assert.deepEqual(dated.unproven.map((change) => change.commit), [widened], "the baseline before the folder is outside the range");
+});
+
+test("the acknowledgement subject names the unproven changes at the clean HEAD and reads the Spec folder from the State", () => {
+  const r = repo();
+  const quiet = { readOverrides: () => [], readConfigureVerify: () => [] };
+  r.put("specs/2026-11-01-shop-epic/spec.md", "spec\n");
+  r.put("project/pipeline-state.json", JSON.stringify({ schema: "pipeline.state.v0", planApproval: { poGateAuthority: { specPath: "specs/2026-11-01-shop-epic/spec.md" } } }));
+  r.commit("docs: dated epic spec", ["specs/2026-11-01-shop-epic/spec.md", "project/pipeline-state.json"]);
+  const nothing = buildGateChangeAcknowledgementSubject({ root: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), ...quiet });
+  assert.deepEqual([nothing.ok, nothing.code], [false, "GCA-NOTHING-TO-ACKNOWLEDGE"]);
+  r.put("project/pipeline.yaml", "gates: {}\n"); r.commit("chore: manifest", ["project/pipeline.yaml"]);
+  r.put("project/pipeline.yaml", "gates:\n  push:\n    approval: none\n"); const weakened = r.commit("chore: weaken", ["project/pipeline.yaml"]);
+  const built = buildGateChangeAcknowledgementSubject({ root: r.dir, featureId: "epic-2", commonDir: join(r.dir, ".git"), ...quiet });
+  assert.equal(built.ok, true, built.detail);
+  assert.deepEqual(built.candidate, { commit: weakened, tree: r.git("rev-parse", "HEAD^{tree}") });
+  assert.equal(built.subject.schema, "pipeline.gate-change-acknowledgement-subject.v1");
+  assert.deepEqual(built.subject.changes.map((change) => change.commit), [weakened]);
+  assert.equal(built.subject.changesSha256, gateChangeListDigest(built.subject.changes).sha256);
+  assert.equal(GATE_CHANGE_ACKNOWLEDGEMENT_KIND, "acknowledge-gate-definition-changes");
+  const lines = gateChangeAcknowledgementConfirmationLines(built.subject);
+  assert.match(lines.join("\n"), /project\/pipeline\.yaml changed in [a-f0-9]{12}/u);
+  assert.match(lines.at(-1), /acknowledged after the fact/u);
 });

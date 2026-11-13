@@ -20,11 +20,16 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
 // keys off its own, separate `CRITICAL_COMMAND_KINDS` in po-human-approval.mjs) --
 // membership here only makes it a valid `kind` for `criticalActionSubjectSha256`/
 // `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
+// ADR-0096: defined in this leaf module because lib/gate-definition-changes.mjs and the two scripts that import it form an import
+// cycle; a module-level kind list must not read a binding the cycle has not initialised yet.
+export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
 export const CRITICAL_ACTION_KINDS = Object.freeze([
   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
   "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
   // ADR-0095: the PO's approval of one Spec addendum; its subject comes from lib/spec-addendum.mjs only.
   "spec-addendum",
+  // ADR-0096: the PO's acknowledgement of the unproven gate-definition changes of a feature range (lib/gate-definition-changes.mjs).
+  "acknowledge-gate-definition-changes",
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;

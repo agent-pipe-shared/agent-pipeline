@@ -39,6 +39,7 @@ import {
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { describeLapsedFinding, lapsedFindingsRepair, readLapsedCriticFindings } from "../lib/critic-lapsed-findings.mjs";
+import { describeGateDefinitionChange, gateChangeAcknowledgementRepair, gateDefinitionChangeReadback, specDirectoryOf } from "../lib/gate-definition-changes.mjs";
 import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
@@ -747,6 +748,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     if (!addendumGate.ok) fail("CLOSE-SPEC-ADDENDUM-UNCOVERED", `feature close preparation is blocked by the Spec addenda: ${addendumGate.findings.slice(0, 5).join("; ")}${addendumGate.findings.length > 5 ? `; and ${addendumGate.findings.length - 5} more` : ""}`);
     // C29 (Claude greenfield run 3, L1): an earlier blocker/major that a later round marked fixed with no reviewed code change since stays open for the close.
     const lapsed = readLapsedCriticFindings({ repoRoot: root, featureId: observed.feature.id, candidateCommit: git(root, ["rev-parse", "HEAD"]), gitCommonDir: common, projectDir: root });
+    // ADR-0096 (D248, Claude test run 3 L4): every gate-definition change of the range carries a proof; no cut-off (PO tile).
+    const gateChanges = gateDefinitionChangeReadback({ rootDir: root, featureId: observed.feature.id, commonDir: common,
+      specDirectory: specDirectoryOf(snapshot.state.planApproval?.poGateAuthority?.specPath ?? snapshot.state.continuity?.authority?.spec?.path) });
+    if (gateChanges.status === "unproven") fail("CLOSE-GATE-CHANGE-UNPROVEN", `feature close preparation is blocked: ${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${gateChanges.unproven.slice(0, 5).map(describeGateDefinitionChange).join("; ")}${gateChanges.unproven.length > 5 ? `; and ${gateChanges.unproven.length - 5} more` : ""}. Repair: ${gateChangeAcknowledgementRepair()}`);
+    if (gateChanges.status === "unavailable") fail("CLOSE-GATE-CHANGE-UNREADABLE", `feature close preparation is blocked: the gate-definition changes of this feature's range could not be read (${gateChanges.reason}); a close never passes an unread range`);
     if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: ${lapsed.open.length} blocker/major finding(s) of an earlier Critic round were never corrected in a reviewed round: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
     // A missing slice queue says nothing about whether the whole candidate
     // received independent review. Resolve the State and package contracts.
@@ -1434,6 +1440,19 @@ try {
         emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor"), ...earlier, ...settled });
       }
     } catch { emit({ schema: "pipeline.close-critic-standing.v1", status: "unknown" }); }
+  } else if (command === "gate-changes") {
+    // ADR-0096: read-only, so the one-shot close names an unproven gate-definition change and the acknowledgement BEFORE it spends a Verify. The close keeps its own check.
+    const parsed = exactArgs(argv, new Set(["root"]));
+    if (!parsed || !parsed.values.root) fail("CLOSE-ARGS", "gate-changes arguments invalid");
+    const gateRoot = physicalRoot(parsed.values.root);
+    try {
+      const state = stateSnapshot(gateRoot).state;
+      const readback = gateDefinitionChangeReadback({ rootDir: gateRoot, featureId: activeFeature(state).id, commonDir: gitCommonDir(gateRoot),
+        specDirectory: specDirectoryOf(state.planApproval?.poGateAuthority?.specPath ?? state.continuity?.authority?.spec?.path) });
+      if (readback.status === "unproven") emit({ schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: readback.unproven.map(describeGateDefinitionChange), repair: gateChangeAcknowledgementRepair() });
+      // A proven list carries the record itself: the one-shot close writes it into the feature's evidence, and the bundle carries it (ADR-0096 Decision 6).
+      else emit({ schema: "pipeline.close-gate-changes.v1", status: readback.status, ...(readback.status === "unavailable" ? { reason: readback.reason } : { changes: readback.changes.length, record: readback }) });
+    } catch { emit({ schema: "pipeline.close-gate-changes.v1", status: "unknown" }); }
   } else if (command === "critic-addenda") {
     // C21E: the Critic addenda a close derives anyway, written BEFORE the one-shot close spends a Verify: their commit moves HEAD, so writing them inside the close made the candidate stale.
     const parsed = exactArgs(argv, new Set(["root"]));
