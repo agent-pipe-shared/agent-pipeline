@@ -139,8 +139,10 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   const afterMaterialize = approvePushAttempt(root, deps);
   assert.ok(!afterMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
     "AC-6: after materializing, the artifact resolves -- the refusal is no longer the artifact-unavailable one");
-  assert.ok(afterMaterialize.lines.some((line) => /CRITICAL-PROOF-EXTERNAL-PATH\); external proof was not consumed\. The three proof paths must be absolute/u.test(line)),
-    `a refused proof path names its cause: ${afterMaterialize.lines.join(" ")}`);
+  // Candidate 29 (Codex run 3, T3): for a push the refusal names both valid forms, the three external paths or exactly the
+  // three scratch mirror paths of this repository, never a mix.
+  assert.ok(afterMaterialize.lines.some((line) => /CRITICAL-PROOF-EXTERNAL-PATH\); external proof was not consumed\. The three proof paths are one set, never mixed: either all three external paths .* or all three of this repository's scratch mirror, exactly: --proof-request \S*scratch\/\S+ --proof-authority \S*scratch\/\S+ --proof \S*scratch\/\S+\.$/u.test(line)),
+    `a refused proof path names its cause and both valid forms: ${afterMaterialize.lines.join(" ")}`);
 
   // End-to-end: a real signed approval, over the artifact exactly as materialized.
   const external = mktempProjectDir();

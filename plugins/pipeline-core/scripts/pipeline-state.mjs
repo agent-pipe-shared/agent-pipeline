@@ -10145,7 +10145,15 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
 // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
 // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
 /** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
-export function criticalProofRefusalHint(code, renewal = "") {
+export function criticalProofRefusalHint(code, renewal = "", mirror = null) {
+  // Candidate 29 (Codex greenfield run 3, T3): a session mixed one external proof path with two scratch paths. For a kind that
+  // admits the repository's scratch mirror (push, Critic acknowledgement, Spec addendum) the hint names both valid forms: all
+  // three external paths, or exactly these three mirror paths -- never a mix.
+  if (code === "CRITICAL-PROOF-EXTERNAL-PATH" && mirror !== null && typeof mirror?.request === "string"
+    && typeof mirror?.authority === "string" && typeof mirror?.proof === "string") {
+    return " The three proof paths are one set, never mixed: either all three external paths the signing step printed (requestPath, authorityPath, proofPath: absolute, existing, outside this repository), "
+      + `or all three of this repository's scratch mirror, exactly: --proof-request ${mirror.request} --proof-authority ${mirror.authority} --proof ${mirror.proof}.`;
+  }
   if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
   if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return ` The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request.${renewal}`;
   // Candidate 29 (AGY run 3, R12): a push signed in the evening and approved the next morning failed here without naming the way on.
@@ -13888,7 +13896,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         dir, state: base, kind: "push", candidate: observed,
         subject: { sourceCommit: observed.commit, remote, destination, threatModel: threatModelBinding }, flags: parsed.value, now: approvedAt, required: true,
       });
-      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.${criticalProofRefusalHint(verified.code)}`); return 2; }
+      if (!verified.ok) {
+        // Candidate 29 (Codex run 3, T3): name the one in-repository form a push admits, the exact scratch mirror.
+        const mirrorCommon = defaultGitCommonDir(dir);
+        const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, "push") : null;
+        console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.${criticalProofRefusalHint(verified.code, "", mirror)}`);
+        return 2;
+      }
       const priorConsumption = base.criticalProofConsumption;
       if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
         || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
