@@ -39,6 +39,7 @@ import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, criticalAct
 import { criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
 import { buildGateChangeAcknowledgementSubject, gateDefinitionChangeReadback } from "../lib/gate-definition-changes.mjs";
+import { buildMaintenanceAcknowledgementSubjectAtHead, maintenanceRedProof, writeMaintenanceRedObservation } from "../lib/maintenance-delivery.mjs";
 import { addSpecAddendum } from "../lib/feature-package-registration.mjs";
 import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
 import { PO_APPROVAL_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
@@ -158,10 +159,11 @@ function verifyWritten({ result, expectedCandidate, expectedAction, trustPolicy,
 
 test("the critical action kind list this suite is parametrized over is the closed set the product exports", () => {
   assert.deepEqual([...CRITICAL_ACTION_KINDS].sort(), [
-    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "deploy", "feature-package-reconcile",
+    "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check", "deploy", "feature-package-reconcile",
     "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "spec-addendum",
   ], "a new kind must add its round trip here (and a note on which leg proves it), not slip in unproven");
   // acknowledge-gate-definition-changes (ADR-0096): the library, printed and verb legs below, plus its consumer leg (approve-gate-change-acknowledgement).
+  // acknowledge-maintenance-red-check (ADR-0097): the library, printed and verb legs below (builder injected), plus its consumer leg (approve-maintenance-red-check).
 });
 
 for (const kind of CRITICAL_ACTION_KINDS) {
@@ -326,6 +328,13 @@ function emitterInput(kind) {
     // ADR-0096: the verb rebuilds the list from the real feature range at the clean HEAD (one weakened manifest after its first appearance).
     const fixture = gateChangeRepository();
     return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: {}, observed: fixture.head, dependencies: {} };
+  }
+  if (kind === "acknowledge-maintenance-red-check") {
+    // ADR-0097: the verb rebuilds the list through the one builder; it is injected here (its own suite runs it on a real repository).
+    const subject = { schema: "pipeline.maintenance-red-check-subject.v1", featureId: FEATURE_ID, approvalSha256: sha256("approval"),
+      checksSha256: sha256("checks"), checks: [{ checkSha256: sha256("check"), check: { id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json"] }, observedExitCode: 1 }] };
+    return { candidate: { ...CANDIDATE }, subject, extra: {}, observed: { ...CANDIDATE },
+      dependencies: { buildMaintenanceAcknowledgementSubjectFn: () => ({ ok: true, subject, candidate: { ...CANDIDATE }, featureId: FEATURE_ID }) } };
   }
   return { candidate: { ...CANDIDATE }, subject: { label: `verb ${kind}` }, extra: {}, observed: { ...CANDIDATE }, dependencies: {} };
 }
@@ -568,6 +577,42 @@ test("ADR-0096 consumer leg: acknowledge-gate-definition-changes -- the line app
   assert.equal(after.status, "proven", JSON.stringify(after.unproven));
   assert.deepEqual([after.changes.at(-1).proof.kind, after.changes.at(-1).proof.label], ["po-acknowledgement", "acknowledged after the fact"]);
   const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys });
+  assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+});
+
+test("ADR-0097 consumer leg: acknowledge-maintenance-red-check -- the line approve-maintenance-red-check prints is signed by the verb, the follow-up records it once, and the admission's proof reader then finds it", () => {
+  const root = fixtureRepository(consumerFiles({ "tests/unit/docs.test.ts": "it('links', () => {})\n" }));
+  const keys = keyDirectory();
+  const home = fixtureDir("home");
+  const common = join(root, ".git");
+  const head = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
+  const check = { id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json", "tests/unit/docs.test.ts"] };
+  const before = buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common });
+  assert.equal(before.code, "MRA-NOTHING-TO-ACKNOWLEDGE", "nothing is acknowledged before a red observation exists");
+  assert.equal(writeMaintenanceRedObservation({ commonDir: common, featureId: FEATURE_ID, check, candidate: head, exitCode: 1, outputSha256: sha256("red"), observedAt: new Date().toISOString() }).ok, true);
+  const built = buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common });
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const verb = ["approve-maintenance-red-check", "--by", "PO"];
+
+  const first = runPipelineStateVerb(verb, { dir: root, home, keys });
+  assert.equal(first.code, 2, describeRun(first));
+  const printed = JSON.parse(first.lines.at(-1));
+  assert.equal(printed.status, "signature-required");
+  assert.deepEqual(printed.signatureCommand.subject, built.subject, "the printed subject is the one builder's list");
+  assert.match(first.stderr, /the configured verify command \(exit 1 at [a-f0-9]{12}\)/u, "the agent shows the PO the list before the signing line");
+
+  const prompts = [];
+  const signed = runPrintedArgv({ argv: printed.signatureCommand.argv.slice(1), keys, home, dependencies: { observeCandidate: () => head, readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } } });
+  assert.equal(signed.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+  assert.match(prompts.join("\n"), /red check without a Spec criterion: the configured verify command/u, "the terminal shows the PO the same list");
+
+  const recorded = runPipelineStateVerb(printed.recordCommand.argv.slice(1), { dir: root, home, keys });
+  assert.equal(recorded.code, 0, describeRun(recorded));
+  assert.match(recorded.stdout, /Red maintenance check\(s\) acknowledged by "PO" \(signature\) for 1 check\(s\)/u);
+  const proof = maintenanceRedProof({ commonDir: common, root, featureId: FEATURE_ID, approvalSha256: built.subject.approvalSha256, approvalCommit: null, check });
+  assert.deepEqual([proof?.kind, proof?.mode, proof?.label], ["po-acknowledgement", "signature", "red before the feature acknowledged by the PO"]);
+  assert.equal(buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common }).code, "MRA-NOTHING-TO-ACKNOWLEDGE", "an acknowledged check is not listed again");
+  const replay = runPipelineStateVerb(printed.recordCommand.argv.slice(1), { dir: root, home, keys });
   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
 });
 

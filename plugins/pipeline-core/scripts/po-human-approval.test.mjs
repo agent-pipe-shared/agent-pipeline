@@ -2528,7 +2528,21 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
       } catch (error) { usage = /Usage:/u.test(String(error?.message ?? error)); }
       assert.equal(usage, false, "prepare-critical composes acknowledge-caller-authored-critic (G20-39)");
     }
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic"].includes(entry))) {
+    // `acknowledge-gate-definition-changes` (ADR-0096) and `acknowledge-maintenance-red-check` (ADR-0097) were added to
+    // CRITICAL_COMMAND_KINDS deliberately (PO tiles 2026-11-13) and derive their subject at the clean HEAD; excluded here (QG-04)
+    // and pinned positively: prepare-critical reaches their subject builder instead of refusing with Usage.
+    for (const kind of ["acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"]) {
+      let message = "";
+      try {
+        runHumanApproval([
+          "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+          "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+          "--kind", kind, "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
+        ], {});
+      } catch (error) { message = String(error?.message ?? error); }
+      assert.doesNotMatch(message, /Usage:/u, `prepare-critical composes ${kind}`);
+    }
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",

@@ -102,13 +102,15 @@ const INVENTORY = Object.freeze([
 // path, not a third per-feature decision (candidate 29: 28e added the verb without classifying it here).
 // `approve-gate-change-acknowledgement` (29c, ADR-0096) records the PO's acknowledgement of gate-definition changes that carry no
 // other proof. A feature course that changes no gate definition, or changes one through its own route, never meets it.
+// `approve-maintenance-red-check` (29c, ADR-0097) records the PO's acknowledgement that a check without a Spec criterion was red
+// before the feature. A feature course whose Verify was green before it started never meets it.
 // G20-42 (honest accounting, no case changed): a consumer project's release (the version tag after close and push) takes ONE PO release approval
 // per RELEASE, not per feature: it is the existing `release-preflight` critical kind recorded by `release-preflight-cli.mjs` (chat run, or the PO's
 // signature of the printed `authorize-critical --kind release-preflight` line). It adds no pipeline-state verb, so nothing here classifies it, and
 // the per-feature count of the feature course stays two (plan approval, push approval); the release is a separate, last, per-release interaction.
 const OFF_HAPPY_PATH_VERBS = Object.freeze([
   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
-  "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement",
+  "approve-residual-acceptance", "approve-critic-acknowledgement", "approve-spec-addendum", "approve-gate-change-acknowledgement", "approve-maintenance-red-check",
   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",

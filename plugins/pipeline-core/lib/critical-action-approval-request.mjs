@@ -23,6 +23,8 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
 // ADR-0096: defined in this leaf module because lib/gate-definition-changes.mjs and the two scripts that import it form an import
 // cycle; a module-level kind list must not read a binding the cycle has not initialised yet.
 export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
+// ADR-0097: same reason (lib/maintenance-delivery.mjs imports it from here).
+export const MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND = "acknowledge-maintenance-red-check";
 export const CRITICAL_ACTION_KINDS = Object.freeze([
   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
   "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
@@ -30,6 +32,8 @@ export const CRITICAL_ACTION_KINDS = Object.freeze([
   "spec-addendum",
   // ADR-0096: the PO's acknowledgement of the unproven gate-definition changes of a feature range (lib/gate-definition-changes.mjs).
   "acknowledge-gate-definition-changes",
+  // ADR-0097: the PO's acknowledgement that a maintenance check was red before the feature (lib/maintenance-delivery.mjs).
+  "acknowledge-maintenance-red-check",
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;

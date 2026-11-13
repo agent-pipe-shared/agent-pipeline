@@ -48,7 +48,7 @@ check("CRITICAL_ACTION_KINDS holds the documented seven members in order", () =>
   // G20-39 (PO 2026-11-07): acknowledge-caller-authored-critic is a deliberate new kind (the close-gate bridge); restated in place (QG-04).
   // ADR-0095 (PO tiles 2026-11-13): spec-addendum is a deliberate new kind (the Spec correction inside implementation); restated in place (QG-04).
   // ADR-0096 (PO tile L4 2026-11-13): acknowledge-gate-definition-changes is a deliberate new kind (the after-the-fact gate-change acknowledgement); restated in place (QG-04).
-  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "spec-addendum", "acknowledge-gate-definition-changes"]);
+  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "spec-addendum", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"]);
 });
 check("a release-preflight request round-trips end to end, and cross-kind substitution stays refused", () => {
   const rpSubject = { schema: "pipeline.release-preflight-consent-subject.v1", version: "1.2.3", base: { commit: "c".repeat(40), tree: "d".repeat(40) }, lifecycle: { featureId: "cyb-4", manifestPath: "lifecycle.json", manifestSha256: "e".repeat(64) }, retentionPolicySha256: "f".repeat(64) };
