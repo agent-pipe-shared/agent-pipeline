@@ -309,7 +309,7 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
     // Data-minimising: counts, digests and timestamps only.
     assert.deepEqual(Object.keys(result).sort(), [
       "childSessions", "completeness", "effort", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
-      "segments", "sessionId", "status", "turns", "unparsedLineCount", "usage",
+      "segments", "sessionId", "status", "turns", "unknownChildren", "unparsedLineCount", "usage",
     ]);
     // Justification (CGF-14, restated in place, nothing weakened): the key set is still pinned; `effort` is the one new key, the per-answer
     // effort record taken from the same records as `turns` and `usage`.
@@ -560,6 +560,67 @@ test("export reports candidate-bound-reached for Codex and Claude when the enume
     const atCap = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: "exact", env: { CODEX_HOME: exactCodex }, limits: { maxCandidates: 2 } });
     assert.equal(atCap.completeness, "complete");
     assert.deepEqual(atCap.incompleteReasons, []);
+  });
+});
+
+// C29 (Codex run 3, C1): Codex names a session file rollout-<time>-<session id>.jsonl. A segment or a spawned child beyond the
+// newest-first candidate bound is found by name, a spawned child with no session file is counted, and the bound is only
+// lifted when every file beyond it names its own session.
+const C1_PARENT = "0a0a0a0a-1111-4222-8333-444444444444";
+const C1_CHILD = "0b0b0b0b-1111-4222-8333-444444444444";
+const C1_MISSING = "0c0c0c0c-1111-4222-8333-444444444444";
+const c1Rollout = (day, id) => `rollout-2026-09-${day}T00-00-00-${id}.jsonl`;
+const c1Filler = (codexHome, project, day, index) => codexSegment(codexHome, c1Rollout(day, `0d0d0d0d-1111-4222-8333-00000000000${index}`), {
+  cwd: project, sessionId: `0d0d0d0d-1111-4222-8333-00000000000${index}`, metaTimestamp: stamp("04:00:00"),
+});
+const c1Spawn = (call_id, agent_id) => [
+  { timestamp: stamp("05:00:02"), type: "response_item", payload: { type: "function_call", name: "spawn_agent", call_id, arguments: "{}" } },
+  { timestamp: stamp("05:00:03"), type: "response_item", payload: { type: "function_call_output", call_id, output: JSON.stringify({ agent_id }) } },
+];
+
+test("C29-C1: the Codex export finds a session's older segment and a spawned child beyond the candidate bound by name, and is complete", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, c1Rollout("09", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:30:00"), records: [{ type: "note", name: "newer" }] });
+    c1Filler(codexHome, project, "08", 1);
+    c1Filler(codexHome, project, "07", 2);
+    codexSegment(codexHome, c1Rollout("02", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:00:00"), records: c1Spawn("s1", C1_CHILD) });
+    codexSegment(codexHome, c1Rollout("01", C1_CHILD), {
+      cwd: project, sessionId: C1_CHILD, metaTimestamp: stamp("05:00:04"),
+      metaExtra: { source: { subagent: { thread_spawn: { parent_thread_id: C1_PARENT, depth: 1 } } } },
+    });
+    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: C1_PARENT, env: { CODEX_HOME: codexHome } };
+    const result = recovery.exportRunnerTranscript({ ...args, limits: { maxCandidates: 2 } });
+    assert.equal(result.status, "available");
+    assert.equal(result.segmentCount, 2, "the older segment beyond the bound is read");
+    assert.deepEqual(result.childSessions.map((child) => child.childId), [C1_CHILD]);
+    assert.equal(result.unknownChildren, 0);
+    assert.deepEqual(result.incompleteReasons, []);
+    assert.equal(result.completeness, "complete");
+    // The same export without a bound says the same: the name index changes reach, not the answer.
+    const unbounded = recovery.exportRunnerTranscript(args);
+    assert.deepEqual({ ...unbounded }, { ...result });
+    // A name walk that is itself cut short keeps the bound reported.
+    const cut = recovery.exportRunnerTranscript({ ...args, limits: { maxCandidates: 2, maxNameIndexFiles: 3 } });
+    assert.ok(cut.incompleteReasons.includes("candidate-bound-reached"));
+    assert.equal(cut.completeness, "partial");
+  });
+});
+
+test("C29-C1: a spawned child with no session file is counted as unknown and makes the Codex export partial", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, c1Rollout("05", C1_PARENT), { cwd: project, sessionId: C1_PARENT, metaTimestamp: stamp("05:00:00"), records: [...c1Spawn("s1", C1_CHILD), ...c1Spawn("s2", C1_MISSING)] });
+    codexSegment(codexHome, c1Rollout("04", C1_CHILD), {
+      cwd: project, sessionId: C1_CHILD, metaTimestamp: stamp("05:00:04"),
+      metaExtra: { source: { subagent: { thread_spawn: { parent_thread_id: C1_PARENT, depth: 1 } } } },
+    });
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: C1_PARENT, env: { CODEX_HOME: codexHome } });
+    assert.equal(result.status, "available");
+    assert.deepEqual(result.childSessions.map((child) => child.childId), [C1_CHILD]);
+    assert.equal(result.unknownChildren, 1);
+    assert.ok(result.incompleteReasons.includes("child-segment-not-found"));
+    assert.equal(result.completeness, "partial");
+    assert.equal(result.metadataComplete, false);
+    assert.equal(JSON.stringify(result).includes(C1_MISSING), false, "only the count leaves, never the unknown id");
   });
 });
 
