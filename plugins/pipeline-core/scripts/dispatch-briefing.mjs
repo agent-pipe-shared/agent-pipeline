@@ -977,7 +977,10 @@ export function generateDispatchBinding(options, deps = {}) {
   if (settledPreview !== null && (settledPreview.settledCount > 0 || leavingEntries.length > 0)) {
     const argv = ["node", fileURLToPath(new URL("./routine-repair.mjs", import.meta.url)), "run", "heal", "--root", root, "--reason", "retire settled pending states before dispatch"];
     preDispatch = [{ kind: "routine-repair", argv, why: `${settledPreview.settledCount} settled pending states, ${leavingEntries.length} stop-failure records` }];
-    warnings.push({ code: "DBG-SETTLED-PENDING-HEAL", message: `${settledPreview.settledCount} settled pending states and ${leavingEntries.length} stop-failure record(s) of settled dispatches remain; run before dispatching: ${argv.join(" ")}` });
+    // C29 (Glossover K-26): the printed command is copied into a shell, so every argument that is not a plain word is single-quoted
+    // (the reason has spaces; a bare join split it and routine-repair refused with RR-ARGS).
+    const shellWord = (value) => (/^[A-Za-z0-9_./:=@%+,-]+$/u.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`);
+    warnings.push({ code: "DBG-SETTLED-PENDING-HEAL", message: `${settledPreview.settledCount} settled pending states and ${leavingEntries.length} stop-failure record(s) of settled dispatches remain; run before dispatching: ${argv.map(shellWord).join(" ")}` });
   }
   for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;

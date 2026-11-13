@@ -1935,6 +1935,8 @@ test("W7: settled pending states and stop-failure records of settled dispatches 
   const summary = result.warnings.filter((entry) => entry.code === "DBG-SETTLED-PENDING-HEAL");
   assert.equal(summary.length, 1);
   assert.match(summary[0].message, /routine-repair\.mjs run heal/u);
+  // C29 (Glossover K-26): the printed command survives a shell: the multi-word reason is one quoted argument.
+  assert.ok(summary[0].message.endsWith("--reason 'retire settled pending states before dispatch'"), summary[0].message);
   const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { settledPending: settled, stopFailures: stops }));
   assert.equal(binding.preDispatch?.length, 1, "the binding route reports it too");
   assert.deepEqual(directorySnapshot(fx.root), before);
