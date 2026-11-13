@@ -543,6 +543,20 @@ function findCriterionRows(sourceBytes, needle) {
   return rows;
 }
 
+/**
+ * K-31: is line `index` the header of a table the host parser reads as an acceptance table, with its delimiter row next?
+ * Mirrors scanAcceptedCriterionRows (lib/critic-accepted-contract.mjs): the exact three-column header `# | Criterion | Evidence`,
+ * or a two-column header whose cells are a number label and a criterion label.
+ */
+function acceptanceTableHeaderAt(lines, index) {
+  const header = tableCells(lines[index]?.text ?? "").map((cell) => cell.value);
+  const delimiter = tableCells(lines[index + 1]?.text ?? "").map((cell) => cell.value);
+  const threeColumn = header.length === 3 && header.join("\0") === "#\0Criterion\0Evidence";
+  const twoColumn = header.length === 2 && /^(?:#|nr\.?|id)$/iu.test(header[0])
+    && /^(?:kriterium|kriterien|abnahmekriterium|anforderung|criterion|requirement)$/iu.test(header[1]);
+  return (threeColumn || twoColumn) && delimiter.length === header.length && delimiter.every((cell) => /^:?-{3,}:?$/u.test(cell));
+}
+
 /** Cells of one Markdown table row (leading bar required, escaped bars kept); `from`/`to` index the line. */
 function tableCells(text) {
   const bars = [];
@@ -585,12 +599,22 @@ function findCriterionOccurrences(sourceBytes, id) {
   const listMarker = /^\s*(?:[-*+]|[0-9]{1,3}[.)])[ \t]/u;
   const found = [];
   let fence = null;
+  // K-31 (Glossover, 2026-11-13): a table row is a criterion place only inside a table the host parser reads as an acceptance
+  // table (scanAcceptedCriterionRows, lib/critic-accepted-contract.mjs): the header `| # | Criterion | Evidence |` or a two-column
+  // `| #/Nr./id | Criterion/Kriterium/... |`, followed by a delimiter row. Any other table (a slice plan whose first column lists
+  // criterion ids) is a reference, so the generator no longer counts it as a second place.
+  let acceptanceTable = false;
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     const fenced = /^\s*(`{3,}|~{3,})/u.exec(line.text);
-    if (fenced) { fence = fence === null ? fenced[1][0] : fence === fenced[1][0] ? null : fence; continue; }
+    if (fenced) { acceptanceTable = false; fence = fence === null ? fenced[1][0] : fence === fenced[1][0] ? null : fence; continue; }
     if (fence !== null) continue;
     if (line.text.trimStart().startsWith("|")) {
+      if (!acceptanceTable) {
+        acceptanceTable = acceptanceTableHeaderAt(lines, index);
+        if (acceptanceTable) index++; // the delimiter row
+        continue;
+      }
       const cells = tableCells(line.text);
       // A two-column acceptance table (`Nr. | Kriterium`) numbers its rows `n` or `R-n`; the host parser maps both to `AC-n`
       // (scanAcceptedCriterionRows, lib/critic-accepted-contract.mjs), so the generator must find the same row.
@@ -601,6 +625,7 @@ function findCriterionOccurrences(sourceBytes, id) {
       }
       continue;
     }
+    acceptanceTable = false;
     const heading = /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line.text);
     if (heading) {
       // The host parser admits a heading only when it IS the id; a heading that merely mentions it is a reference.

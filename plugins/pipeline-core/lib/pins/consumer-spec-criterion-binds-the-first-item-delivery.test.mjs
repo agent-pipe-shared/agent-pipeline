@@ -36,7 +36,7 @@ import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
-import { parseAcceptedCriticCriterion } from "../critic-accepted-contract.mjs";
+import { parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
 // Namespaces, not named imports: a missing export must fail its own case, not the loading of this whole file.
 import * as hostReturn from "../native-goldfish-host-return.mjs";
 import * as contract from "../critic-accepted-contract.mjs";
@@ -76,6 +76,8 @@ const SPEC_TEXT = [
   "   keeping the running total visible.", "",
   "```", "AC-12: this id is only inside a code fence", "```", "",
   "AC-7: first statement of seven", "AC-7: second statement of seven", "",
+  // K-31: a table row is a place only inside an acceptance table the host reads (header and delimiter row).
+  "| # | Criterion | Evidence |", "| --- | --- | --- |",
   "| AC-8 | WHEN a table says it THE SYSTEM SHALL count once | t |", "- AC-8: WHEN a list says it THE SYSTEM SHALL count twice", "",
 ].join("\n");
 
@@ -204,7 +206,7 @@ test("a malformed criterion id and an over-long criterion are typed refusals", a
   const fx = makeFixture();
   assert.equal(runDispatchBriefing(argvOf(fx, "AC-0"), depsOf(fx)).code, "DBG-CRITERION-ID");
   assert.equal(runDispatchBriefing(argvOf(fx, "ac-1"), depsOf(fx)).code, "DBG-CRITERION-ID");
-  const long = makeFixture(`| AC-1 | ${"WHEN x THE SYSTEM SHALL y ".repeat(200)} | t |\n`);
+  const long = makeFixture(`| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | ${"WHEN x THE SYSTEM SHALL y ".repeat(200)} | t |\n`);
   const result = runDispatchBriefing(argvOf(long, "AC-1"), depsOf(long));
   assert.equal(result.ok, false);
   assert.equal(result.code, "DBG-CRITERION-TOO-LONG");
@@ -479,6 +481,24 @@ test("a reference-only table cell and a heading that merely mentions an id do no
     assert.equal(missing.ok, false);
     assert.equal(missing.code, "DBG-CRITERION-MISSING", `${referenced}: a cell that only references it is not a statement`);
   }
+});
+
+// K-31 (Glossover, 2026-11-13): a slice-plan table whose FIRST cell is the criterion id, under a non-normative heading, made the
+// generator count a second place (DBG-CRITERION-AMBIGUOUS) although the host parser reads only an acceptance table and binds the bullet.
+test("K-31: an id-first row of a table the host does not read as an acceptance table is not a second place", async () => {
+  const sliced = [EARS_SPEC, "## 5h. Build plan: order and vertical slices", "",
+    "| Criterion | S1 | S2 |", "| --- | --- | --- |",
+    "| AC-E1-01-09 | S1: the cart part | S2: the rest |", "",
+    "| AC-E1-01-11 | without a header row | still a reference |", ""].join("\n");
+  const { parsed } = await bindAndCheck("AC-E1-01-09", E09, sliced);
+  assert.equal(parsed.parserVersion, "markdown-acceptance-bullet-item.v1");
+  await bindAndCheck("AC-E1-01-11", E11, sliced);
+  // Parity: the host scan sees exactly one row for the id, the generator agrees, and a real acceptance table row still counts.
+  assert.equal(scanAcceptedCriterionRows(sliced).filter((row) => row.id === "AC-E1-01-09").length, 1);
+  const twice = [sliced, "## 18. Acceptance criteria (table)", "", "| # | Criterion | Evidence |", "| --- | --- | --- |",
+    `| AC-E1-01-09 | ${E09} | test |`, ""].join("\n");
+  const { result } = await bindEars("AC-E1-01-09", twice);
+  assert.equal(result.code, "DBG-CRITERION-AMBIGUOUS", JSON.stringify(result).slice(0, 300));
 });
 
 test("a compound prefix id does not match: AC-E1-02-1 is not AC-E1-02-10, and a plain id is not a compound one", async () => {
