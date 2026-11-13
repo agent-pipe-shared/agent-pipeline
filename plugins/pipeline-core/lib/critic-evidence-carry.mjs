@@ -75,9 +75,56 @@ function isRepositoryModePromotion(entry, ctx) {
   return promoted.ok === true && Buffer.compare(promoted.bytes, after) === 0;
 }
 
+/**
+ * Candidate 29 (AGY run 3 R1 and the Codex run of 2026-11-13, PO tile "admit the push-preparation paths"). Two more push-preparation changes land
+ * after the feature close and ended the carry although the Critic has nothing to review in them:
+ *   - the push threat model `project/push-threat-model.md` (push-threat-model-gate.mjs), created or answered when push-init asks for it: a
+ *     project document about the signing ceremony, never product behaviour. Admitted when added or modified as a regular file that still
+ *     reads as a model (a Markdown heading, at most 1 MiB); a deletion stays content.
+ *   - an APPEND to the root `.gitleaksignore` of content-v1 entries that each name a path of the feature evidence or the audit bundle of the
+ *     feature in this carry (the close's own security scan flags a public identifier the generated evidence copies; the sanctioned
+ *     gitleaks-repair-ignore.mjs --approve-new appends exactly such a line). Every earlier byte stays as it was; an entry for any other path
+ *     (source, configuration, a document), a legacy or malformed line, a comment, a removed or rewritten entry is content.
+ */
+export const PUSH_THREAT_MODEL_PATH = "project/push-threat-model.md";
+export const GITLEAKS_IGNORE_PATH = ".gitleaksignore";
+const MAX_PUSH_THREAT_MODEL_BYTES = 1024 * 1024;
+const CONTENT_V1 = /^content-v1:[a-f0-9]{64}:(.+):[a-zA-Z0-9][a-zA-Z0-9._-]*:[1-9][0-9]*:[1-9][0-9]*$/u;
+// The feature evidence and the audit bundle, as paths; the class check below still applies the vetoes and the feature list (a record-only
+// evidence path is named by the record-only class first, so the class id alone cannot select these two).
+const EVIDENCE_IGNORE_PATH = /^(?:specs\/[^/]+\/evidence|audit-bundles\/[^/]+)\/.+$/u;
+
+function isPushThreatModelChange(entry, ctx) {
+  if (ctx === null || entry.path !== PUSH_THREAT_MODEL_PATH || !["A", "M"].includes(entry.status) || entry.newMode !== "100644"
+    || !REGULAR.has(entry.oldMode)) return false;
+  const after = blobBytes(ctx.root, ctx.to, entry.path);
+  if (after === null || after.length === 0 || after.length > MAX_PUSH_THREAT_MODEL_BYTES) return false;
+  const text = after.toString("utf8");
+  return Buffer.from(text, "utf8").equals(after) && /^#{1,6}[ \t]+\S/mu.test(text);
+}
+
+function isEvidenceIgnoreAppend(entry, ctx, featureIds) {
+  if (ctx === null || entry.path !== GITLEAKS_IGNORE_PATH || !["A", "M"].includes(entry.status) || entry.newMode !== "100644"
+    || !REGULAR.has(entry.oldMode)) return false;
+  const before = entry.status === "A" ? Buffer.alloc(0) : blobBytes(ctx.root, ctx.from, entry.path);
+  const after = blobBytes(ctx.root, ctx.to, entry.path);
+  if (before === null || after === null || after.length <= before.length) return false;
+  const prior = before.toString("utf8");
+  const next = after.toString("utf8");
+  if (!Buffer.from(prior, "utf8").equals(before) || !Buffer.from(next, "utf8").equals(after)) return false;
+  const prefix = prior === "" || prior.endsWith("\n") ? prior : `${prior}\n`;
+  if (!next.startsWith(prefix) || !next.endsWith("\n")) return false;
+  const added = next.slice(prefix.length, -1).split("\n");
+  return added.length > 0 && added.every((line) => {
+    const path = CONTENT_V1.exec(line)?.[1];
+    return path !== undefined && EVIDENCE_IGNORE_PATH.test(path) && administrationDocumentationClassOf(path, { featureIds }) !== null;
+  });
+}
+
 function offending(entries, featureIds, ctx = null) {
   return entries.filter((entry) => !["A", "M", "D"].includes(entry.status) || !REGULAR.has(entry.oldMode) || !REGULAR.has(entry.newMode)
-    || (administrationDocumentationClassOf(entry.path, { featureIds }) === null && !isRepositoryModePromotion(entry, ctx))).map((entry) => entry.path);
+    || (administrationDocumentationClassOf(entry.path, { featureIds }) === null && !isRepositoryModePromotion(entry, ctx)
+      && !isPushThreatModelChange(entry, ctx) && !isEvidenceIgnoreAppend(entry, ctx, featureIds))).map((entry) => entry.path);
 }
 
 /**

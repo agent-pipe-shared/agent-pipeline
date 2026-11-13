@@ -267,3 +267,62 @@ test("the per-commit test used by the course: one parent, only administration pa
   assert.equal(administrationDocumentationOnlyCommit(r.root, r.git(["rev-list", "--max-parents=0", "HEAD"])), false, "the root commit has no single parent");
   assert.equal(administrationDocumentationOnlyCommit(join(r.root, "missing"), docs), false);
 });
+
+// Candidate 29 (AGY run 3 R1; the Codex run of 2026-11-13 stopped at VEP-CVL-CARRY-CONTENT-CHANGED after the close): push preparation after the close
+// writes the push threat model and appends gitleaks entries for a public identifier the generated close evidence copies. Neither gives the Critic
+// anything to review; both are carried, and only in their exact shape.
+const DIGEST = "a".repeat(64);
+const ignoreLine = (path, line = 300) => `content-v1:${DIGEST}:${path}:generic-api-key:${line}:6111`;
+test("the push threat model and an evidence-only gitleaks append after the close are carried", (t) => {
+  const r = repo(t);
+  r.write("src/app.js", "1\n"); r.write(".gitleaksignore", `${ignoreLine("src/legacy.js", 3)}\n`);
+  const reviewed = r.commit("reviewed");
+  r.write("project/push-threat-model.md", "# Push threat model\n\nAnswered for this project.\n");
+  const model = r.commit("threat model");
+  r.write(".gitleaksignore", `${ignoreLine("src/legacy.js", 3)}\n${ignoreLine("specs/f/evidence/dispatch-projection.json")}\n${ignoreLine("audit-bundles/f/b/artifacts/03.json", 12)}\n`);
+  const ignore = r.commit("gitleaks append");
+  const decision = decide(r, reviewed, ignore, { featureIds: ["f"] });
+  assert.equal(decision.carried, true, JSON.stringify(decision));
+  assert.deepEqual(decision.passedOverCommits, [model, ignore]);
+  assert.equal(administrationDocumentationOnlyCommit(r.root, model, { featureIds: ["f"] }), true);
+  assert.equal(administrationDocumentationOnlyCommit(r.root, ignore, { featureIds: ["f"] }), true, "the per-commit test of the carry classification agrees");
+  assert.equal(decide(r, reviewed, ignore, { featureIds: ["g"] }).carried, false, "an entry for another feature's evidence is content");
+  // A first .gitleaksignore (absent at the reviewed commit) holding only evidence entries is an append too.
+  const fresh = repo(t);
+  fresh.write("src/app.js", "1\n");
+  const freshReviewed = fresh.commit("reviewed");
+  fresh.write(".gitleaksignore", `${ignoreLine("specs/f/evidence/x.json")}\n`);
+  assert.equal(decide(fresh, freshReviewed, fresh.commit("first ignore"), { featureIds: ["f"] }).carried, true);
+});
+
+test("every other push-preparation shape stays content", (t) => {
+  const base = `${ignoreLine("src/legacy.js", 3)}\n`;
+  const miss = (mutate, { prior = base, model = null } = {}) => {
+    const m = repo(t);
+    m.write("src/app.js", "1\n"); m.write(".gitleaksignore", prior);
+    if (model !== null) m.write("project/push-threat-model.md", model);
+    const reviewed = m.commit("reviewed");
+    mutate(m);
+    return decide(m, reviewed, m.commit("change"), { featureIds: ["f"] });
+  };
+  for (const [name, mutate, options] of [
+    ["an ignore entry for a source file", (m) => m.write(".gitleaksignore", `${base}${ignoreLine("src/app.js")}\n`)],
+    ["an ignore entry for a document outside the evidence", (m) => m.write(".gitleaksignore", `${base}${ignoreLine("docs/guide.md")}\n`)],
+    ["an ignore entry for a Critic export", (m) => m.write(".gitleaksignore", `${base}${ignoreLine("specs/f/evidence/critic/r.json")}\n`)],
+    ["a legacy fingerprint line", (m) => m.write(".gitleaksignore", `${base}specs/f/evidence/x.json:generic-api-key:300\n`)],
+    ["a comment line", (m) => m.write(".gitleaksignore", `${base}# evidence\n`)],
+    ["an earlier entry is removed", (m) => m.write(".gitleaksignore", `${ignoreLine("specs/f/evidence/x.json")}\n`)],
+    ["an earlier entry is rewritten in place", (m) => m.write(".gitleaksignore", `${ignoreLine("src/legacy.js", 4)}\n${ignoreLine("specs/f/evidence/x.json")}\n`)],
+    ["no final newline", (m) => m.write(".gitleaksignore", `${base}${ignoreLine("specs/f/evidence/x.json")}`)],
+    ["a source file rides along", (m) => { m.write(".gitleaksignore", `${base}${ignoreLine("specs/f/evidence/x.json")}\n`); m.write("src/app.js", "2\n"); }],
+    ["the ignore file becomes executable", (m) => { m.write(".gitleaksignore", `${base}${ignoreLine("specs/f/evidence/x.json")}\n`); chmodSync(join(m.root, ".gitleaksignore"), 0o755); }],
+    ["the threat model is deleted", (m) => m.git(["rm", "--quiet", "project/push-threat-model.md"]), { model: "# Model\n" }],
+    ["the threat model has no heading", (m) => m.write("project/push-threat-model.md", "no heading here\n")],
+    ["the threat model is empty", (m) => m.write("project/push-threat-model.md", "")],
+    ["another file under project/", (m) => m.write("project/push-notes.md", "# Notes\n")],
+  ]) {
+    const decision = miss(mutate, options);
+    assert.equal(decision.carried, false, `${name}: ${JSON.stringify(decision)}`);
+    assert.equal(decision.code, "CEC-CONTENT-CHANGED", name);
+  }
+});

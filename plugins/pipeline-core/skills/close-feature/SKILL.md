@@ -189,7 +189,9 @@ must then name the new candidate. Candidate 17: a `candidate-frozen` plan also p
 The close still accepts them, but the push then needs a Critic round for them, and that round is only
 possible while the course is open: register a correction-DIFF round BEFORE the close (route in
 `register-feature-package.mjs --help`, "Critic delta request route"). After the close the course takes no
-review; the way is a new feature of rigor 1 with a full Critic over those commits. Findings you judge not relevant are put on the scanner's own ignore
+review; the way is a new feature of rigor 1 with a full Critic over those commits. Push preparation is no such content: the
+repository-mode promotion of the calibration twins, `project/push-threat-model.md`, and `.gitleaksignore` lines that
+`gitleaks-repair-ignore.mjs --approve-new` appends for this feature's evidence or audit bundle are carried (`lib/critic-evidence-carry.mjs`). Findings you judge not relevant are put on the scanner's own ignore
 route BEFORE the freeze, with a reason: gitleaks through `.gitleaksignore` (`gitleaks-repair-ignore.mjs`),
 dependency findings through the project's `osv-scanner.toml` (`[[IgnoredVulns]]` with `id`, `ignoreUntil`
 and `reason`). The shipped gitleaks configuration already exempts the bare hex digests the close itself
