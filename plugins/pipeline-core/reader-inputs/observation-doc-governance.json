@@ -296,6 +296,8 @@
           "docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md",
           "docs/adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md",
           "docs/adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md",
+          "docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md",
+          "docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md",
           "docs/adr/README.md"
         ]
       },
