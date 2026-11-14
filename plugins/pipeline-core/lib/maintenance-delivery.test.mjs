@@ -179,3 +179,19 @@ test("green after the delivery: the close needs a sealed green configured-verify
     "for the side candidate only its own green counts, never the main line's");
   assert.equal(greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: base }), null, "a candidate that contains no green commit after the base");
 });
+
+test("ADR-0100 Decision 6: a green receipt made after the verify command was replaced does not repair the red configured check", () => {
+  const r = repo();
+  const calibration = (verify) => `${JSON.stringify({ project: "fixture", verify }, null, 2)}\n`;
+  r.put("project/pipeline.json", calibration("node --test tests/old.test.mjs")); const base = r.commit("chore: red base", ["project/pipeline.json"]);
+  r.put("project/pipeline.json", calibration("node --test tests/new.test.mjs")); const replaced = r.commit("chore: replace project verification command", ["project/pipeline.json"]);
+  const replacedTree = r.git("rev-parse", "HEAD^{tree}");
+  const slices = [{ id: "MAINT-1", state: "ready", delivery: { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA }, baseCommit: base, checks: [configuredCheck] } }];
+  receipt(r, { suite: "configured-verify", commit: replaced, tree: replacedTree, exitCode: 0, runId: "run-1-green-under-new-command" });
+  assert.deepEqual(maintenanceSlicesLackingGreenVerify({ commonDir: r.common, root: r.dir, slices, candidateCommit: replaced }), ["MAINT-1"],
+    "green under another command is no repair of the check that was red");
+  r.put("project/pipeline.json", calibration("node --test tests/old.test.mjs")); r.put("tests/old.test.mjs", "fixed\n");
+  const repaired = r.commit("test: repair under the base command", ["project/pipeline.json", "tests/old.test.mjs"]);
+  receipt(r, { suite: "configured-verify", commit: repaired, tree: r.git("rev-parse", "HEAD^{tree}"), exitCode: 0, runId: "run-2-green-under-base-command" });
+  assert.equal(greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: repaired })?.runId, "run-2-green-under-base-command");
+});

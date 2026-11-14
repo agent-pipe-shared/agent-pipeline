@@ -159,16 +159,23 @@ function readConfigureVerifyReady(commonDir) {
     const replacement = object(value.facts.replacement) ? value.facts.replacement : null;
     records.push({ id: name.slice(0, 64), head: value.facts.head, entries: value.facts.entries, replacement,
       // ADR-0100: a replacement counts only with its approval in the store, never by the record's own word.
-      replacementApproved: replacement !== null && replacementApprovalStored(commonDir, replacement.subjectSha256) });
+      replacementApproved: replacement !== null && replacementApprovalStored(commonDir, replacement) });
   }
   return records;
 }
 
-function replacementApprovalStored(commonDir, subjectSha256) {
-  if (typeof subjectSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(subjectSha256)) return false;
+// The same rule as calibration-verify-commit-transition.mjs replacementApprovalStored (kept local: that module imports pipeline-state.mjs,
+// which imports this one). The stored approval must match the subject AND the proof digest, so the signed/unsigned label below follows
+// the approval, never the record's own mode word.
+function replacementApprovalStored(commonDir, replacement) {
+  const hex = /^[a-f0-9]{64}$/u;
+  if (typeof replacement.subjectSha256 !== "string" || !hex.test(replacement.subjectSha256)
+    || !(replacement.proofSha256 === null || (typeof replacement.proofSha256 === "string" && hex.test(replacement.proofSha256)))
+    || (replacement.mode === "signature") !== (replacement.proofSha256 !== null)) return false;
   let envelopes = [];
   try { envelopes = readPrivateApprovals(commonDir, VERIFY_REPLACEMENT_KIND); } catch { envelopes = []; }
-  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === subjectSha256);
+  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === replacement.subjectSha256
+    && (typeof envelope.approval.criticalProof?.proofSha256 === "string" ? envelope.approval.criticalProof.proofSha256 : null) === replacement.proofSha256);
 }
 
 function trustAnchorShape(bytes) {

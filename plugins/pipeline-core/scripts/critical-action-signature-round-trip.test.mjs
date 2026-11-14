@@ -29,7 +29,7 @@
 import assert from "node:assert/strict";
 import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test, { after } from "node:test";
@@ -48,6 +48,9 @@ import { buildReleasePreflight, prepareReleasePreflightAuthorizeLine } from "./r
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { inspectCalibrationVerifyCommitTransition, inspectCurrentCalibrationVerifyReady } from "../lib/calibration-verify-commit-transition.mjs";
+import { criticalApprovalStoreRoot } from "../lib/critical-action-authorization.mjs";
+import { buildVerifyReplacementSubject, runVerifyReplacementTestRun } from "../lib/verify-replacement.mjs";
 
 /* ---------------------------------------------------------------------------------------------- *
  * Fixtures
@@ -629,7 +632,7 @@ test("ADR-0097 consumer leg: acknowledge-maintenance-red-check -- the line appro
 // The fixture's plan is approved in the committed chat mode (a signed plan approval has no affordable fixture, and switching the mode
 // afterwards makes the PO-gate authority stale, CVCT-AUTHORITY-STALE, by design). The signature leg therefore selects the strict proof
 // path through the route's waiver seam; everything after it -- proof, store, transition, readback -- is the production code.
-const SIGNATURE_MODE = Object.freeze({ criticalProofWaiverForFn: () => ({ waived: false, code: null }) });
+const SIGNATURE_MODE = Object.freeze({ forceStrictCriticalProof: true });
 function verifyReplacementRepository() {
   const root = mkdtempSync(join(nativeContractFixtureParent(), "verify-replace-"));
   prepareApprovedItemCourseFixture({ root });
@@ -678,7 +681,21 @@ test("ADR-0100 consumer leg: replace-verify-command -- configure-verify --replac
   const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: stateDependencies });
   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
 
-  // 4. Committed, the close's readback counts both tier changes as the signed replacement (no label: it is signed).
+  // 4. Staged, the pre-commit hook's own predicate admits exactly the two mirrors -- and only while the stored approval backs the record.
+  gitOut(fixture.root, "add", "--", "project/pipeline.json", ".claude/pipeline.json");
+  const staged = ["project/pipeline.json", ".claude/pipeline.json"];
+  const admitted = inspectCalibrationVerifyCommitTransition({ rootDir: fixture.root, stagedPaths: staged });
+  assert.deepEqual([admitted.ok, admitted.code, [...(admitted.paths ?? [])].sort()], [true, "CVCT-COMMIT-READY", [".claude/pipeline.json", "project/pipeline.json"]], JSON.stringify(admitted));
+  // The hook's "commit them alone" repair (other paths staged with the mirrors) recognises the ready replacement too.
+  const alone = inspectCurrentCalibrationVerifyReady({ rootDir: fixture.root, verifyCommand: REPLACED_VERIFY });
+  assert.deepEqual([alone.ok, alone.code], [true, "CVCT-COMMIT-READY"], JSON.stringify(alone));
+  const store = join(criticalApprovalStoreRoot(fixture.common), "approvals", "replace-verify-command");
+  renameSync(store, `${store}.aside`);
+  const unbacked = inspectCalibrationVerifyCommitTransition({ rootDir: fixture.root, stagedPaths: staged });
+  assert.deepEqual([unbacked.ok, unbacked.code], [false, "CVCT-RECORD"], "a ready record without its stored approval admits nothing");
+  renameSync(`${store}.aside`, store);
+
+  // 5. Committed, the close's readback counts both tier changes as the signed replacement (no label: it is signed).
   commitFiles(fixture.root, { "project/pipeline.json": readFileSync(join(fixture.root, "project/pipeline.json"), "utf8"), ".claude/pipeline.json": readFileSync(join(fixture.root, ".claude/pipeline.json"), "utf8") }, "chore: replace project verification command");
   const replacedAt = gitOut(fixture.root, "rev-parse", "HEAD");
   const readback = gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: "unit", commonDir: fixture.common });
@@ -720,6 +737,32 @@ test("ADR-0100: a red new command signs nothing and writes nothing; the default 
   const same = runPipelineStateVerb(["configure-verify", "--verify-command", previous[0], "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
   assert.equal(same.code, 2);
   assert.match(same.stderr, /CVR-SAME-COMMAND/u);
+  assert.match(plain.stderr, /--replace/u, "the configured-tier refusal names the replace route");
+
+  // A command that leaves a new file behind changed the tree: refused, and no receipt is written for it.
+  const drifting = runPipelineStateVerb(["configure-verify", "--verify-command", "node -e \"require('fs').writeFileSync('drift.txt','x')\"", "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(drifting.code, 2, describeRun(drifting));
+  assert.match(drifting.stderr, /CVR-TEST-RUN-DRIFT/u);
+  assert.ok(!drifting.stdout.includes("signature-required"));
+  rmSync(join(fixture.root, "drift.txt"), { force: true });
+
+  // A tracked change refuses before the command runs.
+  const notePath = join(fixture.root, "src/change.mjs");
+  const original = readFileSync(notePath, "utf8");
+  writeFileSync(notePath, `${original}// dirty\n`);
+  const dirty = runPipelineStateVerb(["configure-verify", "--verify-command", REPLACED_VERIFY, "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(dirty.code, 2, describeRun(dirty));
+  assert.match(dirty.stderr, /CVR-DIRTY/u);
+  assert.doesNotMatch(dirty.stderr, /running the new command once/u, "nothing runs on a dirty tree");
+  writeFileSync(notePath, original);
+
+  // A passing run binds its HEAD: after HEAD moves, the old receipt names no subject.
+  const passed = runVerifyReplacementTestRun({ root: fixture.root, commonDir: fixture.common, verifyCommand: REPLACED_VERIFY });
+  assert.equal(passed.ok, true, JSON.stringify(passed));
+  assert.equal(buildVerifyReplacementSubject({ root: fixture.root, commonDir: fixture.common, verifyCommand: REPLACED_VERIFY }).ok, true);
+  commitFiles(fixture.root, { "notes.md": "moves HEAD\n" }, "docs: a later commit");
+  assert.equal(buildVerifyReplacementSubject({ root: fixture.root, commonDir: fixture.common, verifyCommand: REPLACED_VERIFY }).code, "CVR-TEST-RUN-REQUIRED",
+    "a receipt of another HEAD is not accepted");
 });
 
 test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {

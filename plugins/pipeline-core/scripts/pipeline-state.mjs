@@ -10451,8 +10451,9 @@ function runConfigureVerifyReplace({ dir, rest, base, now, deps }) {
   const kind = VERIFY_REPLACEMENT_KIND;
   const refuse = (code, detail = "") => { console.error(`Error: configure-verify --replace refused (${code}).${detail ? ` ${detail}` : ""}${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
   // The seam lets the signature leg run on an approved fixture whose plan was approved in chat mode (a later mode switch makes the
-  // PO-gate authority stale, CVCT-AUTHORITY-STALE, by design); production always reads the committed mode.
-  const waiverFor = deps.criticalProofWaiverForFn ?? criticalProofWaiverFor;
+  // PO-gate authority stale, CVCT-AUTHORITY-STALE, by design). It can only force the strict proof path, never waive one; production
+  // always reads the committed mode.
+  const waiverFor = deps.forceStrictCriticalProof === true ? () => ({ waived: false, code: null }) : criticalProofWaiverFor;
   const configured = waiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
   const waived = configured.waived === true;

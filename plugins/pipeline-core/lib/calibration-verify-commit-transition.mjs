@@ -17,6 +17,8 @@ import { assertPrivateRegularFile, writePrivateFileNoReplaceAtomic } from "./pri
 import { parseStrictJson } from "./governance-event.mjs";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+import { readPrivateApprovals } from "./critical-action-authorization.mjs";
+import { VERIFY_REPLACEMENT_KIND } from "./critical-action-approval-request.mjs";
 
 const PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
 const SCHEMA = "pipeline.calibration-verify-commit-transition.v1";
@@ -219,6 +221,15 @@ function validReplacement(value) {
     && ["signature", "chat-attributed-unattested"].includes(value.mode) && (value.mode === "signature") === (value.proofSha256 !== null);
 }
 
+/** ADR-0100: a record's replacement member counts only when this device's store holds the approval of exactly that subject and proof. */
+export function replacementApprovalStored(commonDir, replacement) {
+  if (!validReplacement(replacement)) return false;
+  let envelopes = [];
+  try { envelopes = readPrivateApprovals(commonDir, VERIFY_REPLACEMENT_KIND); } catch { envelopes = []; }
+  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === replacement.subjectSha256
+    && (typeof envelope.approval.criticalProof?.proofSha256 === "string" ? envelope.approval.criticalProof.proofSha256 : null) === replacement.proofSha256);
+}
+
 function transition(repo, currentApproval, command, statePostSha256 = null, replacement = null) {
   if (classifyVerifyCommand(command) !== "configured" || typeof command !== "string" || Buffer.byteLength(command) > 32_768 || /[\r\n\0]/u.test(command)) fail("CVCT-COMMAND");
   const before = committedCalibrationPaths(repo).map((path) => twinAt(repo, path, "HEAD"));
@@ -249,7 +260,7 @@ function replacementMembers(repo, command, previousCommand) {
     let record; try { record = readRecord(repo, join(repo.directory, name)); } catch { continue; }
     const facts = record.facts;
     if (facts?.head !== repo.head || facts.tree !== repo.tree || facts.verifyCommand !== command || !validReplacement(facts.replacement)
-      || facts.replacement.previousCommand !== previousCommand) continue;
+      || facts.replacement.previousCommand !== previousCommand || !replacementApprovalStored(repo.common, facts.replacement)) continue;
     if (!members.some((member) => same(member, facts.replacement))) members.push(facts.replacement);
   }
   return members;
@@ -464,8 +475,11 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths 
 export function inspectCurrentCalibrationVerifyReady({rootDir,verifyCommand}={}) {
   try {
     const repo=repository(rootDir),currentApproval=approval(repo);
-    const candidates=[transition(repo,currentApproval,verifyCommand),
-      transition(repo,currentApproval,verifyCommand,currentApproval.stateSha256)];
+    // ADR-0100: under a configured committed command only a ready replacement of this HEAD (its approval stored) is a candidate.
+    const committedVerify=twinAt(repo,committedCalibrationPaths(repo)[0],"HEAD").value.verify;
+    const candidates=classifyVerifyCommand(committedVerify)==="configured"
+      ? replacementMembers(repo,verifyCommand,committedVerify).map(member=>transition(repo,currentApproval,verifyCommand,null,member))
+      : [transition(repo,currentApproval,verifyCommand),transition(repo,currentApproval,verifyCommand,currentApproval.stateSha256)];
     const facts=candidates.find(value=>existsSync(recordPath(repo,value.id,"ready")));
     if(!facts || existsSync(join(repo.directory,"transition.lock"))) fail("CVCT-RECORD");
     if(!same(readRecord(repo,recordPath(repo,facts.id,"ready")),{schema:SCHEMA,phase:"ready",facts})) fail("CVCT-RECORD");
