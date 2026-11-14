@@ -26,6 +26,26 @@ test("a finished stop answers at once with its commit and tells the agent to go 
   assert.match(result.message, /same turn/u);
 }));
 
+// C29 K-38 (Glossover): "integration":"refused" came back without a reason, and the Elephant could not tell whether a step was needed.
+test("C29 K-38: a refused Main integration names its code and reason and says the delivery is committed and not re-dispatched", () => inside((commonDir) => {
+  const refused = { ...COMMITTED, integration: { status: "refused", code: "SDC-AUTHORITY-CAS", reason: "reference-preimage-changed" } };
+  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: refused, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
+  const { exitCode, result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER }, { commonDir, ...clock() });
+  assert.equal(exitCode, 0);
+  assert.equal(result.status, "committed");
+  assert.equal(result.integration, "refused");
+  assert.equal(result.integrationCode, "SDC-AUTHORITY-CAS");
+  assert.equal(result.integrationReason, "reference-preimage-changed");
+  assert.match(result.message, /refused \(SDC-AUTHORITY-CAS: reference-preimage-changed\)/u);
+  assert.match(result.message, /do not re-dispatch/u);
+  assert.match(result.message, /Dispatch: fix-1 \(goldfish\)/u);
+  // An integrated stop carries no integration detail and no note.
+  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-2", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
+  const clean = waitForHostCommit({ root: "unused", dispatch: "fix-2", after: AFTER }, { commonDir, ...clock() }).result;
+  assert.equal(Object.hasOwn(clean, "integrationCode"), false);
+  assert.doesNotMatch(clean.message, /refused/u);
+}));
+
 test("a stop that finishes during the wait is seen by the next poll", () => inside((commonDir) => {
   const ticking = clock();
   const pause = (ms) => { ticking.pause(ms); if (ticking.now() >= 6_000) writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") }); };

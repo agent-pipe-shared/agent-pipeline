@@ -20,7 +20,10 @@ export function writeNativeGoldfishStopOutcome({ commonDir, dispatchId, result, 
     const path = pathOf(commonDir, dispatchId), temporary = `${path}.tmp`;
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     writeFileSync(temporary, `${JSON.stringify({ schema: SCHEMA, dispatchId, status: result?.status ?? null, code: result?.code ?? null, commit: typeof result?.commit === "string" ? result.commit : null,
-      integration: result?.integration?.status ?? null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
+      integration: result?.integration?.status ?? null,
+      // C29 K-38 (Glossover): a refused integration named no code, so the waiter could not say why or whether a step was needed.
+      integrationCode: typeof result?.integration?.code === "string" ? result.integration.code.slice(0, 120) : null,
+      integrationReason: typeof result?.integration?.reason === "string" ? result.integration.reason.slice(0, 300) : null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
     renameSync(temporary, path);
     return true;
   } catch { return false; }

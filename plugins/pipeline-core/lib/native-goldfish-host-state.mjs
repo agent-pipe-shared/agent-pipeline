@@ -2103,9 +2103,27 @@ export function requalifyNativeGoldfishItemDelivery(input={}) {
   }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-REQUALIFICATION-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 
+/** C29 K-38 (Glossover, parallel run 2026-11-14): the stop's integration ran once, so a sibling stop writing the registry at the same moment
+ * (SDC-AUTHORITY-CAS, a held lock, or one of the sibling races the terminal release already retries) left a delivered item "integration refused".
+ * Those refusals are now repeated on a fresh boundary, as the terminal release does: at least NATIVE_BOUNDARY_REBIND_LIMIT rounds and further
+ * rounds while the stop's wait budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned. */
+export const NATIVE_INTEGRATION_RETRY_CODES=Object.freeze(['SDC-AUTHORITY-CAS','SDC-LOCK-HELD']);
+export function integrationRefusalIsSiblingRace(result){
+  return result?.status==='refused'&&(NATIVE_INTEGRATION_RETRY_CODES.includes(result.code)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason));
+}
+export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=nativeStopWaitBudgetMs(),now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
+  const start=now();
+  for(let attempt=1;;attempt+=1){
+    const result=once(args);
+    if(!integrationRefusalIsSiblingRace(result))return result;
+    const wait=Math.min(100*attempt,1000);
+    if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs)return {...result,attempts:attempt};
+    pause(wait);
+  }
+}
 /** Elephant integration acknowledgement only after Source-bound targeted
  * delivery and Main ancestry/content readback. It never executes ordinary tests. */
-export function integrateNativeGoldfishItemDelivery({root,pendingSha256}={}) {
+function integrateNativeGoldfishItemDeliveryOnce({root,pendingSha256}={}) {
   try {
     if(!SHA.test(pendingSha256??''))throw nativeManagedFault('native-item-pending-selector');
     const repository=inspectSignedDescriptorCustodyRepository(root),owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});

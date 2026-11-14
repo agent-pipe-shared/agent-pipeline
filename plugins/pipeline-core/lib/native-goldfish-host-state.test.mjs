@@ -2035,6 +2035,29 @@ const cases = [
     assert.equal(stopped.status, "authored-commit-recorded", JSON.stringify(stopped));
   }) },
 
+  { id: "NGHS73", name: "C29 K-38: the stop's integration repeats a sibling race (CAS, held lock, terminal sibling race) on a fresh boundary within its budget and returns every other refusal at once", run: () => {
+    // Glossover 2026-11-14: a parallel stop's integration came back SDC-AUTHORITY-CAS once and was never repeated, so a delivered item stayed unintegrated.
+    const clock = () => { let t = 0; return { now: () => t, pause: (ms) => { t += ms; } }; };
+    const scripted = (results) => { const calls = []; return { calls, once: (args) => { calls.push(args); return results[Math.min(calls.length - 1, results.length - 1)]; } }; };
+    const cas = { status: "refused", code: "SDC-AUTHORITY-CAS", reason: "reference-preimage-changed" };
+    const integrated = { status: "integrated", code: "NGHS-ITEM-INTEGRATED" };
+    const twice = scripted([cas, { status: "refused", code: "SDC-LOCK-HELD", reason: "registry-lock-held" }, { status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "domain-membership-race" }, integrated]);
+    assert.deepEqual(integrateNativeGoldfishItemDelivery({ root: "r", pendingSha256: "p" }, { once: twice.once, budgetMs: 10_000, ...clock() }), integrated);
+    assert.equal(twice.calls.length, 4);
+    assert.deepEqual(twice.calls[3], { root: "r", pendingSha256: "p" }, "every round runs the same request");
+    const named = scripted([{ status: "refused", code: "NGHS-ITEM-TARGETED-EVIDENCE-REQUIRED", reason: "native-item-targeted-evidence-required" }]);
+    assert.equal(integrateNativeGoldfishItemDelivery({}, { once: named.once, budgetMs: 10_000, ...clock() }).code, "NGHS-ITEM-TARGETED-EVIDENCE-REQUIRED");
+    assert.equal(named.calls.length, 1, "a real refusal is never repeated");
+    const stuck = scripted([cas]);
+    const last = integrateNativeGoldfishItemDelivery({}, { once: stuck.once, budgetMs: 0, ...clock() });
+    assert.equal(last.code, "SDC-AUTHORITY-CAS");
+    assert.equal(stuck.calls.length, 8, "without budget the round bound holds");
+    assert.equal(last.attempts, 8);
+    const budgeted = scripted([cas]);
+    integrateNativeGoldfishItemDelivery({}, { once: budgeted.once, budgetMs: 30_000, ...clock() });
+    assert.ok(budgeted.calls.length > 8, "rounds continue while the budget lasts");
+  } },
+
 ];
 
 /** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */
