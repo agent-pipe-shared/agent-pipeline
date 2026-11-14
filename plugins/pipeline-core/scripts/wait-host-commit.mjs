@@ -45,7 +45,14 @@ function fromOutcome(outcome, waitedSeconds) {
   // A continued child gets no new launch notice, and this record stays on disk: the next wait must start after it or it would answer "checkpoint" again before the real stop.
   if (outcome.status === "checkpoint-recorded") {
     const nextAfter = new Date(Date.parse(outcome.observedAt) + 1).toISOString();
-    return { exitCode: 0, result: { ...common, status: "checkpoint", nextAfter, message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. If you continue this same child, wait for its next stop with --after ${nextAfter}. ${outcome.message}`.trim() } };
+    // C29d T3 (PO tile 2026-11-14): the four routes, named once with their commands, so a scope decision costs no search.
+    const id = outcome.dispatchId;
+    const routes = `Routes: (1) more budget, same scope: continue this child from its continuation card with SendMessage; `
+      + `(2) stop the work: slice-queue.mjs cancel ${id} --started --reason "<why>" --class budget; `
+      + `(3) the scope must change (a check it may not touch, a path it needs outside its scope): slice-queue.mjs cancel ${id} --started --reason "<why>" --class wrong-premise, `
+      + `then land any diff it left with goldfish-host-commit-recover.mjs plan/apply --dispatch-id ${id}, then dispatch a successor briefing under a NEW id (the id binds the queue row); `
+      + `(4) the work is complete except an out-of-scope item: land it with goldfish-host-commit-recover.mjs plan/apply --dispatch-id ${id}, no cancel, and brief the out-of-scope item separately.`;
+    return { exitCode: 0, result: { ...common, status: "checkpoint", nextAfter, message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. If you continue this same child, wait for its next stop with --after ${nextAfter}. ${routes} ${outcome.message}`.trim() } };
   }
   return { exitCode: 1, result: { ...common, status: "stop-failed", commit: outcome.commit, message: `The stop finished without a recorded host commit. Follow this recovery before committing anything by hand: ${outcome.message}`.trim() } };
 }

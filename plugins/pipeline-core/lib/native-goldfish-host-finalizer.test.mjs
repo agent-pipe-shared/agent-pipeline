@@ -577,7 +577,8 @@ const cases = [
     const first = finalize(stopInput(binding, undefined));
     assert.equal(first.status, "checkpoint-recorded", `${first.code} ${JSON.stringify(first)}`);
     assert.equal(first.reservation, "live");
-    assert.deepEqual(first.continuation, { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" });
+    assert.deepEqual(first.continuation, { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget",
+      scopeChange: "slice-queue-cancel-started-class-wrong-premise-then-recover-then-successor-new-id", completeExceptOutOfScope: "goldfish-host-commit-recover-without-cancel" });
     assert.equal(snapshot(commonDir), before, "a checkpoint consumes and changes nothing");
     const second = finalize(stopInput(binding, undefined));
     assert.deepEqual(second, first);

@@ -88,6 +88,10 @@ test("a budget checkpoint is its own status and claims no commit", () => inside(
   assert.equal(exitCode, 0);
   assert.equal(result.status, "checkpoint");
   assert.equal(result.commit, undefined);
+  // C29d T3: the four routes with their commands, the scope-change one with the fitting class and a new successor id.
+  assert.match(result.message, /slice-queue\.mjs cancel fix-1 --started --reason "<why>" --class budget/u);
+  assert.match(result.message, /slice-queue\.mjs cancel fix-1 --started --reason "<why>" --class wrong-premise, then land any diff it left with goldfish-host-commit-recover\.mjs plan\/apply --dispatch-id fix-1, then dispatch a successor briefing under a NEW id/u);
+  assert.match(result.message, /complete except an out-of-scope item: land it with goldfish-host-commit-recover\.mjs plan\/apply --dispatch-id fix-1, no cancel/u);
   // The record stays on disk and a continued child gets no new notice: the printed time must step past it.
   assert.equal(result.nextAfter, "2026-11-10T08:00:30.001Z");
   assert.match(result.message, /--after 2026-11-10T08:00:30\.001Z/u);

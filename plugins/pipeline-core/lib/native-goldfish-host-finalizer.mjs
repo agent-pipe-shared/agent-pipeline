@@ -497,10 +497,16 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
   if (!observation?.ok) return withDetail(fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized"), observation?.detail);
   // D31: a checkpoint is an interim hand-back of a budget stop. Nothing is consumed, committed, released or cancelled, so
-  // the reservation stays live and a repeat is idempotent; the result names the two continuation routes.
+  // the reservation stays live and a repeat is idempotent; the result names the continuation routes.
+  // C29d T3 (PO tile 2026-11-14, K-35/K-45): a checkpoint is also where a scope decision arrives (an existing red check the child
+  // must not touch, a path outside its scope). Besides resume and the budget cancel, the result names the scope-change route
+  // (cancel as started with the class that fits, land the predecessor's diff with the recover command, dispatch a successor under
+  // a new id) and the route for work that is complete except an out-of-scope item (land it with the recover command, no cancel).
   if (observation.final.outcome === "checkpoint") return { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE",
     dispatchId: state.binding.dispatchId, commit: null, record: null, reservation: "live",
-    continuation: { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" } };
+    continuation: { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget",
+      scopeChange: "slice-queue-cancel-started-class-wrong-premise-then-recover-then-successor-new-id",
+      completeExceptOutOfScope: "goldfish-host-commit-recover-without-cancel" } };
   if (observation.final.outcome !== "succeeded") return fail("NGHF-RETURN-NOT-SUCCESS", "not-finalized");
 
   const concurrent=state.binding.itemDelivery&&state.baseline?.schema===NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA;
