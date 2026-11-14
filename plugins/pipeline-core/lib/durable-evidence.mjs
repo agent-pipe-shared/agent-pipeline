@@ -170,12 +170,15 @@ function projectedBriefing(record, hits) {
 /** `records` are validated terminal dispatch records (`{ record }`), `briefings` the map `scanBriefings` returns. A dispatch whose briefing names another feature's item is not this feature's. */
 export function projectCloseDispatches({ featureId, records = [], briefings = new Map() } = {}) {
   const dispatches = []; const gaps = []; let omitted = 0;
-  for (const { record } of [...records].sort((left, right) => (left.record.taskId < right.record.taskId ? -1 : left.record.taskId > right.record.taskId ? 1 : 0))) {
+  for (const { record, source = null } of [...records].sort((left, right) => (left.record.taskId < right.record.taskId ? -1 : left.record.taskId > right.record.taskId ? 1 : 0))) {
     const hits = briefings.get(record.taskId) ?? [];
     if (hits.some((hit) => typeof hit.itemId === "string" && !hit.itemId.startsWith(`${featureId}.`))) continue;
     if (dispatches.length >= PROJECTION_MAX_DISPATCHES) { omitted += 1; continue; }
     const { briefing: unusedBriefing, source: unusedSource, ...fields } = dispatchEntry(record, null, null);
-    dispatches.push({ taskId: record.taskId, record: maskDeep(fields), briefing: projectedBriefing(record, hits) });
+    // C29 R13 (AGY run 3; PO tile 2026-11-13 "proofs into the audit bundle"): the record file stays git-ignored under evidence/, so the projection names the digest of
+    // its exact bytes; an auditor holding the local file can check it against the bundle. Null only for a caller that passed no source (never the close's own reader).
+    const recordSource = source !== null && typeof source.path === "string" && digest(source.sha256) !== null ? { path: source.path, sha256: source.sha256 } : null;
+    dispatches.push({ taskId: record.taskId, record: maskDeep(fields), recordSource, briefing: projectedBriefing(record, hits) });
   }
   if (omitted > 0) gaps.push({ code: "DISPATCH-LIST-TRUNCATED", count: omitted });
   return { schema: CLOSE_DISPATCH_PROJECTION_SCHEMA, featureId, dispatches, gaps };
@@ -183,7 +186,7 @@ export function projectCloseDispatches({ featureId, records = [], briefings = ne
 export function closeDispatchProjectionBytes(projection) { return jsonBytes(projection); }
 /** The completed dispatch records and the briefings found in scratch/, for `projectCloseDispatches` (read-only). */
 export function readCloseDispatchInputs(root) {
-  return { records: readDispatchSources(resolve(root)).completed.map(({ record }) => ({ record })), briefings: scanBriefings(resolve(root)) };
+  return { records: readDispatchSources(resolve(root)).completed.map(({ path, bytes, record }) => ({ record, source: { path, sha256: sha(bytes) } })), briefings: scanBriefings(resolve(root)) };
 }
 function briefingFor(record, scanned) {
   if (digest(record.attestation?.briefingSha256) !== null) return { sha256: record.attestation.briefingSha256, path: null, source: "attestation" };

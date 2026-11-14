@@ -8,7 +8,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { buildAuditBundle, evidenceIndexFromLsTree, planAuditBundle,planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
-import { closeDispatchProjectionBytes, projectCloseDispatches } from "./durable-evidence.mjs";
+import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatchInputs } from "./durable-evidence.mjs";
 import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 import { closeSbom } from "./sbom-close.mjs";
@@ -262,6 +262,22 @@ test("C28 / C28e the projection carries each found briefing as its digest only, 
   const many = projectCloseDispatches({ featureId: FEATURE_ID, records: Array.from({ length: 250 }, (_, index) => dispatchRecord(`D-${String(index).padStart(3, "0")}`)), briefings: new Map() });
   assert.equal(many.dispatches.length, 200); assert.ok(many.gaps.some((gap) => gap.code === "DISPATCH-LIST-TRUNCATED" && gap.count === 50), "the cut is a typed gap, not silence");
   assert.ok(closeDispatchProjectionBytes(projection).toString("utf8").endsWith("\n"));
+});
+// C29 R13 (AGY run 3; PO tile 2026-11-13): the dispatch record files stay git-ignored, so each projected dispatch names the digest of its exact record bytes.
+test("C29-R13 each projected dispatch names the path and digest of its local record file; the close's own reader supplies them", () => {
+  const root = mkdtempSync(join(tmpdir(), "c29-r13-"));
+  try {
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    // A valid terminal v3 record (the shape the preflight's N33B fixture writes): the reader skips anything its validator refuses.
+    const record = { schema: "pipeline.dispatch-record.v3", taskId: "D-FILE", agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: ["a".repeat(40)], candidateCommit: "a".repeat(40), resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["specs/spec.md"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
+    const bytes = `${JSON.stringify(record)}\n`;
+    writeFileSync(join(root, "evidence", "dispatch-record-D-FILE.json"), bytes);
+    const inputs = readCloseDispatchInputs(root);
+    const projection = projectCloseDispatches({ featureId: FEATURE_ID, ...inputs });
+    assert.equal(projection.dispatches.length, 1, JSON.stringify(projection.gaps));
+    assert.deepEqual(projection.dispatches[0].recordSource, { path: "evidence/dispatch-record-D-FILE.json", sha256: sha(bytes) });
+    assert.equal(projectCloseDispatches({ featureId: FEATURE_ID, records: [dispatchRecord("D-BARE")] }).dispatches[0].recordSource, null, "no source given, none invented");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 function projectionBundle(input, projection) {
   mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/dispatch-projection.json"), closeDispatchProjectionBytes(projection));
