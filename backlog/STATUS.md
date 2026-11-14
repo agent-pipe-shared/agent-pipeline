@@ -259,6 +259,7 @@
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.concurrent-session-warning-never-fires-on-native-windows | open | defect | pipeline | alfred | 2026-10-09 | 2026-10-12 | — |
+| pipeline.concurrent-stop-terminal-release-livelock-under-load | open | defect | pipeline | alfred | 2026-11-14 | — | — |
 | pipeline.consumer-defined-scanner-exceptions-need-a-po-approved-route | open | workflow-improvement | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.consumer-must-allowlist-every-runner-lane | closed | workflow-improvement | pipeline | nova-b | 2026-08-28 | — | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
@@ -341,6 +342,7 @@
 | pipeline.dispatch-authority-store-check-fails-on-windows | open | defect | pipeline | alfred | 2026-10-26 | — | — |
 | pipeline.dispatch-briefing-build-cannot-read-a-spec-addendum-as-a-criterion | open | defect | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows | open | defect | pipeline | alfred | 2026-10-03 | — | — |
+| pipeline.dispatch-checks-run-outside-the-consumer-verify-command | open | workflow-improvement | pipeline | alfred | 2026-11-14 | — | — |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-07-27 | — |
@@ -1097,7 +1099,7 @@
 
 ## Counts
 
-- open: 400
+- open: 402
 - in_progress: 0
 - closed: 674
 - rejected: 3

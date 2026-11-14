@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b1474d74bc9e0bc95ff08cf75259d21b0945df256c5ce937677c0ada63b0a93a"
+    "transitionHead": "b37373a42381c302144831fff2bdc82a85b091266b4602725fefb7a5ce8b6c90"
   },
   "counts": {
-    "open": 400,
+    "open": 402,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -3164,6 +3164,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.concurrent-stop-terminal-release-livelock-under-load",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-14",
+      "source": "Candidate 29d clean-clone runs (stop-pair suite NGSP7, NGSP9D) and the NGSP7 red of an earlier Full Verify",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.consumer-defined-scanner-exceptions-need-a-po-approved-route",
       "status": "open",
       "type": "workflow-improvement",
@@ -4125,6 +4135,16 @@
       "owner": "pipeline",
       "created": "2026-10-03",
       "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03: a pipeline-core:goldfish-deep authoring dispatch (ALFRED-FR-AUTHOR-1) was refused on every tool call, including Read.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.dispatch-checks-run-outside-the-consumer-verify-command",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-14",
+      "source": "Peer consumer session report 2026-11-14 (toil, K-39 in the candidate 29d notes)",
       "deferred": false,
       "sprint": "alfred"
     },
