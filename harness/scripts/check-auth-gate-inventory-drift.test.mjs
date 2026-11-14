@@ -284,7 +284,8 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
   // G20-39 (PO 2026-11-07): one deliberate new entry, acknowledge-caller-authored-critic (legacy-renderer), restated from 21 (QG-04).
   // Candidates 28e/29c: three deliberate new entries, spec-addendum (ADR-0095), acknowledge-gate-definition-changes (ADR-0096) and
   // acknowledge-maintenance-red-check (ADR-0097), all legacy-renderer, restated from 22 (QG-04).
-  assert.equal(catalog.entries.length, 25);
+  // Candidate 29d: one deliberate new entry, replace-verify-command (ADR-0100), legacy-renderer, restated from 25 (QG-04).
+  assert.equal(catalog.entries.length, 26);
   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [

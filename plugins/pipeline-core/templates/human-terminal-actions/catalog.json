@@ -545,6 +545,26 @@
       "platforms": null
     },
     {
+      "id": "replace-verify-command",
+      "inventoryId": "replace-verify-command",
+      "revision": 1,
+      "purpose": "Record the verify command replacement approval terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#configure-verify"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
       "id": "critical-action-family",
       "inventoryId": "critical-action-family",
       "revision": 1,

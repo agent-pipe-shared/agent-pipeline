@@ -458,7 +458,8 @@ import { criticalActionAuthority } from "../lib/critical-action-authorization-re
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, specAddendumApprovalBytes, specAddendumApprovalPath } from "../lib/spec-addendum.mjs";
 import { buildGateChangeAcknowledgementSubject } from "../lib/gate-definition-changes.mjs";
-import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
+import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, VERIFY_REPLACEMENT_KIND } from "../lib/critical-action-approval-request.mjs";
+import { buildVerifyReplacementSubject, runVerifyReplacementTestRun, verifyReplacementApproval } from "../lib/verify-replacement.mjs";
 import { MAINTENANCE_ACK_LABEL, buildMaintenanceAcknowledgementSubjectAtHead, describeMaintenanceCheck } from "../lib/maintenance-delivery.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
@@ -664,10 +665,10 @@ const RECOVERY_BRIDGE_DECISION_KEYS = [
 // Live Claude run on 20j: the printed one-line commit could not succeed. GIT-03 needs both trailers in the final block, and a
 // command line holding the parentheses of the Dispatch trailer is refused by the push guard, so the route is a message file.
 const VERIFICATION_TIER_MESSAGE_FILE = "scratch/commit-msg/verification-tiers.txt";
-function printVerificationTierCommit() {
+function printVerificationTierCommit(subjectLine = "chore: configure project verification") {
   console.log(`Write this commit message to ${VERIFICATION_TIER_MESSAGE_FILE}, exactly the lines between the markers:`);
   console.log("--- message ---");
-  console.log("chore: configure project verification");
+  console.log(subjectLine);
   console.log("");
   console.log("AI-Assisted: true");
   console.log("Dispatch: stage-0 (elephant)");
@@ -4894,7 +4895,7 @@ function externalPublicJson(dir, value) {
 // kind, rejects symlinks and hard links, and pins its authority to this repository's
 // private key-directory pointer before cryptographic verification.  It is therefore not
 // a general in-repository-proof escape hatch, and every other kind remains external-only.
-const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND]);
+const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, VERIFY_REPLACEMENT_KIND]);
 function localPushScratchJson(dir, value, expectedPath) {
   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
     return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
@@ -4955,9 +4956,9 @@ function localMirrorScratchArtifacts(dir, flags, kind) {
  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
  * behaviour is byte-identical to before this addition.
  */
-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND]);
+const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND, SPEC_ADDENDUM_KIND, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND, VERIFY_REPLACEMENT_KIND]);
 
-function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
+function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false, waiverFor = criticalProofWaiverFor }) {
   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
   // chat` in pipeline.user.yaml for `push` (ADR-0056), or by an explicit reasoned
   // waiver in the policy file for the other kinds (ADR-0055). Never inferred, never
@@ -4976,7 +4977,7 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   // project declare push as proof-requiring in exactly the configuration where its
   // operator had committed the opposite. Chat mode was unreachable for every fresh
   // consumer, which is half of why the push gate could not be seeded at all.
-  const configured = criticalProofWaiverFor(dir, kind);
+  const configured = waiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
   if (configured.waived) return { ok: true, proof: null, waived: configured.waiver };
   // Global `human_approval: chat` returned above before this policy/anchor
@@ -10439,6 +10440,111 @@ function runApproveMaintenanceRedCheck({ dir, rest, base, now, deps }) {
   return 0;
 }
 
+/**
+ * ADR-0100 (D252, test round 28d finding C6): `configure-verify --verify-command <new> --replace --by <label>` replaces a configured
+ * verify command during implementation. First call: the new command runs once on the clean tree (it must pass and leave the tree as
+ * it was), then the signing request for the one PO signature over both mirrors is printed. Second call (with the proof paths, or with
+ * an approval already recorded for this exact subject): the mirrors are written with exactly the signed bytes through the existing
+ * configure-verify commit transition, which carries the `replacement` member the pre-commit hook and the close read.
+ */
+function runConfigureVerifyReplace({ dir, rest, base, now, deps }) {
+  const kind = VERIFY_REPLACEMENT_KIND;
+  const refuse = (code, detail = "") => { console.error(`Error: configure-verify --replace refused (${code}).${detail ? ` ${detail}` : ""}${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
+  // The seam lets the signature leg run on an approved fixture whose plan was approved in chat mode (a later mode switch makes the
+  // PO-gate authority stale, CVCT-AUTHORITY-STALE, by design); production always reads the committed mode.
+  const waiverFor = deps.criticalProofWaiverForFn ?? criticalProofWaiverFor;
+  const configured = waiverFor(dir, kind);
+  if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
+  const waived = configured.waived === true;
+  const proofOmitted = !["--proof-request", "--proof-authority", "--proof"].some((flag) => rest.includes(flag));
+  const parsed = parseExactFlags(rest, new Set(waived || proofOmitted ? ["verify-command", "by"] : ["verify-command", "by", "proof-request", "proof-authority", "proof"]));
+  const flags = parsed.value ?? {};
+  if (!parsed.ok || isBlank(flags.by) || classifyVerifyCommand(flags["verify-command"]) !== "configured") {
+    console.error("Error: configure-verify --replace requires exactly --verify-command <the new, real verification command> and --by (the label the PO gave for this command) and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
+    return 2;
+  }
+  const command = flags["verify-command"];
+  const lifecycle = derivePlanLifecycle(base);
+  if (!isLateVerifyRecoveryLifecycle(lifecycle)) return refuse(lifecycle.code ?? "PS-LIFECYCLE-NOT-IMPLEMENTING", "a replacement needs an established implementing lifecycle; zero calibration write.");
+  const committedLayout = inspectCommittedCalibrationVerifyLayout({ rootDir: dir });
+  if (committedLayout.status !== "configured") return refuse("CVR-NOT-CONFIGURED", "only a configured verify command is replaced; configure the first one with configure-verify --verify-command <command> (no --replace).");
+  if (committedLayout.command === command) return refuse("CVR-SAME-COMMAND", "the new command equals the configured one; nothing to replace.");
+  const common = resolveCriticalApprovalCommonDir(dir);
+  if (common === null) return refuse("CRITICAL-APPROVAL-STORE-UNAVAILABLE");
+  let root;
+  try { root = realpathSync(resolve(dir)); } catch { return refuse("CVR-REPOSITORY"); }
+  const buildSubject = deps.buildVerifyReplacementSubjectFn ?? buildVerifyReplacementSubject;
+  let built = buildSubject({ root, commonDir: common, verifyCommand: command });
+  if (!built.ok && built.code === "CVR-TEST-RUN-REQUIRED") {
+    console.error(`configure-verify --replace: running the new command once on the clean tree before anything is signed: ${command}`);
+    const ran = (deps.runVerifyReplacementTestRunFn ?? runVerifyReplacementTestRun)({ root, commonDir: common, verifyCommand: command });
+    if (!ran.ok) return refuse(ran.code, ran.detail);
+    built = buildSubject({ root, commonDir: common, verifyCommand: command });
+  }
+  if (!built.ok) return refuse(built.code, built.detail);
+  const { subject, candidate, featureId } = built;
+  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
+  let approval = verifyReplacementApproval({ commonDir: common, subjectSha256 });
+  if (approval === null) {
+    console.error(["PO APPROVAL OF A VERIFY COMMAND REPLACEMENT -- one signature covers both calibration files:",
+      `  now:   ${subject.previousCommand}`, `  after: ${subject.verifyCommand}`,
+      "  the new command ran once at this HEAD and passed; the mirrors get exactly the signed bytes."].join("\n"));
+    const approvedAt = now();
+    if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
+      try {
+        const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
+        const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
+        const mirrorCommon = defaultGitCommonDir(dir);
+        const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
+        const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256, signCommand: rendered });
+        console.log(JSON.stringify({ schema: "pipeline.verify-replacement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
+          signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
+          ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged and commit the printed calibration files")}` }),
+          recordCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "configure-verify", "--verify-command", command, "--replace", "--by", flags.by, "--proof-request", mirror?.request ?? "<proof-request>", "--proof-authority", mirror?.authority ?? "<proof-authority>", "--proof", mirror?.proof ?? "<proof>"],
+            note: mirror === null ? "run after the PO signed; the three proof paths are printed by the signing step" : "run unchanged once the proof is there; the three paths are the repository mirror the signing step writes" } }));
+      } catch { /* the refusal below still names the missing flags */ }
+      return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
+    }
+    const verified = verifyCriticalHumanProof({ dir, state: base, kind, candidate, subject, flags, now: approvedAt, required: true, waiverFor });
+    if (!verified.ok) return refuse(verified.code);
+    const priorConsumption = base.criticalProofConsumption;
+    if (priorConsumption !== undefined && (!Array.isArray(priorConsumption) || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) return refuse("CRITICAL-PROOF-CONSUMPTION-INVALID");
+    if (verified.proof !== null && ((Array.isArray(priorConsumption) ? priorConsumption : []).some((entry) => entry.proofSha256 === verified.proof.proofSha256)
+      || isCriticalProofConsumedPrivately(common, verified.proof.proofSha256))) return refuse("CRITICAL-PROOF-REPLAY");
+    approval = { approvedBy: flags.by, approvedAt, forCommit: candidate.commit, forTree: candidate.tree, featureId, subjectSha256,
+      previousCommand: subject.previousCommand, verifyCommand: subject.verifyCommand, testRunSha256: subject.testRunSha256, entries: subject.entries, criticalProof: verified.proof };
+    if (waived) {
+      approval.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
+      approval.humanApproval = chatAttributionRecord({ kind, by: flags.by });
+    } else if (verified.waived !== undefined) approval.criticalProofWaiver = verified.waived;
+    const stored = writeCriticalApproval({ gitCommonDir: common, kind, approval, consumedAt: approvedAt });
+    if (!stored.ok) return refuse(stored.code);
+  }
+  // The approval exists for exactly this subject: write the signed bytes through the configure-verify commit transition.
+  const proofSha256 = typeof approval.criticalProof?.proofSha256 === "string" ? approval.criticalProof.proofSha256 : null;
+  const replacement = { previousCommand: subject.previousCommand, subjectSha256, proofSha256, mode: proofSha256 === null ? "chat-attributed-unattested" : "signature" };
+  if (!retireDeadCalibrationContinuityLock({ dir, sourceBoundary: deps.sourceBoundary })) return refuse("CVR-WRITER-LOCK", "a live or unknown State writer lock remains; no calibration write.");
+  const commitTransition = prepareCalibrationVerifyCommitTransition({ rootDir: dir, verifyCommand: command, sourceBoundary: deps.sourceBoundary, replacement });
+  if (!commitTransition?.ok || !commitTransition.preparedHandle
+    || !sameJson(commitTransition.entries, subject.entries)) return refuse(commitTransition?.code ?? "CVR-TRANSITION", "the commit transition does not match the signed post-images; zero calibration write.");
+  const written = writeCalibrationVerifyCommand(dir, command, commitTransition.entries);
+  if (!written.ok || !sameJson(written.written, commitTransition.paths)) {
+    console.error("Error: configure-verify --replace could not write the exact calibration tiers; calibration mutation is possible. Inspect both tiers before retrying.");
+    return 2;
+  }
+  const commitReady = completeCalibrationVerifyCommitTransition({ preparedHandle: commitTransition.preparedHandle });
+  if (!commitReady?.ok || commitReady.code !== "CVCT-COMMIT-READY" || !sameJson(commitReady.paths, commitTransition.paths)) {
+    console.error(`Error: the verify command was replaced, but its commit route is unavailable (${commitReady?.code ?? "CVCT-COMPLETE-UNAVAILABLE"}); calibration mutation occurred. Inspect the tiers before retrying; no commit seal is reported.`);
+    return 2;
+  }
+  console.log(`Verify command replaced (${replacement.mode === "signature" ? "signed" : "chat-attributed, not signed"} by "${approval.approvedBy}") for feature ${featureId}.`);
+  console.log("Commit exactly the selected verification tiers through the normal hooks:");
+  console.log(`git add -- ${commitReady.paths.join(" ")}`);
+  printVerificationTierCommit("chore: replace project verification command");
+  console.log("Keep the private State untracked; the normal hook rechecks this exact transition at commit time.");
+  return 0;
+}
+
 function runFeaturePackageWriteCommand(sub, argv, deps) {
   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
   if (sub === "feature-package-reconcile") {
@@ -12644,6 +12750,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     // It never repairs a missing, malformed or diverged twin, and an already
     // configured contract is accepted only as an exact zero-write replay.
     case "configure-verify": {
+      // ADR-0100: an explicit --replace takes the replacement route; without it the configured-tier refusal below is unchanged.
+      if (rest.filter((arg) => arg === "--replace").length === 1) return runConfigureVerifyReplace({ dir, rest: rest.filter((arg) => arg !== "--replace"), base, now, deps });
       const parsed = parseExactFlags(rest, new Set(["verify-command"]));
       if (!parsed.ok || classifyVerifyCommand(parsed.value["verify-command"]) !== "configured") {
         console.error('Error: configure-verify requires exactly --verify-command <real, non-blank verification command>; the seeded UNCONFIGURED_VERIFY placeholder is refused.');
@@ -12661,7 +12769,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       // preparing a transition or writing either calibration tier.
       const committedLayout = inspectCommittedCalibrationVerifyLayout({rootDir:dir});
       if (committedLayout.status === "configured" && committedLayout.command !== command) {
-        console.error("Error: configure-verify refused calibration tiers (configured); zero calibration write.");
+        console.error("Error: configure-verify refused calibration tiers (configured); zero calibration write. To replace the configured command during implementation run the same command with --replace and --by <the label the PO gave>: the new command runs once, then one PO signature covers both calibration files (ADR-0100). No override.");
         return 2;
       }
       const twins = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:command});
