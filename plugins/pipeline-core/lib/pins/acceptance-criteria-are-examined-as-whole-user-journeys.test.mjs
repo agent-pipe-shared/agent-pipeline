@@ -77,6 +77,25 @@ test("J1 the same Spec with the journeys and the asserted effect is ready", asyn
   assert.equal(verdict.code, "PLR-HANDOFF-READY");
 });
 
+// C29 G6 (Glossover): the hand-off admitted a Spec as soon as one row was locatable, so a row the registration cannot locate passed it,
+// submit-plan's registration refused it afterwards, and the journey gaps only surfaced on the attempt after that.
+test("J1/G6 a criterion row the registration cannot locate is refused at the hand-off, together with the journey gaps, in one refusal", async () => {
+  const { PLAN_HANDOFF_CODES, planHandoffRefusal } = await load("lib/plan-handoff-readiness.mjs");
+  assert.ok(PLAN_HANDOFF_CODES.includes("PLR-HANDOFF-CRITERION-UNSUPPORTED"));
+  const unlocated = `- **AC-7 (part 1):** ${RELOAD}`;
+  const verdict = await handoff(spec(UNJOURNEYED, INTERNAL, "", unlocated));
+  assert.equal(verdict.ok, false, JSON.stringify(verdict));
+  assert.equal(verdict.code, "PLR-HANDOFF-CRITERION-UNSUPPORTED");
+  assert.match(verdict.message, /AC-7/u, "the unlocatable row is named");
+  assert.match(verdict.message, /Also: .*AC-1/u, "the journey gap of the same Spec is named in the same refusal");
+  const text = planHandoffRefusal("submit-plan", verdict);
+  assert.match(text, /Repair: re-render every named criterion row/u);
+  assert.match(text, /then run submit-plan again/u);
+  const alone = await handoff(spec(JOURNEYED, INTERNAL, "", unlocated));
+  assert.equal(alone.code, "PLR-HANDOFF-CRITERION-UNSUPPORTED");
+  assert.doesNotMatch(alone.message, /Also:/u, "no journey clause when every user-facing criterion names its journeys");
+});
+
 test("J1 the clause works in a bullet criterion with an indented continuation line too", async () => {
   const { inspectSpecJourneys } = await load("lib/spec-journey-coverage.mjs");
   const body = (extra) => ["# Spec", "", "## Acceptance criteria", "", `- **AC-3:** ${RELOAD}`, ...extra, ""].join("\n");
