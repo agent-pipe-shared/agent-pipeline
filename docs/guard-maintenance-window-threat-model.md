@@ -846,6 +846,14 @@ a range would hide a weakened gate, a maintenance proof read loosely would admit
 criterion and no red-before proof covers, and a wrong range base would move the walk, which is why
 none of them can be lifted by a window.
 
+Candidate 29d (K-34) adds `plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs`, which
+`lib/native-goldfish-host-state.mjs` now imports: when HEAD carries a host commit that no lineage
+proof covers, the concurrent commit plan reads the in-flight siblings' stop outcomes and names the
+sibling whose failed stop made that commit. The outcome only selects the refusal's name and text;
+the commit is refused either way. A reader that a window could loosen could still not admit the
+commit, but it could misname the sibling and send the recovery to the wrong dispatch, which is why
+it cannot be lifted by a window either.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module

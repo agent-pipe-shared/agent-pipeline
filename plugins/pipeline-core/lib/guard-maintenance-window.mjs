@@ -961,6 +961,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // and lib/native-goldfish-host-state.mjs, plus the commit split the walk imports.
   "plugins/pipeline-core/lib/private-state-write-guard.mjs", "plugins/pipeline-core/lib/gate-definition-changes.mjs",
   "plugins/pipeline-core/lib/maintenance-delivery.mjs", "plugins/pipeline-core/lib/close-commit-split.mjs",
+  // Candidate 29d (K-34, GMWKC01): lib/native-goldfish-host-state.mjs reads a sibling's stop outcome to refuse its unproven host commit by name.
+  "plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
