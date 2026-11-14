@@ -134,6 +134,15 @@ test("RCD-R6: a repeated option is named, with or without a value, and only when
   assert.match(String(result.stderr), /Rejected element: the flag "-A" \(this option is given more than once and is admitted once here; keep one -A\)\./u);
 });
 
+test("RCD-R6b (C29 P2-2): a repeated -e on rg or grep names the one-pattern alternation, and that spelling is admitted", async () => {
+  assert.equal(repeatedFlagHint("rg -n -e one -e two README.md", "-e", root), "this option is given more than once and is admitted once here; keep one -e; for several patterns give one -e with an alternation in single quotes, e.g. -e 'one|two'");
+  assert.equal(repeatedFlagHint("grep -n -e one -e two README.md", "-e", root), "this option is given more than once and is admitted once here; keep one -e; for several patterns give one pattern with an alternation in single quotes and no -e, e.g. -E 'one|two'");
+  assert.equal(isReadOnlyDiagnosticCommand("rg -n -e 'one|two' README.md", root), true, "the suggested rg spelling is admitted");
+  assert.equal(isReadOnlyDiagnosticCommand("grep -n -E 'one|two' README.md", root), true, "the suggested grep spelling is admitted");
+  const result = await refusal("rg -n -e one -e two README.md");
+  assert.match(String(result.stderr), /keep one -e; for several patterns give one -e with an alternation/u);
+});
+
 test("RCD15: a refused ls flag gets the names-only listing spellings, a names-only flag and other commands get none", () => {
   const hint = String(lsListingHint("ls -la .git/agent-pipeline", "-la", root));
   assert.match(hint, /listed as names only/u);

@@ -10,6 +10,7 @@
  *
  * Pure and read-only: it parses and re-asks `isReadOnlyDiagnosticCommand`, it grants nothing.
  */
+import { basename } from "node:path";
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
@@ -191,7 +192,15 @@ export function repeatedFlagHint(command, flag, root) {
   const { argv } = parsed.segments[0];
   const endOfOptions = argv.indexOf("--");
   const options = endOfOptions === -1 ? argv : argv.slice(0, endOfOptions);
-  return options.filter((word) => word === flag).length > 1 ? `this option is given more than once and is admitted once here; keep one ${flag}` : null;
+  if (options.filter((word) => word === flag).length <= 1) return null;
+  // C29 P2-2 (Claude run 3: 4 of 15 read refusals were `rg -e a -e b -e c`): several patterns fit one -e as an alternation.
+  const searcher = basename(parsed.segments[0].executable).toLowerCase();
+  const alternation = flag === "-e" && (searcher === "rg" || searcher === "grep")
+    ? (searcher === "rg"
+      ? "; for several patterns give one -e with an alternation in single quotes, e.g. -e 'one|two'"
+      : "; for several patterns give one pattern with an alternation in single quotes and no -e, e.g. -E 'one|two'")
+    : "";
+  return `this option is given more than once and is admitted once here; keep one ${flag}${alternation}`;
 }
 
 /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
