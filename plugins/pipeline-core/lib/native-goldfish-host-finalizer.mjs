@@ -556,7 +556,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
       expectedPendingSha256: observedAttempt.pendingSha256 });
     postCommitStage = "record-draft";
     const testFirstEvidence = testFirstEvidenceStatus(physical, observation.final.testFirst);
-    const drafted = draftRecord({ state, observation, commitReadback: committed, testFirstEvidence });
+    const drafted = (dependencies.draftRecord ?? draftRecord)({ state, observation, commitReadback: committed, testFirstEvidence });
     if (!drafted.ok) return { ...fail(drafted.code), commit: committed.commit };
     const recordBytes = nativeAuthoredRecordBytes(drafted.record);
     postCommitStage = "observation-draft";

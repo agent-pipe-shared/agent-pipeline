@@ -203,7 +203,13 @@ function recoverySentence(dispatchId, { root = null, commit = null } = {}) {
  */
 function failureReason(entry) { return entry?.causeReason ?? entry?.reason ?? entry?.detail?.reason ?? null; }
 /** A commit exception whose concurrent-commit ownership proof is missing needs the registry healed before the recovery. */
-function healSentence(reason) {
+function healSentence(reason, entry = null) {
+  if (reason === "native-concurrent-sibling-commit-unrecorded") {
+    // K-34: the commit that moved HEAD is a sibling's host commit whose stop failed afterwards, so its lineage proof never came; waiting cannot help.
+    const named = /sibling ([A-Za-z0-9._:-]{1,128}) commit ([0-9a-f]{7,40})/u.exec(String(entry?.detail?.errorMessage ?? ""));
+    const sibling = named ? `${named[1]} (host commit ${named[2]})` : "a sibling Goldfish";
+    return ` The cause is native-concurrent-sibling-commit-unrecorded: HEAD was moved by the host commit of ${sibling}, whose own stop then failed before it wrote that commit's lineage proof, so this stop cannot prove the commit and did not wait for it. Recover that sibling first (its stop-failure record names the code; the host commit exists, so its recovery writes only the lost record), then recover this dispatch the same way, onto the advanced HEAD. Heal only while no Goldfish is in flight: node <plugin-root>/scripts/routine-repair.mjs run heal --root <root> --reason "<why>".`;
+  }
   return reason === "native-concurrent-unowned-head"
     ? ` The cause is native-concurrent-unowned-head: HEAD moved without a genuine return of this launch. Heal first: node <plugin-root>/scripts/routine-repair.mjs run heal --root <root> --reason "<why>" (only while no Goldfish is in flight).`
     : "";
@@ -225,7 +231,7 @@ function stopFailureNotice(failure, root = null) {
   const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
     ? ` Cause: at its stop the child's pending host-commit state could not be read${typeof failure.reason === "string" && failure.reason !== "" ? "" : " (this record carries no reason; it may predate the reason field)"}. Recovery: ${recoverySentence(failure.dispatchId, { root })}`
     : failure.code === "NGHF-COMMIT-EXCEPTION"
-      ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`
+      ? `${healSentence(failureReason(failure), failure)} Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`
       : ` Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`;
   return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
 }
@@ -256,7 +262,7 @@ function nativeGoldfishHookBaseMessage(result, waitCommand = null, root = null) 
     return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Recovery: ${recoverySentence(result.dispatchId, { root })} scripts/dispatch-record-write.mjs still refuses a v4 authored-commit Claude record without host observation.`;
   }
   if (result.code === "NGHF-COMMIT-EXCEPTION") {
-    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result))} Recovery: ${recoverySentence(result.dispatchId ?? result.stopDispatchId, { root })}${describeFailureDetail(result.detail)}`;
+    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result), result)} Recovery: ${recoverySentence(result.dispatchId ?? result.stopDispatchId, { root })}${describeFailureDetail(result.detail)}`;
   }
   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;

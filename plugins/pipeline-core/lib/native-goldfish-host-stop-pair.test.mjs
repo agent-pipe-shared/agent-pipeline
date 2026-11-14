@@ -21,6 +21,7 @@ import { initializeSessionAuthorityRegistry } from "./session-authority-registry
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+import { writeNativeGoldfishStopOutcome } from "./native-goldfish-stop-outcome.mjs";
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const FILES = ["change", "second", "third", "fourth"];
@@ -115,9 +116,9 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sy
   // C19K-W246 (A): mode "early" stops without waiting for the other and marks its host commit; mode "late" starts its terminal preparation (on the repository the
   // finalizer inspected before) only once the early stop has finished (its host commit moved HEAD), so it holds a repository inspected before that commit. Waiting for the early stop's own post-commit writes keeps this case off the separate authority-terminal-release race (see the notes).
   const prepareTerminal = mode === "late" || mode === "late-sim" ? `args=>{wait(join(dir,${mode === "late" ? "'out-'+other+'.json'" : "'committed-'+other"}),60000);return prepareNativeGoldfishAuthorityTerminal(args);}`
-    : mode === "early" ? `args=>prepareNativeGoldfishAuthorityTerminal(args)`
+    : mode === "early" || mode === "fail-after-commit" ? `args=>prepareNativeGoldfishAuthorityTerminal(args)`
     : `args=>{const done=prepareNativeGoldfishAuthorityTerminal(args);writeFileSync(join(dir,'prepared-'+tag),'1');wait(join(dir,'prepared-'+other),60000);return done;}`;
-  const commit = mode === "early" ? `request=>{const landed=commitAdmittedNativeGoldfishReturn(request);writeFileSync(join(dir,'committed-'+tag),'1');return landed;}`
+  const commit = mode === "early" || mode === "fail-after-commit" ? `request=>{const landed=commitAdmittedNativeGoldfishReturn(request);writeFileSync(join(dir,'committed-'+tag),'1');return landed;}`
     : `request=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,300);return commitAdmittedNativeGoldfishReturn(request);}`;
   const url = (name) => JSON.stringify(new URL(name, import.meta.url).href);
   const script = `import {existsSync,readFileSync,writeFileSync} from 'node:fs';import {join} from 'node:path';`
@@ -126,6 +127,7 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sy
     + `import {prepareNativeGoldfishHostState,prepareNativeGoldfishAuthorityTerminal} from ${url("./native-goldfish-host-state.mjs")};`
     + `import {finalizeNativeGoldfishHostReturn} from ${url("./native-goldfish-host-finalizer.mjs")};`
     + `import {commitAdmittedNativeGoldfishReturn} from ${url("./agy-host-commit-execution.mjs")};`
+    + `import {writeNativeGoldfishStopOutcome} from ${url("./native-goldfish-stop-outcome.mjs")};`
     + `const root=${JSON.stringify(root)},dir=${JSON.stringify(dir)},tag=${JSON.stringify(tag)},other=${JSON.stringify(other)};`
     + `const wait=(path,ms)=>{const until=Date.now()+ms;while(!existsSync(path)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);};`
     + `const lead=tag.slice(0,-1)+'0';` // the first stop of a round ("t0", or "r2t0" in a later round) creates its runtime first
@@ -137,7 +139,11 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sy
     + `writeFileSync(join(dir,'admitted-'+tag),'1');wait(join(dir,'go'),120000);`
     + `result=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned},{`
     + `prepareTerminal:${prepareTerminal},`
+    // K-34: "fail-after-commit" fails right after its host commit where Glossover's platform stop did (the record draft refuses with the
+    // K-29 code), so it never writes the lineage proof, and then writes its stop outcome the way the hook's last step does.
+    + (mode === "fail-after-commit" ? `draftRecord:()=>({ok:false,code:'NGHF-CRITIC-PATH-DISPOSITION'}),` : "")
     + `commit:${commit}}));`
+    + (mode === "fail-after-commit" ? `writeNativeGoldfishStopOutcome({commonDir:repository.commonDir,dispatchId:launch.tool_use_id.replace(/^tool-/,''),result:{...result,status:'recovery-required'},message:'fixture'});` : "")
     + `}catch(error){result={thrown:String(error?.code??error?.message)};}`
     + `writeFileSync(join(dir,'out-'+tag+'.json'),JSON.stringify(result));`;
   return spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "ignore", openSync(join(dir, `stderr-${tag}.log`), "w")] });
@@ -149,7 +155,7 @@ async function concurrentPair(root, launches, round = "", { staged = false } = {
   const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), tags = launches.map((_, index) => `${round}t${index}`);
   const children = launches.map((one, index) => {
     writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
-    return stopChild({ root, tag: tags[index], dir, other: tags[(index + 1) % tags.length], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? "early" : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
+    return stopChild({ root, tag: tags[index], dir, other: tags[(index + 1) % tags.length], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? (staged === "sibling-fails" ? "fail-after-commit" : "early") : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
   });
   const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
   try {
@@ -447,6 +453,24 @@ const cases = [
     const chain = git(root, "rev-list", "--reverse", `${original.candidate.commit}..HEAD`).split("\n").filter(Boolean);
     assert.deepEqual([...chain].sort(), results.map((result) => result.commit).sort(), "the three host commits are exactly the new history");
     assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after the three stops");
+  }) },
+  { id: "NGSP9F", name: "K-34: a sibling stop that made its host commit and then failed leaves no lineage proof; the next stop refuses at once by name (sibling and commit) instead of waiting out its settle budget, and commits nothing", run: () => fixture(async ({ root }) => {
+    // Two real stops in their own processes, as in Glossover's run: the first commits and then fails after the commit (its platform stop
+    // did with the K-29 code), writes its stop outcome and never writes the lineage proof; the second starts its terminal preparation only then.
+    const { launch, original } = setup(root, { ownRuntime: false });
+    const first = launch(0), started = Date.now();
+    const [failed, second] = await concurrentPair(root, [first, launch(1)], "", { staged: "sibling-fails" });
+    const elapsed = Date.now() - started;
+    assert.notEqual(failed.status, "authored-commit-recorded", JSON.stringify(failed));
+    assert.match(String(failed.commit), /^[0-9a-f]{40}$/u, `the first stop made its host commit before it failed: ${JSON.stringify(failed)}`);
+    assert.equal(git(root, "rev-parse", `${failed.commit}^`), original.candidate.commit);
+    assert.equal(second.code, "NGHF-COMMIT-EXCEPTION", JSON.stringify(second));
+    assert.equal(second.detail?.reason, "native-concurrent-sibling-commit-unrecorded", JSON.stringify(second));
+    assert.equal(git(root, "rev-parse", "HEAD"), failed.commit, "the second stop committed nothing");
+    assert.ok(elapsed < 60000, `refused without waiting out the settle budget (${elapsed} ms for the whole pair)`);
+    const message = nativeGoldfishHookMessage(second, { root });
+    assert.match(message, new RegExp(`host commit of ${first.id} \\(host commit ${failed.commit.slice(0, 12)}\\)`), message);
+    assert.match(message, /Recover that sibling first/u, message);
   }) },
 ];
 

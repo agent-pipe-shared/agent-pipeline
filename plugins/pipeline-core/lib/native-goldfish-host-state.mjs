@@ -32,6 +32,7 @@ import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
 import { sliceQueueLocation, readSliceQueueSource, readBoundedFile, writeWorkingQueue, restoreWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 import { isSafeTaskId } from "./dispatch-record.mjs";
+import { readNativeGoldfishStopOutcome } from "./native-goldfish-stop-outcome.mjs";
 import { fileURLToPath } from "node:url";
 /** ADR-0097: what an item delivery is bound to -- its criterion locator, or its maintenance binding with the identity of the one red check (two maintenance deliveries of different checks never compare equal). Every comparator reads it through here. */
 const deliveryBinding=delivery=>isMaintenanceDelivery(delivery)?{maintenance:delivery.maintenance,checkSha256:maintenanceCheckSha256(delivery.checks?.[0])}:delivery?.criterionLocator;
@@ -818,7 +819,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
   if(current.association.state!=='bound')throw nativeManagedFault('native-concurrent-owner-unbound');
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
   const members=new Map(inspectNativeMemberRecords({boundary,port,producer}).map(member=>[member.record.bindingSha256,member.record]));
-  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),siblingScopes=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
+  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),siblingScopes=new Set(),foreignCommits=[],inFlightSiblings=[],settled=readSettledItemSliceIds({repository,boundary});
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
     if(!member||!pending.binding.itemDelivery||!pending.delivery||operation.association.state!=='bound')continue;
@@ -826,7 +827,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
     // known below, so a commit it already landed is still recognised as foreign (NGHS17).
     if(!settled.has(pending.delivery.sliceId)&&scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
     // Literal, retained original item scopes are the only foreign dirty paths.
-    if(member.phase!=='released')for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}
+    if(member.phase!=='released'){for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}inFlightSiblings.push(pending.binding.dispatchId);}
     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
     if(terminal){const observed=read.entries.find(row=>row.sourceFact.sha256===terminal.value.observationSha256);
       if(!observed||!observed.value.changedPaths.every(path=>pending.binding.allowedPaths.includes(path)))throw nativeManagedFault('native-concurrent-foreign-observation');
@@ -856,7 +857,15 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
     // write scope, check or dependency paths, exactly as a disjoint advance of the briefing's base is; one that touches them is refused by name, as before.
     // It must also touch no path of a sibling still in flight: such a commit may be that sibling's host commit whose proof is not written yet, and is then
     // refused here so that the settle loop waits for the proof and the receipt keeps its sibling lineage.
-    if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes]))throw nativeManagedFault('native-concurrent-unowned-head');parent=commit;unproven=true;continue;}
+    if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes])){
+      // K-34 (Glossover, 2026-11-13): a sibling stop that made this host commit and then failed (its stop outcome names the commit and is
+      // no recorded success) never writes the lineage proof, so the settle loop would wait for it until its budget ends. The commit is still
+      // refused (nothing proves its lineage), but at once and by name, so the failure says which sibling to recover first.
+      const failedSibling=inFlightSiblings.find(dispatchId=>{const outcome=readNativeGoldfishStopOutcome({commonDir:repository.commonDir,dispatchId,after:'1970-01-01T00:00:00.000Z'});
+        return typeof outcome?.commit==='string'&&outcome.commit.length>=7&&commit.startsWith(outcome.commit)&&outcome.status!=='authored-commit-recorded';});
+      if(failedSibling)throw Object.assign(nativeManagedFault('native-concurrent-sibling-commit-unrecorded'),{message:`native-concurrent-sibling-commit-unrecorded sibling ${failedSibling} commit ${commit.slice(0,12)}`,siblingDispatchId:failedSibling});
+      throw nativeManagedFault('native-concurrent-unowned-head');}
+      parent=commit;unproven=true;continue;}
     const observed=read.entries.find(row=>row.sourceFact.sha256===proof.observationSha256);
     if(observed.value.parent!==parent)throw nativeManagedFault('native-concurrent-parent-proof');
     lineage.push(proof);provenSteps.push({parent,commit});parent=commit;
