@@ -832,7 +832,10 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
     // known below, so a commit it already landed is still recognised as foreign (NGHS17).
     if(!settled.has(pending.delivery.sliceId)&&scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
     // Literal, retained original item scopes are the only foreign dirty paths.
-    if(member.phase!=='released'){for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}inFlightSiblings.push(pending.binding.dispatchId);}
+    // K-46 (Glossover 2026-11-14): a settled (cancelled or integrated) sibling may share paths with this slice, since the collision
+    // rule above admits it. Those shared paths belong to this live slice: kept as foreign, the admission dropped them from this
+    // slice's own change set (AGY-HOST-COMMIT-PATH-MISMATCH, "claimed but not changed"). Its other paths stay foreign as before.
+    if(member.phase!=='released'){const settledSibling=settled.has(pending.delivery.sliceId);for(const path of pending.binding.allowedPaths){if(settledSibling&&allowedPaths.includes(path))continue;foreignPaths.add(path);siblingScopes.add(path);}inFlightSiblings.push(pending.binding.dispatchId);}
     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
     if(terminal){const observed=read.entries.find(row=>row.sourceFact.sha256===terminal.value.observationSha256);
       if(!observed||!observed.value.changedPaths.every(path=>pending.binding.allowedPaths.includes(path)))throw nativeManagedFault('native-concurrent-foreign-observation');

@@ -1355,6 +1355,28 @@ const cases = [
     assert.equal(fourth.ok,true,JSON.stringify(fourth));
   })},
 
+  { id: "NGHS37K", name: "K-46 (Glossover 2026-11-14): the successor of a slice cancelled with --started hands back the paths it shares with that predecessor; the predecessor's retained scope is no foreign dirty path of its successor", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/successor-course'),sessionId:'successor-course-owner'});
+    assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+    const item=(sliceId,scope)=>{const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:[...new Set(['src/change.mjs','src/change.test.mjs',...scope])]}]};
+      const binding={...makeBinding({dispatchId:sliceId,commit:original.candidate.commit,tree:original.candidate.tree}),allowedPaths:scope,schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+      const input=toolInput('claude',{root,session:`session-${sliceId}`,toolUseId:`tool-${sliceId}`,binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${sliceId}\nWrite scope: ${scope.join(', ')}\n`;
+      return {binding,input,prepared:runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}))};};
+    // The predecessor starts on the shared path and stops without an edit; the orchestrator cancels it as started (wrong premise).
+    const predecessor=item('TEXTS',['src/change.mjs']);assert.equal(predecessor.prepared.ok,true,JSON.stringify(predecessor.prepared));
+    const cancelled=runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'TEXTS',reason:'scope gains one path',started:true,cancelClass:'wrong-premise'}));
+    assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));
+    // The successor keeps the predecessor's path and adds one, under a new id, then delivers both.
+    const successor=item('TEXTS-2',['src/change.mjs','src/extra.mjs']);assert.equal(successor.prepared.ok,true,JSON.stringify(successor.prepared));
+    writeFileSync(join(root,'src/change.mjs'),"export const value='expected'; // TEXTS-2 delivery\n");writeFileSync(join(root,'src/extra.mjs'),'export const extra=1;\n');
+    const returned={...successor.input,hook_event_name:'PostToolUse',tool_response:{status:'completed',resolvedModel:'sonnet',content:[{type:'text',text:JSON.stringify({schema:'pipeline.native-goldfish-host-return.v1',dispatchId:'TEXTS-2',candidateCommit:successor.binding.candidateCommit,outcome:'succeeded',report:'Successor delivery.',changedPaths:['src/change.mjs','src/extra.mjs']})}]}};
+    const finished=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned}));
+    assert.equal(finished.status,'authored-commit-recorded',JSON.stringify(finished));
+    assert.deepEqual(spawnSync('git',['-C',root,'show','--name-only','--format=','HEAD'],{encoding:'utf8'}).stdout.trim().split('\n').sort(),['src/change.mjs','src/extra.mjs']);
+  })},
+
   { id: "NGHS38", name: "a slice with an unreleased AGY reservation counts as started: its cancel needs --started, with or without a registry (Critic F2)", run: () => fixture(({ root }) => {
     const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
     const original=prepareApprovedItemCourseFixture({root});
