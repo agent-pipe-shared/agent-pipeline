@@ -3,7 +3,7 @@
  * C28e (PO tiles 2026-11-12): the ONE machine-readable list of every program the Pipeline needs on a machine, and of the optional ones it can use.
  *
  * It feeds three readers and has no second copy anywhere:
- *   - the user document docs/toolchain.md (rendered by lib/toolchain-doc.mjs, written by harness/scripts/generate-toolchain-doc.mjs, drift-checked
+ *   - the user document docs/toolchain.md (rendered by lib/toolchain-doc.mjs, written by the source repository's generator script, drift-checked
  *     by lib/toolchain-registry.test.mjs),
  *   - the toolchain preflight (scripts/toolchain-preflight.mjs): the major-version floors it checks and the document pointer it prints,
  *   - the environment readiness findings the start preflight carries (each scanner finding names its class and its section of the document).

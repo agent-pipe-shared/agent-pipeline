@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * C28e: renders docs/toolchain.md from the one tool registry (lib/toolchain-registry.mjs). harness/scripts/generate-toolchain-doc.mjs writes it;
+ * C28e: renders docs/toolchain.md from the one tool registry (lib/toolchain-registry.mjs). The source repository's generator script writes it;
  * lib/toolchain-registry.test.mjs fails when the committed file differs from this rendering, so the document never drifts from the registry.
  */
 import { TOOLCHAIN_REGISTRY } from "./toolchain-registry.mjs";
@@ -28,7 +28,7 @@ export function renderToolchainDoc() {
   const lines = [
     "# Tools the Pipeline needs",
     "",
-    "<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->",
+    "<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by the source repository's generate-toolchain-doc script; do not edit by hand. -->",
     "",
     "Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\\Program Files` directories and `%USERPROFILE%\\.local\\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.",
     "",
