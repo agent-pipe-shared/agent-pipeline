@@ -42,9 +42,19 @@ if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import
 
 /** Called by the original Elephant host return adapter after actual checks.
  * This readback never runs ordinary checks again or trusts terminal prose. */
-export function qualifyNativeGoldfishHookDelivery({root,result}={}) {
+export function qualifyNativeGoldfishHookDelivery({root,result,deadlineMs=null}={}) {
   if(result?.status!=='authored-commit-recorded'||!result.delivery?.pendingSha256)return result;
-  return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256})};
+  return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256},{deadlineMs})};
+}
+
+/** C29 K-38: the host timeout this hook runs under, per event, as hooks.json and codex-hooks.json register it (PreToolUse is the
+ * SubagentHandback matcher at 120 s; every other registration is 300 s; a pin compares both files). The integration's sibling-race retries end
+ * NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS before that timeout, counted from process start, so a stop whose finalize already used most of the
+ * window still writes its stop outcome and message before the host ends it. */
+export const NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS = 30_000;
+export function nativeHookTimeoutMs(event) { return event === "PreToolUse" ? 120_000 : 300_000; }
+export function nativeHookIntegrationDeadlineMs({ event, startedMs = performance.timeOrigin } = {}) {
+  return startedMs + nativeHookTimeoutMs(event) - NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS;
 }
 
 /** D31/D32: the Claude SubagentStop block decision for a recorded checkpoint, or null.
@@ -354,7 +364,7 @@ if (isDirectInvocation(import.meta.url)) {
   // A stop hook never blocks the stop, with one deliberate exception (D31/D32): a recorded checkpoint with a remaining
   // budget grant makes the Claude SubagentStop block once so the Goldfish continues. Every fault degrades to the recovery
   // message, exit 0.
-  try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
+  try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result,deadlineMs:nativeHookIntegrationDeadlineMs({event:input.hook_event_name})}); }
   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
   // G20-63: a Codex SubagentStart that bound nothing says so to the starting child (additionalContext), not only on the hook's stderr.
   if (runner === "codex" && input.hook_event_name === "SubagentStart" && result?.code === "NGHS-CODEX-START-UNBOUND") {

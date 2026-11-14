@@ -2106,18 +2106,27 @@ export function requalifyNativeGoldfishItemDelivery(input={}) {
 /** C29 K-38 (Glossover, parallel run 2026-11-14): the stop's integration ran once, so a sibling stop writing the registry at the same moment
  * (SDC-AUTHORITY-CAS, a held lock, or one of the sibling races the terminal release already retries) left a delivered item "integration refused".
  * Those refusals are now repeated on a fresh boundary, as the terminal release does: at least NATIVE_BOUNDARY_REBIND_LIMIT rounds and further
- * rounds while the stop's wait budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned. */
-export const NATIVE_INTEGRATION_RETRY_CODES=Object.freeze(['SDC-AUTHORITY-CAS','SDC-LOCK-HELD']);
+ * rounds while the retry budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned.
+ * Only race reasons are repeated: SDC-AUTHORITY-CAS also carries structural refusals (a broken binding, a duplicate member, a drifted namespace)
+ * that a fresh boundary cannot cure, so the code alone never qualifies. `deadlineMs` is a hard end the caller owns (the stop hook passes what is
+ * left of its own host timeout); no round starts after it, the minimum round count included. */
+export const NATIVE_INTEGRATION_RACE_REFUSALS=Object.freeze({
+  'SDC-LOCK-HELD':Object.freeze(['registry-lock-held']),
+  'SDC-AUTHORITY-CAS':Object.freeze(['reference-preimage-changed','publication-preimage-changed','read-generation-drift','release-prefix-changed','member-record-not-current','domain-transition-registry-concurrent-writer']),
+});
+export const NATIVE_INTEGRATION_RETRY_BUDGET_MS=60_000;
 export function integrationRefusalIsSiblingRace(result){
-  return result?.status==='refused'&&(NATIVE_INTEGRATION_RETRY_CODES.includes(result.code)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason));
+  if(result?.status!=='refused')return false;
+  return (NATIVE_INTEGRATION_RACE_REFUSALS[result.code]??[]).includes(result.reason)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason);
 }
-export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=nativeStopWaitBudgetMs(),now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
+export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=NATIVE_INTEGRATION_RETRY_BUDGET_MS,deadlineMs=null,now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
   const start=now();
   for(let attempt=1;;attempt+=1){
     const result=once(args);
     if(!integrationRefusalIsSiblingRace(result))return result;
     const wait=Math.min(100*attempt,1000);
-    if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs)return {...result,attempts:attempt};
+    const pastDeadline=Number.isFinite(deadlineMs)&&now()+wait>deadlineMs;
+    if(pastDeadline||(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs))return {...result,attempts:attempt};
     pause(wait);
   }
 }
