@@ -24,11 +24,14 @@ function shippedModules(dir) {
   return out;
 }
 
+test("the guarded bound is the 1 MiB source-entry bound, and the walk reaches the largest module", () => {
+  assert.equal(SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes, 1048576, "the bound this pin guards changed; re-check the margin and the native Windows reader's own clamp");
+  assert.ok(shippedModules(PLUGIN_ROOT).some((path) => path.endsWith(join("scripts", "pipeline-state.mjs"))), "the largest module is part of the walk");
+});
+
 test("every shipped plugin module stays at least 4 KiB below the session authority's source-entry bound", () => {
   const bound = SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes;
-  assert.equal(bound, 1048576, "the bound this pin guards changed; re-check the margin and the native Windows reader's own clamp");
   const modules = shippedModules(PLUGIN_ROOT);
-  assert.ok(modules.some((path) => path.endsWith(join("scripts", "pipeline-state.mjs"))), "the largest module is part of the walk");
   const over = modules.map((path) => ({ path: relative(PLUGIN_ROOT, path), size: statSync(path).size })).filter(({ size }) => size > bound - MARGIN_BYTES);
   assert.deepEqual(over, [], `modules within ${MARGIN_BYTES} bytes of the ${bound}-byte bound: move code out (as ADR-0100's replace route moved to lib/verify-replacement.mjs) instead of raising the bound`);
 });
