@@ -7,7 +7,10 @@
 //          GREEN/RED, exit code, tests/pass/fail/skip/todo counts, the file and the worker, plus failing case names.
 //          Exit 0 only when every file exits 0; exit 2 on a usage error or a dirty source (see below).
 // Data:    worker clones scratch/clones/pw-<label>-<n> (untracked, reused between runs); worker HOME/TMPDIR under
-//          <home>/pipeline-test-tmp/par-<label> (removed and recreated each run, outside every repository).
+//          <home>/.ptp/<8-hex digest of the label>/h<n> and t<n> (removed and recreated each run, outside every
+//          repository). The worker HOME is kept short on purpose: test fixtures place a synthetic home under it, and
+//          the session-power socket address beneath that home must fit Linux's 107-byte limit. A HOME over 40 bytes
+//          sent those fixtures into the checkout, where the address no longer fits (SP-ADDRESS, e.g. SHDQ002-007).
 // Not read-only: it writes only the worker clones and temp dirs, never the source checkout.
 // Staleness fix (K53): a worker clone ran whatever commit it last saw. It is now force-checked-out to the source's
 // exact HEAD (fetch + detached checkout + clean) on every run, the commit is printed, and a source with uncommitted
@@ -17,6 +20,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, chmodSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { createHash } from "node:crypto";
 const argv = process.argv.slice(2);
 const allowDirty = argv.includes("--allow-dirty");
 const [nArg, label, ...rest0] = argv.filter((a) => a !== "--allow-dirty");
@@ -37,7 +41,7 @@ if (dirty.length > 0 && !allowDirty) {
   for (const d of dirty.slice(0, 10)) console.error(`  ${d}`);
   process.exit(2);
 }
-const base = join(homedir(), "pipeline-test-tmp", `par-${label}`);
+const base = join(homedir(), ".ptp", createHash("sha256").update(label).digest("hex").slice(0, 8));
 rmSync(base, { recursive: true, force: true });
 mkdirSync(base, { recursive: true, mode: 0o700 });
 const syncClone = (clone) => {
@@ -58,7 +62,8 @@ const lanes = Array.from({ length: workers }, (_, n) => {
   }
   const got = gitIn(clone, "rev-parse", "HEAD");
   if (got !== srcCommit) { console.error(`run-parallel: worker ${n} is at ${got} but the source HEAD is ${srcCommit}`); process.exit(2); }
-  const home = join(base, `home-${n}`); const tmp = join(base, `tmp-${n}`);
+  const home = join(base, `h${n}`); const tmp = join(base, `t${n}`);
+  if (Buffer.byteLength(home) > 40) console.error(`run-parallel: WARNING worker HOME ${home} is over 40 bytes; fixtures that need a socket address under it fall back to the checkout and fail SP-ADDRESS`);
   for (const d of [home, tmp]) { mkdirSync(d, { recursive: true, mode: 0o700 }); chmodSync(d, 0o700); }
   writeFileSync(join(home, ".gitconfig"), `[user]\n\tname = ${name}\n\temail = ${email}\n`);
   return { n, clone, home, tmp, queue: [] };

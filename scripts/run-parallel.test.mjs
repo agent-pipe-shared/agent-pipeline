@@ -89,3 +89,17 @@ test("a source whose history was rewritten does not crash the worker sync", () =
   assert.match(r.stdout, new RegExp(`commit=${git(src, "rev-parse", "HEAD")}`));
   assert.match(r.stdout, /tests 3 /);
 });
+
+test("the worker HOME is <home>/.ptp/<8 hex>/h<n> whatever the label length (SHDQ socket-address room)", () => {
+  // A fixture places a synthetic home under the worker HOME and needs a session-power socket address beneath it
+  // (107 bytes); a long label used to make the worker HOME too long, so SHDQ002-007 failed SP-ADDRESS on every worker.
+  initSrc(1);
+  writeFileSync(join(src, "b.test.mjs"), `import test from "node:test";\nimport assert from "node:assert/strict";\ntest("short worker home", () => { assert.match(process.env.HOME, /^${home.replace(/[/.]/g, (c) => "\\" + c)}\\/\\.ptp\\/[0-9a-f]{8}\\/h0$/); });\n`);
+  git(src, "add", "b.test.mjs");
+  git(src, "commit", "--quiet", "-m", "home shape");
+  const r = spawnSync(process.execPath, [runner, "1", "a-very-long-label-name-for-the-home-shape", "--src", src, "b.test.mjs"], {
+    cwd: work, encoding: "utf8", env: { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: sandbox, NODE_TEST_CONTEXT: "" },
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /GREEN/);
+});
