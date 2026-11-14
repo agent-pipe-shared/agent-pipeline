@@ -96,3 +96,7 @@ Known limits:
 - ADR-0085 (the fitness model is materialized from the approved design);
 - ADR-0014 (the Critic input carries the gate changes);
 - ADR-0091 / ADR-0090 (the close and its audit bundle).
+
+## Amendment 2026-11-14: a signed verify-command replacement is its own proof kind (ADR-0100, D252)
+
+Decision 3 gains one proof kind for `GS-10`/`GS-11`: a configure-verify transition record of this device that carries a `replacement` member counts only when the approval of kind `replace-verify-command` with that subject digest is in this device's store, and then as `verify-replacement` -- no label when signed, "chat-attributed, not signed" otherwise. Such a record never falls back to the first-configuration kind `configure-verify`. Device-local as before; on another machine the change needs the acknowledgement of Decision 4.

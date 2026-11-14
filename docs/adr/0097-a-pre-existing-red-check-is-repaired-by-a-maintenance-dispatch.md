@@ -72,3 +72,7 @@ Known limits:
 - ADR-0061 / ADR-0074 (the critical ceremony and its new kind);
 - ADR-0014 (the Critic packet fields);
 - D195 (`command:<id>` checks); D205 (a shared item no longer blocks; only the slice or an overlapping write scope does).
+
+## Amendment 2026-11-14: a replaced verify command repairs nothing (ADR-0100, D252)
+
+Decision 4's green-after-delivery receipt for the check `verify:configured` counts only when the calibrated verify command at the receipt's commit equals the one at the slice's base commit (when the base is readable). A verify command replaced between the red observation and the green receipt therefore never turns the check green by itself.
