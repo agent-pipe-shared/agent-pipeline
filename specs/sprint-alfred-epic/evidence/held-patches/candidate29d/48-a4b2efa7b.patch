@@ -1,0 +1,58 @@
+diff --git a/docs/toolchain.md b/docs/toolchain.md
+index af602f5ce12a2f3cb41c558d8a8f3c02131fd8d1..41b179d64d92afb06e3f62899c51a3e352251467 100644
+--- a/docs/toolchain.md
++++ b/docs/toolchain.md
+@@ -1,6 +1,6 @@
+ # Tools the Pipeline needs
+ 
+-<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->
++<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by the source repository's generate-toolchain-doc script; do not edit by hand. -->
+ 
+ Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\Program Files` directories and `%USERPROFILE%\.local\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.
+ 
+diff --git a/plugins/pipeline-core/docs/toolchain.md b/plugins/pipeline-core/docs/toolchain.md
+index af602f5ce12a2f3cb41c558d8a8f3c02131fd8d1..41b179d64d92afb06e3f62899c51a3e352251467 100644
+--- a/plugins/pipeline-core/docs/toolchain.md
++++ b/plugins/pipeline-core/docs/toolchain.md
+@@ -1,6 +1,6 @@
+ # Tools the Pipeline needs
+ 
+-<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->
++<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by the source repository's generate-toolchain-doc script; do not edit by hand. -->
+ 
+ Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\Program Files` directories and `%USERPROFILE%\.local\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.
+ 
+diff --git a/plugins/pipeline-core/lib/toolchain-doc.mjs b/plugins/pipeline-core/lib/toolchain-doc.mjs
+index cd720dad19edac82b23d4a44a4ac13157ad5877d..4777ea7775ed9de3ffa4826b3fa2e438cea02a12 100644
+--- a/plugins/pipeline-core/lib/toolchain-doc.mjs
++++ b/plugins/pipeline-core/lib/toolchain-doc.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /**
+- * C28e: renders docs/toolchain.md from the one tool registry (lib/toolchain-registry.mjs). harness/scripts/generate-toolchain-doc.mjs writes it;
++ * C28e: renders docs/toolchain.md from the one tool registry (lib/toolchain-registry.mjs). The source repository's generator script writes it;
+  * lib/toolchain-registry.test.mjs fails when the committed file differs from this rendering, so the document never drifts from the registry.
+  */
+ import { TOOLCHAIN_REGISTRY } from "./toolchain-registry.mjs";
+@@ -28,7 +28,7 @@ export function renderToolchainDoc() {
+   const lines = [
+     "# Tools the Pipeline needs",
+     "",
+-    "<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->",
++    "<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by the source repository's generate-toolchain-doc script; do not edit by hand. -->",
+     "",
+     "Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\\Program Files` directories and `%USERPROFILE%\\.local\\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.",
+     "",
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.mjs b/plugins/pipeline-core/lib/toolchain-registry.mjs
+index 351547076f4d912b2da4eb87374f0f34d23bc8aa..f032929c8dc0dd94654d77f397cadfbe63b6ba3c 100644
+--- a/plugins/pipeline-core/lib/toolchain-registry.mjs
++++ b/plugins/pipeline-core/lib/toolchain-registry.mjs
+@@ -3,7 +3,7 @@
+  * C28e (PO tiles 2026-11-12): the ONE machine-readable list of every program the Pipeline needs on a machine, and of the optional ones it can use.
+  *
+  * It feeds three readers and has no second copy anywhere:
+- *   - the user document docs/toolchain.md (rendered by lib/toolchain-doc.mjs, written by harness/scripts/generate-toolchain-doc.mjs, drift-checked
++ *   - the user document docs/toolchain.md (rendered by lib/toolchain-doc.mjs, written by the source repository's generator script, drift-checked
+  *     by lib/toolchain-registry.test.mjs),
+  *   - the toolchain preflight (scripts/toolchain-preflight.mjs): the major-version floors it checks and the document pointer it prints,
+  *   - the environment readiness findings the start preflight carries (each scanner finding names its class and its section of the document).
