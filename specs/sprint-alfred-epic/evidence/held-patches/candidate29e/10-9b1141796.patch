@@ -1,0 +1,87 @@
+diff --git a/harness/scripts/check-dispatch-provenance.mjs b/harness/scripts/check-dispatch-provenance.mjs
+index abd7b840f106a2ade1ea73d9433a7292833f9efb..eb42eef9f6646bee78d9912e1604884fe6689d59 100644
+--- a/harness/scripts/check-dispatch-provenance.mjs
++++ b/harness/scripts/check-dispatch-provenance.mjs
+@@ -25,7 +25,9 @@
+  * resolves a prior stop on whether EL-01's stage-0 fast-path exemption
+  * (roles/elephant.md, EL-01) can be auto-detected from commit metadata
+  * alone). A commit is a recognized exemption ONLY if BOTH hold:
+- *   (a) its message contains a case-insensitive match for the phrase
++ *   (a) its message carries the exact trailer `Dispatch: stage-0 (elephant)`
++ *       (`agent-obligations.md` §6, ADR-0101), or, with no `Dispatch:` line,
++ *       contains a case-insensitive match for the phrase
+  *       "stage-0 fast path" — the self-declaration phrasing every real
+  *       stage-0 commit in this repo has used to date (verified against
+  *       a54f53b1, bf6abb76, 4a7a750f, 8b8181639, 034ce1d2, 14743192 via
+@@ -232,6 +234,8 @@ function hasFinalIntegrationSignal(message) {
+ // ------------------------------------------------------- stage-0 exemption
+ 
+ const STAGE0_PHRASE_RE = /stage-0 fast path/i;
++/** The direct-Elephant trailer value (`agent-obligations.md` §6, ADR-0101), exact. */
++export const STAGE0_TRAILER_VALUE = "stage-0 (elephant)";
+ 
+ /** Case-insensitive self-declaration match (module header, "THE STAGE-0
+  *  EXEMPTION", condition (a)). */
+@@ -483,17 +487,20 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate,
+       continue; // valid Dispatch: trailer -- OK
+     }
+ 
+-    if (trailer.present && !trailer.valid) {
++    // ADR-0101: `Dispatch: stage-0 (elephant)` is the stage-0 self-declaration
++    // (agent-obligations.md §6), like the phrase; the same caps apply to it.
++    const stage0Trailer = trailer.present && trailer.raw === STAGE0_TRAILER_VALUE;
++    if (trailer.present && !trailer.valid && !stage0Trailer) {
+       findings.push(
+         `MISSING-DISPATCH-PROVENANCE ${sha} reason=malformed-trailer -- "Dispatch:" line present but does not match ` +
+-        `"Dispatch: <TASK_ID> (goldfish|critic)": "${trailer.raw}"`,
++        `"Dispatch: <TASK_ID> (goldfish|critic)" or "Dispatch: ${STAGE0_TRAILER_VALUE}": "${trailer.raw}"`,
+       );
+       continue;
+     }
+ 
+-    // No Dispatch: line at all -- the only remaining route is the
++    // No valid Dispatch: line -- the only remaining route is the
+     // conservative stage-0 exemption (module header, "THE STAGE-0 EXEMPTION").
+-    if (!hasStage0Phrase(message)) {
++    if (!stage0Trailer && !hasStage0Phrase(message)) {
+       findings.push(
+         `MISSING-DISPATCH-PROVENANCE ${sha} reason=no-trailer-no-exemption -- no "Dispatch:" trailer and no ` +
+         `"stage-0 fast path" self-declaration in the commit message`,
+@@ -508,7 +515,7 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate,
+     }
+ 
+     findings.push(
+-      `MISSING-DISPATCH-PROVENANCE ${sha} reason=stage0-claim-caps-exceeded -- "stage-0 fast path" phrase present but ` +
++      `MISSING-DISPATCH-PROVENANCE ${sha} reason=stage0-claim-caps-exceeded -- stage-0 self-declaration (trailer or "stage-0 fast path" phrase) present but ` +
+       `mechanical caps not met (${caps.filesChanged} files / ${caps.linesChanged} changed lines / ` +
+       `${caps.productionLinesChanged} production lines; cap is <=${STAGE0_MAX_FILES} files / <=${STAGE0_MAX_LINES} lines / ` +
+       `<=${STAGE0_MAX_PRODUCTION_LINES} production lines, EL-01, ADR-0101); not recognized as an exemption -- either a false ` +
+diff --git a/harness/scripts/check-dispatch-provenance.test.mjs b/harness/scripts/check-dispatch-provenance.test.mjs
+index 1f6af9fd3293d88c6691a3dc157cc0fef8d763c1..d6924bfecc80d639e03cd3a2b57a595eb498d028 100644
+--- a/harness/scripts/check-dispatch-provenance.test.mjs
++++ b/harness/scripts/check-dispatch-provenance.test.mjs
+@@ -208,6 +208,24 @@ check("behaviour: phrase present + 26 lines in one code file -> flagged by the p
+   cleanup(root);
+ });
+ 
++check("behaviour: the Dispatch: stage-0 (elephant) trailer is the stage-0 self-declaration: within caps clears, over the production cap is flagged", () => {
++  const root = buildRoot();
++  writeFile(root, "src/seed.txt", "seed\n");
++  const base = commit(root, "base");
++  writeFile(root, "src/alpha.mjs", nLines(20, "alpha"));
++  writeFile(root, "src/alpha.test.mjs", nLines(30, "alpha-test"));
++  const within = commit(root, "fix(x): small repair with its test\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
++  const clean = run(root, base, within);
++  assert.equal(clean.ok, true, clean.findings.join("\n"));
++  assert.equal(clean.coverage.commitsExempt, 1);
++  writeFile(root, "src/beta.mjs", nLines(26, "beta"));
++  const over = commit(root, "fix(x): larger repair\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
++  const flagged = run(root, within, over);
++  assert.equal(flagged.ok, false);
++  assert.ok(findingsOf(flagged, "MISSING-DISPATCH-PROVENANCE").some((f) => f.includes("reason=stage0-claim-caps-exceeded")), flagged.findings.join("\n"));
++  cleanup(root);
++});
++
+ check("behaviour: phrase present + files cap exceeded (4 files) -> flagged even with tiny diffs", () => {
+   const root = buildRoot();
+   writeFile(root, "src/seed.txt", "seed\n");

@@ -1,0 +1,275 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 66d8da0b9321371d53537976e36b6d4b2d350e26..9771743699bc5e7699f5daa26f6a392b5cd44454 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -154,21 +154,28 @@ sanitized receipt rather than an implementation decision.
+ ### 3.3 Stage-0 fast path
+ 
+ The stage-0 fast path is a narrow, self-contained exception (EL-01) letting an
+-interactive Elephant session execute a fix itself instead of dispatching a
+-Goldfish. It applies only when a task meets ALL of the following criteria:
+-
+-1. Touches at most 2 files.
+-2. Is at most roughly 25 diff lines.
+-3. Makes no architecture, schema, public-API, test, guardrail-hook-CI,
+-   dependency, or security-surface change.
+-4. Is trivially `git revert`-able.
+-5. Has no risk flag set.
+-
+-If ALL five criteria hold, the interactive Elephant session MAY execute the
+-fix itself. `verify` and the evidence artifact remain mandatory regardless. A
+-Critic run is required only if the risk flag is set. This exception is scoped
+-exclusively to this definition — it is not extended by local judgment;
+-anything outside these criteria still requires a Goldfish dispatch.
++interactive Elephant session execute a change itself instead of dispatching a
++Goldfish, at any rigor level
++(ADR-0101).
++It applies only when a task meets ALL of the following criteria:
++
++1. Touches at most 3 files.
++2. Is at most 60 changed lines (additions plus deletions) and one concern.
++3. At most 25 of those lines are production logic (code files that are not
++   tests).
++4. Makes no architecture, schema, public-API, guardrail-hook-CI, dependency,
++   or security-surface change. Tests and pins may be changed or added, except
++   a test that checks the Elephant's own new logic from the same change.
++5. Is trivially `git revert`-able.
++6. Has no risk flag set.
++
++If ALL six criteria hold, the interactive Elephant session MAY execute the
++change itself. The affected tests are green before the commit; `verify` and
++the evidence artifact remain mandatory regardless; the commit carries the
++trailer `Dispatch: stage-0 (elephant)`. A Critic run is required only if the
++risk flag is set. This exception is scoped exclusively to this definition — it
++is not extended by local judgment; anything outside these criteria still
++requires a Goldfish dispatch.
+ 
+ ### 3.4 Administrative role work and local commits
+ 
+diff --git a/harness/definition-of-done.md b/harness/definition-of-done.md
+index 2b1e4b4b69233b1c452d3c8f4cea9b5ea6978434..4dda120d32a286db7c798522426c06a3e936dac8 100644
+--- a/harness/definition-of-done.md
++++ b/harness/definition-of-done.md
+@@ -93,7 +93,7 @@ Per-check results inside reports are three-valued as well: **pass / fail / not v
+ 
+ Invariant first: **A1–A5 (verify + evidence) are mandatory at every level — there is no path around the deterministic gates** (`docs/operating-model.md` — *Rigor, risk and gates*). Everything else scales with the rigor level:
+ 
+-**Rigor-0 eligibility (canonical definition):** `roles/elephant.md` — *EL-01* carries the full stage-0 fast-path definition — size limits and exclusion list — and is the sole place it is defined. This table does not repeat it, it only lists the resulting DoD toll per rigor column; a task that fails those criteria is not rigor-0 regardless of what this table shows.
++**Stage-0 fast path (canonical definition):** `roles/elephant.md` — *EL-01* carries the full stage-0 fast-path definition — size limits and exclusion list — and is the sole place it is defined. It decides who may author a change, not the rigor level: it applies at every rigor (ADR-0101). This table does not repeat it; it only lists the DoD toll per rigor column.
+ 
+ | Requirement | Rigor 0 (issue-only) | Rigor 1 (delta spec) | Rigor 2 (spec-anchored) | DoD item |
+ |---|---|---|---|---|
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index a247d7c23cbae5316e55a1d8be760a8f73769f85..c7a3ad0af8aa224de69a11256959a8be25ea1000 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -274,8 +274,9 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put("    excludes the work — that is the failure this pair exists to make visible.");
+   put("  - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded");
+   put("    fast-path fix. Implementation self-execution still requires every");
+-  put("    fast-path criterion in operating-model §3.3, including at most 2 files and");
+-  put("    roughly 25 diff lines. The trailer does not establish those criteria or");
++  put("    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,");
++  put("    at most 60 changed lines, at most 25 of them production logic, tests green.");
++  put("    The trailer does not establish those criteria or");
+   put("    waive path, phase, signature or protected-source gates.");
+   put("  - `Dispatch: design (elephant)` — the direct-Elephant trailer for");
+   put("    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch");
+diff --git a/harness/scripts/generate-elephant-role-prohibitions.mjs b/harness/scripts/generate-elephant-role-prohibitions.mjs
+index 7a2c68e99bbe9b40d192b4d5dfd30366a5bf701c..a07fa34e82d099aa5301051ab0617230cc2099fc 100644
+--- a/harness/scripts/generate-elephant-role-prohibitions.mjs
++++ b/harness/scripts/generate-elephant-role-prohibitions.mjs
+@@ -145,7 +145,7 @@ export const EXCLUDED_EL_IDS = Object.freeze({
+ // generator cannot detect; grep for "Role prohibitions loaded" before
+ // touching it.
+ const CONFIRMATION_TAIL =
+-  " — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony";
++  " — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony";
+ 
+ const HEADING3_RE = /^### (EL-\d+[a-z]?) \((MUST(?: NOT)?)\)\s*(?:—|-)\s*(.+)$/u;
+ const HEADING2_RE = /^## \d+[a-zA-Z]?\.\s*.*\((EL-\d+[a-z]?)\)\s*$/u;
+diff --git a/harness/session-bootstrap.md b/harness/session-bootstrap.md
+index a95033e40789821bd9d6e4ed925e3b9554d441c4..09b1a959e13324effc7a7f0455a124b0b74585d2 100644
+--- a/harness/session-bootstrap.md
++++ b/harness/session-bootstrap.md
+@@ -163,7 +163,7 @@ continues to govern consent and tool/export boundaries.
+ 
+ This step ends in a **third mandatory confirmation line** (printed directly under the model/effort line; literally checked like line 1 — format → §6.1):
+ 
+-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
++> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
+ 
+ ### Step 2 — Staleness check against the marketplace remote
+ 
+@@ -311,7 +311,7 @@ All mandatory steps including **1b** (set and verify model/effort per model-poli
+ 
+ Directly below that, per **1d**, a **third line**:
+ 
+-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
++> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
+ 
+ The Elephant must additionally be able to speak to the session-lifecycle policy (Elephant retention at full context, Goldfish cadence — a mandatory part of the operating model, → `docs/operating-model.md`); the bootstrap loads no extra files for this, the policy ships with the ruleset.
+ 
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 66d8da0b9321371d53537976e36b6d4b2d350e26..9771743699bc5e7699f5daa26f6a392b5cd44454 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -154,21 +154,28 @@ sanitized receipt rather than an implementation decision.
+ ### 3.3 Stage-0 fast path
+ 
+ The stage-0 fast path is a narrow, self-contained exception (EL-01) letting an
+-interactive Elephant session execute a fix itself instead of dispatching a
+-Goldfish. It applies only when a task meets ALL of the following criteria:
+-
+-1. Touches at most 2 files.
+-2. Is at most roughly 25 diff lines.
+-3. Makes no architecture, schema, public-API, test, guardrail-hook-CI,
+-   dependency, or security-surface change.
+-4. Is trivially `git revert`-able.
+-5. Has no risk flag set.
+-
+-If ALL five criteria hold, the interactive Elephant session MAY execute the
+-fix itself. `verify` and the evidence artifact remain mandatory regardless. A
+-Critic run is required only if the risk flag is set. This exception is scoped
+-exclusively to this definition — it is not extended by local judgment;
+-anything outside these criteria still requires a Goldfish dispatch.
++interactive Elephant session execute a change itself instead of dispatching a
++Goldfish, at any rigor level
++(ADR-0101).
++It applies only when a task meets ALL of the following criteria:
++
++1. Touches at most 3 files.
++2. Is at most 60 changed lines (additions plus deletions) and one concern.
++3. At most 25 of those lines are production logic (code files that are not
++   tests).
++4. Makes no architecture, schema, public-API, guardrail-hook-CI, dependency,
++   or security-surface change. Tests and pins may be changed or added, except
++   a test that checks the Elephant's own new logic from the same change.
++5. Is trivially `git revert`-able.
++6. Has no risk flag set.
++
++If ALL six criteria hold, the interactive Elephant session MAY execute the
++change itself. The affected tests are green before the commit; `verify` and
++the evidence artifact remain mandatory regardless; the commit carries the
++trailer `Dispatch: stage-0 (elephant)`. A Critic run is required only if the
++risk flag is set. This exception is scoped exclusively to this definition — it
++is not extended by local judgment; anything outside these criteria still
++requires a Goldfish dispatch.
+ 
+ ### 3.4 Administrative role work and local commits
+ 
+diff --git a/plugins/pipeline-core/roles/elephant.md b/plugins/pipeline-core/roles/elephant.md
+index dbd13a5769ccaaf4acecdd06d80587d945a35a79..c00376c1848cb5bf05f7ecf27a54e0d7322220c6 100644
+--- a/plugins/pipeline-core/roles/elephant.md
++++ b/plugins/pipeline-core/roles/elephant.md
+@@ -32,7 +32,7 @@ You are the **Elephant** — the orchestrator of the Agent-Pipeline.
+ - **Rule:** You write no production code. Your outputs are specs, plans, briefings, gate decisions, register/ADR entries, handover updates.
+ - **Why:** Execution needs fresh context; you must stay lean and unbiased for the gate decision (self-confirmation bias: whoever built it cannot judge it coldly).
+ - **Check:** Production diffs originate from Goldfish sessions; commit/session trailers prove authorship — verified at close by the mandatory authorship check.
+-- **Exception (rigor-0 fast-path only):** for a task that fully meets the stage-0 fast-path definition — ALL criteria: ≤ 2 files, ≤ ~25 diff lines, no architecture/schema/public-API/test/guardrail-hook-CI/dependency/security-surface change, trivially `git revert`-able, and no risk flag set — the interactive Elephant session MAY execute the fix itself. `verify` + the evidence artifact remain mandatory; a Critic run is required only if the risk flag is set. This exception is scoped EXCLUSIVELY to this definition — do not extend it by local judgment; anything outside those criteria still requires a Goldfish dispatch.
++- **Exception (stage-0 fast path only, ADR-0101):** for a task that fully meets the stage-0 fast-path definition, at any rigor level — ALL criteria: ≤ 3 files, ≤ 60 changed lines, one concern, ≤ 25 of those lines production logic (code files that are not tests), no architecture/schema/public-API/guardrail-hook-CI/dependency/security-surface change, trivially `git revert`-able, and no risk flag set; tests and pins may be changed or added, except a test that checks your own new logic from the same change — the interactive Elephant session MAY execute the change itself. The affected tests are green before the commit, `verify` + the evidence artifact remain mandatory, and the commit carries `Dispatch: stage-0 (elephant)`; a Critic run is required only if the risk flag is set. This exception is scoped EXCLUSIVELY to this definition — do not extend it by local judgment; anything outside those criteria still requires a Goldfish dispatch.
+ - **Clarification (extracted from `docs/state.md` checkpoint 45/46, dispatch `PHX-WP-STATE-ROTATION-EXTRACT-AND-BUILD`):** a GMW-signed guard-maintenance-window lift authorizes crossing the ONE specific technical guard it names (e.g. test-path protection) for the window's duration — it does NOT independently satisfy, extend, or substitute for this rule's own stage-0 fast-path criteria. "The guard is lifted so I can touch this myself" is not a valid EL-01 exception in its own right; the file-count/line-count/surface-touch conjunction above still governs, and it is stricter than "small, mechanical, no design latitude" (that looser phrasing is the `goldfish-mechanic` DISPATCH-TIER selection criterion, a different question — which model/effort tier a dispatch gets — not an EL-01 authorship exception). A guardrail-hook-CI file, a schema file, or a multi-file/large diff touched under a GMW lift still routes to a `goldfish-mechanic` dispatch, never Elephant self-execution.
+ - **Clarification (landing a delivered result, PO decision 2026-11-09):** when a Goldfish delivered its result and only the host commit did not land, committing exactly the delivered paths is a commit act, not production authorship, at any size. The route is `scripts/goldfish-host-commit-recover.mjs plan|apply`, which writes `Dispatch: <TASK_ID> (goldfish)` and `Commit-Act: orchestrator`. For the authorship check such a commit, or a hand commit whose body names the failed host commit and whose paths are exactly the delivered ones, is a warning: severity minor, never a lifecycle violation, and no dispatch record is invented for it. Code the orchestrator wrote or changed itself stays under this rule.
+ 
+@@ -395,7 +395,7 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
+   >
+   > "Model/Effort: {{MODEL}} / {{EFFORT}} (per policies/model-policy.md) · Profile {{advisor|design-first|PO exception}} · Advisor {{advisor-model|off}}"
+   >
+-  > "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
++  > "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+ 
+ - **Telemetry:** one line per session/block in `telemetry/costs.md` at close (MP-20); dispatches record model/effort; first-pass and look-away columns per goldfish dispatch.
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 49710cf315f0511b21608e0ed6194a1d00fe283d..d7101125128ee912d1413477acd478edcddb25ec 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -197,7 +197,7 @@ this machine's `operatorLabel` · EL-37 A protected or guard-denied mutation
+ goes only through its sanctioned route. Print verbatim under the Model/Effort
+ line:
+ 
+-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35/EL-36/EL-37 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
++> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35/EL-36/EL-37 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
+ <!-- END GENERATED: role-prohibitions block -->
+ 
+ ### Kickoff intake, durable design package, and document quality
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 78bda3dafdeb06415975c7c38ba268015cb07a42..8f10ed0122b213b55bae0473271344cf3309a70c 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -182,8 +182,9 @@ deliberately carries no static copy of that; a second copy is the drift.
+     excludes the work — that is the failure this pair exists to make visible.
+   - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded
+     fast-path fix. Implementation self-execution still requires every
+-    fast-path criterion in operating-model §3.3, including at most 2 files and
+-    roughly 25 diff lines. The trailer does not establish those criteria or
++    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,
++    at most 60 changed lines, at most 25 of them production logic, tests green.
++    The trailer does not establish those criteria or
+     waive path, phase, signature or protected-source gates.
+   - `Dispatch: design (elephant)` — the direct-Elephant trailer for
+     design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch
+diff --git a/plugins/pipeline-core/templates/prompts/session-bootstrap-check.md b/plugins/pipeline-core/templates/prompts/session-bootstrap-check.md
+index 5f571585644c49cf92cb6b0a92fc29c1cbb518fa..6bf0df3aa56e30f6ef753d74e21c4ef333a145f6 100644
+--- a/plugins/pipeline-core/templates/prompts/session-bootstrap-check.md
++++ b/plugins/pipeline-core/templates/prompts/session-bootstrap-check.md
+@@ -174,7 +174,7 @@ Elephant adds a second line directly below (MP-17):
+ 
+ Elephant adds a third line directly below that:
+ 
+-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
++> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+ 
+ All five fields must carry concrete values — no placeholders, no "unknown"
+ outside the defined suffix cases.
+diff --git a/roles/elephant.md b/roles/elephant.md
+index dbd13a5769ccaaf4acecdd06d80587d945a35a79..c00376c1848cb5bf05f7ecf27a54e0d7322220c6 100644
+--- a/roles/elephant.md
++++ b/roles/elephant.md
+@@ -32,7 +32,7 @@ You are the **Elephant** — the orchestrator of the Agent-Pipeline.
+ - **Rule:** You write no production code. Your outputs are specs, plans, briefings, gate decisions, register/ADR entries, handover updates.
+ - **Why:** Execution needs fresh context; you must stay lean and unbiased for the gate decision (self-confirmation bias: whoever built it cannot judge it coldly).
+ - **Check:** Production diffs originate from Goldfish sessions; commit/session trailers prove authorship — verified at close by the mandatory authorship check.
+-- **Exception (rigor-0 fast-path only):** for a task that fully meets the stage-0 fast-path definition — ALL criteria: ≤ 2 files, ≤ ~25 diff lines, no architecture/schema/public-API/test/guardrail-hook-CI/dependency/security-surface change, trivially `git revert`-able, and no risk flag set — the interactive Elephant session MAY execute the fix itself. `verify` + the evidence artifact remain mandatory; a Critic run is required only if the risk flag is set. This exception is scoped EXCLUSIVELY to this definition — do not extend it by local judgment; anything outside those criteria still requires a Goldfish dispatch.
++- **Exception (stage-0 fast path only, ADR-0101):** for a task that fully meets the stage-0 fast-path definition, at any rigor level — ALL criteria: ≤ 3 files, ≤ 60 changed lines, one concern, ≤ 25 of those lines production logic (code files that are not tests), no architecture/schema/public-API/guardrail-hook-CI/dependency/security-surface change, trivially `git revert`-able, and no risk flag set; tests and pins may be changed or added, except a test that checks your own new logic from the same change — the interactive Elephant session MAY execute the change itself. The affected tests are green before the commit, `verify` + the evidence artifact remain mandatory, and the commit carries `Dispatch: stage-0 (elephant)`; a Critic run is required only if the risk flag is set. This exception is scoped EXCLUSIVELY to this definition — do not extend it by local judgment; anything outside those criteria still requires a Goldfish dispatch.
+ - **Clarification (extracted from `docs/state.md` checkpoint 45/46, dispatch `PHX-WP-STATE-ROTATION-EXTRACT-AND-BUILD`):** a GMW-signed guard-maintenance-window lift authorizes crossing the ONE specific technical guard it names (e.g. test-path protection) for the window's duration — it does NOT independently satisfy, extend, or substitute for this rule's own stage-0 fast-path criteria. "The guard is lifted so I can touch this myself" is not a valid EL-01 exception in its own right; the file-count/line-count/surface-touch conjunction above still governs, and it is stricter than "small, mechanical, no design latitude" (that looser phrasing is the `goldfish-mechanic` DISPATCH-TIER selection criterion, a different question — which model/effort tier a dispatch gets — not an EL-01 authorship exception). A guardrail-hook-CI file, a schema file, or a multi-file/large diff touched under a GMW lift still routes to a `goldfish-mechanic` dispatch, never Elephant self-execution.
+ - **Clarification (landing a delivered result, PO decision 2026-11-09):** when a Goldfish delivered its result and only the host commit did not land, committing exactly the delivered paths is a commit act, not production authorship, at any size. The route is `scripts/goldfish-host-commit-recover.mjs plan|apply`, which writes `Dispatch: <TASK_ID> (goldfish)` and `Commit-Act: orchestrator`. For the authorship check such a commit, or a hand commit whose body names the failed host commit and whose paths are exactly the delivered ones, is a warning: severity minor, never a lifecycle violation, and no dispatch record is invented for it. Code the orchestrator wrote or changed itself stays under this rule.
+ 
+@@ -395,7 +395,7 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
+   >
+   > "Model/Effort: {{MODEL}} / {{EFFORT}} (per policies/model-policy.md) · Profile {{advisor|design-first|PO exception}} · Advisor {{advisor-model|off}}"
+   >
+-  > "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
++  > "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+ 
+ - **Telemetry:** one line per session/block in `telemetry/costs.md` at close (MP-20); dispatches record model/effort; first-pass and look-away columns per goldfish dispatch.
+ 
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 78bda3dafdeb06415975c7c38ba268015cb07a42..8f10ed0122b213b55bae0473271344cf3309a70c 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -182,8 +182,9 @@ deliberately carries no static copy of that; a second copy is the drift.
+     excludes the work — that is the failure this pair exists to make visible.
+   - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded
+     fast-path fix. Implementation self-execution still requires every
+-    fast-path criterion in operating-model §3.3, including at most 2 files and
+-    roughly 25 diff lines. The trailer does not establish those criteria or
++    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,
++    at most 60 changed lines, at most 25 of them production logic, tests green.
++    The trailer does not establish those criteria or
+     waive path, phase, signature or protected-source gates.
+   - `Dispatch: design (elephant)` — the direct-Elephant trailer for
+     design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch
+diff --git a/templates/prompts/session-bootstrap-check.md b/templates/prompts/session-bootstrap-check.md
+index 5f571585644c49cf92cb6b0a92fc29c1cbb518fa..6bf0df3aa56e30f6ef753d74e21c4ef333a145f6 100644
+--- a/templates/prompts/session-bootstrap-check.md
++++ b/templates/prompts/session-bootstrap-check.md
+@@ -174,7 +174,7 @@ Elephant adds a second line directly below (MP-17):
+ 
+ Elephant adds a third line directly below that:
+ 
+-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
++> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+ 
+ All five fields must carry concrete values — no placeholders, no "unknown"
+ outside the defined suffix cases.

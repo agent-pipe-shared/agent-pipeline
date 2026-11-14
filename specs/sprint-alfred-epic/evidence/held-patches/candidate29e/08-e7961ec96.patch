@@ -1,0 +1,49 @@
+diff --git a/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs b/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs
+index 1413e04137b4bd2b82f57e10da449f901d12618d..0b95ff5c7eafe72b976f20ab8fddd2e7abd6fd48 100644
+--- a/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs
++++ b/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs
+@@ -5,8 +5,8 @@
+  *
+  * Plugin: pipeline-core (Agent-Pipeline). Backlog:
+  * backlog/items/2026-08-08-el-01-has-no-in-session-tripwire.md. Canon:
+- * roles/elephant.md EL-01 (no production code, rigor-0/no-risk-flag stage-0
+- * exception only) and EL-16 (delegate-first, execution phase).
++ * roles/elephant.md EL-01 (no production code, no-risk-flag stage-0
++ * exception only, ADR-0101) and EL-16 (delegate-first, execution phase).
+  *
+  * WHY THIS FILE EXISTS
+  *   EL-01 was, until now, enforced only by review after the fact: commit
+@@ -30,10 +30,11 @@
+  *
+  * TRIGGER CONDITION -- risk class, not rigor
+  *   EL-01's own stage-0 fast-path exception lists its criteria explicitly:
+- *   "ALL criteria: <= 2 files, <= ~25 diff lines, no architecture/schema/
+- *   public-API/test/guardrail-hook-CI/dependency/security-surface change,
+- *   trivially git-revert-able, and no risk flag set". Rigor level is never
+- *   named in that list at all -- only the risk flag is. File count and diff
++ *   (ADR-0101) at most 3 files and 60 changed lines, one concern, at most 25
++ *   lines of production logic, no architecture/schema/public-API/guardrail-
++ *   hook-CI/dependency/security-surface change, trivially git-revert-able,
++ *   and no risk flag set -- "at any rigor level". Only the risk flag is a
++ *   per-feature criterion. File count and diff
+  *   size are also properties of the whole task's eventual diff, not of one
+  *   PreToolUse call in isolation: a hook firing BEFORE an edit lands cannot
+  *   know how many files or lines the finished task will touch. This hook
+@@ -469,7 +470,7 @@ if (unevaluable) {
+     `Cause: ${unevaluable.cause}.`,
+     `File: ${filePath}`,
+     `Why: the tripwire fails closed (PO decision D86) when it cannot read the evidence it ` +
+-      `enforces on; an unevaluable risk flag is treated as set, so the rigor-0/no-risk-flag ` +
++      `enforces on; an unevaluable risk flag is treated as set, so the no-risk-flag ` +
+       `stage-0 exception (EL-01, roles/elephant.md) is unavailable until the evidence is readable.`,
+     `Repair: ${unevaluable.repair}`,
+     ...NO_RECORD_LINES,
+@@ -481,7 +482,7 @@ emit(2, [
+   `Feature: "${feature.id}" (risk class: ${riskClass}, spec: ${specPath})`,
+   `File: ${filePath}`,
+   `Why: EL-01 (roles/elephant.md) forbids the Elephant from writing production code outside ` +
+-    `the narrow rigor-0/no-risk-flag stage-0 fast path; this feature's risk flag is set, so ` +
++    `the narrow no-risk-flag stage-0 fast path; this feature's risk flag is set, so ` +
+     `that exception is categorically unavailable.`,
+   ...NO_RECORD_LINES,
+ ]);

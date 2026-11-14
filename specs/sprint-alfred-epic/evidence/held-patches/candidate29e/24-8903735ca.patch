@@ -1,0 +1,26 @@
+diff --git a/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs b/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
+index 3550f7bd220381da4a27ab965a2b6078b3ba5ecc..b1e6940231206f2a18198a2de7ffeee6f0555c36 100644
+--- a/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
+@@ -222,7 +222,7 @@ function producerFixture(tag) {
+   const root = join(base, "project");
+   mkdirSync(join(root, ".claude"), { recursive: true });
+   writeFileSync(join(root, ".gitignore"), "evidence/\n");
+-  writeFileSync(join(root, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n");
++  writeFileSync(join(root, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n    trivy:\n      enabled: false\n");
+   const git = (args) => { const r = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false }); assert.equal(r.status, 0, r.stderr); };
+   git(["init", "-q"]); git(["config", "user.name", "SFP Pin Fixture"]); git(["config", "user.email", "sfp@example.invalid"]);
+   // Restated to the decided contract of 537d5c85d (G32-SECURITY-REMOTE): the candidate snapshot is bound to the effective push
+diff --git a/plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs b/plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs
+index 14c3ddefe23465599a2c41a2081cfb6aeea5c9f0..94e4f27b686d1ccad05d45570a1aaba8b2e32ff9 100644
+--- a/plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs
++++ b/plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs
+@@ -40,6 +40,8 @@ security:
+       enabled: false
+     license-check:
+       enabled: true
++    trivy:
++      enabled: false
+ `;
+ 
+ const BULK_FILES = 5000;

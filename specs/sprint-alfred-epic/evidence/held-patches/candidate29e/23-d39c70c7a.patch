@@ -1,0 +1,68 @@
+diff --git a/docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md b/docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..99620e16baad5aa0eb4f0d5dc5513cdbabfe799b
+--- /dev/null
++++ b/docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md
+@@ -0,0 +1,25 @@
++# ADR-0103: the close scans infrastructure files with Trivy and blocks only new findings
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-14
++
++**Status:** accepted (2026-11-14, register D255). The PO decided the scope in tiles 28d 4 and 5 (a Trivy adapter for infrastructure and container files, offline built-in rules, run only where such files exist, installed from the official release with its checksum, no sudo), 29d T8b (a Trivy finding blocks only when the feature introduced it) and 29e (Trivy goes into the one final candidate 29e). The rules below that go further than those tiles were decided while building; they are marked "built rule" and the PO may overrule any of them. Built in candidate 29e. Not yet run on a consumer repository.
++
++**Context source:** ADR-0092 named Trivy as required "only where a project has infrastructure or container files" and left the adapter to its own decision. Bank consumer repositories carry Dockerfiles, Terraform and Kubernetes manifests that no current scanner reads.
++
++## Decision
++
++1. **A fifth scanner.** `plugins/pipeline-core/scripts/security-adapters/trivy.mjs` runs `trivy config` in the close scan (`scripts/security-scan.mjs`), enabled by default like the other four; `security.scanners.trivy.enabled: false` turns it off. It maps to `cap.iac`.
++2. **Applicability is decided by the Pipeline, without the binary.** A trigger file is a `Dockerfile`, `Containerfile`, `Dockerfile.*`, `Containerfile.*` or `*.dockerfile`; a `*.tf`; or a YAML/JSON file with a top-level `apiVersion` and `kind`. Without one the scanner reads not applicable, spawns nothing and blocks nothing. Built rules (measured on Trivy 0.76.2): a `Kustomization`, `Component`, `List` or `<X>List` document and a file with a template marker (`{{`) are no triggers, since Trivy reports no target for most of them; at the top level of a Git work tree only tracked regular files count (a working copy's untracked and ignored bytes are no part of the candidate, and walking them took 28 s and exceeded the entry bound), elsewhere the root is walked.
++3. **The call is neutral and offline.** An empty `--config` file and `--ignorefile`, a private working directory and cache, no `TRIVY_*` variable, `--skip-check-update`, and (built rule) `--disable-telemetry` and `--skip-version-check`, which Trivy's own help names as network uses. A candidate's own `trivy.yaml`, `.trivyignore` or environment therefore cannot narrow its scan.
++4. **Fail closed.** A nonzero exit, a timeout, unparseable JSON, a schema version other than 2, a stderr line at level ERROR or FATAL other than the expected embedded-checks fallback, or a trigger file that Trivy did not report as a target is a scanner error.
++5. **Only new findings block (T8b).** `lib/trivy-baseline.mjs` scans the base commit of the active feature in a temporary detached worktree, removed afterwards. A candidate finding counts as existing when the base had the same rule at the same path; the line is ignored and the count per rule and path is kept, so a moved finding stays existing and an extra one is new. Existing findings are listed and never block; new ones block at the configured severities. Without a named feature or base commit every finding at a blocking severity blocks, and the summary says why.
++6. **Inline ignores are shown, never applied as a block.** Trivy honours `trivy:ignore:<ID>` comments; the evidence lists each one with path, line and rule.
++7. **The toolchain asks for Trivy only where it is needed.** The tool registry gets the class `required-with-infrastructure` and the entry `trivy`; `docs/toolchain.md` is regenerated. The toolchain preflight probes Trivy only when the tracked files hold a trigger file, needs every switch the scan passes, and lets a person defer it like a required tool. The onboarding consent names Trivy for such projects. Built rule: the start-time environment readiness report gets no Trivy finding, because it would walk and parse the tracked YAML and JSON at every session start.
++8. **The catalog control `ctl.stack.iac-cloud.state-encryption`** (revision 2) applies only when the tree has infrastructure files.
++
++## Consequences
++
++- A consumer manifest that names the four older scanners explicitly gets Trivy on as well; in a project without trigger files it reads not applicable. A test fixture that enables one scanner only now disables Trivy explicitly.
++- A project whose only infrastructure is a Helm chart reads not applicable (template files are no triggers), and a Backstage `Component` file is scanned when other triggers exist but does not make a project infrastructure.
++- Trivy's built-in rules are its own; the evidence names them as `trivy:embedded-checks` and the version that ran. The stderr grammar the fail-closed rule reads is pinned by fixtures of 0.76.2; a later release that changes it shows up as a scanner error, not as a silent pass.
++- Not covered: image scanning (`cap.container`), a project-owned Trivy rule set, and a `required_capabilities` value for `iac`. The close of this repository itself is unaffected: its tracked files hold no trigger file.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 7b28ee3d3c1aa89bdeda599d7b9e3a05dd90b46d..a106657d60577403d0ae90568b74bdc48dfabc68 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -109,6 +109,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0100](0100-configure-verify-may-replace-the-verify-command-with-one-signature.md) | configure-verify may replace the verify command, with one signature | accepted | 2026-11-14 |
+ | [0101](0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md) | The stage-0 fast path admits small changes with tests, at any rigor | accepted | 2026-11-14 |
+ | [0102](0102-the-main-session-is-reminded-to-work-in-parallel.md) | The main session is reminded to work in parallel | accepted | 2026-11-14 |
++| [0103](0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md) | The close scans infrastructure files with Trivy and blocks only new findings | accepted | 2026-11-14 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index 05465b5a8217c63b9c02fc9f38b35bcc30c3e473..fbae51a1f7ea4c3e55e3a342dbaff843100caf43 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -37,6 +37,8 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0101](adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md) accepted 2026-11-14 (PO tile G-T1 round 3, "Medium + tests", D253):** the stage-0 fast path admits an Elephant change at any rigor with at most 3 files, at most 60 changed lines, one concern and at most 25 lines of production logic; tests and pins may change, except a test that checks the Elephant's own new logic from the same change; no new public API, schema, dependency or security surface; affected tests green, trailer `Dispatch: stage-0 (elephant)`, no extra Critic; above that a Goldfish. "Tier-0" is retired. The provenance check enforces 3/60 and the 25-line code cap; the guard maintenance window keeps refusing test files. Built in candidate 29e.
+ 
+ **[ADR-0102](adr/0102-the-main-session-is-reminded-to-work-in-parallel.md) accepted 2026-11-14 (PO tile "idea one", D254):** the main session gets one short parallel-by-default line, with its limits, from three existing hooks: setup-check at session start when it has nothing else to say, the post-compact re-grounding, and the dispatch budget guard on every N-th main-session tool call as context only, never a permission decision. `session.parallel_reminder_every` in pipeline.user.yaml sets N (0..1000, 0 = off, default 25). Claude Code only at all three points; not runner-neutral. Built in candidate 29e.
++
++**[ADR-0103](adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md) accepted 2026-11-14 (PO tiles 28d 4/5, 29d T8b, 29e, D255):** the close scan runs Trivy (`trivy config`, offline built-in rules, neutral config/ignore file/environment, no telemetry or update check) as a fifth, default-enabled scanner for `cap.iac` wherever the tracked files hold a Dockerfile/Containerfile, a Terraform file or a Kubernetes manifest; elsewhere it reads not applicable and spawns nothing. It fails closed on a stray error line or an unscanned trigger file. A finding blocks only when the feature added it: the feature's base commit is scanned in a temporary worktree and a finding with the same rule and path there is listed, not blocking; without a base every blocking-severity finding blocks. Inline `trivy:ignore` comments are listed, never applied as a block. The registry class `required-with-infrastructure` makes the toolchain preflight and the onboarding consent ask for Trivy only in such projects; no start-time readiness finding. Built rules beyond the tiles (List/Kustomization/template files are no triggers, tracked files only, telemetry off) are marked in the ADR. Built in candidate 29e, not yet run on a consumer repository.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 4bad287efd85dd7a9d799fdc5c1c38b1d407fbd7..bc3dcaae79a86c8eec1bbbdd24e6f351f386ebc7 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -303,6 +303,7 @@
+           "docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md",
+           "docs/adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md",
+           "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
++          "docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md",
+           "docs/adr/README.md"
+         ]
+       },

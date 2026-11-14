@@ -1,0 +1,481 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 3751ec50bc9af63113f55718dd2fe1ff7a53fa19..a028b60da0c366799aed84e87516bc387b13746c 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -562,8 +562,11 @@ the kernel closure test found imported by kernel modules but not yet listed:
+ `lib/hardened-private-directory.mjs`,
+ `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
+ `scripts/security-readiness/gitleaks-readiness.mjs`,
+-`scripts/security-readiness/osv-scanner-readiness.mjs`, and
+-`scripts/security-readiness/semgrep-readiness.mjs`. These modules decide the
++`scripts/security-readiness/osv-scanner-readiness.mjs`,
++`scripts/security-readiness/semgrep-readiness.mjs`,
++`scripts/security-readiness/trivy-readiness.mjs`, and
++`scripts/security-adapters/trivy.mjs` (candidate 29e: the toolchain preflight
++decides with the adapter's own trigger rule whether Trivy is needed at all). These modules decide the
+ central-refresh and start-hint behavior of the agy runner, checkpoint-push
+ approval and critical-action authorization, the continuity-authority drift
+ projection, durable filesystem writes and private-directory hardening, hook
+diff --git a/docs/toolchain.md b/docs/toolchain.md
+index 41b179d64d92afb06e3f62899c51a3e352251467..a80c7a000f0ef91fa119f2b29da4cf3cba963890 100644
+--- a/docs/toolchain.md
++++ b/docs/toolchain.md
+@@ -60,6 +60,20 @@ The feature close runs these. Onboarding checks them and asks you to install a m
+ - **macOS:** `brew install semgrep`.
+ - **Windows:** not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\Program Files\Semgrep`, `%USERPROFILE%\.local\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close.
+ 
++## Required where the project has infrastructure or container files
++
++The feature close runs this only when the project's tracked files hold a Dockerfile or Containerfile, a Terraform file or a Kubernetes manifest; anywhere else the scan reads not applicable and needs no install. Where such files exist, a missing tool is treated like a missing required one, and it may be deferred the same way.
++
++### trivy
++
++- **Purpose:** misconfiguration scan of the project's Dockerfiles, Terraform files and Kubernetes manifests at every feature close, offline with its built-in rules.
++- **Used by:** the security gate of the feature close, in a project with infrastructure or container files.
++- **Minimum:** a release whose `trivy config` has `--format`, `--skip-check-update`, `--cache-dir`, `--ignorefile`, `--disable-telemetry` and `--skip-version-check`.
++- **Check:** `trivy --version`.
++- **Linux and WSL:** download `trivy_<version>_Linux-64bit.tar.gz` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy` into `~/.local/bin` (no sudo).
++- **macOS:** `brew install trivy`.
++- **Windows:** download `trivy_<version>_windows-64bit.zip` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy.exe` into `%USERPROFILE%\.local\bin`.
++
+ ## Required on the machine of the person who signs
+ 
+ Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.
+diff --git a/plugins/pipeline-core/docs/toolchain.md b/plugins/pipeline-core/docs/toolchain.md
+index 41b179d64d92afb06e3f62899c51a3e352251467..a80c7a000f0ef91fa119f2b29da4cf3cba963890 100644
+--- a/plugins/pipeline-core/docs/toolchain.md
++++ b/plugins/pipeline-core/docs/toolchain.md
+@@ -60,6 +60,20 @@ The feature close runs these. Onboarding checks them and asks you to install a m
+ - **macOS:** `brew install semgrep`.
+ - **Windows:** not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\Program Files\Semgrep`, `%USERPROFILE%\.local\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close.
+ 
++## Required where the project has infrastructure or container files
++
++The feature close runs this only when the project's tracked files hold a Dockerfile or Containerfile, a Terraform file or a Kubernetes manifest; anywhere else the scan reads not applicable and needs no install. Where such files exist, a missing tool is treated like a missing required one, and it may be deferred the same way.
++
++### trivy
++
++- **Purpose:** misconfiguration scan of the project's Dockerfiles, Terraform files and Kubernetes manifests at every feature close, offline with its built-in rules.
++- **Used by:** the security gate of the feature close, in a project with infrastructure or container files.
++- **Minimum:** a release whose `trivy config` has `--format`, `--skip-check-update`, `--cache-dir`, `--ignorefile`, `--disable-telemetry` and `--skip-version-check`.
++- **Check:** `trivy --version`.
++- **Linux and WSL:** download `trivy_<version>_Linux-64bit.tar.gz` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy` into `~/.local/bin` (no sudo).
++- **macOS:** `brew install trivy`.
++- **Windows:** download `trivy_<version>_windows-64bit.zip` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy.exe` into `%USERPROFILE%\.local\bin`.
++
+ ## Required on the machine of the person who signs
+ 
+ Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 4c0ac99355cee94941fcac8f9d62e2084e5cd80b..486df0693232d90e0ee74f2a3a4b30616621db57 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -800,9 +800,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs",
+   "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+   "plugins/pipeline-core/lib/hook-currentness.mjs",
++  // Candidate 29e (ADR-0103, GMWKC01): the toolchain preflight imports the Trivy adapter's trigger rule and the Trivy readiness probe.
++  "plugins/pipeline-core/scripts/security-adapters/trivy.mjs",
+   "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
+   "plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs",
+   "plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs",
++  "plugins/pipeline-core/scripts/security-readiness/trivy-readiness.mjs",
+   "plugins/pipeline-core/scripts/toolchain-preflight.mjs",
+   // Approved design retirement and actual imported-module closure: these modules
+   // execute with kernel authority and remain unreachable through maintenance windows.
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+index c8e7e02b23f9cee814e2b23e908a232b13536b3f..e1a65f6d46ab97b580541b435a99ad6f57fce022 100644
+--- a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -65,8 +65,8 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
+   // in their own terminal or defers, and only the deferral record is a covered action (an old record without this id simply does not cover it).
+   Object.freeze({
+     id: "toolchain",
+-    en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
+-    de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
++    en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy where the project has infrastructure or container files; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
++    de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
+     routes: Object.freeze([{ script: "toolchain-defer.mjs", verbs: null }]),
+   }),
+   Object.freeze({
+diff --git a/plugins/pipeline-core/lib/toolchain-deferrals.mjs b/plugins/pipeline-core/lib/toolchain-deferrals.mjs
+index e8db3acd54b3a393abaa8c192dcb033c28cfe846..f07361fc3062602be6c8ed59065e3f2c8c7a8a71 100644
+--- a/plugins/pipeline-core/lib/toolchain-deferrals.mjs
++++ b/plugins/pipeline-core/lib/toolchain-deferrals.mjs
+@@ -58,11 +58,11 @@ export function readToolDeferral(id, dependencies = {}) {
+ 
+ /**
+  * Records that the person deferred installing `id`, with their answer word for word (bounded). Only a tool of the registry whose class is
+- * `required` or `required-to-sign` can be deferred; an optional tool needs no deferral. An invalid existing file is never overwritten.
++ * `required`, `required-with-infrastructure` or `required-to-sign` can be deferred; an optional tool needs no deferral. An invalid existing file is never overwritten.
+  */
+ export function recordToolDeferral(id, answer, dependencies = {}) {
+   const entry = toolchainEntry(id);
+-  if (entry === null || !["required", "required-to-sign"].includes(entry.class)) throw new Error(`TOOLCHAIN-DEFER-REFUSED: ${String(id).slice(0, 64)} is not a required tool of the registry`);
++  if (entry === null || !["required", "required-with-infrastructure", "required-to-sign"].includes(entry.class)) throw new Error(`TOOLCHAIN-DEFER-REFUSED: ${String(id).slice(0, 64)} is not a required tool of the registry`);
+   const quote = String(answer ?? "").replace(/\s+/gu, " ").trim().slice(0, ANSWER_MAX);
+   if (quote === "") throw new Error("TOOLCHAIN-DEFER-REFUSED: the person's answer is required, word for word");
+   const read = readToolchainDeferrals(dependencies);
+diff --git a/plugins/pipeline-core/lib/toolchain-doc.mjs b/plugins/pipeline-core/lib/toolchain-doc.mjs
+index 4777ea7775ed9de3ffa4826b3fa2e438cea02a12..ca22a56363e79c6c670937b10cb1594e158194c4 100644
+--- a/plugins/pipeline-core/lib/toolchain-doc.mjs
++++ b/plugins/pipeline-core/lib/toolchain-doc.mjs
+@@ -8,12 +8,14 @@ import { TOOLCHAIN_REGISTRY } from "./toolchain-registry.mjs";
+ const PLATFORM_NAMES = Object.freeze({ linux: "Linux and WSL", darwin: "macOS", win32: "Windows" });
+ const CLASS_TITLES = Object.freeze({
+   required: "Required on every machine",
++  "required-with-infrastructure": "Required where the project has infrastructure or container files",
+   "required-to-sign": "Required on the machine of the person who signs",
+   optional: "Optional",
+   "project-setting": "Settings in the project's own build",
+ });
+ const CLASS_INTROS = Object.freeze({
+   required: "The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.",
++  "required-with-infrastructure": "The feature close runs this only when the project's tracked files hold a Dockerfile or Containerfile, a Terraform file or a Kubernetes manifest; anywhere else the scan reads not applicable and needs no install. Where such files exist, a missing tool is treated like a missing required one, and it may be deferred the same way.",
+   "required-to-sign": "Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.",
+   optional: "A feature that works without these, or has a fallback. Install one when you use the feature it names.",
+   "project-setting": "Not programs: switches in the project's build that produce the files the SBOM of the close reads. The close names the one that is missing.",
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.mjs b/plugins/pipeline-core/lib/toolchain-registry.mjs
+index f032929c8dc0dd94654d77f397cadfbe63b6ba3c..8578cbe54e6d65c7b03f63eb9c30fe5f31eecd1d 100644
+--- a/plugins/pipeline-core/lib/toolchain-registry.mjs
++++ b/plugins/pipeline-core/lib/toolchain-registry.mjs
+@@ -8,7 +8,8 @@
+  *   - the toolchain preflight (scripts/toolchain-preflight.mjs): the major-version floors it checks and the document pointer it prints,
+  *   - the environment readiness findings the start preflight carries (each scanner finding names its class and its section of the document).
+  *
+- * Classes: `required` (every machine that runs the Pipeline: the close needs it), `required-to-sign` (the machine of the person who signs approvals,
++ * Classes: `required` (every machine that runs the Pipeline: the close needs it), `required-with-infrastructure` (C29e, ADR-0103: needed only
++ * where the project's tracked files hold a Dockerfile/Containerfile, a Terraform file or a Kubernetes manifest), `required-to-sign` (the machine of the person who signs approvals,
+  * the default push gate), `optional` (a feature that works without it, or has a fallback), `project-setting` (a switch in the project's own build,
+  * not a program; named so the SBOM help and this list agree).
+  *
+@@ -19,7 +20,7 @@
+  */
+ 
+ export const TOOLCHAIN_REGISTRY_SCHEMA = "pipeline.toolchain-registry.v1";
+-export const TOOL_CLASSES = Object.freeze(["required", "required-to-sign", "optional", "project-setting"]);
++export const TOOL_CLASSES = Object.freeze(["required", "required-with-infrastructure", "required-to-sign", "optional", "project-setting"]);
+ export const TOOL_PLATFORMS = Object.freeze(["linux", "darwin", "win32"]);
+ 
+ const tool = (entry) => Object.freeze({ ...entry, floor: Object.freeze({ ...entry.floor }), install: Object.freeze({ ...entry.install }), usedBy: Object.freeze([...entry.usedBy]) });
+@@ -76,6 +77,16 @@ export const TOOLCHAIN_REGISTRY = Object.freeze([
+       win32: "not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\\Program Files\\Semgrep`, `%USERPROFILE%\\.local\\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close",
+     },
+   }),
++  tool({
++    id: "trivy", class: "required-with-infrastructure", purpose: "misconfiguration scan of the project's Dockerfiles, Terraform files and Kubernetes manifests at every feature close, offline with its built-in rules",
++    usedBy: ["the security gate of the feature close, in a project with infrastructure or container files"], probe: "trivy --version",
++    floor: { text: "a release whose `trivy config` has `--format`, `--skip-check-update`, `--cache-dir`, `--ignorefile`, `--disable-telemetry` and `--skip-version-check`" },
++    install: {
++      linux: "download `trivy_<version>_Linux-64bit.tar.gz` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy` into `~/.local/bin` (no sudo)",
++      darwin: "`brew install trivy`",
++      win32: "download `trivy_<version>_windows-64bit.zip` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy.exe` into `%USERPROFILE%\\.local\\bin`",
++    },
++  }),
+   tool({
+     id: "openssl", class: "required-to-sign", purpose: "signs and checks the PO's Ed25519 approvals (push approval, overrides, acceptance by signature)",
+     usedBy: ["po-human-approval.mjs"], probe: "openssl version",
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.test.mjs b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+index 6805f7931f2d05e0dfdc2251a535057697122515..b2b81d081436749d5b67dbb6db72e701003cf5d7 100644
+--- a/plugins/pipeline-core/lib/toolchain-registry.test.mjs
++++ b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
+ import { renderToolchainDoc } from "./toolchain-doc.mjs";
+ import { TOOLCHAIN_REGISTRY, TOOL_CLASSES, TOOL_PLATFORMS, meetsVersionFloor, toolchainDocPointer, toolchainEntry } from "./toolchain-registry.mjs";
+ import { readToolDeferral, readToolchainDeferrals, recordToolDeferral, clearToolDeferral, toolchainDeferralsPath } from "./toolchain-deferrals.mjs";
+-import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport } from "../scripts/toolchain-preflight.mjs";
++import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport, runToolchainPreflight } from "../scripts/toolchain-preflight.mjs";
+ import { buildHandle } from "../scripts/tool-identity.mjs";
+ import { scannerEntryReadiness } from "./security-close-status.mjs";
+ import { runToolchainDefer } from "../scripts/toolchain-defer.mjs";
+@@ -27,10 +27,45 @@ test("the registry: unique ids, known classes, an install route for every platfo
+     assert.ok(entry.purpose.length > 0 && entry.floor.text.length > 0 && entry.usedBy.length > 0, entry.id);
+     assert.ok(Object.isFrozen(entry) && Object.isFrozen(entry.install), entry.id);
+   }
+-  for (const toolId of FIXED_TOOLS.filter((id) => id !== "license-check")) assert.equal(toolchainEntry(toolId)?.class, "required", `${toolId} is a required tool of the registry`);
++  for (const toolId of FIXED_TOOLS.filter((id) => !["license-check", "trivy"].includes(id))) assert.equal(toolchainEntry(toolId)?.class, "required", `${toolId} is a required tool of the registry`);
++  assert.equal(toolchainEntry("trivy").class, "required-with-infrastructure", "C29e: Trivy is needed only where infrastructure or container files exist");
+   assert.equal(toolchainEntry("openssl").class, "required-to-sign");
+ });
+ 
++test("C29e: the preflight asks for Trivy only where the tracked files hold infrastructure or container files", () => {
++  const dir = home();
++  try {
++    let probed = 0;
++    const base = {
++      probeNodeFn: () => observed("node", "24.15.0", ["spawn-shell-false"]), probeGitFn: () => observed("git", "2.50.1", ["object-format", "diff-paths"]),
++      resolveExecutableFn: (name) => (name === "trivy" ? null : `/tools/${name}`), resolveInstallerFn: () => null,
++      scannerProbes: { trivy: () => { probed += 1; return observed("trivy", "0.76.2", []); } },
++    };
++    const manifestResult = { status: "ok", manifest: { security: { scanners: { trivy: { enabled: true } } } } };
++    const none = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, { ...base, trivyTriggerFilesFn: () => ({ container: [], terraform: [], kubernetes: [] }) });
++    assert.equal(none.results.find((entry) => entry.tool === "trivy").status, "not_required");
++    assert.equal(none.status, "ready", "an explicit trivy entry is a known scanner, never TCP-UNSUPPORTED-SCANNER");
++    const some = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, { ...base, trivyTriggerFilesFn: () => ({ container: ["Dockerfile"], terraform: [], kubernetes: [] }) });
++    const entry = some.results.find((candidate) => candidate.tool === "trivy");
++    assert.equal(entry.status, "binary_missing");
++    assert.match(entry.guidance, /docs\/toolchain\.md#trivy/u);
++    assert.equal(probed, 0, "a missing binary is never probed");
++    const undecided = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, { ...base, trivyTriggerFilesFn: () => ({ error: "x" }) });
++    assert.equal(undecided.results.find((candidate) => candidate.tool === "trivy").status, "probe_error");
++    const ready = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, {
++      ...base, resolveExecutableFn: (name) => `/tools/${name}`, trivyTriggerFilesFn: () => ({ container: [], terraform: ["main.tf"], kubernetes: [] }),
++      scannerProbes: { trivy: () => observed("trivy", "0.76.2", ["--format", "--skip-check-update", "--cache-dir", "--ignorefile", "--disable-telemetry", "--skip-version-check"]) },
++    });
++    assert.equal(ready.results.find((candidate) => candidate.tool === "trivy").status, "ready");
++    const old = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, {
++      ...base, resolveExecutableFn: (name) => `/tools/${name}`, trivyTriggerFilesFn: () => ({ container: ["Dockerfile"], terraform: [], kubernetes: [] }),
++      scannerProbes: { trivy: () => observed("trivy", "0.40.0", ["--format", "--skip-check-update", "--cache-dir", "--ignorefile"]) },
++    });
++    assert.equal(old.results.find((candidate) => candidate.tool === "trivy").status, "incompatible_capability", "a release without the offline switches cannot run the close scan");
++    assert.deepEqual(recordToolDeferral("trivy", "later", deps(dir)).status, "recorded", "Trivy may be deferred like a required tool");
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
+ test("docs/toolchain.md is the registry's rendering, in the repository and in the plugin's vendored copy", () => {
+   const text = renderToolchainDoc();
+   for (const entry of TOOLCHAIN_REGISTRY) assert.ok(text.includes(`### ${entry.id}\n`), entry.id);
+@@ -131,8 +166,9 @@ test("the onboarding consent names every required tool, and only the deferral re
+   const step = ONBOARDING_CONSENT_COVERED_STEPS.find((entry) => entry.id === "toolchain");
+   assert.ok(step, "the consent lists the tool check");
+   const names = { node: "Node.js", git: "Git", openssl: "OpenSSL" };
+-  for (const entry of TOOLCHAIN_REGISTRY.filter((candidate) => ["required", "required-to-sign"].includes(candidate.class))) {
+-    for (const language of ["en", "de"]) assert.ok(step[language].includes(names[entry.id] ?? entry.id), `${language}: ${entry.id}`);
++  const consentNames = { ...names, trivy: "Trivy" };
++  for (const entry of TOOLCHAIN_REGISTRY.filter((candidate) => ["required", "required-with-infrastructure", "required-to-sign"].includes(candidate.class))) {
++    for (const language of ["en", "de"]) assert.ok(step[language].includes(consentNames[entry.id] ?? entry.id), `${language}: ${entry.id}`);
+   }
+   assert.equal(coveringStepForArgv(["toolchain-defer.mjs", "--tool", "semgrep"])?.id, "toolchain");
+   assert.equal(coveringStepForArgv(["toolchain-preflight.mjs", "--repair", "git-hooks"]), null, "no installer or other script is covered by it");
+diff --git a/plugins/pipeline-core/scripts/security-adapters/trivy.test.mjs b/plugins/pipeline-core/scripts/security-adapters/trivy.test.mjs
+index 809063fc3603c97faf5308dd921973dbe66202dc..a8185deac46030f04d9f43f14599d187fb009eea 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/trivy.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/trivy.test.mjs
+@@ -2,9 +2,10 @@
+ // C29e (ADR-0103): the Trivy adapter -- applicability without the binary, neutral offline invocation, fail-closed parsing.
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { delimiter as PATH_DELIMITER, join } from "node:path";
++import { probeTrivy, TRIVY_REQUIRED_FLAGS } from "../security-readiness/trivy-readiness.mjs";
+ import { spawnSync } from "node:child_process";
+ import {
+   CAPABILITY_CONTRACT_V2, TRIVY_NOT_APPLICABLE_REASON, extractTrivyFindings, inlineIgnores, isKubernetesManifestText, neutralTrivyEnv,
+@@ -233,3 +234,16 @@ test("real binary (skipped without trivy): a clean, a failing and a self-suppres
+     rmSync(work, { recursive: true, force: true });
+   }
+ });
++
++test("real binary readiness (skipped without trivy): version and every switch the close scan passes", { skip: realTrivy.status !== 0 ? "trivy is not installed" : false }, () => {
++  const binary = String(process.env.PATH ?? "").split(PATH_DELIMITER).map((dir) => join(dir, process.platform === "win32" ? "trivy.exe" : "trivy")).find((path) => existsSync(path));
++  const work = mkdtempSync(join(tmpdir(), "trivy-readiness-"));
++  try {
++    const observed = probeTrivy({ executablePath: binary, rootDir: work, tempDir: work });
++    assert.equal(observed.ok, true, JSON.stringify(observed));
++    assert.match(observed.handle.version, /^\d+\.\d+\.\d+$/u);
++    assert.deepEqual(observed.handle.capabilities, [...TRIVY_REQUIRED_FLAGS]);
++  } finally {
++    rmSync(work, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/security-readiness/trivy-readiness.mjs b/plugins/pipeline-core/scripts/security-readiness/trivy-readiness.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..56fbe775b4d032dfee663df3aadefb7f2ac74d29
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/security-readiness/trivy-readiness.mjs
+@@ -0,0 +1,24 @@
++// SPDX-License-Identifier: SUL-1.0
++// C29e (ADR-0103): the toolchain readiness probe of Trivy. It reads the version and the `config` help and never scans. It runs in the closed
++// probe environment (tool-identity.mjs: fixed PATH, private temp directory, no HOME and no TRIVY_* variable); neither call touches a cache.
++import { mkdtempSync, rmSync } from "node:fs";
++import { join } from "node:path";
++import { buildHandle, executableIdentity } from "../tool-identity.mjs";
++import { runProbeRetryingEperm as runProbe } from "./probe-retry.mjs";
++
++/** The switches the close scan passes (security-adapters/trivy.mjs); a release without one of them cannot run that scan. */
++export const TRIVY_REQUIRED_FLAGS = Object.freeze(["--format", "--skip-check-update", "--cache-dir", "--ignorefile", "--disable-telemetry", "--skip-version-check"]);
++
++export function probeTrivy({ executablePath, rootDir, tempDir }, deps = {}) {
++  const observed = executableIdentity(executablePath); if (!observed.ok) return observed;
++  const scratch = mkdtempSync(join(tempDir, "pipeline-trivy-preflight-"));
++  try {
++    const options = { cwd: rootDir, tempDir: scratch, timeoutMs: 30000, ...deps };
++    const version = runProbe(observed.identity.realPath, ["--version"], options); if (!version.ok) return version;
++    const help = runProbe(observed.identity.realPath, ["config", "--help"], options); if (!help.ok) return help;
++    const text = `${version.stdout}\n${version.stderr}`; const match = text.match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:\s|$)/u); const helpText = `${help.stdout}\n${help.stderr}`;
++    return { ok: true, status: "ready", handle: buildHandle("trivy", observed.identity, match?.[1] ?? null, TRIVY_REQUIRED_FLAGS.filter((flag) => helpText.includes(flag)), (deps.now ?? new Date()).toISOString()) };
++  } finally {
++    rmSync(scratch, { recursive: true, force: true });
++  }
++}
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index f11f2b67f2ae0501b28b8e3af6087828fa2b6284..48cffd018a2370aff8e2dd4e3fd845c4e138c9fe 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -17,6 +17,7 @@
+  *   gitleaks     -> cap.secrets
+  *   osv-scanner  -> cap.sca
+  *   semgrep      -> cap.sast
++ *   trivy        -> cap.iac (C29e; probed only where the tracked files hold infrastructure or container files)
+  * `node` and `git` are toolchain prerequisites, not security capabilities,
+  * and are excluded from the capability-level report entirely. `license-check`
+  * is a catalog CONTROL, not a capability family (CYB-1F F-4, ratified
+@@ -68,38 +69,40 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
+ import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
+ import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
++import { probeTrivy, TRIVY_REQUIRED_FLAGS } from "./security-readiness/trivy-readiness.mjs";
++import { trivyTriggerFiles, triggerCount } from "./security-adapters/trivy.mjs";
+ import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { meetsVersionFloor, toolchainDocAnchor, toolchainDocPointer, toolchainEntry } from "../lib/toolchain-registry.mjs";
+ import { readToolDeferral } from "../lib/toolchain-deferrals.mjs";
+ 
+ export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
+-export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
+-const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
++export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"]);
++const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"]);
+ const STATUS_PRECEDENCE = Object.freeze(["execution_environment", "untrusted_path", "binary_missing", "input_missing", "probe_timeout", "probe_error", "incompatible_version", "incompatible_capability"]);
+-const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"] });
++const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"], trivy: [...TRIVY_REQUIRED_FLAGS] });
+ const GUIDANCE = Object.freeze({
+-  linux: { node: "Install a Node.js release that meets the pipeline minimum from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install a supported OSV-Scanner major release in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
+-  darwin: { node: "Install a Node.js release that meets the pipeline minimum through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
+-  win32: { node: "Install a Node.js release that meets the pipeline minimum through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
+-  unsupported: { node: "Use a supported linux, darwin, or win32 runner.", git: "Use a supported linux, darwin, or win32 runner.", gitleaks: "Use a supported runner.", "osv-scanner": "Use a supported runner.", semgrep: "Use a supported runner.", "license-check": "Use a supported runner." },
++  linux: { node: "Install a Node.js release that meets the pipeline minimum from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install a supported OSV-Scanner major release in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files.", trivy: "Install a compatible Trivy binary in a recognized system or ~/.local/bin location." },
++  darwin: { node: "Install a Node.js release that meets the pipeline minimum through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs.", trivy: "Install managed Trivy." },
++  win32: { node: "Install a Node.js release that meets the pipeline minimum through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs.", trivy: "Install a compatible trivy.exe in a recognized location." },
++  unsupported: { node: "Use a supported linux, darwin, or win32 runner.", git: "Use a supported linux, darwin, or win32 runner.", gitleaks: "Use a supported runner.", "osv-scanner": "Use a supported runner.", semgrep: "Use a supported runner.", "license-check": "Use a supported runner.", trivy: "Use a supported runner." },
+ });
+ const INSTALLER_NAMES = Object.freeze(["apt-get", "brew", "go", "pipx", "sudo", "winget"]);
+ 
+ // Capability contract (W7-2): the preflight names the tool, the probe that proves it present and the kind of
+ // source the human uses. It emits no command string, no sudo and no pinned version; the human installs, then
+ // re-reads the preflight. Installer discovery (INSTALLER_NAMES) is still read but no longer shapes a command.
+-const PROBES = Object.freeze({ node: "node --version", git: "git --version", gitleaks: "gitleaks version", "osv-scanner": "osv-scanner --version", semgrep: "semgrep --version" });
++const PROBES = Object.freeze({ node: "node --version", git: "git --version", gitleaks: "gitleaks version", "osv-scanner": "osv-scanner --version", semgrep: "semgrep --version", trivy: "trivy --version" });
+ const SOURCE_HINTS = Object.freeze({
+-  linux: { node: "the distribution package source or the official Node.js download page", git: "the distribution package source", gitleaks: "the official Gitleaks release page or a trusted package source", "osv-scanner": "the official OSV-Scanner release page or a trusted package source", semgrep: "the official Semgrep page or an isolated pipx environment" },
+-  darwin: { node: "the managed macOS package source or the official Node.js download page", git: "Xcode Command Line Tools or a managed package source", gitleaks: "a managed macOS package source or the official Gitleaks release page", "osv-scanner": "a managed macOS package source or the official OSV-Scanner release page", semgrep: "a managed macOS package source or an isolated pipx environment" },
+-  win32: { node: "the official Node.js download page or a managed Windows package source", git: "the official Git for Windows page", gitleaks: "the official Gitleaks release page", "osv-scanner": "the official OSV-Scanner release page", semgrep: "the official Semgrep page or an isolated pipx environment" },
++  linux: { node: "the distribution package source or the official Node.js download page", git: "the distribution package source", gitleaks: "the official Gitleaks release page or a trusted package source", "osv-scanner": "the official OSV-Scanner release page or a trusted package source", semgrep: "the official Semgrep page or an isolated pipx environment", trivy: "the official Trivy release page with its checksums file" },
++  darwin: { node: "the managed macOS package source or the official Node.js download page", git: "Xcode Command Line Tools or a managed package source", gitleaks: "a managed macOS package source or the official Gitleaks release page", "osv-scanner": "a managed macOS package source or the official OSV-Scanner release page", semgrep: "a managed macOS package source or an isolated pipx environment", trivy: "a managed macOS package source or the official Trivy release page" },
++  win32: { node: "the official Node.js download page or a managed Windows package source", git: "the official Git for Windows page", gitleaks: "the official Gitleaks release page", "osv-scanner": "the official OSV-Scanner release page", semgrep: "the official Semgrep page or an isolated pipx environment", trivy: "the official Trivy release page with its checksums file" },
+ });
+ function attendedContract(platform, tool) {
+   const probe = PROBES[tool];
+   if (probe === undefined) return null;
+   const source = SOURCE_HINTS[platform]?.[tool] ?? "the vendor's official page";
+-  const scannerNote = ["gitleaks", "osv-scanner", "semgrep"].includes(tool) ? " npm is not an approved installer for these scanners." : "";
++  const scannerNote = ["gitleaks", "osv-scanner", "semgrep", "trivy"].includes(tool) ? " npm is not an approved installer for these scanners." : "";
+   return `Capability contract for ${tool}: probe: ${probe}; source: ${source}. Run the install yourself, then re-read the preflight; the preflight installs nothing and emits no command.${scannerNote}`;
+ }
+ 
+@@ -157,6 +160,7 @@ function readyCompatibility(tool, observed) {
+   if (tool === "gitleaks" && !parsed) return result(tool, "incompatible_version", observed);
+   if (tool === "osv-scanner" && !meetsVersionFloor("osv-scanner", parsed)) return result(tool, "incompatible_version", observed);
+   if (tool === "semgrep" && !parsed) return result(tool, "incompatible_version", observed);
++  if (tool === "trivy" && !parsed) return result(tool, "incompatible_version", observed);
+   const required = REQUIRED_CAPABILITIES[tool] ?? [];
+   if (!required.every((capability) => observed.handle.capabilities.includes(capability))) return result(tool, "incompatible_capability", observed);
+   return result(tool, "ready", observed);
+@@ -240,12 +244,21 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
+   const gateMode = manifest?.gates?.security?.mode ?? "blocking";
+   const enabled = Object.entries(manifest?.security?.scanners ?? {}).filter(([, config]) => config?.enabled === true).map(([name]) => name).sort();
+   const unsupported = enabled.some((name) => !KNOWN_SCANNERS.has(name));
+-  const probes = deps.scannerProbes ?? { gitleaks: probeGitleaks, "osv-scanner": probeOsvScanner, semgrep: probeSemgrep };
++  const probes = { gitleaks: probeGitleaks, "osv-scanner": probeOsvScanner, semgrep: probeSemgrep, trivy: probeTrivy, ...(deps.scannerProbes ?? {}) };
+   const resolver = deps.resolveExecutableFn ?? resolveTrustedSystemExecutable;
+   const installerResolver = deps.resolveInstallerFn ?? resolveSystemExecutable;
+   const installers = new Set(INSTALLER_NAMES.filter((name) => installerResolver(name, { platform }) !== null));
+-  for (const tool of ["gitleaks", "osv-scanner", "semgrep"]) {
++  // C29e (ADR-0103): Trivy is needed only where the tracked files hold infrastructure or container files, the same rule the close scan applies
++  // (security-adapters/trivy.mjs trivyTriggerFiles). Without one it stays not_required; a tree whose applicability cannot be decided is a probe error.
++  let trivyApplicable = false;
++  if (enabled.includes("trivy")) {
++    const triggers = (deps.trivyTriggerFilesFn ?? trivyTriggerFiles)(root);
++    if (triggers?.error) baseResults.trivy = result("trivy", "probe_error");
++    else trivyApplicable = triggerCount(triggers) > 0;
++  }
++  for (const tool of ["gitleaks", "osv-scanner", "semgrep", "trivy"]) {
+     if (!enabled.includes(tool)) continue;
++    if (tool === "trivy" && !trivyApplicable) continue;
+     const trusted = resolvedTool(resolver, tool, platform);
+     const observed = !trusted.ok ? trusted : probes[tool]({ executablePath: trusted.path, rootDir: root, tempDir }, { now });
+     baseResults[tool] = readyCompatibility(tool, observed); if (baseResults[tool].status === "ready") handles[tool] = observed.handle;
+@@ -268,7 +281,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
+   };
+ }
+ 
+-export const CAPABILITY_TOOL_ROOTS = Object.freeze({ gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast" });
++export const CAPABILITY_TOOL_ROOTS = Object.freeze({ gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast", trivy: "cap.iac" });
+ 
+ export function evaluateCapabilityCompleteness(preflightResult, requiredCapabilities) {
+   if (!preflightResult || !Array.isArray(preflightResult.results)) throw new TypeError("evaluateCapabilityCompleteness: preflightResult.results must be the results array produced by runToolchainPreflight()");
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.schema.json b/plugins/pipeline-core/scripts/toolchain-preflight.schema.json
+index 9489bcc3e45beb99777032ca5cc23d422b8daab3..d4a8ad303660d4893a1b040439acf09c5b2a631c 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.schema.json
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.schema.json
+@@ -13,14 +13,14 @@
+     "platform": { "enum": ["linux", "darwin", "win32", "unsupported"] },
+     "results": {
+       "type": "array",
+-      "minItems": 6,
+-      "maxItems": 6,
++      "minItems": 7,
++      "maxItems": 7,
+       "items": {
+         "type": "object",
+         "required": ["tool", "status", "version", "capabilities", "preparedHandleDigest", "affectedClaim", "installCommand", "installAttempted", "guidance"],
+         "additionalProperties": false,
+         "properties": {
+-          "tool": { "enum": ["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"] },
++          "tool": { "enum": ["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"] },
+           "status": { "type": "string" },
+           "version": { "type": ["string", "null"] },
+           "capabilities": { "type": "array", "items": { "type": "string" } },
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index 76a6bc564c53e6de1f30bbce7b40066a5ad01318..174718d6e3af108de6c02a105cb246f905d4e07c 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -127,7 +127,7 @@ check("invalid manifest blocks before every identity or capability probe", () =>
+   const repo = root(); let calls = 0;
+   try {
+     const result = runToolchainPreflight({ rootDir: repo, manifestResult: { status: "invalid", errors: [{}] } }, { probeNodeFn: () => { calls++; }, probeGitFn: () => { calls++; }, scannerProbes: new Proxy({}, { get: () => () => { calls++; } }) });
+-    assert.equal(result.code, "TCP-MANIFEST-INVALID"); assert.equal(result.exitCode, 2); assert.equal(calls, 0); assert.equal(result.results.length, 6);
++    assert.equal(result.code, "TCP-MANIFEST-INVALID"); assert.equal(result.exitCode, 2); assert.equal(calls, 0); assert.equal(result.results.length, 7);
+   } finally { rmSync(repo, { recursive: true, force: true }); }
+ });
+ check("absent manifest requires only compatible Node and Git", () => {
+@@ -135,7 +135,7 @@ check("absent manifest requires only compatible Node and Git", () => {
+   try {
+     const result = runToolchainPreflight({ rootDir: repo, manifestResult: { status: "absent" } }, { probeNodeFn: nodeReady, probeGitFn: gitReady });
+     assert.equal(result.code, "TCP-READY"); assert.equal(result.exitCode, 0); assert.deepEqual(result.results.map(({ tool }) => tool), FIXED_TOOLS);
+-    assert.deepEqual(result.results.slice(2).map(({ status }) => status), ["not_required", "not_required", "not_required", "not_required"]);
++    assert.deepEqual(result.results.slice(2).map(({ status }) => status), ["not_required", "not_required", "not_required", "not_required", "not_required"]);
+   } finally { rmSync(repo, { recursive: true, force: true }); }
+ });
+ check("enabled scanners are probed under warn and carry exact prepared handles", () => {
+@@ -317,7 +317,7 @@ check("Semgrep probes use bounded temporary settings instead of writing the user
+ // mapping, a real runToolchainPreflight()-shaped integration fixture, and the
+ // zero-mutation proof.
+ check("capability-completeness: tool-to-capability-root mapping matches the CYB-1F frozen assignment", () => {
+-  assert.deepEqual(CAPABILITY_TOOL_ROOTS, { gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast" });
++  assert.deepEqual(CAPABILITY_TOOL_ROOTS, { gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast", trivy: "cap.iac" });
+ });
+ check("capability-completeness: a required capability with a ready tool reports \"required\"", () => {
+   const output = evaluateCapabilityCompleteness({ results: [entry("gitleaks", "ready")] }, ["cap.secrets"]);
+@@ -917,6 +917,8 @@ check("W7-2c: every actionable result names the tool, its probe, a source hint a
+ check("W7-2d: the readiness status values are unchanged by the capability contract", () => {
+   for (const { mode, result } of w7NoSudoActions()) {
+     if (result.tool === "license-check") continue;
++    // C29e: trivy is not enabled in this fixture, so it is never asked for (not_required, no actionable text).
++    if (result.tool === "trivy") { assert.equal(result.status, "not_required", `${mode}/trivy`); continue; }
+     if (result.tool === "node") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_version", `${mode}/node`);
+     else if (result.tool === "git") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_capability", `${mode}/git`);
+     else assert.equal(result.status, "binary_missing", `${mode}/${result.tool}`);

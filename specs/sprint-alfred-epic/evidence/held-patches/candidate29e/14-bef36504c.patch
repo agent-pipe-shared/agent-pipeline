@@ -1,0 +1,72 @@
+diff --git a/docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md b/docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad59cb41319717f8c5b522708708f0f242bb5878
+--- /dev/null
++++ b/docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md
+@@ -0,0 +1,29 @@
++# ADR-0102: the main session is reminded to work in parallel
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-14
++
++**Status:** accepted (2026-11-14, PO tile "idea one", register D254). Built in candidate 29e. Not yet used on a consumer repository.
++
++**Context source (PO, 2026-11-14):** the PO asked agents to parallelize actively, and asked how that behaviour gets into a durable reminder that tells the agent again every few turns what to do. Of the proposed ideas the PO chose a short reminder from the hooks, preferring an existing hook over a new one.
++
++## Context
++
++A main session tends to fall back to serial work after a while: one read per message, one scout after another, test files run one by one. A rule in a role file is read once at bootstrap and fades from the context. The hooks already run at session start, after a compact and before every tool call, so they can repeat a short line without a new hook.
++
++## Decision
++
++1. **One short text,** `PARALLEL_REMINDER` in `plugins/pipeline-core/lib/parallel-reminder.mjs`: send independent read-only calls together, run independent read-only scouts and test files in parallel; the limits (never two heavy test suites at once, one write dispatch per message, no write to the tree while a write dispatch runs) are part of the same line.
++2. **Three existing hooks carry it, no new hook:**
++   - `hooks/setup-check.mjs` (SessionStart `startup|resume|clear`) emits it as context when it has no setup message to give;
++   - `hooks/post-compact-reground.mjs` (SessionStart `compact`) appends it as the last line of the re-grounding;
++   - `hooks/guard-dispatch-budget.mjs` (PreToolUse) adds it on every N-th tool call of the main session.
++3. **Context only.** The every-N output carries `additionalContext` and never a `permissionDecision`: an `allow` would skip the user's permission prompt for that call. The reminder decides nothing.
++4. **N is configurable** as `session.parallel_reminder_every` in `pipeline.user.yaml`, an integer from 0 to 1000; 0 turns the reminder off at all three points; absent or invalid means 25. The V3 validator and `scripts/pipeline-user-v3.schema.json` accept the key; `keep_awake` stays required in `session`.
++5. **The counter is lock-free and fail-open:** one byte per main-session call in `<git-common-dir>/agent-pipeline/dispatch-budget/orchestrator-seen/<session>.calls`; the file size decides. Any error means no reminder; parallel calls can move a reminder by one call. Subagents are not counted.
++
++## Consequences
++
++- Claude Code gets the reminder at all three points.
++- Codex gets it after a compact only where its session-start hint carries the compact text; its session start and every-N reminder are not wired. Antigravity has no SessionStart hook and no budget guard here. The reminder is therefore not runner-neutral, and is not reported as such.
++- The budget guard's hook matcher does not cover every tool (for example Agent, Workflow and MCP tools), so N counts only the matched calls.
++- `lib/parallel-reminder.mjs` joins the never-liftable kernel paths, since a kernel hook imports it.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 8873a2aadc431f11dcf3f4d608683e2814e33599..7b28ee3d3c1aa89bdeda599d7b9e3a05dd90b46d 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -108,6 +108,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0099](0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md) | An Antigravity branch result lands with the child's own commits | accepted | 2026-11-14 |
+ | [0100](0100-configure-verify-may-replace-the-verify-command-with-one-signature.md) | configure-verify may replace the verify command, with one signature | accepted | 2026-11-14 |
+ | [0101](0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md) | The stage-0 fast path admits small changes with tests, at any rigor | accepted | 2026-11-14 |
++| [0102](0102-the-main-session-is-reminded-to-work-in-parallel.md) | The main session is reminded to work in parallel | accepted | 2026-11-14 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index ce02d062ff35ef380480ddae981e92c57e31d8c6..05465b5a8217c63b9c02fc9f38b35bcc30c3e473 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -35,6 +35,8 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0099](adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md) accepted 2026-11-13 (PO tile "R5: build a harvest command", D251, Antigravity test run 3):** `agy-native-integrate.mjs apply --keep-authorship <dispatch id>` lands an Antigravity `Workspace: "branch"` child's own commits unchanged by `git merge --ff-only`, only when the branch was cut from the current HEAD and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer (same id) and `AI-Assisted: true`; otherwise the patch route stays. The dispatch record is still written by the attested writer over exactly those commits and says `orchestrator-attested`; binding the host's per-child descriptor is not built (open PO question). Built in candidate 29d, never run in a real Antigravity session.
+ **[ADR-0100](adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md) accepted 2026-11-13 (PO tile 3 after the 28d test round, "configure-verify replaces, 1 signature", D252, finding C6):** `configure-verify --verify-command <new> --replace --by <label>` replaces a configured verify command during implementation: the new command runs once on a tree with no tracked change and must pass and leave the tree unchanged (private test-run receipt); one critical-action approval of kind `replace-verify-command` (signature, or chat-attributed and labelled in chat mode) covers both calibration mirrors' exact post-images; the Pipeline writes them through the existing configure-verify commit transition with a `replacement` member; the close counts the change as proof kind `verify-replacement` (unlabelled when signed); a maintenance slice's green receipt counts only under the base commit's verify command (amends ADR-0096 Decision 3 and ADR-0097 Decision 4). The GS-10/GS-11 refusal names the route instead of two overrides. Built in candidate 29d, never run on a consumer repository.
+ **[ADR-0101](adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md) accepted 2026-11-14 (PO tile G-T1 round 3, "Medium + tests", D253):** the stage-0 fast path admits an Elephant change at any rigor with at most 3 files, at most 60 changed lines, one concern and at most 25 lines of production logic; tests and pins may change, except a test that checks the Elephant's own new logic from the same change; no new public API, schema, dependency or security surface; affected tests green, trailer `Dispatch: stage-0 (elephant)`, no extra Critic; above that a Goldfish. "Tier-0" is retired. The provenance check enforces 3/60 and the 25-line code cap; the guard maintenance window keeps refusing test files. Built in candidate 29e.
++
++**[ADR-0102](adr/0102-the-main-session-is-reminded-to-work-in-parallel.md) accepted 2026-11-14 (PO tile "idea one", D254):** the main session gets one short parallel-by-default line, with its limits, from three existing hooks: setup-check at session start when it has nothing else to say, the post-compact re-grounding, and the dispatch budget guard on every N-th main-session tool call as context only, never a permission decision. `session.parallel_reminder_every` in pipeline.user.yaml sets N (0..1000, 0 = off, default 25). Claude Code only at all three points; not runner-neutral. Built in candidate 29e.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 0deeedcc068782bfea940e1dc42b1b8044e58d53..4bad287efd85dd7a9d799fdc5c1c38b1d407fbd7 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -302,6 +302,7 @@
+           "docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md",
+           "docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md",
+           "docs/adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md",
++          "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
+           "docs/adr/README.md"
+         ]
+       },

@@ -1,0 +1,528 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 5e270487446e3293e20a8204f596367cf41347b0..3751ec50bc9af63113f55718dd2fe1ff7a53fa19 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -754,6 +754,8 @@ receipt that `scripts/advisory-host-bridge.mjs` accepts),
+ briefing whose admission `hooks/guard-dispatch.mjs` decides),
+ `plugins/pipeline-core/lib/dispatch-budget-notice.mjs` (the budget notice
+ `hooks/guard-dispatch-budget.mjs` announces),
++`plugins/pipeline-core/lib/parallel-reminder.mjs` (the every-N parallel
++reminder `hooks/guard-dispatch-budget.mjs` adds as context, candidate 29e),
+ `plugins/pipeline-core/lib/node-sandbox-probe.mjs` (the sandbox probe
+ `scripts/pipeline-start-preflight.mjs` relies on),
+ `plugins/pipeline-core/lib/pipeline-owned-files.mjs` (which files the push and
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 5ee7c54f72f0ed3ed4b6f2a57db8637602d18c6f..f17805f48eeac6b1c4cf9410d5be1e7ec82eafc6 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -706,6 +706,7 @@
+         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
+         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
+         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
++        "verify-phase:harness/scripts/verify.mjs:parallel-reminder-tests",
+         "verify-phase:harness/scripts/verify.mjs:partial-readiness-restore-advice-tests",
+         "verify-phase:harness/scripts/verify.mjs:passive-read-credential-follow-tests",
+         "verify-phase:harness/scripts/verify.mjs:passive-read-policy-tests",
+diff --git a/harness/scripts/verify.mjs b/harness/scripts/verify.mjs
+index cb61f13e9291913648d6cce22387feb02bcba090..225c92cda3893591960cedba1627cd61f347824a 100644
+--- a/harness/scripts/verify.mjs
++++ b/harness/scripts/verify.mjs
+@@ -842,6 +842,8 @@ const TEST_SUITES = [
+   // Candidate 28: the recursive delete rule (18-cd619050b) and the answered Git author (19-3299ba547) landed without a Verify entry.
+   { name: "recursive-delete-policy-tests", file: join(hooksDir, "recursive-delete-policy.test.mjs") },
+   { name: "held-git-author-tests", file: join(libDir, "held-git-author.test.mjs") },
++  // Candidate 29e T10: the parallel reminder (N from pipeline.user.yaml, lock-free counter, context-only outputs).
++  { name: "parallel-reminder-tests", file: join(libDir, "parallel-reminder.test.mjs") },
+   { name: "dispatch-budget-binding-tests", file: join(libDir, "dispatch-budget-binding.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `DBB${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+   { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
+   { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index f289ab4da61aeb11ad2e9f66894095d7a753c48b..709d08ac0ebf4bb65ac4b21a0d456c661aca1411 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -221,6 +221,7 @@ import { normalizeDispatchRecordPath, validateDispatchRecord, isTerminalOutcome
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { writeTargetPath } from "../lib/tool-write-target.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { parallelReminderPreToolUseStdout, readParallelReminderEvery, tickParallelReminder } from "../lib/parallel-reminder.mjs";
+ import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
+ import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
+ import { criticExcludedRole } from "../lib/critic-correction-input-bindings.mjs";
+@@ -1782,6 +1783,11 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
+     recordOrchestratorObservation(commonDir, {
+       branch: "orchestrator", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+     }, options);
++    // C29e T10: every N-th orchestrator call carries the parallel reminder as context only (no permission decision).
++    const every = (options.parallelReminderEveryFn ?? readParallelReminderEvery)(rootDir);
++    if (tickParallelReminder({ commonDir, transcriptPath: rawTranscriptPath, every }, options)) {
++      return { exitCode: 0, stderr: "", stdout: parallelReminderPreToolUseStdout() };
++    }
+     return verdict(0); // never limited, by construction
+   }
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
+index 9bf24b23547ac52f69008162e8a55cc353b13e23..11be9bbaf3493eaca4d0d37b37af944cb6f82be3 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
+@@ -120,6 +120,10 @@ const RUNNER_SOURCE = [
+   "  };",
+   "  if (!scenario.realBudgetBinding) o.dispatchBudgetContractForRoleFn = (agentType) => ({ applicable: false, role: agentType });",
+   "  if (!scenario.rootDirAbsent) o.rootDir = scenario.rootDir;",
++  "  if (Object.prototype.hasOwnProperty.call(scenario, 'parallelEvery')) {",
++  "    o.parallelReminderEveryFn = () => scenario.parallelEvery;",
++  "    o.statSyncFn = (p) => { if (!files.has(canon(p))) { const e = new Error('ENOENT ' + p); e.code = 'ENOENT'; throw e; } return { size: files.get(canon(p)).length }; };",
++  "  }",
+   "  return o;",
+   "}",
+   "",
+@@ -129,6 +133,9 @@ const RUNNER_SOURCE = [
+   "  if (step.op === 'guard') {",
+   "    const r = mod.evaluateDispatchBudgetGuard(step.input, baseOpts());",
+   "    results.push({ exitCode: r.exitCode, stderr: r.stderr });",
++  "  } else if (step.op === 'guardFull') {",
++  "    const r = mod.evaluateDispatchBudgetGuard(step.input, baseOpts());",
++  "    results.push({ exitCode: r.exitCode, stderr: r.stderr, stdout: r.stdout ?? null });",
+   "  } else if (step.op === 'identity') {",
+   "    results.push(mod.subagentIdentity(step.input, { existsSyncFn, readFileSyncFn, pluginRoot: scenario.rootDir ? fakePluginRoot() : undefined }));",
+   "  } else if (step.op === 'maxTurns') {",
+@@ -466,6 +473,35 @@ test("evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded
+   assert.equal(results[results.length - 1], 0, "once the marker exists for this session, no further write should ever occur");
+ });
+ 
++test("evaluateDispatchBudgetGuard (C29e T10): the orchestrator gets the parallel reminder on every N-th call, as context only, never a permission decision", () => {
++  const steps = [];
++  for (let i = 1; i <= 7; i += 1) steps.push({ op: "guardFull", input: orchestratorInputObj() });
++  steps.push({ op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/top-level.calls` });
++  const { results } = run({ rootDir: FAKE_ROOT, parallelEvery: 3, steps });
++  const fired = [];
++  for (let i = 0; i < 7; i += 1) {
++    assert.equal(results[i].exitCode, 0);
++    if (results[i].stdout) {
++      fired.push(i + 1);
++      const out = JSON.parse(results[i].stdout);
++      assert.equal(out.hookSpecificOutput.hookEventName, "PreToolUse");
++      assert.match(out.hookSpecificOutput.additionalContext, /^Parallel by default: /u);
++      assert.equal(out.hookSpecificOutput.permissionDecision, undefined, "an allow would skip the permission prompt");
++    }
++  }
++  assert.deepEqual(fired, [3, 6]);
++  assert.equal(results[7], ".......", "one byte per orchestrator call");
++});
++
++test("evaluateDispatchBudgetGuard (C29e T10): N 0 turns the every-N reminder off and writes no counter", () => {
++  const steps = [];
++  for (let i = 1; i <= 4; i += 1) steps.push({ op: "guardFull", input: orchestratorInputObj() });
++  steps.push({ op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/top-level.calls` });
++  const { results } = run({ rootDir: FAKE_ROOT, parallelEvery: 0, steps });
++  for (let i = 0; i < 4; i += 1) assert.ok(!results[i].stdout, `call ${i + 1} prints nothing`);
++  assert.equal(results[4], null);
++});
++
+ test("evaluateDispatchBudgetGuard: rootDir precedence -- assert the actual resolveGitCommonDirFn argument in all three precedence cases", () => {
+   const withRootDir = run(
+     { rootDir: FAKE_ROOT, files: seedSubagentFiles(), steps: [{ op: "guard", input: readInputObj({}) }] },
+@@ -931,7 +967,10 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): the three identity shapes
+   for (const r of results.slice(0, 3)) assert.equal(r.exitCode, 0);
+   const allFiles = results[3];
+   const counterFiles = allFiles.filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.includes("unresolved-observations"));
+-  const markerFiles = allFiles.filter((p) => p.includes("/orchestrator-seen/"));
++  // The orchestrator-seen directory also holds the C29e T10 parallel-reminder call counter (`<session>.calls`), which
++  // belongs to the same orchestrator call; the once-per-session marker is the `.json` file.
++  const markerFiles = allFiles.filter((p) => p.includes("/orchestrator-seen/") && p.endsWith(".json"));
++  assert.deepEqual(allFiles.filter((p) => p.includes("/orchestrator-seen/") && p.endsWith(".calls")), [`${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/other.calls`], "the reminder counter belongs to the genuine orchestrator call only");
+   const unresolvedFiles = unresolvedObservationFiles(allFiles);
+   assert.equal(counterFiles.length, 1, "exactly one per-agent counter file, for the genuine subagent call");
+   assert.equal(markerFiles.length, 1, "exactly one orchestrator marker, for the genuine orchestrator call");
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index a812b1dcf567c345f97c4288a16660ac8cd5ce36..60424f51ca853d1cd0b1062bd7978be5b68ac829 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -40,6 +40,7 @@ import { liveSlices } from "../lib/fanout-ledger.mjs";
+ import { resolveFanoutConfig } from "../lib/fanout-governor.mjs";
+ import { loadSliceQueue, readyAndLive } from "../lib/slice-queue.mjs";
+ import { resolveGovernedItemQueue, inspectNativeGoldfishItemDelivery, itemDeliveryUnobservedLine } from "../lib/native-goldfish-host-state.mjs";
++import { PARALLEL_REMINDER, readParallelReminderEvery } from "../lib/parallel-reminder.mjs";
+ 
+ const FANOUT_MAX_RECORD_BYTES = 1024 * 1024;
+ const FANOUT_SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+@@ -365,6 +366,8 @@ export function decideOutput(input, state, { rootDir = null, env = process.env }
+         : `\n${itemDeliveryUnobservedLine(ownership.code)}`;
+     }
+   }
++  // C29e T10: the re-grounding repeats the parallel reminder (off with `session.parallel_reminder_every: 0`).
++  if (rootDir && readParallelReminderEvery(rootDir) > 0) message += `\n${PARALLEL_REMINDER}`;
+   const measurement = measureBootstrapPayload(message, { mode: "compact" });
+   const payload = {
+     systemMessage: message,
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+index 0c293449197678f1e39dd363c1f5eedc70c1cbb7..75a001a35d97b511d592825811a2b8512fa21cb6 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+@@ -27,6 +27,7 @@ import {
+   writeModelIdentityObservation,
+ } from "../lib/main-session-route-attestation.mjs";
+ import { STATE_EXCERPT_MAX_BYTES, STATE_EXCERPT_TRUNCATION_MARKER } from "../lib/bootstrap-payload-budget.mjs";
++import { PARALLEL_REMINDER } from "../lib/parallel-reminder.mjs";
+ 
+ const SCRIPT = fileURLToPath(new URL("./post-compact-reground.mjs", import.meta.url));
+ const FEATURE = "phase26-test";
+@@ -241,6 +242,16 @@ check("decideOutput with rootDir embeds the docs/state.md live excerpt bilingual
+   assert.match(deMessage, /Falls hier etwas unklar ist oder unvollständig wirkt, lies docs\/state\.md direkt, bevor du doppelte Arbeit riskierst\./);
+ });
+ 
++check("C29e T10: the compact re-grounding ends with the parallel reminder unless pipeline.user.yaml sets it to 0", () => {
++  const root = freshRoot("parallel-reminder");
++  const withDefault = decideOutput({ source: "compact" }, outer(), { rootDir: root }).payload.systemMessage;
++  assert.ok(withDefault.endsWith(`\n${PARALLEL_REMINDER}`), "no pipeline.user.yaml: the default N > 0 keeps the reminder");
++  writeFileSync(join(root, "pipeline.user.yaml"), "session:\n  keep_awake: false\n  parallel_reminder_every: 0\n");
++  const off = decideOutput({ source: "compact" }, outer(), { rootDir: root }).payload.systemMessage;
++  assert.equal(off.includes(PARALLEL_REMINDER), false, "0 turns it off");
++  assert.equal(decideOutput({ source: "compact" }, outer()).payload.systemMessage.includes(PARALLEL_REMINDER), false, "no rootDir, no reminder");
++});
++
+ check("host payload mirrors deterministic context and exposes pure projection", () => {
+   const decided = decideOutput({ source: "compact" }, outer());
+   const parsed = JSON.parse(decided.stdout);
+diff --git a/plugins/pipeline-core/hooks/setup-check.mjs b/plugins/pipeline-core/hooks/setup-check.mjs
+index 4bf54351ec758ee6d34bddaeab1bbb9bef7d3597..b1d9ef83e2b1ccf0060f53d4cf2a9bd66f35dfc3 100644
+--- a/plugins/pipeline-core/hooks/setup-check.mjs
++++ b/plugins/pipeline-core/hooks/setup-check.mjs
+@@ -74,6 +74,7 @@ import { join } from "node:path";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { parseYaml } from "../lib/yaml-lite.mjs";
++import { parallelReminderEvery, parallelReminderSessionStartStdout } from "../lib/parallel-reminder.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+@@ -278,7 +279,11 @@ export function decideFromProjectDir(rootDir) {
+       parsed = null; // malformed/outside yaml-lite's strict subset -> ambiguous, fail-open
+     }
+   }
+-  return decideOutput({ fileExists, parsed });
++  const decided = decideOutput({ fileExists, parsed });
++  // C29e T10: when setup has nothing to say, the session start carries the parallel reminder instead (context only;
++  // `session.parallel_reminder_every: 0` turns it off). An incomplete setup keeps its own message alone.
++  if (decided.stdout === "" && parallelReminderEvery(parsed) > 0) return { stdout: parallelReminderSessionStartStdout(), json: true, observation: null };
++  return decided;
+ }
+ 
+ // ---- CLI entrypoint: real environment, always exit 0 ------------------------------------------
+diff --git a/plugins/pipeline-core/hooks/setup-check.test.mjs b/plugins/pipeline-core/hooks/setup-check.test.mjs
+index 2920215df81499abf4d6a0667bb6f2877da39877..7598688a7af6a2913e6fc225285bfc6bf6e0e7a6 100644
+--- a/plugins/pipeline-core/hooks/setup-check.test.mjs
++++ b/plugins/pipeline-core/hooks/setup-check.test.mjs
+@@ -30,6 +30,7 @@ import {
+   decideFromProjectDir, reconcileSetupObservation,
+ } from "./setup-check.mjs";
+ import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
++import { parallelReminderSessionStartStdout } from "../lib/parallel-reminder.mjs";
+ 
+ const SCRIPT = fileURLToPath(new URL("./setup-check.mjs", import.meta.url));
+ 
+@@ -204,7 +205,21 @@ function runCli(rootDir) {
+   );
+   const { status, stdout } = runCli(rootDir);
+   ok("CLI: fully set up -> exit 0", status === 0);
+-  ok("CLI: fully set up -> silent (empty stdout)", stdout === "", stdout);
++  // C29e T10: a complete setup has nothing to say, so the session start carries only the parallel reminder (context only).
++  const reminder = stdout.trim() === "" ? null : JSON.parse(stdout);
++  ok("CLI: fully set up -> only the parallel reminder, as context", reminder !== null && reminder.systemMessage === undefined
++    && reminder.hookSpecificOutput?.hookEventName === "SessionStart" && /^Parallel by default: /u.test(reminder.hookSpecificOutput?.additionalContext ?? ""), stdout);
++}
++
++{
++  const rootDir = fixtureDir("cli-fully-set-up-reminder-off");
++  writeRaw(
++    join(rootDir, "pipeline.user.yaml"),
++    `setup:\n  intent: "maintainer"\nsession:\n  keep_awake: false\n  parallel_reminder_every: 0\n`,
++  );
++  const { status, stdout } = runCli(rootDir);
++  ok("CLI: fully set up, reminder off -> exit 0", status === 0);
++  ok("CLI: fully set up, reminder off -> silent (empty stdout)", stdout === "", stdout);
+ }
+ 
+ {
+@@ -213,7 +228,7 @@ function runCli(rootDir) {
+   writeRaw(join(rootDir, "pipeline.user.yaml"), `setup: { intent: "consumer" }\n`);
+   const { status, stdout } = runCli(rootDir);
+   ok("CLI: malformed/unsupported YAML -> exit 0 (fail-open, never blocks)", status === 0);
+-  ok("CLI: malformed/unsupported YAML -> silent (empty stdout)", stdout === "", stdout);
++  ok("CLI: malformed/unsupported YAML -> no setup message, only the parallel reminder (fail-open)", /Parallel by default: /u.test(stdout) && !/setup\.mjs/u.test(stdout), stdout);
+ }
+ 
+ {
+@@ -223,7 +238,7 @@ function runCli(rootDir) {
+   writeRaw(join(rootDir, "pipeline.user.yaml"), `- one\n- two\n`);
+   const { status, stdout } = runCli(rootDir);
+   ok("CLI: top-level YAML array (non-object document) -> exit 0", status === 0);
+-  ok("CLI: top-level YAML array (non-object document) -> silent (ambiguous, fail-open)", stdout === "", stdout);
++  ok("CLI: top-level YAML array (non-object document) -> no setup message, only the parallel reminder (ambiguous, fail-open)", /Parallel by default: /u.test(stdout) && !/setup\.mjs/u.test(stdout), stdout);
+ }
+ 
+ // ======================================================================================
+@@ -261,8 +276,8 @@ function runCli(rootDir) {
+   );
+   const { stdout, observation } = decideFromProjectDir(rootDir);
+   ok(
+-    "onboarding-generated shape (no setup: key at all) -> the hook is silent (default-markers never fires)",
+-    stdout === "" && observation === null,
++    "onboarding-generated shape (no setup: key at all) -> no setup message (default-markers never fires), only the parallel reminder (C29e T10)",
++    stdout === parallelReminderSessionStartStdout() && observation === null,
+     stdout,
+   );
+ }
+@@ -392,7 +407,7 @@ function preflightAt(rootDir, installedVersion = "0.5.3+test") {
+   writeRaw(join(rootDir, "pipeline.user.yaml"), `setup:\n  intent: "maintainer"\n`);
+   const hook = decideFromProjectDir(rootDir);
+   const preflight = preflightAt(rootDir);
+-  ok("(b) setup complete: the hook is silent", hook.stdout === "", hook.stdout);
++  ok("(b) setup complete: no setup message, only the parallel reminder (C29e T10)", hook.stdout === parallelReminderSessionStartStdout(), hook.stdout);
+   ok("(b) setup complete: the hook emits no observation at all", hook.observation === null);
+   ok("(b) setup complete: preflight is ready", preflight.status === "ready", preflight.status);
+   const verdict = reconcileSetupObservation({ preflight, observation: hook.observation });
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index abc41866a4fec0c48c5236abb812726477d8fe70..4c0ac99355cee94941fcac8f9d62e2084e5cd80b 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -900,6 +900,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
+   "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
+   "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
++  // C29e T10: parallel-reminder <- hooks/guard-dispatch-budget (every-N context line).
++  "plugins/pipeline-core/lib/parallel-reminder.mjs",
+   "plugins/pipeline-core/lib/node-sandbox-probe.mjs", "plugins/pipeline-core/lib/onboarding-driver-output.mjs",
+   "plugins/pipeline-core/lib/pipeline-owned-files.mjs",
+   "plugins/pipeline-core/lib/session-authority-observers.mjs",
+diff --git a/plugins/pipeline-core/lib/parallel-reminder.mjs b/plugins/pipeline-core/lib/parallel-reminder.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9d34ff8b09c2a5757cd5fa2f08e620543cd822b2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/parallel-reminder.mjs
+@@ -0,0 +1,82 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * parallel-reminder.mjs -- the parallel-by-default reminder the main session gets at session start, after a compact and
++ * every N of its own tool calls (C29e T10, PO tile 2026-11-14 "idea one": extend existing hooks).
++ *
++ * Agents keep falling back to serial work. Three existing hooks carry the same short text:
++ *   - hooks/setup-check.mjs (SessionStart startup|resume|clear), when it has nothing else to say;
++ *   - hooks/post-compact-reground.mjs (SessionStart compact), as one more line of the re-grounding;
++ *   - hooks/guard-dispatch-budget.mjs (PreToolUse), on every N-th call of the orchestrator session.
++ *
++ * The every-N output carries `additionalContext` only, never a `permissionDecision`: an "allow" would skip the user's
++ * permission prompt for that call (Claude Code hooks reference, PreToolUse decision control), so the reminder must not
++ * decide anything. The counter is lock-free and fail-open: one byte appended per call, the file size decides, any error
++ * means no reminder. Parallel calls may both see a multiple of N or skip one; that only moves a reminder by a call.
++ *
++ * `session.parallel_reminder_every` in pipeline.user.yaml sets N (an integer 0..1000); 0 turns the reminder off at all
++ * three points; absent or invalid means the default 25.
++ */
++import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
++import { basename, dirname, join } from "node:path";
++import { parseYaml } from "./yaml-lite.mjs";
++
++export const PARALLEL_REMINDER_DEFAULT_EVERY = 25;
++export const PARALLEL_REMINDER_MAX_EVERY = 1000;
++export const PARALLEL_REMINDER =
++  "Parallel by default: send independent read-only tool calls together in one message, run independent read-only scouts at the same time and independent test files in parallel. "
++  + "Limits: never two heavy test suites at once, one write dispatch per message, no write to the tree while a write dispatch runs.";
++
++/** N from an already parsed pipeline.user.yaml value (null when unreadable): the default when absent or invalid. */
++export function parallelReminderEvery(parsedUserYaml) {
++  const value = parsedUserYaml !== null && typeof parsedUserYaml === "object" && !Array.isArray(parsedUserYaml)
++    ? parsedUserYaml.session?.parallel_reminder_every
++    : undefined;
++  return Number.isSafeInteger(value) && value >= 0 && value <= PARALLEL_REMINDER_MAX_EVERY ? value : PARALLEL_REMINDER_DEFAULT_EVERY;
++}
++
++/** N from `<rootDir>/pipeline.user.yaml`; fail-open to the default when the file is missing or unreadable. */
++export function readParallelReminderEvery(rootDir, deps = {}) {
++  try {
++    return parallelReminderEvery(parseYaml((deps.readFileSyncFn ?? readFileSync)(join(rootDir, "pipeline.user.yaml"), "utf8")));
++  } catch {
++    return parallelReminderEvery(null);
++  }
++}
++
++/** SessionStart stdout that only adds the reminder to the model's context. */
++export function parallelReminderSessionStartStdout() {
++  return `${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: PARALLEL_REMINDER } })}\n`;
++}
++
++/** PreToolUse stdout that only adds the reminder next to the tool result; no permission decision (module header). */
++export function parallelReminderPreToolUseStdout() {
++  return `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: PARALLEL_REMINDER } })}\n`;
++}
++
++/** The orchestrator's call counter file, next to the budget guard's once-per-session marker. */
++export function parallelReminderCounterPath(commonDir, transcriptPath) {
++  const stem = typeof transcriptPath === "string" && transcriptPath.trim() !== ""
++    ? basename(transcriptPath).replace(/\.jsonl$/u, "")
++    : "unknown-session";
++  return join(commonDir, "agent-pipeline", "dispatch-budget", "orchestrator-seen", `${stem}.calls`);
++}
++
++/**
++ * Count one orchestrator call; true when this call is the N-th (and 2N-th, ...). Fail-open: false on any error, and
++ * false when N is 0. `deps` are seams for tests.
++ */
++export function tickParallelReminder({ commonDir, transcriptPath, every }, deps = {}) {
++  if (!Number.isSafeInteger(every) || every <= 0 || typeof commonDir !== "string" || commonDir === "") return false;
++  const appendFn = deps.appendFileSyncFn ?? appendFileSync;
++  const mkdirFn = deps.mkdirSyncFn ?? mkdirSync;
++  const statFn = deps.statSyncFn ?? statSync;
++  try {
++    const path = parallelReminderCounterPath(commonDir, transcriptPath);
++    mkdirFn(dirname(path), { recursive: true, mode: 0o700 });
++    appendFn(path, ".", { mode: 0o600 });
++    const size = statFn(path).size;
++    return Number.isSafeInteger(size) && size > 0 && size % every === 0;
++  } catch {
++    return false;
++  }
++}
+diff --git a/plugins/pipeline-core/lib/parallel-reminder.test.mjs b/plugins/pipeline-core/lib/parallel-reminder.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..29ef0bc3aca604cf911e731e0a9251dffcf06d68
+--- /dev/null
++++ b/plugins/pipeline-core/lib/parallel-reminder.test.mjs
+@@ -0,0 +1,76 @@
++// SPDX-License-Identifier: SUL-1.0
++// C29e T10: the parallel reminder -- N from pipeline.user.yaml, the lock-free counter, and outputs without a permission decision.
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import {
++  PARALLEL_REMINDER,
++  PARALLEL_REMINDER_DEFAULT_EVERY,
++  parallelReminderCounterPath,
++  parallelReminderEvery,
++  parallelReminderPreToolUseStdout,
++  parallelReminderSessionStartStdout,
++  readParallelReminderEvery,
++  tickParallelReminder,
++} from "./parallel-reminder.mjs";
++
++test("N: default when absent or invalid, the configured integer otherwise, 0 turns it off", () => {
++  assert.equal(parallelReminderEvery(null), PARALLEL_REMINDER_DEFAULT_EVERY);
++  assert.equal(parallelReminderEvery({}), 25);
++  assert.equal(parallelReminderEvery({ session: { keep_awake: false } }), 25);
++  assert.equal(parallelReminderEvery({ session: { parallel_reminder_every: 10 } }), 10);
++  assert.equal(parallelReminderEvery({ session: { parallel_reminder_every: 0 } }), 0);
++  for (const bad of [-1, 1001, 2.5, "10", true, null]) assert.equal(parallelReminderEvery({ session: { parallel_reminder_every: bad } }), 25, `invalid ${JSON.stringify(bad)} falls back`);
++  assert.equal(parallelReminderEvery([]), 25);
++});
++
++test("N is read from the project's pipeline.user.yaml, fail-open to the default", () => {
++  const root = mkdtempSync(join(tmpdir(), "parallel-reminder-root-"));
++  try {
++    assert.equal(readParallelReminderEvery(root), 25, "no file");
++    writeFileSync(join(root, "pipeline.user.yaml"), "session:\n  keep_awake: false\n  parallel_reminder_every: 7\n");
++    assert.equal(readParallelReminderEvery(root), 7);
++    writeFileSync(join(root, "pipeline.user.yaml"), "session: { broken\n");
++    assert.equal(readParallelReminderEvery(root), 25, "unreadable YAML");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("the outputs add context only and never carry a permission decision", () => {
++  const pre = JSON.parse(parallelReminderPreToolUseStdout());
++  assert.deepEqual(pre, { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: PARALLEL_REMINDER } });
++  const start = JSON.parse(parallelReminderSessionStartStdout());
++  assert.deepEqual(start, { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: PARALLEL_REMINDER } });
++  assert.match(PARALLEL_REMINDER, /^Parallel by default: /u);
++  assert.match(PARALLEL_REMINDER, /never two heavy test suites at once/u);
++});
++
++test("the counter fires on the N-th, 2N-th call only, per session, under the once-per-session marker directory", () => {
++  const commonDir = mkdtempSync(join(tmpdir(), "parallel-reminder-common-"));
++  try {
++    const transcriptPath = "/x/session-a.jsonl";
++    const fired = [];
++    for (let call = 1; call <= 7; call += 1) if (tickParallelReminder({ commonDir, transcriptPath, every: 3 })) fired.push(call);
++    assert.deepEqual(fired, [3, 6]);
++    assert.equal(tickParallelReminder({ commonDir, transcriptPath: "/x/session-b.jsonl", every: 3 }), false, "another session counts on its own");
++    assert.match(parallelReminderCounterPath(commonDir, transcriptPath), /agent-pipeline[\\/]dispatch-budget[\\/]orchestrator-seen[\\/]session-a\.calls$/u);
++  } finally {
++    rmSync(commonDir, { recursive: true, force: true });
++  }
++});
++
++test("the counter is fail-open: N 0, a missing common dir or a write error mean no reminder", () => {
++  assert.equal(tickParallelReminder({ commonDir: "/nonexistent", transcriptPath: "t.jsonl", every: 0 }), false);
++  assert.equal(tickParallelReminder({ commonDir: "", transcriptPath: "t.jsonl", every: 1 }), false);
++  const commonDir = mkdtempSync(join(tmpdir(), "parallel-reminder-fail-"));
++  try {
++    mkdirSync(join(commonDir, "agent-pipeline"));
++    const fail = () => { throw new Error("EACCES"); };
++    assert.equal(tickParallelReminder({ commonDir, transcriptPath: "t.jsonl", every: 1 }, { appendFileSyncFn: fail }), false);
++  } finally {
++    rmSync(commonDir, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/lib/runner-profiles-v3.mjs b/plugins/pipeline-core/lib/runner-profiles-v3.mjs
+index 797b9fd40078522723d32734e21029e4aefbd6f6..192a2e9f7cc17e40da6fc0f6309ebcec3a191d0c 100644
+--- a/plugins/pipeline-core/lib/runner-profiles-v3.mjs
++++ b/plugins/pipeline-core/lib/runner-profiles-v3.mjs
+@@ -233,10 +233,17 @@ function validateRoles(value, errors) {
+ 
+ function validateSession(value, errors) {
+   if (!Object.hasOwn(value, "session")) return;
+-  if (!validateClosedObject(value.session, "$.session", ["keep_awake"], errors, "supply exactly the optional keep_awake boolean")) return;
++  if (!validateClosedObject(value.session, "$.session", ["keep_awake"], errors, "supply the keep_awake boolean and, optionally, the parallel_reminder_every integer", ["parallel_reminder_every"])) return;
+   if (typeof value.session.keep_awake !== "boolean") {
+     add(errors, "$.session.keep_awake", "type", "keep_awake must be a boolean", "use true or false; commands and arguments are never configurable");
+   }
++  // C29e T10: how often the main session gets the parallel reminder (lib/parallel-reminder.mjs); 0 turns it off.
++  if (Object.hasOwn(value.session, "parallel_reminder_every")) {
++    const every = value.session.parallel_reminder_every;
++    if (!Number.isSafeInteger(every) || every < 0 || every > 1000) {
++      add(errors, "$.session.parallel_reminder_every", "type", "parallel_reminder_every must be an integer from 0 to 1000", "use a whole number of tool calls (default 25), or 0 to turn the reminder off");
++    }
++  }
+ }
+ 
+ function validateAdvisorExport(value, errors) {
+diff --git a/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs b/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
+index beb6dd8560d1cca18f50fc5c0ba1fdbc7dd6f18c..b5ab6c3c271a82015a734f6c026ac762a0641281 100644
+--- a/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
+@@ -196,6 +196,20 @@ const cases = [
+     const checked = validatePipelineUserV3(malformed);
+     assert.equal(checked.ok, false); assert.ok(has(checked, "$.session.command", "additional_property"));
+   }],
++  ["C29e T10: parallel_reminder_every is an optional integer 0..1000 next to keep_awake", () => {
++    for (const every of [0, 1, 25, 1000]) {
++      const intent = completeIntent(); intent.session = { keep_awake: false, parallel_reminder_every: every };
++      assert.equal(validatePipelineUserV3(intent).ok, true, `accepts ${every}`);
++    }
++    for (const bad of [-1, 1001, 2.5, "25", true, null]) {
++      const intent = completeIntent(); intent.session = { keep_awake: false, parallel_reminder_every: bad };
++      const checked = validatePipelineUserV3(intent);
++      assert.equal(checked.ok, false, `refuses ${JSON.stringify(bad)}`);
++      assert.ok(has(checked, "$.session.parallel_reminder_every", "type"));
++    }
++    const onlyEvery = completeIntent(); onlyEvery.session = { parallel_reminder_every: 10 };
++    assert.equal(validatePipelineUserV3(onlyEvery).ok, false, "keep_awake stays required");
++  }],
+   ["advisor export consent is an optional closed public-safe V3 authority", () => {
+     const schema = loadPipelineUserV3Schema();
+     assert.deepEqual(schema.properties.advisor_export, { "$ref": "#/$defs/advisor_export" });
+diff --git a/plugins/pipeline-core/scripts/pipeline-user-v3.schema.json b/plugins/pipeline-core/scripts/pipeline-user-v3.schema.json
+index 8456d8b471ab50d1e79ed86fb06be55e96107f22..cd9eae7a16827ba3e26efed88e089d2526245545 100644
+--- a/plugins/pipeline-core/scripts/pipeline-user-v3.schema.json
++++ b/plugins/pipeline-core/scripts/pipeline-user-v3.schema.json
+@@ -52,7 +52,8 @@
+       "required": ["keep_awake"],
+       "additionalProperties": false,
+       "properties": {
+-        "keep_awake": { "type": "boolean" }
++        "keep_awake": { "type": "boolean" },
++        "parallel_reminder_every": { "type": "integer", "minimum": 0, "maximum": 1000 }
+       }
+     },
+     "critic_export": {

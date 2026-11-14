@@ -1,0 +1,27 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 335d483fa1607e65e895700775b0490d78a765f7..3129ee508cff170a6828931fee857955fae59340 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -77,7 +77,7 @@ test("C29-C3 security-scan: an empty or unreadable v2 capability plan is named o
+   const scan = JSON.stringify({ scanners: [{ tool: "semgrep", status: "PASS", classification: "success" }] });
+   const verdict = (plan) => JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan, verdict: { blocking: false }, capabilityOutcomes: {}, controls: [] });
+   const withVerdict = (text) => rows(full({ readBytes: (p) => { if (p === "evidence/security-latest.json") return Buffer.from(scan); if (p === SEC_VERDICT && text !== null) return Buffer.from(text); throw new Error("absent"); } }))["security-scan"];
+-  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; v2 capability plan empty, reporting only: capability controls open\)$/u);
++  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; trivy: not applicable; v2 capability plan empty, reporting only: capability controls open\)$/u);
+   assert.match(withVerdict(null).evidence, /; v2 scope unavailable\)$/u);
+   const planned = withVerdict(verdict({ required: ["cap.sast"], optional: [] })).evidence;
+   assert.match(planned, /v2 verdict reporting only, exit by v1\)$/u); assert.doesNotMatch(planned, /plan empty|unavailable/u);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index ba897d7f80331d3a26eca9f98f5b34a0e315d014..5ab7b79edb4ff1788b936a45710c9fdce89c0dc6 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -6190,6 +6190,9 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
+       ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
+       ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
+       ["../scripts/security-adapters/license-check.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "license-check.mjs"]],
++      // QG-04 restatement (C29e T8, ADR-0103): security-scan.mjs imports the Trivy adapter (node: imports only) and lib/trivy-baseline.mjs (local import: semgrep-baseline.mjs, copied below).
++      ["../scripts/security-adapters/trivy.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "trivy.mjs"]],
++      ["./trivy-baseline.mjs", ["plugins", "pipeline-core", "lib", "trivy-baseline.mjs"]],
+       ["../scripts/pipeline-manifest.schema.json", ["plugins", "pipeline-core", "scripts", "pipeline-manifest.schema.json"]],
+       ["./manifest.mjs", ["plugins", "pipeline-core", "lib", "manifest.mjs"]],
+       ["./project-authority.mjs", ["plugins", "pipeline-core", "lib", "project-authority.mjs"]],
