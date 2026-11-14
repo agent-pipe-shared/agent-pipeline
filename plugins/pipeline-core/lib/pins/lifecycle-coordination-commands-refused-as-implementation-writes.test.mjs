@@ -335,6 +335,11 @@ async function walkSteps(f, { actualGuard }) {
   writeFileSync(join(f.root, `specs/${f.featureId}/review/design-review-1.original.md`), 'original report\n');
   check('design-review receipt (sanitized report pair)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
     '--original-report', `specs/${f.featureId}/review/design-review-1.original.md`, '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-2.json`));
+  // C29 G4 (Glossover): the unpublished original must not be committed, so its documented place is the git-ignored evidence/ folder.
+  mkdirSync(join(f.root, 'evidence'), { recursive: true });
+  writeFileSync(join(f.root, 'evidence/design-review-original-1.md'), 'original report\n');
+  check('design-review receipt (original under evidence/)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+    '--original-report', 'evidence/design-review-original-1.md', '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-4.json`));
   check('design-review receipt (delta)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
     '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--previous', receiptPath, '--open-finding', 'F-1', '--out', `specs/${f.featureId}/review/design-review-receipt-3.json`));
   // 4. present-plan, then the approval transport in the spelling inspect renders after a presentation, then the phase switch

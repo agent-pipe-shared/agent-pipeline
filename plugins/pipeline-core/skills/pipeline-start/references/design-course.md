@@ -63,7 +63,11 @@ was needed; capability evidence is not an Advisor answer.
    write the report with `node <plugin-root>/scripts/design-review-receipt.mjs
    export-report --repo <root> --out <report path>` (it writes the returned
    text as returned and prints one line; a sanitized publication goes in
-   `--report`, the exported text in `--original-report`), and `create` stamps
+   `--report`, the exported text in `--original-report`; the unpublished
+   original lives under `evidence/` (for example
+   `evidence/design-review-original-<round>.md`): onboarding git-ignores
+   `/evidence/`, so it stays local and is never committed, while `create` binds
+   its digest; `scratch/` is not admitted for it), and `create` stamps
    the observed model into the receipt itself. A Claude round without that
    observation (a report written by hand, a session started before the hooks
    were loaded) says `unobserved`, and `present-plan` refuses it
