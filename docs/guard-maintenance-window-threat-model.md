@@ -846,6 +846,13 @@ a range would hide a weakened gate, a maintenance proof read loosely would admit
 criterion and no red-before proof covers, and a wrong range base would move the walk, which is why
 none of them can be lifted by a window.
 
+Candidate 29d (ADR-0100) also adds a kernel import. `scripts/pipeline-state.mjs` and
+`scripts/po-human-approval.mjs` import `plugins/pipeline-core/lib/verify-replacement.mjs`, the test
+run and the signed subject of a verify-command replacement (ADR-0100). Every first-party module it
+imports is itself a kernel path. A replacement builder read loosely would let a red or drifting
+command be signed, or bind the signature to other calibration bytes than the ones written, which is
+why it cannot be lifted by a window.
+
 Candidate 29d (K-34) adds `plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs`, which
 `lib/native-goldfish-host-state.mjs` now imports: when HEAD carries a host commit that no lineage
 proof covers, the concurrent commit plan reads the in-flight siblings' stop outcomes and names the

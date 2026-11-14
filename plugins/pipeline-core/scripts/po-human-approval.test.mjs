@@ -2528,10 +2528,10 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
       } catch (error) { usage = /Usage:/u.test(String(error?.message ?? error)); }
       assert.equal(usage, false, "prepare-critical composes acknowledge-caller-authored-critic (G20-39)");
     }
-    // `acknowledge-gate-definition-changes` (ADR-0096) and `acknowledge-maintenance-red-check` (ADR-0097) were added to
+    // `acknowledge-gate-definition-changes` (ADR-0096), `acknowledge-maintenance-red-check` (ADR-0097) and `replace-verify-command` (ADR-0100) were added to
     // CRITICAL_COMMAND_KINDS deliberately (PO tiles 2026-11-13) and derive their subject at the clean HEAD; excluded here (QG-04)
     // and pinned positively: prepare-critical reaches their subject builder instead of refusing with Usage.
-    for (const kind of ["acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"]) {
+    for (const kind of ["acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check", "replace-verify-command"]) {
       let message = "";
       try {
         runHumanApproval([
@@ -2542,7 +2542,7 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
       } catch (error) { message = String(error?.message ?? error); }
       assert.doesNotMatch(message, /Usage:/u, `prepare-critical composes ${kind}`);
     }
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check"].includes(entry))) {
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check", "replace-verify-command"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",

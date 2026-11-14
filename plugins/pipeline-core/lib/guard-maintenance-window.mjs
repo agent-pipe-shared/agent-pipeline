@@ -963,6 +963,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/maintenance-delivery.mjs", "plugins/pipeline-core/lib/close-commit-split.mjs",
   // Candidate 29d (K-34, GMWKC01): lib/native-goldfish-host-state.mjs reads a sibling's stop outcome to refuse its unproven host commit by name.
   "plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs",
+  // Candidate 29d (ADR-0100, GMWKC01): the verify-command replacement, imported by scripts/pipeline-state.mjs and scripts/po-human-approval.mjs.
+  "plugins/pipeline-core/lib/verify-replacement.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

@@ -25,6 +25,8 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
 export const GATE_CHANGE_ACKNOWLEDGEMENT_KIND = "acknowledge-gate-definition-changes";
 // ADR-0097: same reason (lib/maintenance-delivery.mjs imports it from here).
 export const MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND = "acknowledge-maintenance-red-check";
+// ADR-0100: same reason (lib/verify-replacement.mjs imports it from here).
+export const VERIFY_REPLACEMENT_KIND = "replace-verify-command";
 export const CRITICAL_ACTION_KINDS = Object.freeze([
   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
   "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
@@ -34,6 +36,8 @@ export const CRITICAL_ACTION_KINDS = Object.freeze([
   "acknowledge-gate-definition-changes",
   // ADR-0097: the PO's acknowledgement that a maintenance check was red before the feature (lib/maintenance-delivery.mjs).
   "acknowledge-maintenance-red-check",
+  // ADR-0100: the PO's one signature over a verify command replacement (both calibration mirrors) (lib/verify-replacement.mjs).
+  "replace-verify-command",
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;

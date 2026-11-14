@@ -205,6 +205,8 @@ const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-p
   "acknowledge-gate-definition-changes": "gateChangeAcknowledgement",
   // ADR-0097: the PO acknowledgement that a maintenance check was red before the feature; read per check by the item admission.
   "acknowledge-maintenance-red-check": "maintenanceRedAcknowledgement",
+  // ADR-0100: the PO approval of one verify command replacement; read by subject digest by the configure-verify replace route.
+  "replace-verify-command": "verifyReplacementApproval",
   // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
   "release-preflight": "releasePreflightApproval" });
 
