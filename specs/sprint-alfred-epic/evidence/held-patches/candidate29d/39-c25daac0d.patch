@@ -1,0 +1,27 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+index af374e0e71bc122a2f7ee4a1c7e1fba896b609a9..f1596806e3064d8c6b70122e006f6ac6ab41b15c 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+@@ -568,6 +568,8 @@ register("GDBC18", "hook: a message to a running Critic is refused unless it is
+   assert.equal(none.status, 2, "no grant is recorded: nothing to resume on");
+   assert.match(none.stderr, /DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED/u);
+   assert.match(none.stderr, /grant/u);
++  // P3-3 (Claude run 3): a Critic aborted by an API error has no grant and no verdict; the refusal names the fresh round, not only a grant.
++  assert.match(none.stderr, /do not resume it: an aborted Critic left no verdict, so dispatch the same round again from the Critic template as a fresh agent/u);
+   const granted = grantDispatchBudget(["--agent-id", "rc1", "--extra", "10", "--reason", "finish the remaining files", "--root", root]);
+   assert.equal(granted.status, "granted", JSON.stringify(granted));
+   const generated = criticResumeText({ digest: granted.result.digest });
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+index e9e800822c5123d8cd392a012515e0e245071681..5ed037f1d3faa70d034e0ee0d16561789604c429 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+@@ -57,7 +57,8 @@ export function criticResumeText({ digest }) {
+ export function criticResumeRefusalText({ agentId, expected }) {
+   return `DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED: the message to the running Critic ${agentId} is not the generated resume text of its recorded grant. A Critic is resumed only with that text, which carries the grant digest and nothing about findings, verdicts or earlier rounds. `
+     + (expected === null
+-      ? "No grant is recorded for this Critic: record one first (the grant line of its checkpoint notice), then send the generated text."
++      ? "No grant is recorded for this Critic. If it stopped at its budget checkpoint, record a grant first (the grant line of its checkpoint notice), then send the generated text. "
++        + "If it stopped for any other reason (an API or infrastructure error, a cancelled or duplicate dispatch), do not resume it: an aborted Critic left no verdict, so dispatch the same round again from the Critic template as a fresh agent."
+       : `Send exactly this text, unchanged: ${expected}`);
+ }
+ 

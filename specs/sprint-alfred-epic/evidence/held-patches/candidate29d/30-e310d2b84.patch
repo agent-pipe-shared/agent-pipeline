@@ -1,0 +1,119 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index c9d47adcd478cca11c66d9ae479a5b0b4d03efaa..685f2850625ac42e0242629807f82b981e16f2e5 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -42,9 +42,19 @@ if (process.env.PIPELINE_AUTHORITY_TRACE === "1" && isGovernanceHookEntry(import
+ 
+ /** Called by the original Elephant host return adapter after actual checks.
+  * This readback never runs ordinary checks again or trusts terminal prose. */
+-export function qualifyNativeGoldfishHookDelivery({root,result}={}) {
++export function qualifyNativeGoldfishHookDelivery({root,result,deadlineMs=null}={}) {
+   if(result?.status!=='authored-commit-recorded'||!result.delivery?.pendingSha256)return result;
+-  return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256})};
++  return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256},{deadlineMs})};
++}
++
++/** C29 K-38: the host timeout this hook runs under, per event, as hooks.json and codex-hooks.json register it (PreToolUse is the
++ * SubagentHandback matcher at 120 s; every other registration is 300 s; a pin compares both files). The integration's sibling-race retries end
++ * NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS before that timeout, counted from process start, so a stop whose finalize already used most of the
++ * window still writes its stop outcome and message before the host ends it. */
++export const NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS = 30_000;
++export function nativeHookTimeoutMs(event) { return event === "PreToolUse" ? 120_000 : 300_000; }
++export function nativeHookIntegrationDeadlineMs({ event, startedMs = performance.timeOrigin } = {}) {
++  return startedMs + nativeHookTimeoutMs(event) - NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS;
+ }
+ 
+ /** D31/D32: the Claude SubagentStop block decision for a recorded checkpoint, or null.
+@@ -354,7 +364,7 @@ if (isDirectInvocation(import.meta.url)) {
+   // A stop hook never blocks the stop, with one deliberate exception (D31/D32): a recorded checkpoint with a remaining
+   // budget grant makes the Claude SubagentStop block once so the Goldfish continues. Every fault degrades to the recovery
+   // message, exit 0.
+-  try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
++  try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result,deadlineMs:nativeHookIntegrationDeadlineMs({event:input.hook_event_name})}); }
+   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
+   // G20-63: a Codex SubagentStart that bound nothing says so to the starting child (additionalContext), not only on the hook's stderr.
+   if (runner === "codex" && input.hook_event_name === "SubagentStart" && result?.code === "NGHS-CODEX-START-UNBOUND") {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index e4ffcf8e3b602a0ed8567e252b4bc384610dab67..6eb2c39928194b9dfe8cff462cb8413606e858f0 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -2106,18 +2106,27 @@ export function requalifyNativeGoldfishItemDelivery(input={}) {
+ /** C29 K-38 (Glossover, parallel run 2026-11-14): the stop's integration ran once, so a sibling stop writing the registry at the same moment
+  * (SDC-AUTHORITY-CAS, a held lock, or one of the sibling races the terminal release already retries) left a delivered item "integration refused".
+  * Those refusals are now repeated on a fresh boundary, as the terminal release does: at least NATIVE_BOUNDARY_REBIND_LIMIT rounds and further
+- * rounds while the stop's wait budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned. */
+-export const NATIVE_INTEGRATION_RETRY_CODES=Object.freeze(['SDC-AUTHORITY-CAS','SDC-LOCK-HELD']);
++ * rounds while the retry budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned.
++ * Only race reasons are repeated: SDC-AUTHORITY-CAS also carries structural refusals (a broken binding, a duplicate member, a drifted namespace)
++ * that a fresh boundary cannot cure, so the code alone never qualifies. `deadlineMs` is a hard end the caller owns (the stop hook passes what is
++ * left of its own host timeout); no round starts after it, the minimum round count included. */
++export const NATIVE_INTEGRATION_RACE_REFUSALS=Object.freeze({
++  'SDC-LOCK-HELD':Object.freeze(['registry-lock-held']),
++  'SDC-AUTHORITY-CAS':Object.freeze(['reference-preimage-changed','publication-preimage-changed','read-generation-drift','release-prefix-changed','member-record-not-current','domain-transition-registry-concurrent-writer']),
++});
++export const NATIVE_INTEGRATION_RETRY_BUDGET_MS=60_000;
+ export function integrationRefusalIsSiblingRace(result){
+-  return result?.status==='refused'&&(NATIVE_INTEGRATION_RETRY_CODES.includes(result.code)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason));
++  if(result?.status!=='refused')return false;
++  return (NATIVE_INTEGRATION_RACE_REFUSALS[result.code]??[]).includes(result.reason)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason);
+ }
+-export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=nativeStopWaitBudgetMs(),now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
++export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=NATIVE_INTEGRATION_RETRY_BUDGET_MS,deadlineMs=null,now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
+   const start=now();
+   for(let attempt=1;;attempt+=1){
+     const result=once(args);
+     if(!integrationRefusalIsSiblingRace(result))return result;
+     const wait=Math.min(100*attempt,1000);
+-    if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs)return {...result,attempts:attempt};
++    const pastDeadline=Number.isFinite(deadlineMs)&&now()+wait>deadlineMs;
++    if(pastDeadline||(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs))return {...result,attempts:attempt};
+     pause(wait);
+   }
+ }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 0e593b88f4e8d782d32879ca010c2fd6e8978244..2d6a2290aa7c1e3c00f287feaa7c09b766030156 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -21,7 +21,7 @@ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-ho
+ import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld, integrationReadinessRefusal } from "./native-goldfish-host-state.mjs";
+ import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
+ import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
+-import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
++import { qualifyNativeGoldfishHookDelivery, nativeHookTimeoutMs, nativeHookIntegrationDeadlineMs, NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS } from "../hooks/native-goldfish-host.mjs";
+ import { readyAndLive, SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "./slice-queue.mjs";
+ import { runCli, writeQueueAtomic } from "../scripts/slice-queue.mjs";
+ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
+@@ -2056,6 +2056,33 @@ const cases = [
+     const budgeted = scripted([cas]);
+     integrateNativeGoldfishItemDelivery({}, { once: budgeted.once, budgetMs: 30_000, ...clock() });
+     assert.ok(budgeted.calls.length > 8, "rounds continue while the budget lasts");
++    // The code alone never qualifies: a structural CAS refusal is not cured by a fresh boundary and is returned at once.
++    const structural = scripted([{ status: "refused", code: "SDC-AUTHORITY-CAS", reason: "duplicate-member" }]);
++    assert.equal(integrateNativeGoldfishItemDelivery({}, { once: structural.once, budgetMs: 10_000, ...clock() }).reason, "duplicate-member");
++    assert.equal(structural.calls.length, 1, "a structural CAS refusal is never repeated");
++    // The stop hook's hard deadline ends the rounds even before the minimum count: the host timeout wins.
++    const late = scripted([cas]), lateClock = clock();
++    const ended = integrateNativeGoldfishItemDelivery({}, { once: late.once, budgetMs: 30_000, deadlineMs: 350, ...lateClock });
++    assert.equal(ended.code, "SDC-AUTHORITY-CAS");
++    assert.equal(late.calls.length, 3, "rounds at 0, 100 and 300 ms; the next pause of 300 ms would pass the 350 ms deadline");
++    assert.ok(lateClock.now() <= 350);
++  } },
++
++  { id: "NGHS74", name: "C29 K-38: the stop hook's integration deadline follows the host timeout each runner registers for the native host hook", run: () => {
++    // The finalize may already use most of the window (its waits share a 240 s ceiling), so the retries end before the host ends the hook.
++    const hooksDir = join(dirname(fileURLToPath(import.meta.url)), "..", "hooks");
++    let registrations = 0;
++    for (const file of ["hooks.json", "codex-hooks.json"]) {
++      const config = JSON.parse(readFileSync(join(hooksDir, file), "utf8")).hooks;
++      for (const [event, groups] of Object.entries(config)) for (const group of groups) for (const hook of group.hooks) {
++        if (!String(hook.command).includes("hooks/native-goldfish-host.mjs")) continue;
++        registrations += 1;
++        assert.equal(hook.timeout * 1000, nativeHookTimeoutMs(event), `${file} ${event}: the hook's timeout table matches the registration`);
++      }
++    }
++    assert.ok(registrations >= 4, "both runners register the native host hook");
++    assert.equal(nativeHookIntegrationDeadlineMs({ event: "SubagentStop", startedMs: 1_000 }), 1_000 + 300_000 - NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS);
++    assert.equal(nativeHookIntegrationDeadlineMs({ event: "PreToolUse", startedMs: 0 }), 120_000 - NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS);
+   } },
+ 
+ ];

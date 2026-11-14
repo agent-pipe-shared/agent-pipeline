@@ -1,0 +1,348 @@
+diff --git a/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md b/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..4893303bda9cbed9b00886c3fb1a7b61ce7d98da
+--- /dev/null
++++ b/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md
+@@ -0,0 +1,37 @@
++# ADR-0099: An Antigravity branch result lands with the child's own commits
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-14
++
++**Status:** accepted (2026-11-13, PO tile "R5: build a harvest command", register D251). Built in candidate 29d. Not yet run in a real Antigravity session.
++
++**Context source (PO tile, 2026-11-13, Antigravity test run 3, item R5, Toil P3):** the PO chose the recommended harvest command for `Workspace: "branch"` children: fetch the worktree HEAD, keep the authorship, write the observation.
++
++## Context
++
++An Antigravity code-writing child runs in its own git worktree on a `subagent-<...>` branch, cut from the parent's committed HEAD. Its commits land in the shared object database. Nothing is merged back. The take-over route (`agy-native-integrate.mjs`, candidate 20, C28C) applies the branch's net change to the Elephant's working tree. The recovery route then makes one new commit, `Commit-Act: orchestrator`, and writes an `orchestrator-attested` dispatch record.
++
++In the test run the Elephant harvested several branches by hand. The Critic noted as a minor that the landed commit was the orchestrator's, not the child's. The child's commits, its authorship and its own `Dispatch:` trailers were dropped. The D40b commit scan already counts a Goldfish's own commit with the exact trailer as integrated, so nothing beyond keeping those commits is needed.
++
++## Decision
++
++1. **`apply --keep-authorship <dispatch id>`.** It lands the child's commits unchanged with `git merge --ff-only`. HEAD becomes the child's tip, so there is no new commit and nothing is rewritten. It excludes `--commit-dispatch-id`.
++2. **Only when it is a real fast-forward of checked commits.** `plan` reports `fastForward.eligible` only when all of these hold:
++   - the merge base is the current HEAD;
++   - every commit in `HEAD..tip` carries exactly one `Dispatch: <id> (goldfish)` trailer, with the same id throughout, and `AI-Assisted: true`;
++   - the existing plan checks pass (briefed scope, no merge, a clean target and a change that applies).
++
++   A fast-forward runs no commit-msg hook, so the script checks the trailers itself, per commit. `apply` refuses a briefed id that differs from the commits' id. Anything else keeps the patch route, which is unchanged.
++3. **The evidence label stays honest.** The script runs in the Elephant's session, not in the host. It writes the existing take-over record (`agy-native-integrated`) and no dispatch record. Its `next` names the existing attested writer (`dispatch-record-write.mjs --attested-request`) over exactly the landed commits. That record says `orchestrator-attested` and never claims a host observation.
++
++   Antigravity writes a per-child descriptor (`.system_generated/subagents/<childId>.json` with its `workspaceUris`). Binding it by digest would be a host-written fact about the child. That is not built. Whether the record may carry it, and under which label, is an open PO question (AFK tile T6).
++4. **The guard admits exactly one more flag.** `apply` may carry one `--keep-authorship <id>` in place of `--commit-dispatch-id`. The two flags exclude each other, and `plan` takes neither.
++
++## Consequences
++
++- When the parent has not moved since the child's branch was cut, a sequential Antigravity child lands as its own commits. HEAD then moves, so a second parallel child no longer fast-forwards and uses the patch route. Its `fastForward.reason` says so.
++- The antigravity-native-dispatch reference names both routes.
++- The pins are two "C29 R5" cases and the guard argv case in `lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs`.
++- Not covered:
++  - binding the host descriptor (T6);
++  - a branch whose commits were made in the parent's own checkout;
++  - a child commit that names its dispatch in another trailer spelling. That commit is refused, never guessed.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 3001b2673609dd7b9c727c5b75a73a6e0b1ad72d..73cb010bf48df47cf85f06ed27cb87868fe05e19 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -105,6 +105,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0096](0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md) | A gate-definition change needs a bound proof, at commit and at close | accepted | 2026-11-13 |
+ | [0097](0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) | A pre-existing red check is repaired by a maintenance dispatch | accepted | 2026-11-13 |
+ | [0098](0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md) | Design checks and the unpublished review original have fixed locations | accepted | 2026-11-14 |
++| [0099](0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md) | An Antigravity branch result lands with the child's own commits | accepted | 2026-11-14 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index 69e5eea519244fd1459eaa81182f46dd3b8c4d74..d9bec499117aec44f9509461f13360bf30df69a0 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -32,6 +32,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0096](adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md) accepted 2026-11-13 (PO tiles, D248, Claude test run 3 finding L4):** `architecture/boundary-policy.json` (GS-16) and `architecture/fitness-model.json` (GS-17) join the gate-strength table (first creation free, re-materialization through the writer's own commit capability); the close walks every change of the gate-definition set in the feature range and derives a proof (first appearance, committed materialization, configure-verify labelled "confirmed via runner prompt, not signed", a consumed override), refuses an unproven one with no cut-off (`CLOSE-GATE-CHANGE-UNPROVEN`), and offers one PO acknowledgement of the unproven list per range as the repair; inspect lists the gaps early, and the bundle and the Critic input carry every change with its proof. Built in candidate 29c, never run on a consumer repository.
+ **[ADR-0097](adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) accepted 2026-11-13 (PO tiles, D249, consumer finding K-28):** a red check that no criterion of the approved Spec covers is repaired by a maintenance dispatch: the item binding names `maintenance` instead of a criterion, exactly one check (the red one), a write scope of test- or tooling-shaped dependencies of that check outside every gate-strength path and the approved PRD/Spec; the host requires a red observation of the check on the real checkout at the dispatch candidate and proof that it was red before the feature (a red Verify receipt at or before the plan-approval commit, otherwise one signed PO acknowledgement `acknowledge-maintenance-red-check`, labelled; the PO chose both routes); the check must be green after delivery; the Critic packet names maintenance slices as their own kind. Built in candidate 29c, never run on a consumer repository.
+ **[ADR-0098](adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md) accepted 2026-11-13 (PO tile "fixed locations", D250, consumer findings G3/G4):** `node tools/checks/<name>.mjs|.cjs|.js [args]` is no opaque script run in any lifecycle state when the file sits directly in `tools/checks/`, no path part is a link, git tracks it and it is unchanged against HEAD (in draft the agent cannot write there, so it is reviewed project content); the unpublished original of a sanitized design review report lives under the git-ignored `evidence/` (`--original-report evidence/<name>.md`), `scratch/` stays refused. Built in candidate 29d, never run on a consumer repository.
++**[ADR-0099](adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md) accepted 2026-11-13 (PO tile "R5: build a harvest command", D251, Antigravity test run 3):** `agy-native-integrate.mjs apply --keep-authorship <dispatch id>` lands an Antigravity `Workspace: "branch"` child's own commits unchanged by `git merge --ff-only`, only when the branch was cut from the current HEAD and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer (same id) and `AI-Assisted: true`; otherwise the patch route stays. The dispatch record is still written by the attested writer over exactly those commits and says `orchestrator-attested`; binding the host's per-child descriptor is not built (open PO question). Built in candidate 29d, never run in a real Antigravity session.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 326364da082deeeb271bec6082dd8c9bf8a0c5c6..d43adea7d3f2713ba1cb8ac56497397177865732 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -299,6 +299,7 @@
+           "docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md",
+           "docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md",
+           "docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md",
++          "docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md",
+           "docs/adr/README.md"
+         ]
+       },
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index d55ca23748cc0b19f2f36177196bb61ff9a639bb..16192d331e78eaf0637df10758004b2457a05e17 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -627,7 +627,9 @@ function sanctionedHostCommitRecoverArgs(args, root) {
+ // `plan --root <root> --branch <subagent-...> --allowed-path <p>...` or the same with `apply` and one `--expect-sha256 <64 hex>`.
+ // plan writes nothing; apply changes the working tree only (never the index, HEAD or a ref), all-or-nothing.
+ // C28C: `apply` may add one `--commit-dispatch-id <id>`: it then also runs the recovery route's own plan and apply (the ordinary dispatch-trailer commit of
+-// exactly the paths this apply wrote). That is the only way this lane reaches HEAD; plan never does.
++// exactly the paths this apply wrote). C29 R5 (ADR-0099): apply may instead add one `--keep-authorship <id>`, a fast-forward to the child's own
++// commits after the script checked base == HEAD and each commit's `Dispatch: <id> (goldfish)` trailer. The two flags exclude each other. These are
++// the only ways this lane reaches HEAD; plan never does.
+ function sanctionedAgyNativeIntegrateArgs(args, root) {
+   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
+   const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-") && !value.startsWith("/")
+@@ -637,7 +639,7 @@ function sanctionedAgyNativeIntegrateArgs(args, root) {
+     const flag = args[index], value = args[index + 1];
+     if (flag === "--branch" && !branch && /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u.test(value ?? "")) branch = true;
+     else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
+-    else if (flag === "--commit-dispatch-id" && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
++    else if ((flag === "--commit-dispatch-id" || flag === "--keep-authorship") && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
+     else if (flag === "--allowed-path" && pathValue(value) && allowedCount < 50) allowedCount += 1;
+     else return false;
+   }
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index d2379ccee402cb308250c42356450f93aba15927..92c3de0a2eb4f1dcd0adcd5bbec7719c59165416 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -597,6 +597,85 @@ test("C28C: a refused commit step keeps the applied change and names the manual
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
++// C29 R5 (AGY run 3, Toil P3; ADR-0099): the Elephant harvested branch commits by hand and the Critic noted the orchestrator commit. When the child's
++// branch was cut from the current HEAD and every commit carries the briefed Dispatch trailer, apply --keep-authorship lands those commits unchanged.
++function childCommit(wt, files, trailers) {
++  for (const [name, text] of Object.entries(files)) {
++    mkdirSync(dirname(join(wt.path, name)), { recursive: true });
++    writeFileSync(join(wt.path, name), text);
++    git(wt.path, "add", name);
++  }
++  git(wt.path, "-c", "user.name=Child Goldfish", "-c", "user.email=child@example.invalid", "commit", "-q", "-m", "feat: child work", ...(trailers ? ["-m", trailers] : []));
++}
++
++test("C29 R5: apply --keep-authorship lands the child's own commits unchanged when the branch was cut from HEAD and every commit carries the briefed Dispatch trailer", async () => {
++  const fx = brainFixture();
++  try {
++    const integrate = await import("../../scripts/agy-native-integrate.mjs");
++    const wt = worktreeFixture(fx);
++    childCommit(wt, { "src/a.mjs": "export const a = 1;\n" }, "AI-Assisted: true\nDispatch: C29-R5 (goldfish)");
++    childCommit(wt, { "src/a.mjs": "export const a = 2;\n" }, "AI-Assisted: true\nDispatch: C29-R5 (goldfish)");
++    const tip = git(fx.workspace, "rev-parse", `refs/heads/${wt.branch}`);
++    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
++    const planned = integrate.plan(options);
++    assert.equal(planned.status, "ready", JSON.stringify(planned));
++    assert.equal(planned.fastForward.eligible, true, JSON.stringify(planned.fastForward));
++    assert.equal(planned.fastForward.dispatchId, "C29-R5");
++    assert.equal(planned.fastForward.commits.length, 2);
++    assert.match(planned.fastForward.next, /--keep-authorship C29-R5/u);
++    // The briefed id must be the one the commits carry; a mismatch lands nothing.
++    const mismatch = integrate.apply({ ...options, expect: planned.planSha256, keepAuthorship: "OTHER-ID" });
++    assert.equal(mismatch.code, "AGYI-FAST-FORWARD-DISPATCH-MISMATCH", JSON.stringify(mismatch));
++    assert.equal(existsSync(join(fx.workspace, "src", "a.mjs")), false, "a refused harvest lands nothing");
++    const landed = integrate.apply({ ...options, expect: planned.planSha256, keepAuthorship: "C29-R5" });
++    assert.equal(landed.status, "landed", JSON.stringify(landed));
++    assert.equal(landed.code, "AGYI-LANDED-WITH-AUTHORSHIP");
++    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), tip, "HEAD is the child's tip itself: no new commit, nothing rewritten");
++    assert.equal(git(fx.workspace, "log", "-1", "--format=%an <%ae>"), "Child Goldfish <child@example.invalid>", "the child's authorship stays");
++    assert.equal(readFileSync(join(fx.workspace, "src", "a.mjs"), "utf8"), "export const a = 2;\n");
++    assert.equal(git(fx.workspace, "status", "--porcelain", "--", "src"), "", "nothing left uncommitted");
++    assert.deepEqual(landed.landed.commits, planned.fastForward.commits);
++    assert.match(landed.next, /--attested-request/u);
++    assert.match(landed.next, new RegExp(planned.fastForward.commits[1], "u"), "the record step names exactly the landed commits");
++    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir: join(fx.workspace, ".git"), paths: ["src/a.mjs"] }), true, "the take-over record is written as on the patch route");
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++test("C29 R5: no harvest with authorship for a commit without the trailer or a moved HEAD; the patch route stays ready; parse rules", async () => {
++  const fx = brainFixture();
++  try {
++    const integrate = await import("../../scripts/agy-native-integrate.mjs");
++    const wt = worktreeFixture(fx);
++    childCommit(wt, { "src/a.mjs": "export const a = 1;\n" }, "AI-Assisted: true\nDispatch: C29-R5 (goldfish)");
++    childCommit(wt, { "src/a.mjs": "export const a = 2;\n" }, null);
++    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
++    const head = git(fx.workspace, "rev-parse", "HEAD");
++    const untrailed = integrate.plan(options);
++    assert.equal(untrailed.status, "ready", JSON.stringify(untrailed));
++    assert.equal(untrailed.fastForward.eligible, false);
++    assert.match(untrailed.fastForward.reason, /exactly one "Dispatch: <id> \(goldfish\)" trailer/u);
++    const refused = integrate.apply({ ...options, expect: untrailed.planSha256, keepAuthorship: "C29-R5" });
++    assert.equal(refused.code, "AGYI-FAST-FORWARD-UNAVAILABLE", JSON.stringify(refused));
++    assert.match(refused.refusals[0].next, /patch route/u);
++    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "nothing landed");
++    // The parent moved on in an unrelated path: the change still applies as a patch, but the commits cannot land unchanged.
++    git(fx.workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "parent moves on");
++    const wt2 = worktreeFixture(fx, "subagent-second-r5");
++    git(fx.workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "parent moves on again");
++    childCommit(wt2, { "src/b.mjs": "export const b = 1;\n" }, "AI-Assisted: true\nDispatch: C29-R5B (goldfish)");
++    const moved = integrate.plan({ ...options, branch: wt2.branch, allowed: ["src/b.mjs"] });
++    assert.equal(moved.status, "ready", JSON.stringify(moved));
++    assert.equal(moved.fastForward.eligible, false);
++    assert.match(moved.fastForward.reason, /HEAD moved on/u);
++    const parsed = (...args) => integrate.parseArgs(args);
++    const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a"];
++    assert.equal(parsed("apply", ...common, "--expect-sha256", "a".repeat(64), "--keep-authorship", "C29-R5").keepAuthorship, "C29-R5");
++    assert.match(parsed("plan", ...common, "--keep-authorship", "C29-R5").error, /belongs to apply/u);
++    assert.match(parsed("apply", ...common, "--keep-authorship", "C29-R5", "--commit-dispatch-id", "C29-R5").error, /exclude each other/u);
++    assert.match(parsed("apply", ...common, "--keep-authorship", "bad id").error, /unexpected/u);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
+ test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
+   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+   const root = realpathSync(resolve(libDir, "..", "..", ".."));
+@@ -608,6 +687,14 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
+   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)}`), true);
+   // C28C: apply (never plan) may carry one dispatch id for the commit step.
+   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-AGY-COMMIT`), true);
++  // C29 R5: or one --keep-authorship id instead, never both, never on plan.
++  assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5`), true);
++  for (const args of [
++    `plan --root '${root}' --branch ${branch} --allowed-path a --keep-authorship C29-R5`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5 --commit-dispatch-id C29-R5`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --keep-authorship 'bad id'`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --keep-authorship C29-R5`,
++  ]) assert.equal(admitted(args), false, args);
+   for (const args of [
+     `plan --root '${root}' --branch ${branch} --allowed-path a --commit-dispatch-id C28C-X`,
+     `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-X --commit-dispatch-id C28C-Y`,
+diff --git a/plugins/pipeline-core/scripts/agy-native-integrate.mjs b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+index 96d5ebacce5597755a4e6ca2b355664ba9302d1d..b4d6ed16711bd3936f1bba5cb55fdea1c1b03c12 100644
+--- a/plugins/pipeline-core/scripts/agy-native-integrate.mjs
++++ b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+@@ -10,6 +10,8 @@
+  *   plan  --root <root> --branch <subagent-...> --allowed-path <p>...                              read-only
+  *   apply --root <root> --branch <subagent-...> --allowed-path <p>... --expect-sha256 <digest>     writes the working tree only
+  *   apply ... --commit-dispatch-id <id>   (C28C) the same, then the recovery route's own plan and apply commit exactly those paths with the dispatch trailer
++ *   apply ... --keep-authorship <id>      (C29 R5, ADR-0099) instead lands the child's own commits unchanged by fast-forward; only when plan's
++ *                                         `fastForward.eligible` (branch cut from the current HEAD, every commit `Dispatch: <id> (goldfish)`)
+  *
+  * A refusal of the commit step never undoes the applied change: the result carries `commit: {status: "refused", ...}` and `next` names the manual route.
+  *
+@@ -30,7 +32,7 @@ const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "ru
+ const SELF = fileURLToPath(import.meta.url);
+ const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
+ const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
+-const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id>, apply only]";
++const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id> | --keep-authorship <briefed dispatch id>, apply only]";
+ const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // the same token the recovery route accepts
+ const MAX_COMMITS = 200;
+ 
+@@ -45,7 +47,7 @@ const shellWord = (value) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value :
+ export function parseArgs(argv) {
+   const [verb, ...rest] = argv;
+   if (verb !== "plan" && verb !== "apply") return { error: `unknown verb; usage: ${SYNTAX}` };
+-  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null };
++  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null, keepAuthorship: null };
+   for (let i = 0; i < rest.length; i += 2) {
+     const flag = rest[i], value = rest[i + 1];
+     if (typeof value !== "string" || value === "" || /[\u0000-\u001f\u007f]/u.test(value)) return { error: `flag ${flag} needs one value; usage: ${SYNTAX}` };
+@@ -55,9 +57,13 @@ export function parseArgs(argv) {
+     else if (flag === "--expect-sha256" && out.expect === null) out.expect = value;
+     // C28C: apply may also land the ordinary dispatch-trailer commit through the recovery route in the same call (one path, no extra decision).
+     else if (flag === "--commit-dispatch-id" && out.commitDispatchId === null && DISPATCH_ID.test(value)) out.commitDispatchId = value;
++    // C29 R5 (ADR-0099): apply may instead land the child's own commits unchanged by fast-forward, keeping their authorship.
++    else if (flag === "--keep-authorship" && out.keepAuthorship === null && DISPATCH_ID.test(value)) out.keepAuthorship = value;
+     else return { error: `unexpected or repeated flag ${flag}; usage: ${SYNTAX}` };
+   }
+   if (out.commitDispatchId !== null && verb !== "apply") return { error: `--commit-dispatch-id belongs to apply; usage: ${SYNTAX}` };
++  if (out.keepAuthorship !== null && verb !== "apply") return { error: `--keep-authorship belongs to apply; usage: ${SYNTAX}` };
++  if (out.keepAuthorship !== null && out.commitDispatchId !== null) return { error: `--keep-authorship and --commit-dispatch-id exclude each other; usage: ${SYNTAX}` };
+   return out;
+ }
+ 
+@@ -126,9 +132,38 @@ export function plan(options) {
+     return refused("AGYI-APPLY-CONFLICT");
+   }
+   const planSha256 = sha(JSON.stringify({ head: head.out.trim(), tip: tip.out.trim(), base: base.out.trim(), paths, patchSha256: sha(patch.out) }));
++  const applyArgv = ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256];
++  const fastForward = fastForwardFacts(root, head.out.trim(), base.out.trim(), tip.out.trim());
++  if (fastForward.eligible) fastForward.next = [...applyArgv, "--keep-authorship", fastForward.dispatchId].map(shellWord).join(" ");
+   return { schema: PLAN_SCHEMA, status: "ready", code: "AGYI-READY", root, branch: options.branch, head: head.out.trim(), tip: tip.out.trim(),
+-    base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [],
+-    next: ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256].map(shellWord).join(" ") };
++    base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [], fastForward,
++    next: applyArgv.map(shellWord).join(" ") };
++}
++
++/**
++ * C29 R5 (ADR-0099): whether the child's own commits can land unchanged. Only when the branch was cut from the current HEAD (a fast-forward, no
++ * rewrite) and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer, the same id throughout, and `AI-Assisted: true`. A
++ * fast-forward runs no commit-msg hook, so the trailers are checked here, per commit. Anything else keeps the patch route.
++ */
++function fastForwardFacts(root, head, base, tip) {
++  const no = (reason) => ({ eligible: false, reason });
++  if (base !== head) return no("HEAD moved on since the child's branch was cut, so its commits cannot land unchanged; the patch route below applies");
++  const listed = git(root, ["rev-list", "--reverse", `${base}..${tip}`]);
++  if (!listed.ok) return no("the branch's commits are not readable");
++  const chain = listed.out.split("\n").filter(Boolean);
++  let dispatchId = null;
++  for (const commit of chain) {
++    const message = git(root, ["log", "-1", "--format=%B", commit]);
++    const trailers = message.ok ? git(root, ["interpret-trailers", "--parse"], message.out) : null;
++    if (!trailers?.ok) return no(`the trailers of ${commit.slice(0, 12)} are not readable`);
++    const lines = trailers.out.split("\n").filter(Boolean);
++    const dispatch = lines.filter((line) => /^Dispatch:/iu.test(line)).map((line) => /^Dispatch: ([A-Za-z0-9][A-Za-z0-9._-]{0,95}) \(goldfish\)$/u.exec(line)?.[1] ?? null);
++    if (dispatch.length !== 1 || dispatch[0] === null) return no(`commit ${commit.slice(0, 12)} does not carry exactly one "Dispatch: <id> (goldfish)" trailer`);
++    if (!lines.includes("AI-Assisted: true")) return no(`commit ${commit.slice(0, 12)} does not carry "AI-Assisted: true"`);
++    if (dispatchId !== null && dispatch[0] !== dispatchId) return no("the branch's commits name more than one dispatch id");
++    dispatchId = dispatch[0];
++  }
++  return { eligible: true, dispatchId, commits: chain };
+ }
+ 
+ /**
+@@ -179,6 +214,7 @@ export function apply(options) {
+     return { ...planned, status: "refused", code: "AGYI-PLAN-DIGEST-MISMATCH", paths: [],
+       refusals: [refuse("AGYI-PLAN-DIGEST-MISMATCH", "HEAD, the branch or the change moved since plan", `run plan again and use its new planSha256: ${["node", SELF, "plan", "--root", planned.root, "--branch", planned.branch, ...options.allowed.flatMap((p) => ["--allowed-path", p])].map(shellWord).join(" ")}`)] };
+   }
++  if (options.keepAuthorship != null) return landWithAuthorship(planned, options.keepAuthorship);
+   try { recordIntegration(planned); } catch (error) {
+     return { ...planned, status: "refused", code: "AGYI-RECORD-FAILED", paths: [],
+       refusals: [refuse("AGYI-RECORD-FAILED", `the take-over record could not be written (${error?.code ?? error?.name ?? "Error"})`, "nothing was written to the working tree; repair the git directory's permissions and plan again")] };
+@@ -196,6 +232,29 @@ export function apply(options) {
+     next: commit.status === "committed" ? "nothing left to do for this child: its change is committed with the dispatch trailer" : next };
+ }
+ 
++/**
++ * C29 R5 (ADR-0099): land the child's own commits unchanged (`git merge --ff-only`, atomic: it refuses before touching anything). Authorship,
++ * trailers and tree stay the child's, so the D40b scan finds the Goldfish's own `Dispatch:` commit. The take-over record is written first, as
++ * on the patch route. No dispatch record is written here: `next` names the attested writer over exactly these commits, which labels the record
++ * orchestrator-attested (no host observation), as every take-over of a runner without a host return is.
++ */
++function landWithAuthorship(planned, dispatchId) {
++  const refused = (code, message, next) => ({ ...planned, status: "refused", code, paths: [], refusals: [refuse(code, message, next)] });
++  if (!planned.fastForward?.eligible) return refused("AGYI-FAST-FORWARD-UNAVAILABLE", planned.fastForward?.reason ?? "the branch cannot land unchanged", `use the patch route instead: ${planned.next}`);
++  if (planned.fastForward.dispatchId !== dispatchId) {
++    return refused("AGYI-FAST-FORWARD-DISPATCH-MISMATCH", `the branch's commits carry Dispatch: ${planned.fastForward.dispatchId}, not the briefed ${dispatchId}`,
++      "pass the briefed dispatch id; a branch that carries another id is not this dispatch's result");
++  }
++  try { recordIntegration(planned); } catch (error) {
++    return refused("AGYI-RECORD-FAILED", `the take-over record could not be written (${error?.code ?? error?.name ?? "Error"})`, "nothing was landed; repair the git directory's permissions and plan again");
++  }
++  const landed = git(planned.root, ["merge", "--ff-only", "--quiet", planned.tip]);
++  if (!landed.ok) return refused("AGYI-FAST-FORWARD-FAILED", String(landed.err).trim().split("\n").slice(-2).join(" | "), "nothing was landed (a fast-forward is all-or-nothing); plan again");
++  const recordWriter = fileURLToPath(new URL("./dispatch-record-write.mjs", import.meta.url));
++  return { ...planned, status: "landed", code: "AGYI-LANDED-WITH-AUTHORSHIP", landed: { commits: planned.fastForward.commits, dispatchId },
++    next: `the child's commits are on HEAD unchanged. Write the dispatch record over exactly these commits: put {"schema":"pipeline.dispatch-attested-request.v1","briefingPath":"<generated briefing>","handbackPath":"<the child's hand-back text>","commits":${JSON.stringify(planned.fastForward.commits)}} into a file under scratch/, then node ${shellWord(recordWriter)} --repo-root ${shellWord(planned.root)} --attested-request <that file>` };
++}
++
+ /**
+  * C28C: the recovery route's own plan, then its apply with the digest that plan printed, run back to back for exactly the paths this take-over wrote. The
+  * paths are the integrate plan's own, so there is nothing new to review between the two pairs; every refusal of the recovery route is returned as it is and the
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index ce0646af6fe8695a2b6dcc9e145bcd45d35daa0c..2f8eb18b971f92ceecd79ee402c36d3b62693c94 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -69,7 +69,10 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
+   plan --root <root> --branch <the child's branch> --allowed-path <briefed path>...` (read-only; `git worktree list` names the branch), then the
+   same command as `apply` with the `--expect-sha256` digest it printed. `apply` writes the branch's net change into the working tree,
+   uncommitted and unstaged; it refuses a path outside the briefed scope, a path with local changes and a change that no longer applies. The
+-  commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). The host owns the worktree and the
++  commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). When `plan` reports
++  `fastForward.eligible` (the branch was cut from the current HEAD and every commit carries the briefed `Dispatch: <id> (goldfish)`
++  trailer), run its `fastForward.next` instead: `apply ... --keep-authorship <id>` lands the child's own commits unchanged (ADR-0099), and
++  its `next` names the attested record over exactly those commits. The host owns the worktree and the
+   branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
+   <the child's branch>` read the shared object database, so no `git -C <worktree>` is needed. The tool budget is field 6 of the generated
+   briefing and `guard-dispatch` reads it from there; nothing else is passed on the call. Neither step needs a look into the guard sources.

@@ -1,0 +1,56 @@
+diff --git a/backlog/items/2026-11-14-concurrent-stop-terminal-release-livelock-under-load.md b/backlog/items/2026-11-14-concurrent-stop-terminal-release-livelock-under-load.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c58e417bdd70219341edc39e5a37889aabe9deeb
+--- /dev/null
++++ b/backlog/items/2026-11-14-concurrent-stop-terminal-release-livelock-under-load.md
+@@ -0,0 +1,23 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.concurrent-stop-terminal-release-livelock-under-load
++type: defect
++owner: pipeline
++status: open
++created: 2026-11-14
++source: "Candidate 29d clean-clone runs (stop-pair suite NGSP7, NGSP9D) and the NGSP7 red of an earlier Full Verify"
++sprint: alfred
++done_when: manual
++---
++
++# Two concurrent stops can invalidate each other's terminal release until the budget ends
++
++## Description
++
++Under load, two sibling stops that settle at the same time can keep invalidating each other's terminal-release preimage. Each round one of them sees `SDC-AUTHORITY-CAS` (reference preimage changed) or `SDC-AUTHORITY-UNAVAILABLE` (domain-membership race), retries, and changes the shared state the other one just read. Neither makes progress until the stop budget runs out (about 100 s), and the stop ends red.
++
++Measured in candidate 29d: the stop-pair suite cases NGSP7 and NGSP9D are red in 1-worker and 2-worker clean-clone runs, both before and after the K-38 change (so K-38 does not cause it). NGSP9D is green when run alone. In an alternating A/B probe the terminal-release class was red in 5 of 24 runs with the K-34 library change and 0 of 17 without it; by code reading K-34 only adds a stop-outcome file read in the refuse branch of the concurrent plan, taken on every settle round, so the likely mechanism is a shifted timing window of a pre-existing livelock rather than a K-34 defect. A separate, rarer flake (attempt-terminal association, "original private pending invocation unavailable") was seen once without K-34.
++
++## Done when
++
++The terminal release makes progress against a sibling (an ordered retry, or one boundary for both writes), the K-34 outcome read is done once per plan instead of once per settle round, and NGSP7 and NGSP9D are green in repeated 2-worker clean-clone runs.
+diff --git a/backlog/items/2026-11-14-dispatch-checks-run-outside-the-consumer-verify-command.md b/backlog/items/2026-11-14-dispatch-checks-run-outside-the-consumer-verify-command.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b758deb8e7dfb70cd37aefd69b55b598ff0d7fa
+--- /dev/null
++++ b/backlog/items/2026-11-14-dispatch-checks-run-outside-the-consumer-verify-command.md
+@@ -0,0 +1,21 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.dispatch-checks-run-outside-the-consumer-verify-command
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-14
++source: "Peer consumer session report 2026-11-14 (toil, K-39 in the candidate 29d notes)"
++sprint: alfred
++done_when: manual
++---
++
++# Dispatch checks run per item but outside the consumer's own verify command
++
++## Description
++
++A consumer's dispatch checks (`*.check.test.mjs`) are run by the host for each item, but the consumer's own verify command (for example `verify:ci`) does not run them. Nothing tells the consumer so: a green verify run can coexist with a red dispatch check, and the consumer only learns about the gap when a dispatch check fails at item time.
++
++## Done when
++
++The briefing or the close names the gap (which checks the host runs that the verify command does not), or a registration route lets the consumer add its dispatch checks to the verify command, and the PO has chosen which.

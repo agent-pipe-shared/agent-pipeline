@@ -1,0 +1,185 @@
+diff --git a/docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md b/docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e8165b1cb37b18aea1180ddbb460f1b98fde98f
+--- /dev/null
++++ b/docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md
+@@ -0,0 +1,36 @@
++# ADR-0098: Design checks and the unpublished review original have fixed locations
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-14
++
++**Status:** accepted (2026-11-13, PO tile "G3/G4: fixed locations", register D250). Built in candidate 29d. Not yet run on a real consumer repository.
++
++**Context source (PO tile, 2026-11-13, consumer findings G3 and G4):** the PO chose the recommended "fixed locations":
++
++- project check scripts are committed under one fixed folder (`tools/checks/`) and run in draft;
++- the unpublished original of a sanitized design review report lives under the git-ignored `evidence/` folder.
++
++## Context
++
++The design course asks the author to run deterministic checks (paths, hashes, references) before binding the final source hashes. In a consumer project those checks are small project scripts. In design draft the dev-plan gate treats `node <script>` as an opaque script run, because a script can write implementation files. Every project check was therefore refused in the phase that asks for it (G3).
++
++A sanitized design review report (D64) is published, and its unpublished original is bound by digest only. The receipt producer refused the original under `scratch/`. Under `specs/` or `docs/` the commit guard would put it into a commit (G4).
++
++## Decision
++
++1. **Project checks: `tools/checks/`.** `node tools/checks/<name>.mjs|.cjs|.js [args]` is not an opaque script run in any lifecycle state when all of these hold:
++   - the file sits directly in `tools/checks/`;
++   - no part of the path is a symbolic link;
++   - git tracks the file;
++   - it is unchanged against HEAD (`git diff --quiet HEAD`).
++
++   Anything else stays what it was: an edited, untracked, linked or misplaced script, a script under `scratch/` with arguments, and every other interpreter. The folder is fixed, not calibrated, so no calibration field changes.
++2. **Why this is safe in draft.** In draft the dev-plan gate refuses the agent's own edit under `tools/checks/`, because only `docs/`, `specs/`, `.claude/`, `backlog/` and `scratch/` are exempt. A check script therefore comes from an implementation phase or from a human, and is reviewed project content. A committed script may still write files. The rule trusts the review of committed content, not the script's behaviour.
++3. **Review original: `evidence/`.** `design-review-receipt.mjs create --original-report evidence/<name>.md` is the documented place. Onboarding git-ignores `/evidence/`, so the file stays local and is never committed, while `create` binds its digest. The guard and the producer already admitted this path. `scratch/` stays refused for it.
++
++## Consequences
++
++- The design-course reference names both places.
++- The `PLAN-DESIGN-REVIEW-UNOBSERVED` repair names `evidence/` for the original.
++- A project that wants a check to run in draft commits it under `tools/checks/` during an implementation phase, or has a human add it.
++- The pins `C29-G3` (`hooks/guard-lifecycle-ready.test.mjs`) and "design-review receipt (original under evidence/)" (`lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs`) hold both rules.
++- Not covered: a check script that imports an uncommitted or edited module elsewhere in the tree. Only the named file is checked against HEAD.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 29b161079c63c57b2d8db8a0348fe0bf65dfc23a..3001b2673609dd7b9c727c5b75a73a6e0b1ad72d 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -104,6 +104,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0095](0095-a-spec-correction-during-implementation-is-a-signed-addendum.md) | A Spec correction during implementation is a signed addendum | accepted | 2026-11-13 |
+ | [0096](0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md) | A gate-definition change needs a bound proof, at commit and at close | accepted | 2026-11-13 |
+ | [0097](0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) | A pre-existing red check is repaired by a maintenance dispatch | accepted | 2026-11-13 |
++| [0098](0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md) | Design checks and the unpublished review original have fixed locations | accepted | 2026-11-14 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index 463e8307a8c70205270efbf659cadcd8b77600a6..69e5eea519244fd1459eaa81182f46dd3b8c4d74 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -31,6 +31,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0085 amendment](adr/0085-one-review-one-signature-design-approval.md#amendment-2026-11-13-the-reviewer-model-is-host-observed-where-a-route-exists-d247) accepted 2026-11-13 (PO tiles, D247, L3 part 3):** the design review receipt's reviewer model is host-observed where a route exists, labelled elsewhere: on Claude the plugin hooks record each `readiness-reviewer` dispatch (foreground resolved model, background child transcript, read by the hook and never into the agent's context), `export-report` writes the returned text as the report and `create` stamps `reviewerObservation`; Codex and Antigravity receipts say `unobserved` visibly. `present-plan` refuses an unobserved Claude round (`PLAN-DESIGN-REVIEW-UNOBSERVED`); fallback receipts pass; binding bytes unchanged. Built in candidate 29c.
+ **[ADR-0096](adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md) accepted 2026-11-13 (PO tiles, D248, Claude test run 3 finding L4):** `architecture/boundary-policy.json` (GS-16) and `architecture/fitness-model.json` (GS-17) join the gate-strength table (first creation free, re-materialization through the writer's own commit capability); the close walks every change of the gate-definition set in the feature range and derives a proof (first appearance, committed materialization, configure-verify labelled "confirmed via runner prompt, not signed", a consumed override), refuses an unproven one with no cut-off (`CLOSE-GATE-CHANGE-UNPROVEN`), and offers one PO acknowledgement of the unproven list per range as the repair; inspect lists the gaps early, and the bundle and the Critic input carry every change with its proof. Built in candidate 29c, never run on a consumer repository.
+ **[ADR-0097](adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) accepted 2026-11-13 (PO tiles, D249, consumer finding K-28):** a red check that no criterion of the approved Spec covers is repaired by a maintenance dispatch: the item binding names `maintenance` instead of a criterion, exactly one check (the red one), a write scope of test- or tooling-shaped dependencies of that check outside every gate-strength path and the approved PRD/Spec; the host requires a red observation of the check on the real checkout at the dispatch candidate and proof that it was red before the feature (a red Verify receipt at or before the plan-approval commit, otherwise one signed PO acknowledgement `acknowledge-maintenance-red-check`, labelled; the PO chose both routes); the check must be green after delivery; the Critic packet names maintenance slices as their own kind. Built in candidate 29c, never run on a consumer repository.
++**[ADR-0098](adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md) accepted 2026-11-13 (PO tile "fixed locations", D250, consumer findings G3/G4):** `node tools/checks/<name>.mjs|.cjs|.js [args]` is no opaque script run in any lifecycle state when the file sits directly in `tools/checks/`, no path part is a link, git tracks it and it is unchanged against HEAD (in draft the agent cannot write there, so it is reviewed project content); the unpublished original of a sanitized design review report lives under the git-ignored `evidence/` (`--original-report evidence/<name>.md`), `scratch/` stays refused. Built in candidate 29d, never run on a consumer repository.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 1b9230b247323fb4a4470ba378dde259617b58e9..326364da082deeeb271bec6082dd8c9bf8a0c5c6 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -298,6 +298,7 @@
+           "docs/adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md",
+           "docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md",
+           "docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md",
++          "docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md",
+           "docs/adr/README.md"
+         ]
+       },
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index e267adb6fda80ed952c2026eea391477d4c5c556..a2405f8bf23a8eca003a6bb98e260841a20f110b 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -13871,6 +13871,35 @@ test("C28-GL-3: in design draft a test run of REGISTERED suites is admitted (wri
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+ 
++// C29 G3 (Glossover; PO tile 2026-11-13 "fixed locations"): design-course.md asks for deterministic checks before binding. A project check script in the fixed
++// folder tools/checks/ runs in draft when it is committed and unchanged against HEAD: in draft the agent's own edit there is refused, so it cannot plant one.
++test("C29-G3: in design draft a committed, unchanged tools/checks/ script runs; an edited, untracked, linked or misplaced one stays a refused write", () => {
++  const path = devPlanShellFixture();
++  const git = (...args) => { const run = spawnSync("git", ["-C", path, ...args], { encoding: "utf8" }); assert.equal(run.status, 0, run.stderr); };
++  try {
++    mkdirSync(join(path, "tools", "checks"), { recursive: true });
++    mkdirSync(join(path, "tools", "other"), { recursive: true });
++    for (const rel of ["tools/checks/links.mjs", "tools/checks/edited.mjs", "tools/other/links.mjs"]) writeFileSync(join(path, rel), "// check\n");
++    git("init", "-q");
++    git("add", "--", "tools");
++    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "checks");
++    writeFileSync(join(path, "tools", "checks", "edited.mjs"), "// check, edited\n");
++    writeFileSync(join(path, "tools", "checks", "untracked.mjs"), "// check\n");
++    let linked = false;
++    try { symlinkSync(join(path, "tools", "checks", "links.mjs"), join(path, "tools", "checks", "linked.mjs"), "file"); linked = true; } catch { /* host without file links */ }
++    for (const command of ["node tools/checks/links.mjs", "node tools/checks/links.mjs specs/feature/spec.md --strict"]) {
++      const result = devPlanShellRun(path, command);
++      assert.equal(result.exitCode, 0, `refused a committed project check: ${command}\n${result.stderr}`);
++    }
++    for (const command of ["node tools/checks/edited.mjs", "node tools/checks/untracked.mjs", "node tools/other/links.mjs", "node tools/checks/../other/links.mjs",
++      ...(linked ? ["node tools/checks/linked.mjs"] : [])]) {
++      const result = devPlanShellRun(path, command);
++      assert.equal(result.exitCode, 2, `admitted a check that is not committed and unchanged under tools/checks/: ${command}`);
++      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
++    }
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("C28-GL-4: a refusal that is about a read names the admitted read form and never offers a signature or override", () => {
+   const path = c28DraftFixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index f96bc2674d969e82eaca2463ec1178ac7221ac00..d9ae4382cb03da5d0f2c768bdbcf84a248025d09 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Guard module "devplan-shell-lane" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
++import { spawnSync } from "node:child_process";
+ import { lstatSync } from "node:fs";
+ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { loadDeclarativeVerifySuites } from "../verify-suite-registration.mjs";
+@@ -233,6 +234,29 @@ function isRegisteredSuiteRun(operands, root) {
+   });
+ }
+ 
++// C29 G3 (Glossover; PO tile 2026-11-13 "fixed locations", ADR-0098): design-course.md asks for deterministic checks before binding, but every
++// project check script was an opaque write in draft. A script in the fixed folder tools/checks/ that is committed and unchanged against HEAD is
++// reviewed project content, not an ad-hoc write: in draft the dev-plan gate refuses the agent's own edit there, so the agent cannot plant one.
++// Exactly a plain .mjs/.cjs/.js file directly in tools/checks/, no symlink on the way, tracked and identical to HEAD; anything else is what it was.
++const PROJECT_CHECK_SCRIPT = /^tools\/checks\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(?:mjs|cjs|js)$/u;
++function isCommittedProjectCheck(operand, root, dependencies = {}) {
++  if (typeof operand !== "string" || operand === "" || operand.startsWith("-")) return false;
++  const rootReal = resolve(root);
++  const rel = relative(rootReal, resolve(rootReal, operand)).split(sep).join("/");
++  if (!PROJECT_CHECK_SCRIPT.test(rel)) return false;
++  try {
++    let current = rootReal;
++    const parts = rel.split("/");
++    for (let index = 0; index < parts.length; index += 1) {
++      current = join(current, parts[index]);
++      const entry = lstatSync(current);
++      if (entry.isSymbolicLink() || (index < parts.length - 1 ? !entry.isDirectory() : !entry.isFile())) return false;
++    }
++  } catch { return false; }
++  const gitStatus = dependencies.projectCheckGitFn ?? ((args) => spawnSync("git", ["-C", rootReal, ...args], { encoding: "utf8", timeout: 3000 }).status);
++  return gitStatus(["ls-files", "--error-unmatch", "--", rel]) === 0 && gitStatus(["diff", "--quiet", "HEAD", "--", rel]) === 0;
++}
++
+ function opaqueScriptExecutionCandidate(words, root) {
+   if (!Array.isArray(words) || words.length < 2) return null;
+   const executable = basename(words[0]).toLowerCase();
+@@ -247,6 +271,7 @@ function opaqueScriptExecutionCandidate(words, root) {
+       return args[1] && !args[1].startsWith("-") ? args[1] : ".pipeline-opaque-execution";
+     }
+     if (["-e", "--eval", "-p", "--print"].includes(first)) return ".pipeline-opaque-execution";
++    if (!first.startsWith("-") && isCommittedProjectCheck(first, root)) return null;
+     if (!first.startsWith("-")) script = first;
+     else return ".pipeline-opaque-execution";
+   } else if (["python", "python3", "python.exe", "python3.exe"].includes(executable)) {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index aa09129a145ee91cd7a23d2d854480d990d1f795..53108824064be394329c0c25213e989aac269f8f 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -27,7 +27,11 @@ was needed; capability evidence is not an Advisor answer.
+ 1. Complete the material input, PRD, Spec and bound companions in draft. Finish
+    relevant document corrections before binding the final source hashes.
+    Run deterministic checks for paths, hashes, references and configured
+-   verification. Check explicit machine-checkable rules; do not invent
++   verification. A project check script runs in draft from `tools/checks/`
++   (`node tools/checks/<name>.mjs [args]`) when it is committed and unchanged
++   against HEAD (ADR-0098); in draft you cannot write there yourself, so a new
++   check is added during implementation or by a human, and a one-off probe
++   stays `node scratch/<name>.mjs` with no argument. Check explicit machine-checkable rules; do not invent
+    arithmetic from prose. Preserve the separately adopted Reader-review course
+    and evidence; it is not the independent technical design review.
+    Spec acceptance criteria (shape of `templates/spec.md` §5; `submit-plan`

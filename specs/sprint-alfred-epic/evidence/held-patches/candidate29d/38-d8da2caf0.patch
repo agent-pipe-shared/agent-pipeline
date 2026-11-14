@@ -1,0 +1,97 @@
+diff --git a/docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md b/docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md
+index cae38a88a68b43f24bfb14af68e8056b3edcd0a6..4e018c9c371c661e587b023131f7ea3a8fe3e75f 100644
+--- a/docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md
++++ b/docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md
+@@ -96,3 +96,7 @@ Known limits:
+ - ADR-0085 (the fitness model is materialized from the approved design);
+ - ADR-0014 (the Critic input carries the gate changes);
+ - ADR-0091 / ADR-0090 (the close and its audit bundle).
++
++## Amendment 2026-11-14: a signed verify-command replacement is its own proof kind (ADR-0100, D252)
++
++Decision 3 gains one proof kind for `GS-10`/`GS-11`: a configure-verify transition record of this device that carries a `replacement` member counts only when the approval of kind `replace-verify-command` with that subject digest is in this device's store, and then as `verify-replacement` -- no label when signed, "chat-attributed, not signed" otherwise. Such a record never falls back to the first-configuration kind `configure-verify`. Device-local as before; on another machine the change needs the acknowledgement of Decision 4.
+diff --git a/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md b/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
+index b4f3ff997388ae2d1c49a51dbc287b2db53872ee..db151a3fe529d5dd2e1733e949e202ca45e79412 100644
+--- a/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
++++ b/docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md
+@@ -72,3 +72,7 @@ Known limits:
+ - ADR-0061 / ADR-0074 (the critical ceremony and its new kind);
+ - ADR-0014 (the Critic packet fields);
+ - D195 (`command:<id>` checks); D205 (a shared item no longer blocks; only the slice or an overlapping write scope does).
++
++## Amendment 2026-11-14: a replaced verify command repairs nothing (ADR-0100, D252)
++
++Decision 4's green-after-delivery receipt for the check `verify:configured` counts only when the calibrated verify command at the receipt's commit equals the one at the slice's base commit (when the base is readable). A verify command replaced between the red observation and the green receipt therefore never turns the check green by itself.
+diff --git a/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md b/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..fa10f29fcf120140dd365612c6275050821704b1
+--- /dev/null
++++ b/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md
+@@ -0,0 +1,31 @@
++# ADR-0100: configure-verify may replace the verify command, with one signature
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-14
++
++**Status:** accepted (2026-11-13, PO tile 3 after the 28d test round, "configure-verify replaces, 1 signature", register D252). Built in candidate 29d. Not yet run on a consumer repository.
++
++**Context source (PO tile, 2026-11-13, test round 28d, finding C6):** the PO chose the recommended option: during implementation `configure-verify` may replace the verify command; the new command runs once first; then one PO signature covers both mirror files; the Critic gets the provenance and no longer reports the commit as EL-01.
++
++## Context
++
++`configure-verify` writes the verify command into the two calibration mirrors (`project/pipeline.json`, `.claude/pipeline.json`) once, from the baseline-only seed. A second call with another command is refused ("refused calibration tiers (configured)"), and the guard refuses a hand edit of either mirror (gate-strength `GS-10`/`GS-11`).
++
++In the 28d test round a consumer had to change its verify command (it failed on a newer Node). It took about ten steps: the guard refused four times and named `configure-verify`, which refused once configured; the Elephant then ran two signed human-guard overrides, one per mirror file, each with a proof wait that timed out after 570 s; and the Critic reported the two signed commits as a major (EL-01, the Elephant wrote a gate file).
++
++## Decision
++
++1. **An explicit replace route.** `pipeline-state.mjs configure-verify --verify-command <new> --replace` replaces a configured command during an implementing lifecycle. Without `--replace` the configured-tier refusal is unchanged. `--replace` is refused when the committed command is not configured, when it equals the new one, or when the new one names the evidence producer or the Verify adapter (the rule the consumer Verify check already applies).
++2. **The new command runs once first, and must pass.** On a tree with no tracked change (untracked files are allowed, and must be left exactly as they were) the route runs the new command the way the consumer Verify check runs it (`shell: true`, in the project root, with a timeout). It records a private test-run receipt: the command's digest, HEAD and tree, the exit code, the duration and the output digest. The tree must still be clean afterwards. A non-zero exit, a timeout or a changed tree refuses (`CVR-TEST-RUN-RED`, `CVR-TEST-RUN-DRIFT`); nothing is signed. Taking the stricter reading of "test run first" is an open PO question (AFK tile T7).
++3. **One signature over both post-images.** A new critical-action kind, `replace-verify-command`, in the `gates.human_approval` mode, fail-closed to `signature`. Its subject is built by one builder that the recording step and the signing terminal share: the feature id, the previous and the new command, the test-run receipt digest, and for each committed mirror its path, its committed bytes digest and the exact post-image digest. The candidate is the clean HEAD. One proof covers both files. In `chat` mode the record is chat-attributed and labelled, as for every critical kind.
++4. **The write is exactly the signed bytes, and the commit takes the existing configure-verify transition.** With a verified, unconsumed proof the route writes both mirrors with the signed post-images and prepares the existing configure-verify commit transition with a `replacement` member (previous command, subject digest, proof digest). The transition accepts a configured previous command only with that member. The pre-commit hook admits the staged mirrors through the same transition check it already runs (no new union member). The commit route printed is the existing one, with the subject line `chore: replace project verification command`.
++5. **The close sees it as proven, unlabelled when signed.** Amends ADR-0096 Decision 3: for `GS-10`/`GS-11` a configure-verify transition record that carries a `replacement` member and a signature proof is the proof kind `verify-replacement`, with no label; a chat-attributed one is labelled "chat-attributed, not signed". A first configuration keeps its label "confirmed via runner prompt, not signed". The record is device-local, as before; on another machine the change needs the ADR-0096 acknowledgement (its Decision 4).
++6. **A replace between red and green repairs nothing.** Amends ADR-0097 Decision 4: the green receipt of a maintenance slice for `verify:configured` counts only when the calibrated verify command at the receipt's commit equals the one at the slice's base commit. A replaced command therefore never turns a red check green by itself.
++7. **The Critic sees a sanctioned commit.** The Critic constructs its own input. The commit is a configure-verify transition commit with the standard message, made by the Pipeline's own writer after a signed approval, not a hand edit under an override. The proof list is not handed to the Critic (ADR-0014; ADR-0096 Decision 6); the audit bundle's `gate-changes` item lists the change with the proof kind `verify-replacement`. No Critic template changes.
++
++## Consequences
++
++- A verify command change during implementation is three steps: the replace call (test run, then the signing request), the PO's one signature, and the replace call again, then the printed commit.
++- `po-human-approval.mjs` knows the kind (`prepare-critical`/`authorize-critical` without `--subject`; the subject is derived).
++- The lifecycle guard needs no change (it does not list `pipeline-state.mjs` flags). The gate-strength refusal for `GS-10`/`GS-11` and the configured-tier refusal of `configure-verify` now name the `--replace` route, so an agent is no longer sent to two overrides for a verify-command change.
++- The approval mode is bound into the PO-gate authority at plan approval: switching `gates.human_approval` after the plan was approved makes the transition refuse (`CVCT-AUTHORITY-STALE`), for this route as for a first configuration. The round-trip suite therefore runs the signature leg on a chat-approved fixture through a test seam (`criticalProofWaiverForFn`); the proof, store, transition and readback it exercises are the production code.
++- Not covered: replacing `verifyImpact` commands; a replace outside the implementing lifecycle; the Critic template naming the proof kind (it would need a re-pin, a PO decision).
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 73cb010bf48df47cf85f06ed27cb87868fe05e19..3083057c7e3093552b10352125ea39b650a21541 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -106,6 +106,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0097](0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) | A pre-existing red check is repaired by a maintenance dispatch | accepted | 2026-11-13 |
+ | [0098](0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md) | Design checks and the unpublished review original have fixed locations | accepted | 2026-11-14 |
+ | [0099](0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md) | An Antigravity branch result lands with the child's own commits | accepted | 2026-11-14 |
++| [0100](0100-configure-verify-may-replace-the-verify-command-with-one-signature.md) | configure-verify may replace the verify command, with one signature | accepted | 2026-11-14 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index d9bec499117aec44f9509461f13360bf30df69a0..8f10627685ddba60f4a93af6edc58114f728ec6a 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -33,6 +33,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0097](adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md) accepted 2026-11-13 (PO tiles, D249, consumer finding K-28):** a red check that no criterion of the approved Spec covers is repaired by a maintenance dispatch: the item binding names `maintenance` instead of a criterion, exactly one check (the red one), a write scope of test- or tooling-shaped dependencies of that check outside every gate-strength path and the approved PRD/Spec; the host requires a red observation of the check on the real checkout at the dispatch candidate and proof that it was red before the feature (a red Verify receipt at or before the plan-approval commit, otherwise one signed PO acknowledgement `acknowledge-maintenance-red-check`, labelled; the PO chose both routes); the check must be green after delivery; the Critic packet names maintenance slices as their own kind. Built in candidate 29c, never run on a consumer repository.
+ **[ADR-0098](adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md) accepted 2026-11-13 (PO tile "fixed locations", D250, consumer findings G3/G4):** `node tools/checks/<name>.mjs|.cjs|.js [args]` is no opaque script run in any lifecycle state when the file sits directly in `tools/checks/`, no path part is a link, git tracks it and it is unchanged against HEAD (in draft the agent cannot write there, so it is reviewed project content); the unpublished original of a sanitized design review report lives under the git-ignored `evidence/` (`--original-report evidence/<name>.md`), `scratch/` stays refused. Built in candidate 29d, never run on a consumer repository.
+ **[ADR-0099](adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md) accepted 2026-11-13 (PO tile "R5: build a harvest command", D251, Antigravity test run 3):** `agy-native-integrate.mjs apply --keep-authorship <dispatch id>` lands an Antigravity `Workspace: "branch"` child's own commits unchanged by `git merge --ff-only`, only when the branch was cut from the current HEAD and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer (same id) and `AI-Assisted: true`; otherwise the patch route stays. The dispatch record is still written by the attested writer over exactly those commits and says `orchestrator-attested`; binding the host's per-child descriptor is not built (open PO question). Built in candidate 29d, never run in a real Antigravity session.
++**[ADR-0100](adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md) accepted 2026-11-13 (PO tile 3 after the 28d test round, "configure-verify replaces, 1 signature", D252, finding C6):** `configure-verify --verify-command <new> --replace --by <label>` replaces a configured verify command during implementation: the new command runs once on a tree with no tracked change and must pass and leave the tree unchanged (private test-run receipt); one critical-action approval of kind `replace-verify-command` (signature, or chat-attributed and labelled in chat mode) covers both calibration mirrors' exact post-images; the Pipeline writes them through the existing configure-verify commit transition with a `replacement` member; the close counts the change as proof kind `verify-replacement` (unlabelled when signed); a maintenance slice's green receipt counts only under the base commit's verify command (amends ADR-0096 Decision 3 and ADR-0097 Decision 4). The GS-10/GS-11 refusal names the route instead of two overrides. Built in candidate 29d, never run on a consumer repository.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index d43adea7d3f2713ba1cb8ac56497397177865732..a396293a969daa388ea94f540512ce04e89106b8 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -300,6 +300,7 @@
+           "docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md",
+           "docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md",
+           "docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md",
++          "docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md",
+           "docs/adr/README.md"
+         ]
+       },

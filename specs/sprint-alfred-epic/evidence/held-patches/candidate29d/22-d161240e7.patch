@@ -1,0 +1,46 @@
+diff --git a/plugins/pipeline-core/lib/implementation-entry-gate.mjs b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+index 5830f7745ef55a6f8ccb19b7f676bf7c71bdb97d..36d4223fea9784964da4c7de9649bc728d088086 100644
+--- a/plugins/pipeline-core/lib/implementation-entry-gate.mjs
++++ b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+@@ -60,7 +60,7 @@ const REPAIRS = new Map([
+   ["DCC-REVIEW-DELTA-CHAIN", "Create each later receipt with --previous <the receipt of the round before>, then pass the whole chain in order, initial first."],
+   // L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round, as often as needed.
+   ["PLAN-DESIGN-REVIEW-OPEN", "Correct the PRD or Spec for the open findings named here (commit; after submit-plan the PRD/Spec drift repairs apply: run submit-plan again), then run a delta readiness review: a fresh pipeline-core:readiness-reviewer that reads only these findings and what changed. Create its receipt with design-review-receipt.mjs create --previous <the last receipt> (a delta over unchanged documents may only withdraw findings), commit it, and run present-plan again with every receipt of the chain, initial first."],
+-  ["PLAN-DESIGN-REVIEW-UNOBSERVED", "On Claude the reviewer model of every review round is read from the host's record of the dispatch (D247). Dispatch pipeline-core:readiness-reviewer again for the current sources in a session whose plugin hooks are loaded (after a plugin install or hook refresh: restart the session first). Write its returned text as the report with design-review-receipt.mjs export-report --repo <root> --out <new report path> (a sanitized publication goes in --report, the exported text in --original-report), create a new initial receipt with design-review-receipt.mjs create (no --previous: an earlier round made without an observation cannot be continued), commit both, and run present-plan with that chain. A typed fallback receipt (--fallback-reason-code) is passed as it is."],
++  ["PLAN-DESIGN-REVIEW-UNOBSERVED", "On Claude the reviewer model of every review round is read from the host's record of the dispatch (D247). Dispatch pipeline-core:readiness-reviewer again for the current sources in a session whose plugin hooks are loaded (after a plugin install or hook refresh: restart the session first). Write its returned text as the report with design-review-receipt.mjs export-report --repo <root> --out <new report path> (a sanitized publication goes in --report, the exported text in --original-report, kept local under evidence/, which onboarding git-ignores), create a new initial receipt with design-review-receipt.mjs create (no --previous: an earlier round made without an observation cannot be continued), commit both, and run present-plan with that chain. A typed fallback receipt (--fallback-reason-code) is passed as it is."],
+   ["DCC-REVIEW-ROUND-EXCEEDED", "The review chain is above the structural bound of 64 rounds: start a new initial review of the current sources and pass that chain."],
+   ["DCC-PATH-UNSAFE", "The bound path must be a regular repository file; restore it or remove it from the receipt's companions."],
+   ["DCC-PATH-IGNORED", "A bound file must be committed, so it cannot live under a git-ignored directory: move it into the feature folder specs/<feature>/, update the reference, commit, and create the receipt again."],
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index fda095df893cb17b38dcffbaa7b778e32e817383..251698b90edfa039e8496f1d094f72e472292c32 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -335,6 +335,11 @@ async function walkSteps(f, { actualGuard }) {
+   writeFileSync(join(f.root, `specs/${f.featureId}/review/design-review-1.original.md`), 'original report\n');
+   check('design-review receipt (sanitized report pair)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+     '--original-report', `specs/${f.featureId}/review/design-review-1.original.md`, '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-2.json`));
++  // C29 G4 (Glossover): the unpublished original must not be committed, so its documented place is the git-ignored evidence/ folder.
++  mkdirSync(join(f.root, 'evidence'), { recursive: true });
++  writeFileSync(join(f.root, 'evidence/design-review-original-1.md'), 'original report\n');
++  check('design-review receipt (original under evidence/)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
++    '--original-report', 'evidence/design-review-original-1.md', '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-4.json`));
+   check('design-review receipt (delta)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+     '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--previous', receiptPath, '--open-finding', 'F-1', '--out', `specs/${f.featureId}/review/design-review-receipt-3.json`));
+   // 4. present-plan, then the approval transport in the spelling inspect renders after a presentation, then the phase switch
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index ea9f4c938556ab4e52540401ec5a9e57c63a05f4..aa09129a145ee91cd7a23d2d854480d990d1f795 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -63,7 +63,11 @@ was needed; capability evidence is not an Advisor answer.
+    write the report with `node <plugin-root>/scripts/design-review-receipt.mjs
+    export-report --repo <root> --out <report path>` (it writes the returned
+    text as returned and prints one line; a sanitized publication goes in
+-   `--report`, the exported text in `--original-report`), and `create` stamps
++   `--report`, the exported text in `--original-report`; the unpublished
++   original lives under `evidence/` (for example
++   `evidence/design-review-original-<round>.md`): onboarding git-ignores
++   `/evidence/`, so it stays local and is never committed, while `create` binds
++   its digest; `scratch/` is not admitted for it), and `create` stamps
+    the observed model into the receipt itself. A Claude round without that
+    observation (a report written by hand, a session started before the hooks
+    were loaded) says `unobserved`, and `present-plan` refuses it

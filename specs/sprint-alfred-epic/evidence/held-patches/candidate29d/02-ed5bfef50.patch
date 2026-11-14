@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs
+index 147bd5404d160b17fd9b295097fbdc2188997b62..d055a6a5cfc96b861f1b4070d7f0e89e726c8b65 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs
+@@ -110,7 +110,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+   const common=join(f.dir,'.git'),profile=po.createPoGateProfileReceipt({repositoryFingerprint:po.derivePoGateRepositoryFingerprint({gitCommonDir:common,primaryRoot:f.dir}),primaryRoot:f.dir,sourceBytes:bytes(f,'pipeline.user.yaml'),runtimeBytes:bytes(f,'.claude/pipeline.yaml'),updatedAt:AT});
+   const profilePath=po.poGateProfileReceiptPath(common);mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
+   const source=path=>({path,sha256:hash(bytes(f,path))});
+-  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
++  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
+   assert(review.ok,'SETUP actual review producer: '+review.code);write(f,RECEIPT,Buffer.from(review.bytes));
+   const keys=generateKeyPairSync('ed25519');f.publicKey=keys.publicKey.export({type:'spki',format:'pem'});f.keyReference='synthetic-p16-key';
+   writeJson(f,'project/critical-human-proof.json',{schema:'pipeline.critical-human-proof-policy.v3',requiredKinds:['push'],waivedKinds:[],trustAnchors:[{keyReference:f.keyReference,publicKeySha256:hash(f.publicKey)}]});

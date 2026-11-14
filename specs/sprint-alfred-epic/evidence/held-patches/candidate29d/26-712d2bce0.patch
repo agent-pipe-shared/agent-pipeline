@@ -1,0 +1,112 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 547c379d5b0c8a4233aef83d4684e8f77a4255b0..1578daff886775e23af23d4b9494d3fdb00ae159 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -83,6 +83,11 @@ export function heldDependencyRepair() {
+  * It gets its own code and the one repair that applies. Every other unreadable registry keeps the dependency code and the full repair route.
+  */
+ export function integrationReadinessRefusal(readiness) {
++  // C29 K-37 follow-up: the readiness read compares an integrated dependency's check sources in the working tree with the commit. A change there
++  // (an in-flight edit, or a weakened checker) is no registry fault, so it never gets the inspect/heal/move-aside route.
++  if (readiness.reason === "item-check-source-not-candidate") return { ...fail("NGHS-ITEM-INTEGRATION-CHECKER-CHANGED"),
++    reason: "integration readiness refused: a check source of an integrated dependency differs between the working tree and the commit",
++    repair: "a dependency's check file was edited and not committed (git status names it). Wait for the dispatch that edits it to land its host commit, or commit or restore that change, then dispatch this one again; the session registry needs no repair" };
+   if (readiness.code !== "SDC-LOCK-HELD") return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
+   return { ...fail("NGHS-ITEM-INTEGRATION-LOCK-HELD"), reason: `integration readiness not observed (${readiness.code}): the session registry lock was held by another launch`,
+     repair: "another launch held the session registry lock until this admission's wait ran out; the dependency itself was not judged. Send this dispatch again, alone, with one Agent call per message; nothing else needs repair" };
+@@ -1157,7 +1162,9 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+       const item=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
+       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
+       // PF-49: one integration source for every check of a dispatch — native records united with the D40 commit
+-      // evidence, exactly as observeGovernedItemIntegrationReadiness reads it for the admission before this.
++      // evidence, as observeGovernedItemIntegrationReadiness reads it for the admission before this. C29 K-37: this
++      // in-boundary re-check reads the integrated items' check sources from the commit; the working-tree comparison
++      // (a weakened checker refuses) already ran in that observer, which every launch with a dependency passes first.
+       // D177: only the item's own dependencies are proven here; the settled set below is computed once per admission.
+       checkpoint('integrated-slice-read');
+       const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index e6818e6455f2013538deaed7caac647462e6d107..4b090873cf79f250f7f08acb896dc9663393aa5a 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -127,6 +127,11 @@ const cases = [
+     const unreadable = integrationReadinessRefusal({ status: "refused", code: "SAR-READ", reason: "unreadable" });
+     assert.equal(unreadable.code, "NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD");
+     assert.match(unreadable.repair, /move-aside/u);
++    // C29 K-37 follow-up: a dependency's check source changed in the working tree is no registry fault.
++    const checker = integrationReadinessRefusal({ status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "item-check-source-not-candidate" });
++    assert.equal(checker.code, "NGHS-ITEM-INTEGRATION-CHECKER-CHANGED");
++    assert.match(checker.repair, /git status/u);
++    assert.doesNotMatch(checker.repair, /move-aside|heal/u);
+   } },
+   { id: "D177-a-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
+     const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
+@@ -658,6 +663,12 @@ const cases = [
+     const replayed=runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:prepared.sha256}));assert.equal(replayed.status,'integrated',JSON.stringify(replayed));assert.equal(replayed.replayed,true);
+     writeFileSync(join(root,'src/change.test.mjs'),"import test from 'node:test';test('weakened checker',()=>{});\n");
+     const invalidated=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.equal(invalidated.status,'refused',JSON.stringify(invalidated));
++    // C29 K-37 follow-up: the queue's next read names the changed checker and its git-side repair, never a registry repair.
++    const priorCwd=process.cwd();process.chdir(root);
++    try {
++      const next=runtime.run(()=>runCli(['next']));assert.notEqual(next.exit,0,JSON.stringify(next));
++      assert.equal(next.output.code,'NGHS-ITEM-INTEGRATION-CHECKER-CHANGED',JSON.stringify(next));assert.match(next.output.repair,/git status/u);assert.doesNotMatch(next.output.repair,/move-aside/u);
++    } finally { process.chdir(priorCwd); }
+   })},
+ 
+   {id:'NGHS13',name:'same retained Source item requalifies only actually impacted dependencies and rejects unchanged replay or checker weakening',run:()=>fixture(({root})=>{
+@@ -1999,6 +2010,31 @@ const cases = [
+     assert.deepEqual(scan(), [], "a commit that changed the check source still drops the earlier item, as before");
+   }); } },
+ 
++  { id: "NGHS72", name: "C29 K-37 chain: a whole stop of a later dispatch reaches its host commit while an integrated earlier item's check source is edited in the working tree", run: () => fixture(({ root }) => {
++    // The whole-chain proof for NGHS71: not the scan alone but the stop of a later dispatch (finalize = admission, checks, host commit) with LEFT
++    // integrated, whose own write scope holds LEFT's check file and which edited it, as the live fix dispatch did. Before K-37 that stop threw
++    // item-check-source-not-candidate from the integrated-slice scan.
++    const { original, runtime } = d177Setup(root, false);
++    const left = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator); assert.equal(left.prepared.ok, true, JSON.stringify(left.prepared));
++    const returned = (item, id, changedPaths) => ({ ...item.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: item.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: id, candidateCommit: item.binding.candidateCommit, outcome: "succeeded", report: "K-37 chain fixture return.", changedPaths }) }] } });
++    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // K-37 chain LEFT\n");
++    assert.equal(runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned(left, "LEFT", ["src/change.mjs"]) })).status, "authored-commit-recorded");
++    assert.equal(runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: left.prepared.sha256 })).status, "integrated");
++    const head = spawnSync("git", ["-C", root, "rev-parse", "HEAD^{commit}", "HEAD^{tree}"], { encoding: "utf8" }).stdout.trim().split("\n");
++    const scope = ["src/change.test.mjs", "src/second.mjs"];
++    const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "RIGHT", itemId: "RIGHT", criterionLocator: original.criterionLocators["AC-2"], checks: [{ id: "original-criterion", path: "src/second.test.mjs", dependencies: ["src/change.test.mjs", "src/second.mjs", "src/second.test.mjs"] }] };
++    const binding = { ...makeBinding({ dispatchId: "RIGHT", commit: head[0], tree: head[1] }), allowedPaths: scope, schema: "pipeline.native-goldfish-host-briefing.v3", model: "sonnet", effort: "medium", itemDelivery };
++    const input = toolInput("claude", { root, session: "session-RIGHT", toolUseId: "tool-RIGHT", binding });
++    input.tool_input.prompt = input.tool_input.prompt.replace("host-commit:v1", "host-commit:v3") + `\nSlice: RIGHT\nWrite scope: ${scope.join(", ")}\n`;
++    const prepared = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input })); assert.equal(prepared.ok, true, JSON.stringify(prepared));
++    const right = { input, binding };
++    const checkFile = join(root, "src/change.test.mjs");
++    writeFileSync(checkFile, `${readFileSync(checkFile, "utf8")}// the fix dispatch adds one assertion here\n`);
++    writeFileSync(join(root, "src/second.mjs"), "export const value='expected'; // K-37 chain RIGHT\n");
++    const stopped = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned(right, "RIGHT", scope) }));
++    assert.equal(stopped.status, "authored-commit-recorded", JSON.stringify(stopped));
++  }) },
++
+ ];
+ 
+ /** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */
+diff --git a/plugins/pipeline-core/scripts/slice-queue.mjs b/plugins/pipeline-core/scripts/slice-queue.mjs
+index 0b9d03e0f0ef983ce06039855e2a5e0141582297..8ec888980ab0102b39b7a0f6c8bac35962645271 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.mjs
+@@ -34,7 +34,7 @@ import { createHash, randomBytes } from "node:crypto";
+ import { mkdirSync, readFileSync, renameSync, statSync, lstatSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+ import { basename, dirname, join, resolve } from "node:path";
+ 
+-import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice, importGovernedHandoverQueue } from "../lib/native-goldfish-host-state.mjs";
++import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, integrationReadinessRefusal, cancelUnstartedGovernedItemSlice, importGovernedHandoverQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue } from "../lib/slice-queue-location.mjs";
+ import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-support.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+@@ -298,7 +298,9 @@ function deriveStatus(flags, loaded) {
+     ? []
+     : ledgerCall(() => liveSlices({ ...target, evidenceDir, sliceIds, now, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) }));
+   let integrationReadiness;
+-  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:queueRoot()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
++  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:queueRoot()});if(observed.status!=='observed'){const refusal=observed.reason==='item-check-source-not-candidate'?integrationReadinessRefusal(observed):null;
++    throw new CliError(refusal?.code??observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,refusal?refusal.reason:'Source integration readiness is unavailable.',refusal?{repair:refusal.repair}:{});}
++  integrationReadiness=observed.handle;}
+   const status = readyAndLive({ queue: loaded.raw, records, live, now, integrationReadiness }, { platform: process.platform, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) });
+   return { status, target, now };
+ }

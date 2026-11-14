@@ -1,0 +1,34 @@
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index 4cf8f1cc319098a1493d8dcb62c209e0403bec0d..9d279fabdb66a9d50d06e5db412c692d78373b8c 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -187,7 +187,7 @@ export function prepareCriticDispatch(input, deps = {}) {
+       briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
+       ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
+       briefingUse: briefing.runner === "antigravity"
+-        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing."
++        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md)."
+         : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
+       nextStep: value.nextStep,
+       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index f671c8ee5d86bd2b845dbf3b7ea4d8cf32154903..814040d350a23d8fcdb1818eca5b1a1a9cdff173 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -286,6 +286,16 @@ test("Antigravity gets the template's paths-only envelope with absolute paths, w
+   for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
+ });
+ 
++test("R14 (Antigravity run 3): on Antigravity the briefing use names the prepare step a read-only Critic call needs", () => {
++  const steps = stub({ "critic-dispatch-preflight.mjs": ok({ ...deltaSplitPreflight(), split: undefined }), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
++  const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
++    { exists: () => false, mkdir: () => {}, writeFile: () => {}, env: { AI_AGENT: "antigravity" }, runCommand: steps.runCommand });
++  assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
++  assert.match(result.next.briefingUse, /antigravity-native-dispatch-prepare\.mjs prepare --root <root> --request <file>/u);
++  assert.match(result.next.briefingUse, /AGY-NATIVE-ARTIFACT-MISSING/u);
++  assert.match(result.next.briefingUse, /TypeName critic, no Model/u);
++});
++
+ test("a template that lost its copy marker or holds an unknown placeholder refuses instead of handing on an unfilled briefing", () => {
+   const render = (templateText) => () => criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText, commits: [MID, HEAD], runner: "claude", root: ROOT, projectName: "p" });
+   assert.throws(render(TEMPLATE.replace("COPY EVERYTHING BELOW THIS LINE", "COPY BELOW")), { code: "CBB-TEMPLATE-MARKER" });

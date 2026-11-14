@@ -1,0 +1,110 @@
+diff --git a/docs/human-authorization-inventory.md b/docs/human-authorization-inventory.md
+index 38f0355ec81796b9a1bbb46bca40c59824304592..3082540a817c13d1a0f98f8aa2dfc1f793d6d9e3 100644
+--- a/docs/human-authorization-inventory.md
++++ b/docs/human-authorization-inventory.md
+@@ -45,6 +45,9 @@ exact candidate commit+tree.
+ | Interruption promotion <!-- inventory-id: interruption-promotion --> | Approving the promotion of an interruption-telemetry candidate; the signed subject binds the candidate and the promotion subject digest | `interruption-promotion` | Same shared contract; reachable via the direct `prepare-critical`/`approve-critical`/`verify-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`) | `plugins/pipeline-core/lib/interruption-promotion.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs` |
+ | Residual Critic findings acceptance <!-- inventory-id: accept-residual-critic-findings --> | Accepting the minor findings left open after a failed Critic round (a major finding only when the acceptance names the reason class `uncorrectable-past-authorship`, which is part of the signed subject); the finding list and severities are computed by the Pipeline from the consumed Critic receipt, the signed or attributed record binds the candidate commit, tree, receipt and that list, and a blocker can never be accepted | `accept-residual-critic-findings` | Same shared contract; reachable via the direct `prepare-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), in the configured `gates.push_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-residual-acceptance`) |
+ | Caller-authored Critic acknowledgement <!-- inventory-id: acknowledge-caller-authored-critic --> | The close-gate bridge (G20-39, PO 2026-11-07): on a runner that issues no Critic Source-return record, a Critic verdict finalized as `caller-authored-fallback` admits a rigor >= 1 or high-risk feature close only after the PO acknowledges it for exactly that packet, consumed receipt digest, candidate commit and tree; the label stays on the receipt, and an acknowledgement of any other packet or candidate never admits | `acknowledge-caller-authored-critic` | Same shared contract; reachable via the direct `prepare-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), in the configured `gates.push_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/lib/critic-acknowledgement.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-critic-acknowledgement`), `plugins/pipeline-core/scripts/close-coordinator.mjs` |
++| Spec addendum approval <!-- inventory-id: spec-addendum --> | ADR-0095: the PO approves one Spec addendum, a correction of the approved Spec during implementation that may change a criterion's text but never adds or removes a criterion; the signed or attributed record binds the feature, the plan approval and the addendum bytes, and an unapproved addendum is never read as part of the Spec | `spec-addendum` | Same shared contract, in the configured `gates.human_approval` mode (signature proof, or a chat-attributed record with the label the PO gave) | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/lib/spec-addendum.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-spec-addendum`) |
++| Gate-definition change acknowledgement <!-- inventory-id: acknowledge-gate-definition-changes --> | ADR-0096: a change to a gate-definition path (boundary policy, fitness model, calibration, verify suites and the other GS paths) in the feature range that carries no bound proof at its commit admits the close only after the PO acknowledges the listed changes once for that range; the list is derived from the history, never from the caller | `acknowledge-gate-definition-changes` | Same shared contract, in the configured `gates.human_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/lib/gate-definition-changes.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-gate-change-acknowledgement`), `plugins/pipeline-core/scripts/close-coordinator.mjs` |
++| Pre-existing red check acknowledgement <!-- inventory-id: acknowledge-maintenance-red-check --> | ADR-0097: when no Verify receipt from before the plan approval shows a check red, the PO states once that each check observed red at HEAD was already red before the feature, for the rest of the feature under that plan approval; only then may a maintenance dispatch repair it in test or tooling paths, and the queue row carries the label "red before the feature acknowledged by the PO" | `acknowledge-maintenance-red-check` | Same shared contract, in the configured `gates.human_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/lib/maintenance-delivery.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-maintenance-red-check`) |
+ | Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`, `interruption-promotion`, `accept-residual-critic-findings`, `acknowledge-caller-authored-critic`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
+ | Guard Maintenance Window (GMW) install/lift <!-- inventory-id: guard-maintenance-window --> | Time-boxed PO-signed exception letting a self-protecting guard rule (GS-6, protected test paths) honor an additional allow-path | `guard-lift` | Same shared contract, trust-anchor default `project/critical-human-proof.json`; signed via `po-human-approval.mjs sign-intent` against a bare intent digest | `plugins/pipeline-core/lib/guard-maintenance-window.mjs`, `guard-maintenance-window.mjs install`; ADR-0058; `docs/guard-maintenance-window-threat-model.md`, `docs/po-human-approval.md` §"Signing a bare intent digest" |
+ | Human Guard Override (HGO), signed route <!-- inventory-id: human-guard-override-signature --> | Signed admission past a PreToolUse guard denial for one exact request/plan pair, via `guard-human-override.mjs plan`/`prepare-authorization`/`emit-signature-digest`/`authorize-by-signature` | `guard-override` | Same shared contract (default trust anchor same file); the `activate`/chat route also exists alongside this signed one (ADR-0059 Decision 1) | `plugins/pipeline-core/lib/human-guard-override.mjs` (~L1796-1825), `plugins/pipeline-core/scripts/guard-human-override.mjs` |
+@@ -134,6 +137,9 @@ new approval gates.
+ | `interruption-promotion` | `legacy-renderer` | — |
+ | `accept-residual-critic-findings` | `legacy-renderer` | — |
+ | `acknowledge-caller-authored-critic` | `legacy-renderer` | — |
++| `spec-addendum` | `legacy-renderer` | — |
++| `acknowledge-gate-definition-changes` | `legacy-renderer` | — |
++| `acknowledge-maintenance-red-check` | `legacy-renderer` | — |
+ | `critical-action-family` | `abstract-family` | — |
+ | `guard-maintenance-window` | `legacy-renderer` | — |
+ | `human-guard-override-signature` | `legacy-renderer` | — |
+diff --git a/harness/scripts/check-auth-gate-inventory-drift.test.mjs b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+index 3fc1e02d7fb9c3a2ae4eb97509ee9277ea06b861..9ecf220034a023daded0316b961f108be9a8efd9 100644
+--- a/harness/scripts/check-auth-gate-inventory-drift.test.mjs
++++ b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+@@ -282,7 +282,9 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
+   assert.equal(Object.isFrozen(catalog), true);
+   assert.equal(Object.isFrozen(catalog.entries), true);
+   // G20-39 (PO 2026-11-07): one deliberate new entry, acknowledge-caller-authored-critic (legacy-renderer), restated from 21 (QG-04).
+-  assert.equal(catalog.entries.length, 22);
++  // Candidates 28e/29c: three deliberate new entries, spec-addendum (ADR-0095), acknowledge-gate-definition-changes (ADR-0096) and
++  // acknowledge-maintenance-red-check (ADR-0097), all legacy-renderer, restated from 22 (QG-04).
++  assert.equal(catalog.entries.length, 25);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
+   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
+diff --git a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+index 39342a10f6324b1a802624baabf4ed4a67f651e2..82a04d5985fb16e397f926c08176a87c2f841756 100644
+--- a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
++++ b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+@@ -484,6 +484,66 @@
+       "runners": null,
+       "platforms": null
+     },
++    {
++      "id": "spec-addendum",
++      "inventoryId": "spec-addendum",
++      "revision": 1,
++      "purpose": "Record the Spec addendum approval terminal-template disposition",
++      "audience": "user",
++      "disposition": "legacy-renderer",
++      "templateId": null,
++      "builderId": null,
++      "producerRefs": [
++        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-spec-addendum"
++      ],
++      "boundary": null,
++      "mutation": null,
++      "requiresPoApproval": null,
++      "slots": null,
++      "expectedReadback": null,
++      "runners": null,
++      "platforms": null
++    },
++    {
++      "id": "acknowledge-gate-definition-changes",
++      "inventoryId": "acknowledge-gate-definition-changes",
++      "revision": 1,
++      "purpose": "Record the gate-definition change acknowledgement terminal-template disposition",
++      "audience": "user",
++      "disposition": "legacy-renderer",
++      "templateId": null,
++      "builderId": null,
++      "producerRefs": [
++        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-gate-change-acknowledgement"
++      ],
++      "boundary": null,
++      "mutation": null,
++      "requiresPoApproval": null,
++      "slots": null,
++      "expectedReadback": null,
++      "runners": null,
++      "platforms": null
++    },
++    {
++      "id": "acknowledge-maintenance-red-check",
++      "inventoryId": "acknowledge-maintenance-red-check",
++      "revision": 1,
++      "purpose": "Record the pre-existing red check acknowledgement terminal-template disposition",
++      "audience": "user",
++      "disposition": "legacy-renderer",
++      "templateId": null,
++      "builderId": null,
++      "producerRefs": [
++        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-maintenance-red-check"
++      ],
++      "boundary": null,
++      "mutation": null,
++      "requiresPoApproval": null,
++      "slots": null,
++      "expectedReadback": null,
++      "runners": null,
++      "platforms": null
++    },
+     {
+       "id": "critical-action-family",
+       "inventoryId": "critical-action-family",

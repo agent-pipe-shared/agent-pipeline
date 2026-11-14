@@ -1,0 +1,167 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index d3211731e6e1e97e66f35f824218a18ebae9bf30..122c8f69fa5f4f7d8ea8d294a4d12d81f014f0d0 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -2644,6 +2644,44 @@ test("grammar denials return closed typed retries only for independent read diag
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+ 
++// P2-2 (Claude greenfield run 3, 20 of 48 grammar refusals): `cd <project root>; <read>; <read> | head -N; ...` got an
++// empty envelope and no hint, so the agent guessed. The root `cd` is now left out of the typed actions, and a list the
++// v1 envelope cannot type (a part is a pipeline, or not a read) gets a per-part verdict as message text. The verdict
++// is the standalone classifier's; the decision itself (exit 2) never changes.
++test("P2-2: a ; list of reads led by cd <project root> gets typed actions or a per-part verdict, never a changed decision", () => {
++  const path = root();
++  try {
++    markGovernedFixture(path);
++    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++    writeFileSync(join(path, "one.txt"), "one\n");
++    writeFileSync(join(path, "two.txt"), "two\n");
++    const real = realpathSync(path);
++    const typed = `cd ${real}; sed -n '1,10p' one.txt; sed -n '1,10p' two.txt`;
++    assert.deepEqual(retryActionsForDeniedCommand(typed, path).map((action) => action.argv), [["-n", "1,10p", "one.txt"], ["-n", "1,10p", "two.txt"]]);
++    const typedResult = evaluateLifecycleReadyGuard(bash(typed), { projectDir: path });
++    assert.equal(typedResult.exitCode, 2);
++    assert.doesNotMatch(typedResult.stderr, /run each part as its own tool call/u, "typed actions already cover it; no duplicate text");
++
++    const mixed = `cd ${real}; grep -n one one.txt | head -80; wc -c two.txt; touch changed.txt`;
++    assert.deepEqual(retryActionsForDeniedCommand(mixed, path), []);
++    const result = evaluateLifecycleReadyGuard(bash(mixed), { projectDir: path });
++    assert.equal(result.exitCode, 2);
++    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
++    assert.match(result.stderr, /Remediation: run each part as its own tool call/u);
++    assert.match(result.stderr, /Leave out the "cd <project root>" part/u);
++    assert.match(result.stderr, /Admitted on its own, exactly as written: \(1\) grep -n one one\.txt \| head -80  \(2\) wc -c two\.txt/u);
++    assert.match(result.stderr, /Not an admitted read-only form on its own[^\n]*\(3\) touch changed\.txt/u);
++    for (const part of ["grep -n one one.txt | head -80", "wc -c two.txt"]) {
++      assert.equal(evaluateLifecycleReadyGuard(bash(part), { projectDir: path }).exitCode, 0, `${part} is admitted alone, as the text says`);
++    }
++
++    const elsewhere = `cd ${join(real, "..")}; wc -c two.txt; wc -c one.txt`;
++    assert.deepEqual(retryActionsForDeniedCommand(elsewhere, path), [], "a cd anywhere but the root is never left out");
++    assert.doesNotMatch(evaluateLifecycleReadyGuard(bash(elsewhere), { projectDir: path }).stderr, /Leave out the "cd <project root>" part/u);
++    assert.doesNotMatch(evaluateLifecycleReadyGuard(bash("wc -c \"$(id)\"; pwd"), { projectDir: path }).stderr, /run each part as its own tool call/u);
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined", () => {
+   const path = root();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index a83b0f493fd76a26ae4f285d3fa826dbf09f2b84..a295e2f2a0b138d6d4db55ee10e5335e0c9c805a 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -17,7 +17,7 @@ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS,
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+ import { EXTERNAL_DIRECTORY_FILTER_HINT, filterRefusedOnExternalDirectory, firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+-import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
++import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, separatedPartsRemediation, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit, controlPlaneShellWriteBlocked, controlPlaneShellWriteHit } from "./control-plane-script-scan.mjs";
+ import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
+ import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
+@@ -639,7 +639,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+           retryActions,
+           firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
+           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
+-          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
++          // P2-2: when no typed action could be built, a `;`/newline list still gets a per-part verdict as message text.
++          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine))
++            ?? (retryActions.length === 0 && !andChainReadScope
++              ? separatedPartsRemediation((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)
++              : null),
+           null,
+           false,
+           firstOccurrence,
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 2ddca1d6997404e4429273621ec99a3ab20dc1d1..42f7fa468c9a131ffef4a1e4fdc73969fddb4c0d 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -1738,6 +1738,74 @@ function heredocFileRemediation(command) {
+     + "keep any resulting command as a separate tool call.";
+ }
+ 
++/** P2-2: a part that is exactly `cd <absolute project root>`; every command is already judged against that root, so dropping it changes nothing. */
++function isProjectRootCdPart(part, root) {
++  const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++  return parsed.parseStatus === "accepted" && parsed.segments.length === 1
++    && parsed.operators.length === 0 && parsed.redirects.length === 0
++    && basename(parsed.segments[0].executable).toLowerCase() === "cd"
++    && parsed.segments[0].argv.length === 1 && isProjectRootOperand(parsed.segments[0].argv[0], root);
++}
++
++/**
++ * P2-2 (Claude greenfield run 3): the most frequent refused shape was a `;`/newline list of reads, often led by
++ * `cd <project root>` and holding an admitted pipeline such as `grep … | head -80`. retryActionsForDeniedCommand
++ * types only single-segment parts (the v1 envelope has one executable and argv per action), so such a list got an
++ * empty envelope and the agent guessed. This splits on top-level `;` and newlines only (quote- and escape-aware;
++ * nothing with a backtick or `$(` is split), drops a `cd <project root>` part, and judges every remaining part with
++ * the exact classifier a standalone call is judged by. It is message text only: it never admits anything, and a
++ * part it calls admitted is admitted when run on its own because it is that same classifier's verdict.
++ */
++function splitTopLevelSeparatedParts(command) {
++  if (typeof command !== "string" || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return null;
++  const parts = [];
++  let quote = null;
++  let escaped = false;
++  let start = 0;
++  for (let index = 0; index < command.length; index += 1) {
++    const char = command[index];
++    if (escaped) {
++      if (char === "\r" || char === "\n") return null;
++      escaped = false;
++      continue;
++    }
++    if (quote !== "'" && char === "\\") { escaped = true; continue; }
++    if (quote !== null) { if (char === quote) quote = null; continue; }
++    if (char === "'" || char === "\"") { quote = char; continue; }
++    if (char === ";" || char === "\n" || char === "\r") {
++      parts.push(command.slice(start, index).trim());
++      start = index + 1;
++    }
++  }
++  if (quote !== null || escaped) return null;
++  parts.push(command.slice(start).trim());
++  const nonEmpty = parts.filter((part) => part !== "");
++  return nonEmpty.length >= 2 ? nonEmpty : null;
++}
++
++const SEPARATED_PARTS_LISTED = 8;
++const SEPARATED_PART_CHARS = 160;
++
++export function separatedPartsRemediation(command, root, extraRoots = []) {
++  const parts = splitTopLevelSeparatedParts(command);
++  if (parts === null) return null;
++  const droppedCd = parts.some((part) => isProjectRootCdPart(part, root));
++  const rest = parts.filter((part) => !isProjectRootCdPart(part, root));
++  if (rest.length === 0) return null;
++  const shown = (part) => (part.length > SEPARATED_PART_CHARS ? `${part.slice(0, SEPARATED_PART_CHARS)}…` : part);
++  const admitted = [];
++  const other = [];
++  rest.slice(0, SEPARATED_PARTS_LISTED).forEach((part, index) => {
++    (isReadOnlyDiagnosticCommand(part, root, extraRoots) ? admitted : other).push(`(${index + 1}) ${shown(part)}`);
++  });
++  const lines = ["Remediation: run each part as its own tool call; a ; or a line break joins commands the closed grammar does not compose."];
++  if (droppedCd) lines.push("Leave out the \"cd <project root>\" part: every command is already judged against the project root.");
++  if (admitted.length > 0) lines.push(`Admitted on its own, exactly as written: ${admitted.join("  ")}`);
++  if (other.length > 0) lines.push(`Not an admitted read-only form on its own (re-spell it, or use the native Read, Grep or Glob tool; any other command is judged when it runs): ${other.join("  ")}`);
++  if (rest.length > SEPARATED_PARTS_LISTED) lines.push(`${rest.length - SEPARATED_PARTS_LISTED} more part(s) not listed; judge them the same way.`);
++  return lines.join("\n");
++}
++
+ export function grammarRemediation(command) {
+   if (typeof command === "string" && /^\s*node(?:\.exe)?\s+(?:-e|--eval|-p|--print)(?:\s|=|$)/u.test(command)) {
+     return "Remediation: arbitrary inline Node code stays refused. Write the probe to a workspace scratch/browser-probe.mjs file with Write/Edit, then run node scratch/browser-probe.mjs as a separate tool call. Ordinary lifecycle, role and filesystem guards still apply to that script route.";
+@@ -1793,8 +1861,11 @@ export function retryActionsForDeniedCommand(command, root, extraRoots = []) {
+   if (quote !== null || escaped || parts.length === 0) return [];
+   parts.push(command.slice(start).trim());
+   if (parts.some((part) => part === "")) return [];
++  // P2-2: a `cd <project root>` part changes nothing the other parts are judged against, so it is left out rather than emptying the envelope.
++  const reads = parts.filter((part) => !isProjectRootCdPart(part, root));
++  if (reads.length === 0) return [];
+   const actions = [];
+-  for (const part of parts) {
++  for (const part of reads) {
+     const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+     if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+       || parsed.operators.length !== 0 || parsed.redirects.length !== 0

@@ -1,0 +1,89 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
+index 1753836b085f2097a78311b8857c7f275e6a56f6..63b3e2ec99939a1d56b15b734eb3abe0a5686a99 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
+@@ -294,7 +294,7 @@ test("PF-64: the grant script's success result carries a continuationMessage nam
+ test("PF-69: the native-host checkpoint lets a child whose every targeted check is green return succeeded, otherwise blocked with the interim report", () => {
+   const text = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
+   assert.match(text, /if every targeted check of your briefing is already green and no work remains, return the succeeded contract with your report instead of blocked/u);
+-  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "checkpoint" \(changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form\) and a report carrying the condensed report plus a continuation card/u);
++  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "checkpoint" \(changedPaths listing the files changed so far; if no file changed so far, changedPaths is \[\] and the form stays this JSON\) and a report carrying the condensed report plus a continuation card/u);
+   // D31 pin update: validateNativeGoldfishFinal accepts only succeeded|checkpoint, so asserting "blocked" here pinned a refused word.
+   const plain = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: false });
+   assert.doesNotMatch(plain, /succeeded contract/u, "only the native-host variant changes for PF-69");
+@@ -309,7 +309,7 @@ test("D31-BUDGET-NOTICE-1: the native-host checkpoint notice names outcome check
+   assert.match(text, /changedPaths/u);
+   assert.match(text, /done \/ remaining \/ next step/u);
+   assert.match(text, /CONTINUATION CARD -- done: \.\.\.; remaining: \.\.\.; next step: \.\.\./u);
+-  assert.match(text, /no file changed so far, the plain-text stop report is the only legal form/u);
++  assert.match(text, /no file changed so far, changedPaths is \[\] and the form stays this JSON/u, "C29 K-36: the host never read a plain-text stop report");
+ });
+ 
+ test("D31-BUDGET-NOTICE-2: no native-host budget text instructs outcome blocked any more", () => {
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index b94a427308afc075794aa076cf270535adc9216a..20c840137b8e82938b87f6653ac9923587c0603c 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -344,7 +344,7 @@ ${NATIVE_GOLDFISH_HOST_DIRECTIVE}
+ {"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"${b.dispatchId}","candidateCommit":"${b.candidateCommit}","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+ \`\`\`
+ 
+-\`outcome\` is \`succeeded\` only when every targeted check below is green. At the budget checkpoint, at a stop condition, or whenever a targeted check is not green, the final message is still this same JSON object with \`outcome\` set to \`checkpoint\`: the \`report\` string carries the condensed report plus a continuation card (done, remaining, next step), and \`changedPaths\` lists the files you have changed so far, so the host keeps the reservation live and the work can be resumed (a checkpoint commits nothing). Never invent another \`outcome\` word. Only when no file at all has been changed is a plain-text stop report the one legal form (no commit happens then). \`changedPaths\` is sorted, has no duplicates, and lists only paths from the write scope. The \`report\` string holds the condensed report of the final-report section of \`templates/prompts/goldfish-task.md\` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.${testFirstEvidenceParagraph(pkg)}${smallestChangeParagraph(pkg)}
++\`outcome\` is \`succeeded\` only when every targeted check below is green. At the budget checkpoint, at a stop condition, or whenever a targeted check is not green, the final message is still this same JSON object with \`outcome\` set to \`checkpoint\`: the \`report\` string carries the condensed report plus a continuation card (done, remaining, next step), and \`changedPaths\` lists the files you have changed so far, so the host keeps the reservation live and the work can be resumed (a checkpoint commits nothing). Never invent another \`outcome\` word. When no file at all has been changed (a stop condition met before any edit), it is still this same JSON object with \`outcome\` \`checkpoint\` and \`changedPaths\` \`[]\`; a plain-text stop report is never read by the host. \`changedPaths\` is sorted, has no duplicates, and lists only paths from the write scope. The \`report\` string holds the condensed report of the final-report section of \`templates/prompts/goldfish-task.md\` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.${testFirstEvidenceParagraph(pkg)}${smallestChangeParagraph(pkg)}
+ 
+ ## Briefing ${b.dispatchId}: ${pkg.title}
+ 
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+index 87702ea04c55c61359fb2d4584ebdf9cc9f95b07..e9e800822c5123d8cd392a012515e0e245071681 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+@@ -7,7 +7,7 @@
+ import { CLOSING_ALLOWANCE, MAX_GRANT_EXTRA_PER_CALL } from "./dispatch-budget-core.mjs";
+ 
+ export const NATIVE_HOST_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
+-export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "checkpoint" (changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form) and a report carrying the condensed report plus a continuation card (done / remaining / next step) in its report field`;
++export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "checkpoint" (changedPaths listing the files changed so far; if no file changed so far, changedPaths is [] and the form stays this JSON) and a report carrying the condensed report plus a continuation card (done / remaining / next step) in its report field`;
+ 
+ export function nativeHostBlockedContinuation(remainingClosingCalls) {
+   return remainingClosingCalls > 0
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index 9657eddff27f67ad3f35dac926c71ce4518e93fa..d7e319e8bbfe61ac8e323cb46af68c39ef667221 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -127,7 +127,9 @@ function finalShapeCondition(value, binding, allowCheckpoint) {
+   if (value.report.trim() === "") return named("report-empty");
+   if (Buffer.byteLength(value.report, "utf8") > 1024 * 1024) return named("report-oversize");
+   if (!Array.isArray(value.changedPaths)) return named("changed-paths-type");
+-  if (value.changedPaths.length === 0) return named("changed-paths-empty");
++  // C29 K-36 (Glossover): a Goldfish that stops on a stop condition before any edit hands back a checkpoint with no changed path; the
++  // checkpoint commits nothing and keeps the reservation live, so an empty list is admitted for it. A success still names its files.
++  if (value.changedPaths.length === 0 && value.outcome !== "checkpoint") return named("changed-paths-empty");
+   if (value.changedPaths.length > 64) return named("changed-paths-too-many");
+   if (!value.changedPaths.every(normalizedPath)) return named("path-not-normalized");
+   if (new Set(value.changedPaths).size !== value.changedPaths.length) return named("paths-duplicate");
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index 2bee585808d79218261fee42a8bb824693152f82..f3ad10ab79f0461d042d77abf8c8173a110cf797 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -609,10 +609,18 @@ test("(xiii) D31: the built briefing tells the Goldfish to return outcome checkp
+   assert.match(paragraph, /Never invent another `outcome` word/u);
+ });
+ 
+-test("(xiv) D31: the plain-text stop report is no longer the unconditional stop form, only the no-file case", () => {
+-  const { paragraph } = renderedReturnContract();
++test("(xiv) D31, C29 K-36: no stop is a plain-text report; a stop before any edit is the checkpoint JSON with changedPaths [], and the host admits it", () => {
++  const { paragraph, binding, text } = renderedReturnContract();
+   assert.doesNotMatch(paragraph, /otherwise stop and return a plain-text stop report instead of the JSON/u);
+-  assert.match(paragraph, /no file at all[^.]*plain-text stop report/u);
++  assert.doesNotMatch(paragraph, /plain-text stop report is the one legal form/u, "Glossover K-36: the host never read that form; it failed NGHR-FINAL-JSON");
++  assert.match(paragraph, /no file at all has been changed[^.]*`checkpoint` and `changedPaths` `\[\]`/u);
++  const noChange = exampleWith(text, { outcome: "checkpoint", report: "Stopped on a stop condition before any edit. CONTINUATION CARD -- done: recon; remaining: all; next step: coordinator decides.", changedPaths: [] });
++  const stopped = validateNativeGoldfishFinal(noChange, { binding, allowCheckpoint: true });
++  assert.equal(stopped.ok, true, JSON.stringify(stopped));
++  assert.deepEqual(stopped.final.changedPaths, []);
++  const emptySuccess = validateNativeGoldfishFinal(exampleWith(text, { report: "report", changedPaths: [] }), { binding, allowCheckpoint: true });
++  assert.equal(emptySuccess.ok, false, "a success still names the files it changed");
++  assert.equal(emptySuccess.detail?.condition, "changed-paths-empty");
+ });
+ 
+ test("(xv) D31: the briefing's JSON example still validates with outcome succeeded", () => {

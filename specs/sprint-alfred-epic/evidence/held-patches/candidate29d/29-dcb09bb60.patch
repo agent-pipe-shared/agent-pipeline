@@ -1,0 +1,59 @@
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 92c3de0a2eb4f1dcd0adcd5bbec7719c59165416..43913d2d8d28ad84978b5ca28dd455d1717317a7 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -667,6 +667,16 @@ test("C29 R5: no harvest with authorship for a commit without the trailer or a m
+     assert.equal(moved.status, "ready", JSON.stringify(moved));
+     assert.equal(moved.fastForward.eligible, false);
+     assert.match(moved.fastForward.reason, /HEAD moved on/u);
++    // A commit that touched an outside path, undone by a later commit: the net diff is in scope, the history is not, so it cannot land unchanged.
++    const wt3 = worktreeFixture(fx, "subagent-third-r5");
++    childCommit(wt3, { "src/c.mjs": "export const c = 1;\n", "docs/outside.md": "x\n" }, "AI-Assisted: true\nDispatch: C29-R5C (goldfish)");
++    git(wt3.path, "rm", "-q", "docs/outside.md");
++    git(wt3.path, "-c", "user.name=Child Goldfish", "-c", "user.email=child@example.invalid", "commit", "-q", "-m", "fix: drop the stray file", "-m", "AI-Assisted: true\nDispatch: C29-R5C (goldfish)");
++    const undone = integrate.plan({ ...options, branch: wt3.branch, allowed: ["src/c.mjs"] });
++    assert.equal(undone.status, "ready", JSON.stringify(undone));
++    assert.deepEqual(undone.paths, ["src/c.mjs"], "the net diff is in scope");
++    assert.equal(undone.fastForward.eligible, false);
++    assert.match(undone.fastForward.reason, /outside the briefed scope \(docs\/outside\.md\)/u);
+     const parsed = (...args) => integrate.parseArgs(args);
+     const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a"];
+     assert.equal(parsed("apply", ...common, "--expect-sha256", "a".repeat(64), "--keep-authorship", "C29-R5").keepAuthorship, "C29-R5");
+diff --git a/plugins/pipeline-core/scripts/agy-native-integrate.mjs b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+index b4d6ed16711bd3936f1bba5cb55fdea1c1b03c12..87d4cba1279bdba48767effdcc5d551962c9bd91 100644
+--- a/plugins/pipeline-core/scripts/agy-native-integrate.mjs
++++ b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+@@ -133,7 +133,7 @@ export function plan(options) {
+   }
+   const planSha256 = sha(JSON.stringify({ head: head.out.trim(), tip: tip.out.trim(), base: base.out.trim(), paths, patchSha256: sha(patch.out) }));
+   const applyArgv = ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256];
+-  const fastForward = fastForwardFacts(root, head.out.trim(), base.out.trim(), tip.out.trim());
++  const fastForward = fastForwardFacts(root, head.out.trim(), base.out.trim(), tip.out.trim(), allowed);
+   if (fastForward.eligible) fastForward.next = [...applyArgv, "--keep-authorship", fastForward.dispatchId].map(shellWord).join(" ");
+   return { schema: PLAN_SCHEMA, status: "ready", code: "AGYI-READY", root, branch: options.branch, head: head.out.trim(), tip: tip.out.trim(),
+     base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [], fastForward,
+@@ -143,9 +143,11 @@ export function plan(options) {
+ /**
+  * C29 R5 (ADR-0099): whether the child's own commits can land unchanged. Only when the branch was cut from the current HEAD (a fast-forward, no
+  * rewrite) and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer, the same id throughout, and `AI-Assisted: true`. A
+- * fast-forward runs no commit-msg hook, so the trailers are checked here, per commit. Anything else keeps the patch route.
++ * fast-forward runs no commit-msg hook, so the trailers are checked here, per commit. Every commit must also stay inside the briefed scope on its
++ * own: the plan's scope check reads only the net diff, and a commit that touched an outside path which a later one removed would land in history
++ * unchanged, where nothing may rewrite it and the attested writer refuses it. Anything else keeps the patch route.
+  */
+-function fastForwardFacts(root, head, base, tip) {
++function fastForwardFacts(root, head, base, tip, allowed) {
+   const no = (reason) => ({ eligible: false, reason });
+   if (base !== head) return no("HEAD moved on since the child's branch was cut, so its commits cannot land unchanged; the patch route below applies");
+   const listed = git(root, ["rev-list", "--reverse", `${base}..${tip}`]);
+@@ -161,6 +163,10 @@ function fastForwardFacts(root, head, base, tip) {
+     if (dispatch.length !== 1 || dispatch[0] === null) return no(`commit ${commit.slice(0, 12)} does not carry exactly one "Dispatch: <id> (goldfish)" trailer`);
+     if (!lines.includes("AI-Assisted: true")) return no(`commit ${commit.slice(0, 12)} does not carry "AI-Assisted: true"`);
+     if (dispatchId !== null && dispatch[0] !== dispatchId) return no("the branch's commits name more than one dispatch id");
++    const touched = git(root, ["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", commit]);
++    if (!touched.ok) return no(`the paths of ${commit.slice(0, 12)} are not readable`);
++    const outside = touched.out.split("\0").filter(Boolean).filter((path) => !allowed.includes(path));
++    if (outside.length > 0) return no(`commit ${commit.slice(0, 12)} touched paths outside the briefed scope (${outside.slice(0, 5).join(", ")}), even if a later commit undid it; its history cannot land unchanged`);
+     dispatchId = dispatch[0];
+   }
+   return { eligible: true, dispatchId, commits: chain };

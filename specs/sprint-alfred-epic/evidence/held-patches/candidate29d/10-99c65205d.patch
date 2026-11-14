@@ -1,0 +1,32 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 1f19d8fc72825f23dd6b59f1c27c31586600a2e5..a1711eccee8e80ba015b507bac033a65cbbd88d4 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -846,6 +846,14 @@ a range would hide a weakened gate, a maintenance proof read loosely would admit
+ criterion and no red-before proof covers, and a wrong range base would move the walk, which is why
+ none of them can be lifted by a window.
+ 
++Candidate 29d (K-34) adds `plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs`, which
++`lib/native-goldfish-host-state.mjs` now imports: when HEAD carries a host commit that no lineage
++proof covers, the concurrent commit plan reads the in-flight siblings' stop outcomes and names the
++sibling whose failed stop made that commit. The outcome only selects the refusal's name and text;
++the commit is refused either way. A reader that a window could loosen could still not admit the
++commit, but it could misname the sibling and send the recovery to the wrong dispatch, which is why
++it cannot be lifted by a window either.
++
+ ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+ and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+ (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index ce5a82a4923c19dba771e6e62795ceef459f44d7..6a71b38640a09afdafca50dab67093fdaa90eecf 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -961,6 +961,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // and lib/native-goldfish-host-state.mjs, plus the commit split the walk imports.
+   "plugins/pipeline-core/lib/private-state-write-guard.mjs", "plugins/pipeline-core/lib/gate-definition-changes.mjs",
+   "plugins/pipeline-core/lib/maintenance-delivery.mjs", "plugins/pipeline-core/lib/close-commit-split.mjs",
++  // Candidate 29d (K-34, GMWKC01): lib/native-goldfish-host-state.mjs reads a sibling's stop outcome to refuse its unproven host commit by name.
++  "plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever

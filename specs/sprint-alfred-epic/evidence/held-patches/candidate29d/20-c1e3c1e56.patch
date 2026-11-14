@@ -1,0 +1,109 @@
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 794dbb44e50a6fbe9442acf910d18df892310513..2d91516a00a0ac0b62e1760903e0eaafd275eeb5 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -362,7 +362,13 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   if (evidence.length === 0) {
+     // Candidate 17 (Toolbox): the refusal carried no reason; name what is admitted, the exact producers and the flag that passes it.
+     const reason = `No --evidence was given. Produce evidence for the exact candidate ${candidateCommit}, then pass it with --evidence <file> (repeatable): either a Verify evidence of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --base <base> --commit ${candidateCommit} --out <evidence file>) or a Critic diagnostic evidence (node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, see its --help). Security evidence is not admitted here. Produce it while HEAD is the candidate and the tree is clean.`;
+-    fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.", { reason });
++    // C29 A2 (test round 28d): each refusal of the Critic preparation revealed only the next prerequisite. The first refusal an agent meets
++    // now lists the later ones in their fixed order, as push-init lists its unmet checks; the code, the stage and the field set of a
++    // project without a map or a feature package are unchanged.
++    const checks = evidenceRequiredPrerequisites(realRoot, candidateCommit, spec, courseContext);
++    const mapFirst = checks.some((check) => check.id === "architecture-map" && check.ok === false)
++      ? `Repair the architecture map FIRST (checks[0]): evidence binds to the exact candidate commit, so evidence produced before the map commit is stale and must be produced again. Then: ` : "";
++    fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.", { reason: `${mapFirst}${reason}`, ...(checks.length === 0 ? {} : { checks }) });
+   }
+   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
+   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
+@@ -665,6 +671,40 @@ const PACKAGE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
+  * and the active feature id of the project state whose package at the candidate names exactly this Spec path. Otherwise the folder name.
+  * Null only for a path outside specs/<folder>/. Read-only.
+  */
++/**
++ * C29 A2: the ordered prerequisites a refused empty-evidence request still faces, read-only. `ok: false` is measured, `ok: null` is a
++ * later step this preflight cannot observe yet (labelled "unchecked"). Empty when there is nothing beyond the evidence itself to name,
++ * so the refusal of a project without a stale map or a feature package keeps its field set. Any fault leaves the list out, never the refusal.
++ */
++function evidenceRequiredPrerequisites(root, candidateCommit, specPath, courseContext) {
++  try {
++    const checks = [];
++    const currency = inspectArchitecturePushCurrency({ projectDir: root, commit: candidateCommit });
++    if (currency.ok && currency.stale) {
++      const refusal = describeArchitectureCurrencyRefusal(currency);
++      checks.push({ id: "architecture-map", ok: false, status: "stale", code: "CDP-ARCHITECTURE-MAP-STALE", remedy: refusal.remedy, staleContracts: refusal.staleContracts });
++    }
++    const featureId = packageFeatureIdForSpec(root, candidateCommit, specPath, isObject(courseContext) && typeof courseContext.featureId === "string" ? [courseContext.featureId] : []);
++    let packaged = false;
++    if (featureId !== null) { try { packaged = JSON.parse(candidateText(root, candidateCommit, `specs/${featureId}/lifecycle.json`)) !== null; } catch { packaged = false; } }
++    if (checks.length === 0 && !packaged) return [];
++    checks.push({ id: "candidate-evidence", ok: false, status: "missing", code: "CDP-EVIDENCE-REQUIRED", remedy: `produce evidence for ${candidateCommit} while HEAD is that commit and the tree is clean, and pass it with --evidence <file> (see reason)` });
++    if (packaged) {
++      const evidenceDir = `specs/${featureId}/evidence/`;
++      checks.push(
++        { id: "diagnostic-evidence", ok: null, status: "unchecked", code: "CCA-DETERMINISTIC-UNAVAILABLE",
++          remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs with --log and --out under ${evidenceDir} (FPR-DIAG-PATH refuses a bare evidence/ path), both names new (CDI-OUTPUT-EXISTS: evidence is never overwritten), and --full-verify only with a FULL Verify evidence (CDI-FULL-VERIFY)` },
++        { id: "diagnostic-registration", ok: null, status: "unchecked", code: "CCA-DETERMINISTIC-UNAVAILABLE",
++          remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path> BEFORE committing (registration reads the working tree), then commit the artifact, its log and the manifest in ONE evidence-only commit` },
++        { id: "registration-commit", ok: null, status: "unchecked", code: "CDP-ARGUMENT",
++          remedy: "rerun this preflight with --evidence <file> and --registration-commit <full 40-hex id of that evidence-only commit>" });
++    }
++    return checks.map((check, index) => ({ order: index + 1, ...check }));
++  } catch {
++    return [];
++  }
++}
++
+ function packageFeatureIdForSpec(root, candidateCommit, specPath, preferred = []) {
+   const match = /^specs\/([^/]+)\//u.exec(specPath ?? "");
+   if (match === null) return null;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 96bd74fff3c5f8fa956c16ea6fdca86c240a4792..88c3aa8c59a2ebdb2493f57260da0e2adc5b0de4 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1947,6 +1947,44 @@ test("N25 a stale architecture map is refused CDP-ARCHITECTURE-MAP-STALE naming
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// C29 A2 (test round 28d): every refusal of the Critic preparation revealed only the next prerequisite. The empty-evidence refusal keeps
++// its code and stage and lists the later prerequisites in their fixed order: a stale map first (a map commit voids evidence already
++// produced for the candidate), then the evidence, then the feature-package steps this preflight cannot observe yet, labelled unchecked.
++test("A2 the empty-evidence refusal lists a stale map first and the feature-package steps in order; without either its field set is unchanged", () => {
++  const fx = fixture();
++  try {
++    mkdirSync(join(fx.root, "src"), { recursive: true });
++    mkdirSync(join(fx.root, "architecture", "map"), { recursive: true });
++    mkdirSync(join(fx.root, "specs", "pkg"), { recursive: true });
++    writeFileSync(join(fx.root, "src", "contract.mjs"), "export const value = 1;\n");
++    writeFileSync(join(fx.root, "architecture", "map", "index.md"), "# Map\n");
++    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core\n");
++    const commitPaths = (paths, message) => { git(fx.root, ["add", "--", ...paths]); git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(fx.root, ["rev-parse", "HEAD"]); };
++    commitPaths(["src", "architecture"], "adopt map");
++    writeFileSync(join(fx.root, "src", "contract.mjs"), "export const value = 2;\n");
++    const stale = commitPaths(["src"], "contract change without a map update");
++    const mapOnly = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: stale, evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
++    assert.deepEqual(mapOnly.details.checks.map(({ order, id, ok, status }) => [order, id, ok, status]),
++      [[1, "architecture-map", false, "stale"], [2, "candidate-evidence", false, "missing"]]);
++    assert.match(mapOnly.details.checks[0].remedy, /architecture\/map\/core\.md/u);
++    assert.match(mapOnly.details.reason, /^Repair the architecture map FIRST .*evidence produced before the map commit is stale/u);
++    assert.match(mapOnly.details.reason, /--evidence <file>/u, "the producers are still named");
++    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core, covers value 2\n");
++    writeFileSync(join(fx.root, "specs", "pkg", "lifecycle.json"), "{}\n");
++    const packaged = commitPaths(["architecture", "specs/pkg"], "refresh map, add a feature package");
++    const pkg = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: packaged, specPath: "specs/pkg/spec.md", evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
++    assert.deepEqual(pkg.details.checks.map(({ order, id, ok, status }) => [order, id, ok, status]), [
++      [1, "candidate-evidence", false, "missing"], [2, "diagnostic-evidence", null, "unchecked"],
++      [3, "diagnostic-registration", null, "unchecked"], [4, "registration-commit", null, "unchecked"]]);
++    assert.match(pkg.details.checks[1].remedy, /specs\/pkg\/evidence\/.*CDI-OUTPUT-EXISTS.*CDI-FULL-VERIFY/u);
++    assert.match(pkg.details.checks[2].remedy, /--add-diagnostic-evidence <path> BEFORE committing.*ONE evidence-only commit/u);
++    assert.match(pkg.details.checks[3].remedy, /--registration-commit/u);
++    assert.doesNotMatch(pkg.details.reason, /^Repair the architecture map FIRST/u, "a current map is not named");
++    const plain = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: packaged, evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
++    assert.equal(Object.hasOwn(plain.details, "checks"), false, "a current map and no feature package: the refusal keeps its field set");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ // N33 D (D212): early detection. The ready result a person or script reads lists the Critic-required records of the reviewed range that no
+ // Critic evidence covers yet, so the Critic dispatch can include them. Additive and advisory: no refusal, and the library result the
+ // session finalizer binds by digest is left byte-identical.

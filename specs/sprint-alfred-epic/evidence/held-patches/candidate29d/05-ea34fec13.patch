@@ -1,0 +1,78 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 9f291f70756d412b305afca29e81d62bf4aacae9..e46fbc00f84f0b95b9112a5a4c7150d002780ba4 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -52,7 +52,7 @@ Create the Full Verify clone OUTSIDE the repository it verifies and give it a wo
+ 
+ ## Isolated Linux single runs
+ 
+-`node scripts/run-parallel.mjs <workers> <label> [--src <dir>] [--allow-dirty] <test-file>...` gives every worker its own clone of the source HEAD, its own private HOME (with the git identity copied) and its own TMPDIR outside every repository. Heavy suites share `~/.apsp`, its lock and repo-local state when they run side by side in one checkout, and then collide on the registry; the private HOME and TMPDIR remove that. Use at most 3 workers; the heavy suites also slow each other down, so a timeout that appears only under load is re-run alone before it is called red.
++`node scripts/run-parallel.mjs <workers> <label> [--src <dir>] [--allow-dirty] <test-file>...` gives every worker its own clone of the source HEAD, its own private HOME (with the git identity copied) and its own TMPDIR outside every repository. That HOME is short on purpose (`<home>/.ptp/<8 hex>/h<n>`): fixtures place a synthetic home under it and need a session-power socket address beneath that home, which must fit 107 bytes; a longer worker HOME made them fail `SP-ADDRESS`. Heavy suites share `~/.apsp`, its lock and repo-local state when they run side by side in one checkout, and then collide on the registry; the private HOME and TMPDIR remove that. Use at most 3 workers; the heavy suites also slow each other down, so a timeout that appears only under load is re-run alone before it is called red.
+ 
+ The workers see the COMMITTED state of the source only. The runner prints `src=... commit=<sha>`, force-checks every worker clone out at that exact commit on each run, and refuses a source with uncommitted changes (exit 2) unless `--allow-dirty` is given, in which case it says how many paths are left out. Commit before running, and read the printed commit before trusting a count. `node scripts/run-parallel.test.mjs` pins this behaviour.
+ 
+diff --git a/scripts/run-parallel.mjs b/scripts/run-parallel.mjs
+index 9ffc28c17c19e4695ee28d226752e4381b162efb..9d07c7eaa2b4b260fdc4599b21750f4a36b9f51b 100644
+--- a/scripts/run-parallel.mjs
++++ b/scripts/run-parallel.mjs
+@@ -7,7 +7,10 @@
+ //          GREEN/RED, exit code, tests/pass/fail/skip/todo counts, the file and the worker, plus failing case names.
+ //          Exit 0 only when every file exits 0; exit 2 on a usage error or a dirty source (see below).
+ // Data:    worker clones scratch/clones/pw-<label>-<n> (untracked, reused between runs); worker HOME/TMPDIR under
+-//          <home>/pipeline-test-tmp/par-<label> (removed and recreated each run, outside every repository).
++//          <home>/.ptp/<8-hex digest of the label>/h<n> and t<n> (removed and recreated each run, outside every
++//          repository). The worker HOME is kept short on purpose: test fixtures place a synthetic home under it, and
++//          the session-power socket address beneath that home must fit Linux's 107-byte limit. A HOME over 40 bytes
++//          sent those fixtures into the checkout, where the address no longer fits (SP-ADDRESS, e.g. SHDQ002-007).
+ // Not read-only: it writes only the worker clones and temp dirs, never the source checkout.
+ // Staleness fix (K53): a worker clone ran whatever commit it last saw. It is now force-checked-out to the source's
+ // exact HEAD (fetch + detached checkout + clean) on every run, the commit is printed, and a source with uncommitted
+@@ -17,6 +20,7 @@ import { spawn, execFileSync } from "node:child_process";
+ import { existsSync, mkdirSync, chmodSync, rmSync, writeFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import { homedir } from "node:os";
++import { createHash } from "node:crypto";
+ const argv = process.argv.slice(2);
+ const allowDirty = argv.includes("--allow-dirty");
+ const [nArg, label, ...rest0] = argv.filter((a) => a !== "--allow-dirty");
+@@ -37,7 +41,7 @@ if (dirty.length > 0 && !allowDirty) {
+   for (const d of dirty.slice(0, 10)) console.error(`  ${d}`);
+   process.exit(2);
+ }
+-const base = join(homedir(), "pipeline-test-tmp", `par-${label}`);
++const base = join(homedir(), ".ptp", createHash("sha256").update(label).digest("hex").slice(0, 8));
+ rmSync(base, { recursive: true, force: true });
+ mkdirSync(base, { recursive: true, mode: 0o700 });
+ const syncClone = (clone) => {
+@@ -58,7 +62,8 @@ const lanes = Array.from({ length: workers }, (_, n) => {
+   }
+   const got = gitIn(clone, "rev-parse", "HEAD");
+   if (got !== srcCommit) { console.error(`run-parallel: worker ${n} is at ${got} but the source HEAD is ${srcCommit}`); process.exit(2); }
+-  const home = join(base, `home-${n}`); const tmp = join(base, `tmp-${n}`);
++  const home = join(base, `h${n}`); const tmp = join(base, `t${n}`);
++  if (Buffer.byteLength(home) > 40) console.error(`run-parallel: WARNING worker HOME ${home} is over 40 bytes; fixtures that need a socket address under it fall back to the checkout and fail SP-ADDRESS`);
+   for (const d of [home, tmp]) { mkdirSync(d, { recursive: true, mode: 0o700 }); chmodSync(d, 0o700); }
+   writeFileSync(join(home, ".gitconfig"), `[user]\n\tname = ${name}\n\temail = ${email}\n`);
+   return { n, clone, home, tmp, queue: [] };
+diff --git a/scripts/run-parallel.test.mjs b/scripts/run-parallel.test.mjs
+index e6def5ab120639d40e552102987d4e8b7af8d87f..2fc5df8ebfbdf9a7f3da8bc6869f06ecfcd80744 100644
+--- a/scripts/run-parallel.test.mjs
++++ b/scripts/run-parallel.test.mjs
+@@ -89,3 +89,17 @@ test("a source whose history was rewritten does not crash the worker sync", () =
+   assert.match(r.stdout, new RegExp(`commit=${git(src, "rev-parse", "HEAD")}`));
+   assert.match(r.stdout, /tests 3 /);
+ });
++
++test("the worker HOME is <home>/.ptp/<8 hex>/h<n> whatever the label length (SHDQ socket-address room)", () => {
++  // A fixture places a synthetic home under the worker HOME and needs a session-power socket address beneath it
++  // (107 bytes); a long label used to make the worker HOME too long, so SHDQ002-007 failed SP-ADDRESS on every worker.
++  initSrc(1);
++  writeFileSync(join(src, "b.test.mjs"), `import test from "node:test";\nimport assert from "node:assert/strict";\ntest("short worker home", () => { assert.match(process.env.HOME, /^${home.replace(/[/.]/g, (c) => "\\" + c)}\\/\\.ptp\\/[0-9a-f]{8}\\/h0$/); });\n`);
++  git(src, "add", "b.test.mjs");
++  git(src, "commit", "--quiet", "-m", "home shape");
++  const r = spawnSync(process.execPath, [runner, "1", "a-very-long-label-name-for-the-home-shape", "--src", src, "b.test.mjs"], {
++    cwd: work, encoding: "utf8", env: { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: sandbox, NODE_TEST_CONTEXT: "" },
++  });
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /GREEN/);
++});

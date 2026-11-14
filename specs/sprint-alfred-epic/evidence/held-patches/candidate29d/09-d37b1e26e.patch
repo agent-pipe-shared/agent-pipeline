@@ -1,0 +1,175 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index aa884ed886dddc7a02a9b41be2612f57363ba980..c9d47adcd478cca11c66d9ae479a5b0b4d03efaa 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -203,7 +203,13 @@ function recoverySentence(dispatchId, { root = null, commit = null } = {}) {
+  */
+ function failureReason(entry) { return entry?.causeReason ?? entry?.reason ?? entry?.detail?.reason ?? null; }
+ /** A commit exception whose concurrent-commit ownership proof is missing needs the registry healed before the recovery. */
+-function healSentence(reason) {
++function healSentence(reason, entry = null) {
++  if (reason === "native-concurrent-sibling-commit-unrecorded") {
++    // K-34: the commit that moved HEAD is a sibling's host commit whose stop failed afterwards, so its lineage proof never came; waiting cannot help.
++    const named = /sibling ([A-Za-z0-9._:-]{1,128}) commit ([0-9a-f]{7,40})/u.exec(String(entry?.detail?.errorMessage ?? ""));
++    const sibling = named ? `${named[1]} (host commit ${named[2]})` : "a sibling Goldfish";
++    return ` The cause is native-concurrent-sibling-commit-unrecorded: HEAD was moved by the host commit of ${sibling}, whose own stop then failed before it wrote that commit's lineage proof, so this stop cannot prove the commit and did not wait for it. Recover that sibling first (its stop-failure record names the code; the host commit exists, so its recovery writes only the lost record), then recover this dispatch the same way, onto the advanced HEAD. Heal only while no Goldfish is in flight: node <plugin-root>/scripts/routine-repair.mjs run heal --root <root> --reason "<why>".`;
++  }
+   return reason === "native-concurrent-unowned-head"
+     ? ` The cause is native-concurrent-unowned-head: HEAD moved without a genuine return of this launch. Heal first: node <plugin-root>/scripts/routine-repair.mjs run heal --root <root> --reason "<why>" (only while no Goldfish is in flight).`
+     : "";
+@@ -225,7 +231,7 @@ function stopFailureNotice(failure, root = null) {
+   const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
+     ? ` Cause: at its stop the child's pending host-commit state could not be read${typeof failure.reason === "string" && failure.reason !== "" ? "" : " (this record carries no reason; it may predate the reason field)"}. Recovery: ${recoverySentence(failure.dispatchId, { root })}`
+     : failure.code === "NGHF-COMMIT-EXCEPTION"
+-      ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`
++      ? `${healSentence(failureReason(failure), failure)} Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`
+       : ` Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`;
+   return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
+ }
+@@ -256,7 +262,7 @@ function nativeGoldfishHookBaseMessage(result, waitCommand = null, root = null)
+     return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Recovery: ${recoverySentence(result.dispatchId, { root })} scripts/dispatch-record-write.mjs still refuses a v4 authored-commit Claude record without host observation.`;
+   }
+   if (result.code === "NGHF-COMMIT-EXCEPTION") {
+-    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result))} Recovery: ${recoverySentence(result.dispatchId ?? result.stopDispatchId, { root })}${describeFailureDetail(result.detail)}`;
++    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result), result)} Recovery: ${recoverySentence(result.dispatchId ?? result.stopDispatchId, { root })}${describeFailureDetail(result.detail)}`;
+   }
+   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
+     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index aee81ab423c9baeb18b94be632887dd26d5c77f0..3b0dd6b2e0a102dac6d00a4c2cd76a611258502c 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -556,7 +556,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+       expectedPendingSha256: observedAttempt.pendingSha256 });
+     postCommitStage = "record-draft";
+     const testFirstEvidence = testFirstEvidenceStatus(physical, observation.final.testFirst);
+-    const drafted = draftRecord({ state, observation, commitReadback: committed, testFirstEvidence });
++    const drafted = (dependencies.draftRecord ?? draftRecord)({ state, observation, commitReadback: committed, testFirstEvidence });
+     if (!drafted.ok) return { ...fail(drafted.code), commit: committed.commit };
+     const recordBytes = nativeAuthoredRecordBytes(drafted.record);
+     postCommitStage = "observation-draft";
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index a6edc41b0493fb0f16d882207312a913adfabead..ba02d6270d275805442bab32b36f05e4bebc4f54 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -32,6 +32,7 @@ import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
+ import { sliceQueueLocation, readSliceQueueSource, readBoundedFile, writeWorkingQueue, restoreWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
+ import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+ import { isSafeTaskId } from "./dispatch-record.mjs";
++import { readNativeGoldfishStopOutcome } from "./native-goldfish-stop-outcome.mjs";
+ import { fileURLToPath } from "node:url";
+ /** ADR-0097: what an item delivery is bound to -- its criterion locator, or its maintenance binding with the identity of the one red check (two maintenance deliveries of different checks never compare equal). Every comparator reads it through here. */
+ const deliveryBinding=delivery=>isMaintenanceDelivery(delivery)?{maintenance:delivery.maintenance,checkSha256:maintenanceCheckSha256(delivery.checks?.[0])}:delivery?.criterionLocator;
+@@ -818,7 +819,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
+   if(current.association.state!=='bound')throw nativeManagedFault('native-concurrent-owner-unbound');
+   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
+   const members=new Map(inspectNativeMemberRecords({boundary,port,producer}).map(member=>[member.record.bindingSha256,member.record]));
+-  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),siblingScopes=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
++  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),siblingScopes=new Set(),foreignCommits=[],inFlightSiblings=[],settled=readSettledItemSliceIds({repository,boundary});
+   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
+     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
+     if(!member||!pending.binding.itemDelivery||!pending.delivery||operation.association.state!=='bound')continue;
+@@ -826,7 +827,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
+     // known below, so a commit it already landed is still recognised as foreign (NGHS17).
+     if(!settled.has(pending.delivery.sliceId)&&scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
+     // Literal, retained original item scopes are the only foreign dirty paths.
+-    if(member.phase!=='released')for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}
++    if(member.phase!=='released'){for(const path of pending.binding.allowedPaths){foreignPaths.add(path);siblingScopes.add(path);}inFlightSiblings.push(pending.binding.dispatchId);}
+     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
+     if(terminal){const observed=read.entries.find(row=>row.sourceFact.sha256===terminal.value.observationSha256);
+       if(!observed||!observed.value.changedPaths.every(path=>pending.binding.allowedPaths.includes(path)))throw nativeManagedFault('native-concurrent-foreign-observation');
+@@ -856,7 +857,15 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
+     // write scope, check or dependency paths, exactly as a disjoint advance of the briefing's base is; one that touches them is refused by name, as before.
+     // It must also touch no path of a sibling still in flight: such a commit may be that sibling's host commit whose proof is not written yet, and is then
+     // refused here so that the settle loop waits for the proof and the receipt keeps its sibling lineage.
+-    if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes]))throw nativeManagedFault('native-concurrent-unowned-head');parent=commit;unproven=true;continue;}
++    if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes])){
++      // K-34 (Glossover, 2026-11-13): a sibling stop that made this host commit and then failed (its stop outcome names the commit and is
++      // no recorded success) never writes the lineage proof, so the settle loop would wait for it until its budget ends. The commit is still
++      // refused (nothing proves its lineage), but at once and by name, so the failure says which sibling to recover first.
++      const failedSibling=inFlightSiblings.find(dispatchId=>{const outcome=readNativeGoldfishStopOutcome({commonDir:repository.commonDir,dispatchId,after:'1970-01-01T00:00:00.000Z'});
++        return typeof outcome?.commit==='string'&&outcome.commit.length>=7&&commit.startsWith(outcome.commit)&&outcome.status!=='authored-commit-recorded';});
++      if(failedSibling)throw Object.assign(nativeManagedFault('native-concurrent-sibling-commit-unrecorded'),{message:`native-concurrent-sibling-commit-unrecorded sibling ${failedSibling} commit ${commit.slice(0,12)}`,siblingDispatchId:failedSibling});
++      throw nativeManagedFault('native-concurrent-unowned-head');}
++      parent=commit;unproven=true;continue;}
+     const observed=read.entries.find(row=>row.sourceFact.sha256===proof.observationSha256);
+     if(observed.value.parent!==parent)throw nativeManagedFault('native-concurrent-parent-proof');
+     lineage.push(proof);provenSteps.push({parent,commit});parent=commit;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+index 2327335cce6d8f258428a22e851d938a40d58c60..e2bb73803cdafb187af361d3162ca9a5c5211a0d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+@@ -21,6 +21,7 @@ import { initializeSessionAuthorityRegistry } from "./session-authority-registry
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
++import { writeNativeGoldfishStopOutcome } from "./native-goldfish-stop-outcome.mjs";
+ 
+ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+ const FILES = ["change", "second", "third", "fourth"];
+@@ -115,9 +116,9 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sy
+   // C19K-W246 (A): mode "early" stops without waiting for the other and marks its host commit; mode "late" starts its terminal preparation (on the repository the
+   // finalizer inspected before) only once the early stop has finished (its host commit moved HEAD), so it holds a repository inspected before that commit. Waiting for the early stop's own post-commit writes keeps this case off the separate authority-terminal-release race (see the notes).
+   const prepareTerminal = mode === "late" || mode === "late-sim" ? `args=>{wait(join(dir,${mode === "late" ? "'out-'+other+'.json'" : "'committed-'+other"}),60000);return prepareNativeGoldfishAuthorityTerminal(args);}`
+-    : mode === "early" ? `args=>prepareNativeGoldfishAuthorityTerminal(args)`
++    : mode === "early" || mode === "fail-after-commit" ? `args=>prepareNativeGoldfishAuthorityTerminal(args)`
+     : `args=>{const done=prepareNativeGoldfishAuthorityTerminal(args);writeFileSync(join(dir,'prepared-'+tag),'1');wait(join(dir,'prepared-'+other),60000);return done;}`;
+-  const commit = mode === "early" ? `request=>{const landed=commitAdmittedNativeGoldfishReturn(request);writeFileSync(join(dir,'committed-'+tag),'1');return landed;}`
++  const commit = mode === "early" || mode === "fail-after-commit" ? `request=>{const landed=commitAdmittedNativeGoldfishReturn(request);writeFileSync(join(dir,'committed-'+tag),'1');return landed;}`
+     : `request=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,300);return commitAdmittedNativeGoldfishReturn(request);}`;
+   const url = (name) => JSON.stringify(new URL(name, import.meta.url).href);
+   const script = `import {existsSync,readFileSync,writeFileSync} from 'node:fs';import {join} from 'node:path';`
+@@ -126,6 +127,7 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sy
+     + `import {prepareNativeGoldfishHostState,prepareNativeGoldfishAuthorityTerminal} from ${url("./native-goldfish-host-state.mjs")};`
+     + `import {finalizeNativeGoldfishHostReturn} from ${url("./native-goldfish-host-finalizer.mjs")};`
+     + `import {commitAdmittedNativeGoldfishReturn} from ${url("./agy-host-commit-execution.mjs")};`
++    + `import {writeNativeGoldfishStopOutcome} from ${url("./native-goldfish-stop-outcome.mjs")};`
+     + `const root=${JSON.stringify(root)},dir=${JSON.stringify(dir)},tag=${JSON.stringify(tag)},other=${JSON.stringify(other)};`
+     + `const wait=(path,ms)=>{const until=Date.now()+ms;while(!existsSync(path)&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5);};`
+     + `const lead=tag.slice(0,-1)+'0';` // the first stop of a round ("t0", or "r2t0" in a later round) creates its runtime first
+@@ -137,7 +139,11 @@ function stopChild({ root, tag, dir, other, launchPath, returnedPath, mode = "sy
+     + `writeFileSync(join(dir,'admitted-'+tag),'1');wait(join(dir,'go'),120000);`
+     + `result=runtime.run(()=>finalizeNativeGoldfishHostReturn({root,runner:'claude',input:returned},{`
+     + `prepareTerminal:${prepareTerminal},`
++    // K-34: "fail-after-commit" fails right after its host commit where Glossover's platform stop did (the record draft refuses with the
++    // K-29 code), so it never writes the lineage proof, and then writes its stop outcome the way the hook's last step does.
++    + (mode === "fail-after-commit" ? `draftRecord:()=>({ok:false,code:'NGHF-CRITIC-PATH-DISPOSITION'}),` : "")
+     + `commit:${commit}}));`
++    + (mode === "fail-after-commit" ? `writeNativeGoldfishStopOutcome({commonDir:repository.commonDir,dispatchId:launch.tool_use_id.replace(/^tool-/,''),result:{...result,status:'recovery-required'},message:'fixture'});` : "")
+     + `}catch(error){result={thrown:String(error?.code??error?.message)};}`
+     + `writeFileSync(join(dir,'out-'+tag+'.json'),JSON.stringify(result));`;
+   return spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "ignore", openSync(join(dir, `stderr-${tag}.log`), "w")] });
+@@ -149,7 +155,7 @@ async function concurrentPair(root, launches, round = "", { staged = false } = {
+   const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), tags = launches.map((_, index) => `${round}t${index}`);
+   const children = launches.map((one, index) => {
+     writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
+-    return stopChild({ root, tag: tags[index], dir, other: tags[(index + 1) % tags.length], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? "early" : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
++    return stopChild({ root, tag: tags[index], dir, other: tags[(index + 1) % tags.length], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? (staged === "sibling-fails" ? "fail-after-commit" : "early") : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
+   });
+   const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
+   try {
+@@ -448,6 +454,24 @@ const cases = [
+     assert.deepEqual([...chain].sort(), results.map((result) => result.commit).sort(), "the three host commits are exactly the new history");
+     assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after the three stops");
+   }) },
++  { id: "NGSP9F", name: "K-34: a sibling stop that made its host commit and then failed leaves no lineage proof; the next stop refuses at once by name (sibling and commit) instead of waiting out its settle budget, and commits nothing", run: () => fixture(async ({ root }) => {
++    // Two real stops in their own processes, as in Glossover's run: the first commits and then fails after the commit (its platform stop
++    // did with the K-29 code), writes its stop outcome and never writes the lineage proof; the second starts its terminal preparation only then.
++    const { launch, original } = setup(root, { ownRuntime: false });
++    const first = launch(0), started = Date.now();
++    const [failed, second] = await concurrentPair(root, [first, launch(1)], "", { staged: "sibling-fails" });
++    const elapsed = Date.now() - started;
++    assert.notEqual(failed.status, "authored-commit-recorded", JSON.stringify(failed));
++    assert.match(String(failed.commit), /^[0-9a-f]{40}$/u, `the first stop made its host commit before it failed: ${JSON.stringify(failed)}`);
++    assert.equal(git(root, "rev-parse", `${failed.commit}^`), original.candidate.commit);
++    assert.equal(second.code, "NGHF-COMMIT-EXCEPTION", JSON.stringify(second));
++    assert.equal(second.detail?.reason, "native-concurrent-sibling-commit-unrecorded", JSON.stringify(second));
++    assert.equal(git(root, "rev-parse", "HEAD"), failed.commit, "the second stop committed nothing");
++    assert.ok(elapsed < 60000, `refused without waiting out the settle budget (${elapsed} ms for the whole pair)`);
++    const message = nativeGoldfishHookMessage(second, { root });
++    assert.match(message, new RegExp(`host commit of ${first.id} \\(host commit ${failed.commit.slice(0, 12)}\\)`), message);
++    assert.match(message, /Recover that sibling first/u, message);
++  }) },
+ ];
+ 
+ const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

@@ -1,0 +1,239 @@
+diff --git a/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md b/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md
+index fa10f29fcf120140dd365612c6275050821704b1..265dd872b44da8d82a35ead0bf0444f101f56ab0 100644
+--- a/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md
++++ b/docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md
+@@ -26,6 +26,7 @@ In the 28d test round a consumer had to change its verify command (it failed on
+ 
+ - A verify command change during implementation is three steps: the replace call (test run, then the signing request), the PO's one signature, and the replace call again, then the printed commit.
+ - `po-human-approval.mjs` knows the kind (`prepare-critical`/`authorize-critical` without `--subject`; the subject is derived).
+-- The lifecycle guard needs no change (it does not list `pipeline-state.mjs` flags). The gate-strength refusal for `GS-10`/`GS-11` and the configured-tier refusal of `configure-verify` now name the `--replace` route, so an agent is no longer sent to two overrides for a verify-command change.
+-- The approval mode is bound into the PO-gate authority at plan approval: switching `gates.human_approval` after the plan was approved makes the transition refuse (`CVCT-AUTHORITY-STALE`), for this route as for a first configuration. The round-trip suite therefore runs the signature leg on a chat-approved fixture through a test seam (`criticalProofWaiverForFn`); the proof, store, transition and readback it exercises are the production code.
++- The lifecycle guard needs no change (it does not list `pipeline-state.mjs` flags in the ready lane). Measured 2026-11-14 on the installed 29c guard: the replace call shape runs (the 29c script itself then refuses the unknown flag), and `git add -- project/pipeline.json .claude/pipeline.json` is admitted (the gate-strength shell lane admits `git add` by its allowlist). The pre-commit hook admits the staged mirrors through the transition check, and its "commit them alone" repair recognises a ready replacement too. The gate-strength refusal for `GS-10`/`GS-11` and the configured-tier refusal of `configure-verify` now name the `--replace` route, so an agent is no longer sent to two overrides for a verify-command change.
++- The approval mode is bound into the PO-gate authority at plan approval: switching `gates.human_approval` after the plan was approved makes the transition refuse (`CVCT-AUTHORITY-STALE`), for this route as for a first configuration. The round-trip suite therefore runs the signature leg on a chat-approved fixture through a test seam (`forceStrictCriticalProof`, which can only force the strict proof path, never waive one); the proof, store, transition and readback it exercises are the production code.
++- The commit hook and the close readback count a record's `replacement` member only when this device's store holds the approval of exactly that subject digest and proof digest; signed or unsigned therefore follows the stored approval, not the record's own mode word.
+ - Not covered: replacing `verifyImpact` commands; a replace outside the implementing lifecycle; the Critic template naming the proof kind (it would need a re-pin, a PO decision).
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+index 09f087593e259d13f1522c0279ce5b4354e75c89..12236a8218a2c36ecbb58bf9d44bd81bd3f2ef53 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+@@ -17,6 +17,8 @@ import { assertPrivateRegularFile, writePrivateFileNoReplaceAtomic } from "./pri
+ import { parseStrictJson } from "./governance-event.mjs";
+ import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
++import { readPrivateApprovals } from "./critical-action-authorization.mjs";
++import { VERIFY_REPLACEMENT_KIND } from "./critical-action-approval-request.mjs";
+ 
+ const PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
+ const SCHEMA = "pipeline.calibration-verify-commit-transition.v1";
+@@ -219,6 +221,15 @@ function validReplacement(value) {
+     && ["signature", "chat-attributed-unattested"].includes(value.mode) && (value.mode === "signature") === (value.proofSha256 !== null);
+ }
+ 
++/** ADR-0100: a record's replacement member counts only when this device's store holds the approval of exactly that subject and proof. */
++export function replacementApprovalStored(commonDir, replacement) {
++  if (!validReplacement(replacement)) return false;
++  let envelopes = [];
++  try { envelopes = readPrivateApprovals(commonDir, VERIFY_REPLACEMENT_KIND); } catch { envelopes = []; }
++  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === replacement.subjectSha256
++    && (typeof envelope.approval.criticalProof?.proofSha256 === "string" ? envelope.approval.criticalProof.proofSha256 : null) === replacement.proofSha256);
++}
++
+ function transition(repo, currentApproval, command, statePostSha256 = null, replacement = null) {
+   if (classifyVerifyCommand(command) !== "configured" || typeof command !== "string" || Buffer.byteLength(command) > 32_768 || /[\r\n\0]/u.test(command)) fail("CVCT-COMMAND");
+   const before = committedCalibrationPaths(repo).map((path) => twinAt(repo, path, "HEAD"));
+@@ -249,7 +260,7 @@ function replacementMembers(repo, command, previousCommand) {
+     let record; try { record = readRecord(repo, join(repo.directory, name)); } catch { continue; }
+     const facts = record.facts;
+     if (facts?.head !== repo.head || facts.tree !== repo.tree || facts.verifyCommand !== command || !validReplacement(facts.replacement)
+-      || facts.replacement.previousCommand !== previousCommand) continue;
++      || facts.replacement.previousCommand !== previousCommand || !replacementApprovalStored(repo.common, facts.replacement)) continue;
+     if (!members.some((member) => same(member, facts.replacement))) members.push(facts.replacement);
+   }
+   return members;
+@@ -464,8 +475,11 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths
+ export function inspectCurrentCalibrationVerifyReady({rootDir,verifyCommand}={}) {
+   try {
+     const repo=repository(rootDir),currentApproval=approval(repo);
+-    const candidates=[transition(repo,currentApproval,verifyCommand),
+-      transition(repo,currentApproval,verifyCommand,currentApproval.stateSha256)];
++    // ADR-0100: under a configured committed command only a ready replacement of this HEAD (its approval stored) is a candidate.
++    const committedVerify=twinAt(repo,committedCalibrationPaths(repo)[0],"HEAD").value.verify;
++    const candidates=classifyVerifyCommand(committedVerify)==="configured"
++      ? replacementMembers(repo,verifyCommand,committedVerify).map(member=>transition(repo,currentApproval,verifyCommand,null,member))
++      : [transition(repo,currentApproval,verifyCommand),transition(repo,currentApproval,verifyCommand,currentApproval.stateSha256)];
+     const facts=candidates.find(value=>existsSync(recordPath(repo,value.id,"ready")));
+     if(!facts || existsSync(join(repo.directory,"transition.lock"))) fail("CVCT-RECORD");
+     if(!same(readRecord(repo,recordPath(repo,facts.id,"ready")),{schema:SCHEMA,phase:"ready",facts})) fail("CVCT-RECORD");
+diff --git a/plugins/pipeline-core/lib/gate-definition-changes.mjs b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+index 87f42a3a0ed81cb10b2484bad62ff3a88bf8e039..af7b5515af72f73200ebffa3b6a8c1b39d62230d 100644
+--- a/plugins/pipeline-core/lib/gate-definition-changes.mjs
++++ b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+@@ -159,16 +159,23 @@ function readConfigureVerifyReady(commonDir) {
+     const replacement = object(value.facts.replacement) ? value.facts.replacement : null;
+     records.push({ id: name.slice(0, 64), head: value.facts.head, entries: value.facts.entries, replacement,
+       // ADR-0100: a replacement counts only with its approval in the store, never by the record's own word.
+-      replacementApproved: replacement !== null && replacementApprovalStored(commonDir, replacement.subjectSha256) });
++      replacementApproved: replacement !== null && replacementApprovalStored(commonDir, replacement) });
+   }
+   return records;
+ }
+ 
+-function replacementApprovalStored(commonDir, subjectSha256) {
+-  if (typeof subjectSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(subjectSha256)) return false;
++// The same rule as calibration-verify-commit-transition.mjs replacementApprovalStored (kept local: that module imports pipeline-state.mjs,
++// which imports this one). The stored approval must match the subject AND the proof digest, so the signed/unsigned label below follows
++// the approval, never the record's own mode word.
++function replacementApprovalStored(commonDir, replacement) {
++  const hex = /^[a-f0-9]{64}$/u;
++  if (typeof replacement.subjectSha256 !== "string" || !hex.test(replacement.subjectSha256)
++    || !(replacement.proofSha256 === null || (typeof replacement.proofSha256 === "string" && hex.test(replacement.proofSha256)))
++    || (replacement.mode === "signature") !== (replacement.proofSha256 !== null)) return false;
+   let envelopes = [];
+   try { envelopes = readPrivateApprovals(commonDir, VERIFY_REPLACEMENT_KIND); } catch { envelopes = []; }
+-  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === subjectSha256);
++  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === replacement.subjectSha256
++    && (typeof envelope.approval.criticalProof?.proofSha256 === "string" ? envelope.approval.criticalProof.proofSha256 : null) === replacement.proofSha256);
+ }
+ 
+ function trustAnchorShape(bytes) {
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.test.mjs b/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
+index 09c563d2fff3f29c53fa3704aa82b9d3b43f02a4..a882471d5b2c8ef312390335e8cfad1f87a3d4bd 100644
+--- a/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/maintenance-delivery.test.mjs
+@@ -179,3 +179,19 @@ test("green after the delivery: the close needs a sealed green configured-verify
+     "for the side candidate only its own green counts, never the main line's");
+   assert.equal(greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: base }), null, "a candidate that contains no green commit after the base");
+ });
++
++test("ADR-0100 Decision 6: a green receipt made after the verify command was replaced does not repair the red configured check", () => {
++  const r = repo();
++  const calibration = (verify) => `${JSON.stringify({ project: "fixture", verify }, null, 2)}\n`;
++  r.put("project/pipeline.json", calibration("node --test tests/old.test.mjs")); const base = r.commit("chore: red base", ["project/pipeline.json"]);
++  r.put("project/pipeline.json", calibration("node --test tests/new.test.mjs")); const replaced = r.commit("chore: replace project verification command", ["project/pipeline.json"]);
++  const replacedTree = r.git("rev-parse", "HEAD^{tree}");
++  const slices = [{ id: "MAINT-1", state: "ready", delivery: { maintenance: { schema: MAINTENANCE_BINDING_SCHEMA }, baseCommit: base, checks: [configuredCheck] } }];
++  receipt(r, { suite: "configured-verify", commit: replaced, tree: replacedTree, exitCode: 0, runId: "run-1-green-under-new-command" });
++  assert.deepEqual(maintenanceSlicesLackingGreenVerify({ commonDir: r.common, root: r.dir, slices, candidateCommit: replaced }), ["MAINT-1"],
++    "green under another command is no repair of the check that was red");
++  r.put("project/pipeline.json", calibration("node --test tests/old.test.mjs")); r.put("tests/old.test.mjs", "fixed\n");
++  const repaired = r.commit("test: repair under the base command", ["project/pipeline.json", "tests/old.test.mjs"]);
++  receipt(r, { suite: "configured-verify", commit: repaired, tree: r.git("rev-parse", "HEAD^{tree}"), exitCode: 0, runId: "run-2-green-under-base-command" });
++  assert.equal(greenAfterDeliveryReceipt({ commonDir: r.common, root: r.dir, check: configuredCheck, baseCommit: base, candidateCommit: repaired })?.runId, "run-2-green-under-base-command");
++});
+diff --git a/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs b/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
+index 9a60533d24fbfd70da10dabcfca804170f9cd5a2..2e307791129ff41ff5a15156b61d20b72eaf86e5 100644
+--- a/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
++++ b/plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs
+@@ -29,7 +29,7 @@
+ import assert from "node:assert/strict";
+ import { createHash, createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test, { after } from "node:test";
+@@ -48,6 +48,9 @@ import { buildReleasePreflight, prepareReleasePreflightAuthorizeLine } from "./r
+ import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+ import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+ import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { inspectCalibrationVerifyCommitTransition, inspectCurrentCalibrationVerifyReady } from "../lib/calibration-verify-commit-transition.mjs";
++import { criticalApprovalStoreRoot } from "../lib/critical-action-authorization.mjs";
++import { buildVerifyReplacementSubject, runVerifyReplacementTestRun } from "../lib/verify-replacement.mjs";
+ 
+ /* ---------------------------------------------------------------------------------------------- *
+  * Fixtures
+@@ -629,7 +632,7 @@ test("ADR-0097 consumer leg: acknowledge-maintenance-red-check -- the line appro
+ // The fixture's plan is approved in the committed chat mode (a signed plan approval has no affordable fixture, and switching the mode
+ // afterwards makes the PO-gate authority stale, CVCT-AUTHORITY-STALE, by design). The signature leg therefore selects the strict proof
+ // path through the route's waiver seam; everything after it -- proof, store, transition, readback -- is the production code.
+-const SIGNATURE_MODE = Object.freeze({ criticalProofWaiverForFn: () => ({ waived: false, code: null }) });
++const SIGNATURE_MODE = Object.freeze({ forceStrictCriticalProof: true });
+ function verifyReplacementRepository() {
+   const root = mkdtempSync(join(nativeContractFixtureParent(), "verify-replace-"));
+   prepareApprovedItemCourseFixture({ root });
+@@ -678,7 +681,21 @@ test("ADR-0100 consumer leg: replace-verify-command -- configure-verify --replac
+   const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: stateDependencies });
+   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+ 
+-  // 4. Committed, the close's readback counts both tier changes as the signed replacement (no label: it is signed).
++  // 4. Staged, the pre-commit hook's own predicate admits exactly the two mirrors -- and only while the stored approval backs the record.
++  gitOut(fixture.root, "add", "--", "project/pipeline.json", ".claude/pipeline.json");
++  const staged = ["project/pipeline.json", ".claude/pipeline.json"];
++  const admitted = inspectCalibrationVerifyCommitTransition({ rootDir: fixture.root, stagedPaths: staged });
++  assert.deepEqual([admitted.ok, admitted.code, [...(admitted.paths ?? [])].sort()], [true, "CVCT-COMMIT-READY", [".claude/pipeline.json", "project/pipeline.json"]], JSON.stringify(admitted));
++  // The hook's "commit them alone" repair (other paths staged with the mirrors) recognises the ready replacement too.
++  const alone = inspectCurrentCalibrationVerifyReady({ rootDir: fixture.root, verifyCommand: REPLACED_VERIFY });
++  assert.deepEqual([alone.ok, alone.code], [true, "CVCT-COMMIT-READY"], JSON.stringify(alone));
++  const store = join(criticalApprovalStoreRoot(fixture.common), "approvals", "replace-verify-command");
++  renameSync(store, `${store}.aside`);
++  const unbacked = inspectCalibrationVerifyCommitTransition({ rootDir: fixture.root, stagedPaths: staged });
++  assert.deepEqual([unbacked.ok, unbacked.code], [false, "CVCT-RECORD"], "a ready record without its stored approval admits nothing");
++  renameSync(`${store}.aside`, store);
++
++  // 5. Committed, the close's readback counts both tier changes as the signed replacement (no label: it is signed).
+   commitFiles(fixture.root, { "project/pipeline.json": readFileSync(join(fixture.root, "project/pipeline.json"), "utf8"), ".claude/pipeline.json": readFileSync(join(fixture.root, ".claude/pipeline.json"), "utf8") }, "chore: replace project verification command");
+   const replacedAt = gitOut(fixture.root, "rev-parse", "HEAD");
+   const readback = gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: "unit", commonDir: fixture.common });
+@@ -720,6 +737,32 @@ test("ADR-0100: a red new command signs nothing and writes nothing; the default
+   const same = runPipelineStateVerb(["configure-verify", "--verify-command", previous[0], "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+   assert.equal(same.code, 2);
+   assert.match(same.stderr, /CVR-SAME-COMMAND/u);
++  assert.match(plain.stderr, /--replace/u, "the configured-tier refusal names the replace route");
++
++  // A command that leaves a new file behind changed the tree: refused, and no receipt is written for it.
++  const drifting = runPipelineStateVerb(["configure-verify", "--verify-command", "node -e \"require('fs').writeFileSync('drift.txt','x')\"", "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
++  assert.equal(drifting.code, 2, describeRun(drifting));
++  assert.match(drifting.stderr, /CVR-TEST-RUN-DRIFT/u);
++  assert.ok(!drifting.stdout.includes("signature-required"));
++  rmSync(join(fixture.root, "drift.txt"), { force: true });
++
++  // A tracked change refuses before the command runs.
++  const notePath = join(fixture.root, "src/change.mjs");
++  const original = readFileSync(notePath, "utf8");
++  writeFileSync(notePath, `${original}// dirty\n`);
++  const dirty = runPipelineStateVerb(["configure-verify", "--verify-command", REPLACED_VERIFY, "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
++  assert.equal(dirty.code, 2, describeRun(dirty));
++  assert.match(dirty.stderr, /CVR-DIRTY/u);
++  assert.doesNotMatch(dirty.stderr, /running the new command once/u, "nothing runs on a dirty tree");
++  writeFileSync(notePath, original);
++
++  // A passing run binds its HEAD: after HEAD moves, the old receipt names no subject.
++  const passed = runVerifyReplacementTestRun({ root: fixture.root, commonDir: fixture.common, verifyCommand: REPLACED_VERIFY });
++  assert.equal(passed.ok, true, JSON.stringify(passed));
++  assert.equal(buildVerifyReplacementSubject({ root: fixture.root, commonDir: fixture.common, verifyCommand: REPLACED_VERIFY }).ok, true);
++  commitFiles(fixture.root, { "notes.md": "moves HEAD\n" }, "docs: a later commit");
++  assert.equal(buildVerifyReplacementSubject({ root: fixture.root, commonDir: fixture.common, verifyCommand: REPLACED_VERIFY }).code, "CVR-TEST-RUN-REQUIRED",
++    "a receipt of another HEAD is not accepted");
+ });
+ 
+ test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index bb510a2adc34220625bc19591189c7084480adea..f76a2f72214a9abdadc71e79634c4b13ebf5ddc1 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -10451,8 +10451,9 @@ function runConfigureVerifyReplace({ dir, rest, base, now, deps }) {
+   const kind = VERIFY_REPLACEMENT_KIND;
+   const refuse = (code, detail = "") => { console.error(`Error: configure-verify --replace refused (${code}).${detail ? ` ${detail}` : ""}${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
+   // The seam lets the signature leg run on an approved fixture whose plan was approved in chat mode (a later mode switch makes the
+-  // PO-gate authority stale, CVCT-AUTHORITY-STALE, by design); production always reads the committed mode.
+-  const waiverFor = deps.criticalProofWaiverForFn ?? criticalProofWaiverFor;
++  // PO-gate authority stale, CVCT-AUTHORITY-STALE, by design). It can only force the strict proof path, never waive one; production
++  // always reads the committed mode.
++  const waiverFor = deps.forceStrictCriticalProof === true ? () => ({ waived: false, code: null }) : criticalProofWaiverFor;
+   const configured = waiverFor(dir, kind);
+   if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
+   const waived = configured.waived === true;
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index ccdcd8eed069bc3b6b4d2bb88315a65c185576d8..1ee0f6f405269584cf2628514119c3b67036da32 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -1217,7 +1217,7 @@ async function main() {
+       process.stderr.write([
+         "BLOCKED (agent-pipeline pre-commit hook): the verification tiers " + readyPaths.join(", ") + " are admitted without any human step, but only as their own commit; " + otherStaged.length + " other path(s) are staged with them.",
+         "Repair (agent, no PO step): git restore --staged -- " + otherStaged.join(" "),
+-        "then commit with git commit -F and a message file under scratch/: subject chore: configure project verification, a blank line, then the trailer lines AI-Assisted: true and Dispatch: stage-0 (elephant)   (exactly " + readyPaths.join(" ") + " staged)",
++        "then commit with git commit -F and a message file under scratch/: subject chore: configure project verification (chore: replace project verification command when configure-verify --replace wrote them), a blank line, then the trailer lines AI-Assisted: true and Dispatch: stage-0 (elephant)   (exactly " + readyPaths.join(" ") + " staged)",
+         "then stage and commit the other path(s) in a separate commit. No human-guard-override signature is needed for this.",
+       ].join("\\n") + "\\n");
+       process.exitCode = 1;

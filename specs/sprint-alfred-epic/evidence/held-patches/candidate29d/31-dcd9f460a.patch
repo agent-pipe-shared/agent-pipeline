@@ -1,0 +1,82 @@
+diff --git a/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md b/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md
+index 4893303bda9cbed9b00886c3fb1a7b61ce7d98da..a83f55c616b4ee6542e35db937c0b33a1cd83473 100644
+--- a/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md
++++ b/docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md
+@@ -10,7 +10,7 @@
+ 
+ An Antigravity code-writing child runs in its own git worktree on a `subagent-<...>` branch, cut from the parent's committed HEAD. Its commits land in the shared object database. Nothing is merged back. The take-over route (`agy-native-integrate.mjs`, candidate 20, C28C) applies the branch's net change to the Elephant's working tree. The recovery route then makes one new commit, `Commit-Act: orchestrator`, and writes an `orchestrator-attested` dispatch record.
+ 
+-In the test run the Elephant harvested several branches by hand. The Critic noted as a minor that the landed commit was the orchestrator's, not the child's. The child's commits, its authorship and its own `Dispatch:` trailers were dropped. The D40b commit scan already counts a Goldfish's own commit with the exact trailer as integrated, so nothing beyond keeping those commits is needed.
++In the test run the Elephant harvested several branches by hand. The Critic noted as a minor that the landed commit was the orchestrator's, not the child's. The child's commits, its authorship and its own `Dispatch:` trailers were dropped. The D40b commit scan counts a Goldfish's own commit as integrated when its `Dispatch:` trailer names the slice id. The generated briefing makes the slice id the dispatch id (self-check DBG-SELFCHECK-SLICE), so for a briefed slice keeping those commits is enough; a hand-written briefing with a different id gets no such release.
+ 
+ ## Decision
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 3b0dd6b2e0a102dac6d00a4c2cd76a611258502c..4ea1fb5001dab3788d5de4a9caa95b88499c3562 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -576,7 +576,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+     const terminalAssociation = writeNativeGoldfishAttemptTerminalAssociation({ repoRoot: physical, record: drafted.record, attempt });
+     postCommitStage = "authority-terminal-release";
+     const delivery=publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record:drafted.record,lockWait:dependencies.lockWait??null});
+-    const deliveryResult = state.delivery?{...delivery,pendingSha256:pending.sha256}:null;
++    // C29 K-38: the briefed slice id rides along, so the stop outcome states which slice the commit evidence releases instead of assuming it.
++    const deliveryResult = state.delivery?{...delivery,pendingSha256:pending.sha256,...(typeof state.delivery.sliceId==='string'?{sliceId:state.delivery.sliceId}:{})}:null;
+     let checks = null;
+     if (deliveryResult?.checkStatus) {
+       postCommitStage = "checks-publication";
+diff --git a/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs b/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
+index 8e023fb3ecb83e81947c719c749f2ed501994bad..00ca0a99318d3334dd3e287b851bff64d1f3adf8 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
+@@ -23,7 +23,8 @@ export function writeNativeGoldfishStopOutcome({ commonDir, dispatchId, result,
+       integration: result?.integration?.status ?? null,
+       // C29 K-38 (Glossover): a refused integration named no code, so the waiter could not say why or whether a step was needed.
+       integrationCode: typeof result?.integration?.code === "string" ? result.integration.code.slice(0, 120) : null,
+-      integrationReason: typeof result?.integration?.reason === "string" ? result.integration.reason.slice(0, 300) : null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
++      integrationReason: typeof result?.integration?.reason === "string" ? result.integration.reason.slice(0, 300) : null,
++      sliceId: typeof result?.delivery?.sliceId === "string" ? result.delivery.sliceId.slice(0, 128) : null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
+     renameSync(temporary, path);
+     return true;
+   } catch { return false; }
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.mjs b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+index 809afba74d2d8c526a4e54c597c20ab8b4f1cab3..d5a5276c3247617728b24ea647f25170f14bb028 100644
+--- a/plugins/pipeline-core/scripts/wait-host-commit.mjs
++++ b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+@@ -32,8 +32,14 @@ function fromOutcome(outcome, waitedSeconds) {
+     // C29 K-38 (Glossover): a refused Main integration names its code and reason, and what it means. The host commit is in; the commit
+     // evidence (D40) counts the slice as integrated for its dependents when the commit's Dispatch trailer names the slice id. Nothing is re-run.
+     const refused = outcome.integration === "refused";
+-    const integrationDetail = refused ? { integrationCode: outcome.integrationCode ?? null, integrationReason: outcome.integrationReason ?? null } : {};
+-    const note = refused ? ` The stop's Main integration step was refused (${outcome.integrationCode ?? "no code recorded"}${outcome.integrationReason ? `: ${outcome.integrationReason}` : ""}). The delivery itself is committed; do not re-dispatch it. Its dependents are released by the commit evidence when the commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names the slice id (the usual case). Read slice-queue next: if a dependent still lists this slice as held, report that refusal.` : "";
++    const integrationDetail = refused ? { integrationCode: outcome.integrationCode ?? null, integrationReason: outcome.integrationReason ?? null, sliceId: outcome.sliceId ?? null } : {};
++    // The stop records the briefed slice id; the generated briefing makes it the dispatch id (DBG-SELFCHECK-SLICE), so the trailer names it.
++    const release = typeof outcome.sliceId !== "string"
++      ? `Its dependents are released by the commit evidence when the commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names the slice id; the stop recorded no slice id. Read slice-queue next: if a dependent still lists this slice as held, report that refusal.`
++      : outcome.sliceId === outcome.dispatchId
++        ? `The commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names slice ${outcome.sliceId}, so the commit evidence releases its dependents. Read slice-queue next to continue.`
++        : `The commit's trailer names ${outcome.dispatchId} but the slice is ${outcome.sliceId}, so the commit evidence does not release its dependents. Report this refusal; do not integrate by hand.`;
++    const note = refused ? ` The stop's Main integration step was refused (${outcome.integrationCode ?? "no code recorded"}${outcome.integrationReason ? `: ${outcome.integrationReason}` : ""}). The delivery itself is committed; do not re-dispatch it. ${release}` : "";
+     return { exitCode: 0, result: { ...common, status: "committed", commit: outcome.commit, integration: outcome.integration, ...integrationDetail, message: `The host commit is in and the stop has finished.${note} ${CONTINUE}` } };
+   }
+   // A continued child gets no new launch notice, and this record stays on disk: the next wait must start after it or it would answer "checkpoint" again before the real stop.
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+index 49049ffbbc027452617d93a73317fde036fab0de..f76ce149c7b00808675918a9a0f8a49d2a3b5fab 100644
+--- a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
++++ b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+@@ -39,6 +39,15 @@ test("C29 K-38: a refused Main integration names its code and reason and says th
+   assert.match(result.message, /refused \(SDC-AUTHORITY-CAS: reference-preimage-changed\)/u);
+   assert.match(result.message, /do not re-dispatch/u);
+   assert.match(result.message, /Dispatch: fix-1 \(goldfish\)/u);
++  assert.match(result.message, /the stop recorded no slice id/u, "without a recorded slice id the release stays conditional");
++  // With the recorded slice id the message states the fact: the same id releases the dependents, a different one does not.
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-3", result: { ...refused, delivery: { pendingSha256: "a".repeat(64), sliceId: "fix-3" } }, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
++  const same = waitForHostCommit({ root: "unused", dispatch: "fix-3", after: AFTER }, { commonDir, ...clock() }).result;
++  assert.equal(same.sliceId, "fix-3");
++  assert.match(same.message, /names slice fix-3, so the commit evidence releases its dependents/u);
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-4", result: { ...refused, delivery: { pendingSha256: "a".repeat(64), sliceId: "ITEM-B" } }, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
++  const other = waitForHostCommit({ root: "unused", dispatch: "fix-4", after: AFTER }, { commonDir, ...clock() }).result;
++  assert.match(other.message, /names fix-4 but the slice is ITEM-B, so the commit evidence does not release its dependents/u);
+   // An integrated stop carries no integration detail and no note.
+   writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-2", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
+   const clean = waitForHostCommit({ root: "unused", dispatch: "fix-2", after: AFTER }, { commonDir, ...clock() }).result;

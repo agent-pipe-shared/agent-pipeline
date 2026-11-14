@@ -1,0 +1,134 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 1578daff886775e23af23d4b9494d3fdb00ae159..e4ffcf8e3b602a0ed8567e252b4bc384610dab67 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -2103,9 +2103,27 @@ export function requalifyNativeGoldfishItemDelivery(input={}) {
+   }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-REQUALIFICATION-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}
+ }
+ 
++/** C29 K-38 (Glossover, parallel run 2026-11-14): the stop's integration ran once, so a sibling stop writing the registry at the same moment
++ * (SDC-AUTHORITY-CAS, a held lock, or one of the sibling races the terminal release already retries) left a delivered item "integration refused".
++ * Those refusals are now repeated on a fresh boundary, as the terminal release does: at least NATIVE_BOUNDARY_REBIND_LIMIT rounds and further
++ * rounds while the stop's wait budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned. */
++export const NATIVE_INTEGRATION_RETRY_CODES=Object.freeze(['SDC-AUTHORITY-CAS','SDC-LOCK-HELD']);
++export function integrationRefusalIsSiblingRace(result){
++  return result?.status==='refused'&&(NATIVE_INTEGRATION_RETRY_CODES.includes(result.code)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason));
++}
++export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=nativeStopWaitBudgetMs(),now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
++  const start=now();
++  for(let attempt=1;;attempt+=1){
++    const result=once(args);
++    if(!integrationRefusalIsSiblingRace(result))return result;
++    const wait=Math.min(100*attempt,1000);
++    if(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs)return {...result,attempts:attempt};
++    pause(wait);
++  }
++}
+ /** Elephant integration acknowledgement only after Source-bound targeted
+  * delivery and Main ancestry/content readback. It never executes ordinary tests. */
+-export function integrateNativeGoldfishItemDelivery({root,pendingSha256}={}) {
++function integrateNativeGoldfishItemDeliveryOnce({root,pendingSha256}={}) {
+   try {
+     if(!SHA.test(pendingSha256??''))throw nativeManagedFault('native-item-pending-selector');
+     const repository=inspectSignedDescriptorCustodyRepository(root),owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 4b090873cf79f250f7f08acb896dc9663393aa5a..0e593b88f4e8d782d32879ca010c2fd6e8978244 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -2035,6 +2035,29 @@ const cases = [
+     assert.equal(stopped.status, "authored-commit-recorded", JSON.stringify(stopped));
+   }) },
+ 
++  { id: "NGHS73", name: "C29 K-38: the stop's integration repeats a sibling race (CAS, held lock, terminal sibling race) on a fresh boundary within its budget and returns every other refusal at once", run: () => {
++    // Glossover 2026-11-14: a parallel stop's integration came back SDC-AUTHORITY-CAS once and was never repeated, so a delivered item stayed unintegrated.
++    const clock = () => { let t = 0; return { now: () => t, pause: (ms) => { t += ms; } }; };
++    const scripted = (results) => { const calls = []; return { calls, once: (args) => { calls.push(args); return results[Math.min(calls.length - 1, results.length - 1)]; } }; };
++    const cas = { status: "refused", code: "SDC-AUTHORITY-CAS", reason: "reference-preimage-changed" };
++    const integrated = { status: "integrated", code: "NGHS-ITEM-INTEGRATED" };
++    const twice = scripted([cas, { status: "refused", code: "SDC-LOCK-HELD", reason: "registry-lock-held" }, { status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "domain-membership-race" }, integrated]);
++    assert.deepEqual(integrateNativeGoldfishItemDelivery({ root: "r", pendingSha256: "p" }, { once: twice.once, budgetMs: 10_000, ...clock() }), integrated);
++    assert.equal(twice.calls.length, 4);
++    assert.deepEqual(twice.calls[3], { root: "r", pendingSha256: "p" }, "every round runs the same request");
++    const named = scripted([{ status: "refused", code: "NGHS-ITEM-TARGETED-EVIDENCE-REQUIRED", reason: "native-item-targeted-evidence-required" }]);
++    assert.equal(integrateNativeGoldfishItemDelivery({}, { once: named.once, budgetMs: 10_000, ...clock() }).code, "NGHS-ITEM-TARGETED-EVIDENCE-REQUIRED");
++    assert.equal(named.calls.length, 1, "a real refusal is never repeated");
++    const stuck = scripted([cas]);
++    const last = integrateNativeGoldfishItemDelivery({}, { once: stuck.once, budgetMs: 0, ...clock() });
++    assert.equal(last.code, "SDC-AUTHORITY-CAS");
++    assert.equal(stuck.calls.length, 8, "without budget the round bound holds");
++    assert.equal(last.attempts, 8);
++    const budgeted = scripted([cas]);
++    integrateNativeGoldfishItemDelivery({}, { once: budgeted.once, budgetMs: 30_000, ...clock() });
++    assert.ok(budgeted.calls.length > 8, "rounds continue while the budget lasts");
++  } },
++
+ ];
+ 
+ /** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */
+diff --git a/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs b/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
+index 72143b1348772b8452ab0946d63e127573c51067..8e023fb3ecb83e81947c719c749f2ed501994bad 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
+@@ -20,7 +20,10 @@ export function writeNativeGoldfishStopOutcome({ commonDir, dispatchId, result,
+     const path = pathOf(commonDir, dispatchId), temporary = `${path}.tmp`;
+     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+     writeFileSync(temporary, `${JSON.stringify({ schema: SCHEMA, dispatchId, status: result?.status ?? null, code: result?.code ?? null, commit: typeof result?.commit === "string" ? result.commit : null,
+-      integration: result?.integration?.status ?? null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
++      integration: result?.integration?.status ?? null,
++      // C29 K-38 (Glossover): a refused integration named no code, so the waiter could not say why or whether a step was needed.
++      integrationCode: typeof result?.integration?.code === "string" ? result.integration.code.slice(0, 120) : null,
++      integrationReason: typeof result?.integration?.reason === "string" ? result.integration.reason.slice(0, 300) : null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
+     renameSync(temporary, path);
+     return true;
+   } catch { return false; }
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.mjs b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+index 55e4db0c00b1da8f64ed68488429a0ebe6d82ee9..809afba74d2d8c526a4e54c597c20ab8b4f1cab3 100644
+--- a/plugins/pipeline-core/scripts/wait-host-commit.mjs
++++ b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+@@ -28,7 +28,14 @@ const sleep = (ms) => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0
+ 
+ function fromOutcome(outcome, waitedSeconds) {
+   const common = { schema: RESULT_SCHEMA, dispatch: outcome.dispatchId, code: outcome.code, waitedSeconds };
+-  if (outcome.status === "authored-commit-recorded") return { exitCode: 0, result: { ...common, status: "committed", commit: outcome.commit, integration: outcome.integration, message: `The host commit is in and the stop has finished. ${CONTINUE}` } };
++  if (outcome.status === "authored-commit-recorded") {
++    // C29 K-38 (Glossover): a refused Main integration names its code and reason, and what it means. The host commit is in; the commit
++    // evidence (D40) counts the slice as integrated for its dependents when the commit's Dispatch trailer names the slice id. Nothing is re-run.
++    const refused = outcome.integration === "refused";
++    const integrationDetail = refused ? { integrationCode: outcome.integrationCode ?? null, integrationReason: outcome.integrationReason ?? null } : {};
++    const note = refused ? ` The stop's Main integration step was refused (${outcome.integrationCode ?? "no code recorded"}${outcome.integrationReason ? `: ${outcome.integrationReason}` : ""}). The delivery itself is committed; do not re-dispatch it. Its dependents are released by the commit evidence when the commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names the slice id (the usual case). Read slice-queue next: if a dependent still lists this slice as held, report that refusal.` : "";
++    return { exitCode: 0, result: { ...common, status: "committed", commit: outcome.commit, integration: outcome.integration, ...integrationDetail, message: `The host commit is in and the stop has finished.${note} ${CONTINUE}` } };
++  }
+   // A continued child gets no new launch notice, and this record stays on disk: the next wait must start after it or it would answer "checkpoint" again before the real stop.
+   if (outcome.status === "checkpoint-recorded") {
+     const nextAfter = new Date(Date.parse(outcome.observedAt) + 1).toISOString();
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+index c568ded6819649b02bf91c6e282fe85a84f1adbc..49049ffbbc027452617d93a73317fde036fab0de 100644
+--- a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
++++ b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+@@ -26,6 +26,26 @@ test("a finished stop answers at once with its commit and tells the agent to go
+   assert.match(result.message, /same turn/u);
+ }));
+ 
++// C29 K-38 (Glossover): "integration":"refused" came back without a reason, and the Elephant could not tell whether a step was needed.
++test("C29 K-38: a refused Main integration names its code and reason and says the delivery is committed and not re-dispatched", () => inside((commonDir) => {
++  const refused = { ...COMMITTED, integration: { status: "refused", code: "SDC-AUTHORITY-CAS", reason: "reference-preimage-changed" } };
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: refused, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
++  const { exitCode, result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER }, { commonDir, ...clock() });
++  assert.equal(exitCode, 0);
++  assert.equal(result.status, "committed");
++  assert.equal(result.integration, "refused");
++  assert.equal(result.integrationCode, "SDC-AUTHORITY-CAS");
++  assert.equal(result.integrationReason, "reference-preimage-changed");
++  assert.match(result.message, /refused \(SDC-AUTHORITY-CAS: reference-preimage-changed\)/u);
++  assert.match(result.message, /do not re-dispatch/u);
++  assert.match(result.message, /Dispatch: fix-1 \(goldfish\)/u);
++  // An integrated stop carries no integration detail and no note.
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-2", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
++  const clean = waitForHostCommit({ root: "unused", dispatch: "fix-2", after: AFTER }, { commonDir, ...clock() }).result;
++  assert.equal(Object.hasOwn(clean, "integrationCode"), false);
++  assert.doesNotMatch(clean.message, /refused/u);
++}));
++
+ test("a stop that finishes during the wait is seen by the next poll", () => inside((commonDir) => {
+   const ticking = clock();
+   const pause = (ms) => { ticking.pause(ms); if (ticking.now() >= 6_000) writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") }); };

@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index a987c32adc169cbb5801e60908e23bc0946b1aa1..f7b8d2186df0c5c52e900888ac20d0784994a10f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -49,6 +49,14 @@ function initRepo(dir) {
+   const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
+   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+ }
++// A consumer that closes a feature has its Spec folder committed: the close reads the candidate commit (Spec addenda, lapsed Critic
++// findings, maintenance deliveries) and the feature's range from the first commit touching specs/<feature> (ADR-0096). An unborn HEAD
++// or an uncommitted Spec folder fails as CLOSE-GIT or CLOSE-GATE-CHANGE-UNREADABLE before the gate a case means to reach.
++function commitSpecFolder(dir) {
++  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
++  git("add", "--", "specs/feature");
++  git("-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "fixture: approved Spec folder");
++}
+ 
+ function fixture(name = "case", parent = tmpdir()) {
+   const root = mkdtempSync(join(parent, `pipeline-result-bootstrap-${name}-`)); roots.push(root); initRepo(root);
+@@ -56,6 +64,7 @@ function fixture(name = "case", parent = tmpdir()) {
+   writeFileSync(join(root, "specs/feature/prd_feature.md"), "prd\n"); writeFileSync(join(root, "specs/feature/spec.md"), "spec\n");
+   const historical = Buffer.from("# Feature result\n\nExisting canonical Markdown must survive intact.\n", "utf8");
+   writeFileSync(join(root, "specs/feature/result.md"), historical);
++  commitSpecFolder(root);
+   const commonDir = join(root, ".git-common"); mkdirSync(commonDir, { mode: 0o700 });
+   const value = state();
+   value.continuity.authority.prd.sha256 = hash(readFileSync(join(root, "specs/feature/prd_feature.md")));
+@@ -606,7 +615,7 @@ test("N29 anchor: a package whose Result entry has authority:false closes from c
+   // (4) The SAME lifecycle continues: the result, close-request and package gates pass; the next gate is the
+   // candidate-bound Critic/Verify audit every registered package needs (a separate route, not this defect).
+   const proceeds = closeCli(closeArgs, 2);
+-  assert.equal(proceeds.code, "CLOSE-QUALIFICATION-REQUIRED");
++  assert.equal(proceeds.code, "CLOSE-QUALIFICATION-REQUIRED", JSON.stringify(proceeds));
+   assert.equal(closeCli(["inspect", "--root", root, "--lifecycle", lifecycle]).coordinator.phase, "checkpointed");
+ });
+ 

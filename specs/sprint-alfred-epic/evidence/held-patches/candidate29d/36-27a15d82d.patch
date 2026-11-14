@@ -1,0 +1,93 @@
+diff --git a/plugins/pipeline-core/lib/gate-definition-changes.mjs b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+index 5dc7b3d272deb8b328d8eb10df4ade707ce28f2d..87f42a3a0ed81cb10b2484bad62ff3a88bf8e039 100644
+--- a/plugins/pipeline-core/lib/gate-definition-changes.mjs
++++ b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+@@ -14,6 +14,8 @@
+  *   first-appearance        no ancestor of the commit names the path (the commit adds it); free by PO decision
+  *   trust-anchor-bootstrap  GS-2 only: the exact no-anchor -> one-anchor upgrade the pre-commit hook admits
+  *   materialization         GS-17 only: the committed architecture/design-materialization.json of that commit names the blob
++ *   verify-replacement      GS-10/GS-11 only (ADR-0100): such a record that carries a `replacement` member whose approval of kind
++ *                           replace-verify-command is in this device's store; no label when signed, "chat-attributed, not signed" else
+  *   configure-verify        GS-10/GS-11 only: this device's ready configure-verify transition record for that parent and those bytes;
+  *                           labelled "confirmed via runner prompt, not signed" (PO tile)
+  *   human-guard-override    a consumed override capability of this device for the path, authenticated by its MAC, armed at the
+@@ -32,7 +34,7 @@ import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
+ import { join } from "node:path";
+ import { GATE_STRENGTH_FIELD_EXEMPTIONS, GATE_STRENGTH_PATHS, changedGateStrengthDottedPaths } from "../hooks/guard-gate-strength.mjs";
+ import { featureRangeBase } from "./close-commit-split.mjs";
+-import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
++import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND, VERIFY_REPLACEMENT_KIND } from "./critical-action-approval-request.mjs";
+ import { readPrivateApprovals } from "./critical-action-authorization.mjs";
+ import { readConsumedOverrideCapabilities } from "./human-guard-override.mjs";
+ import { parseYaml } from "./yaml-lite.mjs";
+@@ -154,11 +156,21 @@ function readConfigureVerifyReady(commonDir) {
+   for (const name of names) {
+     let value; try { value = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
+     if (value?.schema !== "pipeline.calibration-verify-commit-transition.v1" || value.phase !== "ready" || !object(value.facts) || !Array.isArray(value.facts.entries)) continue;
+-    records.push({ id: name.slice(0, 64), head: value.facts.head, entries: value.facts.entries });
++    const replacement = object(value.facts.replacement) ? value.facts.replacement : null;
++    records.push({ id: name.slice(0, 64), head: value.facts.head, entries: value.facts.entries, replacement,
++      // ADR-0100: a replacement counts only with its approval in the store, never by the record's own word.
++      replacementApproved: replacement !== null && replacementApprovalStored(commonDir, replacement.subjectSha256) });
+   }
+   return records;
+ }
+ 
++function replacementApprovalStored(commonDir, subjectSha256) {
++  if (typeof subjectSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(subjectSha256)) return false;
++  let envelopes = [];
++  try { envelopes = readPrivateApprovals(commonDir, VERIFY_REPLACEMENT_KIND); } catch { envelopes = []; }
++  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === subjectSha256);
++}
++
+ function trustAnchorShape(bytes) {
+   let parsed; try { parsed = JSON.parse(bytes.toString("utf8")); } catch { return null; }
+   if (!object(parsed) || !["pipeline.critical-human-proof-policy.v1", "pipeline.critical-human-proof-policy.v2", "pipeline.critical-human-proof-policy.v3"].includes(parsed.schema)) return null;
+@@ -197,7 +209,9 @@ export function deriveGateChangeProof(change, context) {
+   }
+   if ((change.ruleId === "GS-10" || change.ruleId === "GS-11") && change.blobSha256 !== null) {
+     const record = context.configureVerify.find((entry) => entry.head === change.parent && entry.entries.some((item) => item?.path === change.path && item?.afterSha256 === change.blobSha256));
+-    if (record) return { kind: "configure-verify", ref: record.id, label: CONFIGURE_VERIFY_LABEL };
++    if (record?.replacement) {
++      if (record.replacementApproved) return { kind: "verify-replacement", ref: record.replacement.subjectSha256, label: record.replacement.mode === "signature" ? null : "chat-attributed, not signed" };
++    } else if (record) return { kind: "configure-verify", ref: record.id, label: CONFIGURE_VERIFY_LABEL };
+   }
+   const lower = change.path.toLowerCase();
+   for (const capability of context.overrides) {
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.mjs b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+index cb5a8fb368cf83f91b0ee78e2a76169aae67871f..5e611c23a637cac70c81749e27f217d92e56cf2e 100644
+--- a/plugins/pipeline-core/lib/maintenance-delivery.mjs
++++ b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+@@ -251,6 +251,16 @@ export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit,
+   return null;
+ }
+ 
++/** The committed verify command of the calibration at `commit` (project tier first), or null when none reads. */
++function calibratedVerifyAt(git, commit) {
++  for (const path of ["project/pipeline.json", ".claude/pipeline.json"]) {
++    const shown = git(["show", `${commit}:${path}`]);
++    if (!gitOk(shown)) continue;
++    try { const value = JSON.parse(String(shown.stdout)); return typeof value?.verify === "string" ? value.verify : null; } catch { return null; }
++  }
++  return null;
++}
++
+ /**
+  * Green after the maintenance delivery (ADR-0097 Decision 4) for a check the host could not run at finalize (verify:configured): a
+  * sealed GREEN receipt of the check's suite whose commit lies strictly after the slice's base commit (where the check was observed
+@@ -260,11 +270,15 @@ export function greenAfterDeliveryReceipt({ commonDir, root, check, baseCommit,
+   const suite = maintenanceReceiptSuite(check);
+   if (suite === null || typeof commonDir !== "string" || !OID.test(baseCommit ?? "") || !OID.test(candidateCommit ?? "")) return null;
+   const git = runGit ?? gitRunner(root);
++  // ADR-0100 Decision 6: a replaced verify command never turns the red check green by itself; the receipt counts only under the command
++  // the check was observed red with.
++  const baseVerify = isConfiguredVerifyCheck(check) ? calibratedVerifyAt(git, baseCommit) : null;
+   for (const receipt of sealedSuiteReceipts(commonDir, suite)) {
+     const commit = receipt.candidate.commit;
+     if (receipt.exitCode !== 0 || commit === baseCommit) continue;
+     if (!gitOk(git(["merge-base", "--is-ancestor", baseCommit, commit]))) continue;
+     if (commit !== candidateCommit && !gitOk(git(["merge-base", "--is-ancestor", commit, candidateCommit]))) continue;
++    if (baseVerify !== null && calibratedVerifyAt(git, commit) !== baseVerify) continue;
+     return Object.freeze({ kind: "verify-receipt", ref: receipt.receiptSha256, runId: receipt.runId, commit, suite });
+   }
+   return null;

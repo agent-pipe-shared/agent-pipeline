@@ -1,0 +1,49 @@
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index a39e646ad823f346f8168b207291c25dfc135177..35386710167c273917e210d13465e2adc5fc55ba 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -10,6 +10,7 @@
+  *
+  * Pure and read-only: it parses and re-asks `isReadOnlyDiagnosticCommand`, it grants nothing.
+  */
++import { basename } from "node:path";
+ import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+@@ -191,7 +192,15 @@ export function repeatedFlagHint(command, flag, root) {
+   const { argv } = parsed.segments[0];
+   const endOfOptions = argv.indexOf("--");
+   const options = endOfOptions === -1 ? argv : argv.slice(0, endOfOptions);
+-  return options.filter((word) => word === flag).length > 1 ? `this option is given more than once and is admitted once here; keep one ${flag}` : null;
++  if (options.filter((word) => word === flag).length <= 1) return null;
++  // C29 P2-2 (Claude run 3: 4 of 15 read refusals were `rg -e a -e b -e c`): several patterns fit one -e as an alternation.
++  const searcher = basename(parsed.segments[0].executable).toLowerCase();
++  const alternation = flag === "-e" && (searcher === "rg" || searcher === "grep")
++    ? (searcher === "rg"
++      ? "; for several patterns give one -e with an alternation in single quotes, e.g. -e 'one|two'"
++      : "; for several patterns give one pattern with an alternation in single quotes and no -e, e.g. -E 'one|two'")
++    : "";
++  return `this option is given more than once and is admitted once here; keep one ${flag}${alternation}`;
+ }
+ 
+ /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index af6d0d8e51a98fe070d201176996b6b2eaa35b33..69b7ef2e45952cab5df639640190e2863239f5ce 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -134,6 +134,15 @@ test("RCD-R6: a repeated option is named, with or without a value, and only when
+   assert.match(String(result.stderr), /Rejected element: the flag "-A" \(this option is given more than once and is admitted once here; keep one -A\)\./u);
+ });
+ 
++test("RCD-R6b (C29 P2-2): a repeated -e on rg or grep names the one-pattern alternation, and that spelling is admitted", async () => {
++  assert.equal(repeatedFlagHint("rg -n -e one -e two README.md", "-e", root), "this option is given more than once and is admitted once here; keep one -e; for several patterns give one -e with an alternation in single quotes, e.g. -e 'one|two'");
++  assert.equal(repeatedFlagHint("grep -n -e one -e two README.md", "-e", root), "this option is given more than once and is admitted once here; keep one -e; for several patterns give one pattern with an alternation in single quotes and no -e, e.g. -E 'one|two'");
++  assert.equal(isReadOnlyDiagnosticCommand("rg -n -e 'one|two' README.md", root), true, "the suggested rg spelling is admitted");
++  assert.equal(isReadOnlyDiagnosticCommand("grep -n -E 'one|two' README.md", root), true, "the suggested grep spelling is admitted");
++  const result = await refusal("rg -n -e one -e two README.md");
++  assert.match(String(result.stderr), /keep one -e; for several patterns give one -e with an alternation/u);
++});
++
+ test("RCD15: a refused ls flag gets the names-only listing spellings, a names-only flag and other commands get none", () => {
+   const hint = String(lsListingHint("ls -la .git/agent-pipeline", "-la", root));
+   assert.match(hint, /listed as names only/u);

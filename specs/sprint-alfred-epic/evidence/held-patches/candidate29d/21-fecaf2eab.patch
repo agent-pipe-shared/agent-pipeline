@@ -1,0 +1,29 @@
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 2d91516a00a0ac0b62e1760903e0eaafd275eeb5..93852af2461bf971bd141d049eaf0b88e63f05d4 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -697,7 +697,9 @@ function evidenceRequiredPrerequisites(root, candidateCommit, specPath, courseCo
+         { id: "diagnostic-registration", ok: null, status: "unchecked", code: "CCA-DETERMINISTIC-UNAVAILABLE",
+           remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path> BEFORE committing (registration reads the working tree), then commit the artifact, its log and the manifest in ONE evidence-only commit` },
+         { id: "registration-commit", ok: null, status: "unchecked", code: "CDP-ARGUMENT",
+-          remedy: "rerun this preflight with --evidence <file> and --registration-commit <full 40-hex id of that evidence-only commit>" });
++          remedy: "rerun this preflight with --evidence <file> and --registration-commit <full 40-hex id of that evidence-only commit>" },
++        { id: "one-command-route", ok: null, status: "unchecked", code: null,
++          remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/prepare-dispatch.mjs critic --root <root> --spec ${specPath} --base <ref> --candidate ${candidateCommit} --label <name> -- <check command> runs the diagnostic evidence, its registration and this preflight for you and stops once for the evidence-only commit (prepare-dispatch.mjs --help)` });
+     }
+     return checks.map((check, index) => ({ order: index + 1, ...check }));
+   } catch {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 88c3aa8c59a2ebdb2493f57260da0e2adc5b0de4..e756e68948cb9f464824d5362aae3eab1d9cdd4d 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1975,7 +1975,8 @@ test("A2 the empty-evidence refusal lists a stale map first and the feature-pack
+     const pkg = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: packaged, specPath: "specs/pkg/spec.md", evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
+     assert.deepEqual(pkg.details.checks.map(({ order, id, ok, status }) => [order, id, ok, status]), [
+       [1, "candidate-evidence", false, "missing"], [2, "diagnostic-evidence", null, "unchecked"],
+-      [3, "diagnostic-registration", null, "unchecked"], [4, "registration-commit", null, "unchecked"]]);
++      [3, "diagnostic-registration", null, "unchecked"], [4, "registration-commit", null, "unchecked"], [5, "one-command-route", null, "unchecked"]]);
++    assert.match(pkg.details.checks[4].remedy, /prepare-dispatch\.mjs critic .*--label <name> -- <check command>/u, "the one-command route is named");
+     assert.match(pkg.details.checks[1].remedy, /specs\/pkg\/evidence\/.*CDI-OUTPUT-EXISTS.*CDI-FULL-VERIFY/u);
+     assert.match(pkg.details.checks[2].remedy, /--add-diagnostic-evidence <path> BEFORE committing.*ONE evidence-only commit/u);
+     assert.match(pkg.details.checks[3].remedy, /--registration-commit/u);
