@@ -47,6 +47,7 @@ import { run as runPipelineState } from "./pipeline-state.mjs";
 import { buildReleasePreflight, prepareReleasePreflightAuthorizeLine } from "./release-preflight-cli.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
 
 /* ---------------------------------------------------------------------------------------------- *
  * Fixtures
@@ -160,8 +161,9 @@ function verifyWritten({ result, expectedCandidate, expectedAction, trustPolicy,
 test("the critical action kind list this suite is parametrized over is the closed set the product exports", () => {
   assert.deepEqual([...CRITICAL_ACTION_KINDS].sort(), [
     "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "acknowledge-gate-definition-changes", "acknowledge-maintenance-red-check", "deploy", "feature-package-reconcile",
-    "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "spec-addendum",
+    "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "replace-verify-command", "spec-addendum",
   ], "a new kind must add its round trip here (and a note on which leg proves it), not slip in unproven");
+  // replace-verify-command (ADR-0100): the library, printed and verb legs below (builder injected), plus its consumer leg (configure-verify --replace).
   // acknowledge-gate-definition-changes (ADR-0096): the library, printed and verb legs below, plus its consumer leg (approve-gate-change-acknowledgement).
   // acknowledge-maintenance-red-check (ADR-0097): the library, printed and verb legs below (builder injected), plus its consumer leg (approve-maintenance-red-check).
 });
@@ -335,6 +337,13 @@ function emitterInput(kind) {
       checksSha256: sha256("checks"), checks: [{ checkSha256: sha256("check"), check: { id: "verify", path: "project/pipeline.json", verify: "configured", dependencies: ["project/pipeline.json"] }, observedExitCode: 1 }] };
     return { candidate: { ...CANDIDATE }, subject, extra: {}, observed: { ...CANDIDATE },
       dependencies: { buildMaintenanceAcknowledgementSubjectFn: () => ({ ok: true, subject, candidate: { ...CANDIDATE }, featureId: FEATURE_ID }) } };
+  }
+  if (kind === "replace-verify-command") {
+    // ADR-0100: the verb rebuilds the subject from the newest passing test run through the one builder; injected here (the consumer leg runs it for real).
+    const subject = { schema: "pipeline.verify-replacement-subject.v1", featureId: FEATURE_ID, previousCommand: "node --test old.test.mjs", verifyCommand: "node --test new.test.mjs",
+      testRunSha256: sha256("test-run"), entries: [{ path: "project/pipeline.json", beforeSha256: sha256("before"), afterSha256: sha256("after") }] };
+    return { candidate: { ...CANDIDATE }, subject, extra: {}, observed: { ...CANDIDATE },
+      dependencies: { buildVerifyReplacementSubjectFn: () => ({ ok: true, subject, candidate: { ...CANDIDATE }, featureId: FEATURE_ID }) } };
   }
   return { candidate: { ...CANDIDATE }, subject: { label: `verb ${kind}` }, extra: {}, observed: { ...CANDIDATE }, dependencies: {} };
 }
@@ -614,6 +623,103 @@ test("ADR-0097 consumer leg: acknowledge-maintenance-red-check -- the line appro
   assert.equal(buildMaintenanceAcknowledgementSubjectAtHead({ root, commonDir: common }).code, "MRA-NOTHING-TO-ACKNOWLEDGE", "an acknowledged check is not listed again");
   const replay = runPipelineStateVerb(printed.recordCommand.argv.slice(1), { dir: root, home, keys });
   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+});
+
+/** An approved, implementing consumer (the production plan writers) whose two calibration tiers carry the same configured command, committed. */
+// The fixture's plan is approved in the committed chat mode (a signed plan approval has no affordable fixture, and switching the mode
+// afterwards makes the PO-gate authority stale, CVCT-AUTHORITY-STALE, by design). The signature leg therefore selects the strict proof
+// path through the route's waiver seam; everything after it -- proof, store, transition, readback -- is the production code.
+const SIGNATURE_MODE = Object.freeze({ criticalProofWaiverForFn: () => ({ waived: false, code: null }) });
+function verifyReplacementRepository() {
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "verify-replace-"));
+  prepareApprovedItemCourseFixture({ root });
+  // The neutral tier is a byte copy of the committed legacy tier (its first appearance, free).
+  commitFiles(root, { "project/pipeline.json": readFileSync(join(root, ".claude", "pipeline.json"), "utf8") }, "chore: the neutral calibration tier");
+  return { root, common: join(root, ".git"), head: () => ({ commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") }) };
+}
+const REPLACED_VERIFY = "node src/change.mjs";
+const verifyTiers = (root) => ["project/pipeline.json", ".claude/pipeline.json"].map((path) => JSON.parse(readFileSync(join(root, path), "utf8")).verify);
+
+test("ADR-0100 consumer leg: replace-verify-command -- configure-verify --replace runs the new command, the printed line is signed by the verb, the follow-up writes both tiers once and the close readback names the proof", () => {
+  const fixture = verifyReplacementRepository();
+  const keys = keyDirectory();
+  const home = fixtureDir("home");
+  const stateDependencies = { architectureEntryReadiness: () => ({ status: "ready" }), ...SIGNATURE_MODE };
+  const previous = verifyTiers(fixture.root);
+  assert.equal(previous[0], previous[1]);
+  const verb = ["configure-verify", "--verify-command", REPLACED_VERIFY, "--replace", "--by", "PO"];
+
+  // 1. Without an approval the route runs the new command once on the clean tree and prints the signing line; nothing is written.
+  const first = runPipelineStateVerb(verb, { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(first.code, 2, describeRun(first));
+  assert.match(first.stderr, /running the new command once on the clean tree/u);
+  const printed = JSON.parse(first.lines.at(-1));
+  assert.equal(printed.status, "signature-required");
+  assert.equal(printed.signatureCommand.kind, "replace-verify-command");
+  assert.deepEqual([printed.signatureCommand.subject.previousCommand, printed.signatureCommand.subject.verifyCommand], [previous[0], REPLACED_VERIFY]);
+  assert.deepEqual(printed.signatureCommand.subject.entries.map((entry) => entry.path).sort(), [".claude/pipeline.json", "project/pipeline.json"], "one signature covers both tiers");
+  assert.deepEqual(verifyTiers(fixture.root), previous, "nothing is written before the signature");
+
+  // 2. The PO's terminal runs the printed line unchanged; the verb derives the same subject from the test-run receipt.
+  const prompts = [];
+  const head = fixture.head();
+  const signed = runPrintedArgv({ argv: printed.signatureCommand.argv.slice(1), keys, home, dependencies: { observeCandidate: () => head, readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } } });
+  assert.equal(signed.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+  assert.equal(signed.action.subjectSha256, printed.signatureCommand.subjectSha256, "the terminal signs the digest the route printed");
+  assert.match(prompts.join("\n"), new RegExp(`verify command after: ${REPLACED_VERIFY}`, "u"), "the terminal shows the PO the new command");
+
+  // 3. The follow-up writes exactly the signed bytes into both tiers, once.
+  const follow = printed.recordCommand.argv;
+  const recorded = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(recorded.code, 0, describeRun(recorded));
+  assert.match(recorded.stdout, /Verify command replaced \(signed by "PO"\)/u);
+  assert.match(recorded.stdout, /chore: replace project verification command/u);
+  assert.deepEqual(verifyTiers(fixture.root), [REPLACED_VERIFY, REPLACED_VERIFY]);
+  const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+
+  // 4. Committed, the close's readback counts both tier changes as the signed replacement (no label: it is signed).
+  commitFiles(fixture.root, { "project/pipeline.json": readFileSync(join(fixture.root, "project/pipeline.json"), "utf8"), ".claude/pipeline.json": readFileSync(join(fixture.root, ".claude/pipeline.json"), "utf8") }, "chore: replace project verification command");
+  const replacedAt = gitOut(fixture.root, "rev-parse", "HEAD");
+  const readback = gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: "unit", commonDir: fixture.common });
+  const ours = readback.changes.filter((change) => change.commit === replacedAt);
+  assert.deepEqual(ours.map((change) => change.path).sort(), [".claude/pipeline.json", "project/pipeline.json"], JSON.stringify(readback.changes));
+  for (const change of ours) assert.deepEqual([change.proof?.kind, change.proof?.label], ["verify-replacement", null], JSON.stringify(change));
+});
+
+test("ADR-0100: under the committed chat mode the replacement is attributed, not signed, and the readback labels it so", () => {
+  const fixture = verifyReplacementRepository();
+  const keys = keyDirectory();
+  const home = fixtureDir("home");
+  const stateDependencies = { architectureEntryReadiness: () => ({ status: "ready" }) };
+  const replaced = runPipelineStateVerb(["configure-verify", "--verify-command", REPLACED_VERIFY, "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(replaced.code, 0, describeRun(replaced));
+  assert.match(replaced.stdout, /Verify command replaced \(chat-attributed, not signed by "PO"\)/u);
+  assert.deepEqual(verifyTiers(fixture.root), [REPLACED_VERIFY, REPLACED_VERIFY]);
+  commitFiles(fixture.root, { "project/pipeline.json": readFileSync(join(fixture.root, "project/pipeline.json"), "utf8"), ".claude/pipeline.json": readFileSync(join(fixture.root, ".claude/pipeline.json"), "utf8") }, "chore: replace project verification command");
+  const replacedAt = gitOut(fixture.root, "rev-parse", "HEAD");
+  const ours = gateDefinitionChangeReadback({ rootDir: fixture.root, featureId: "unit", commonDir: fixture.common }).changes.filter((change) => change.commit === replacedAt);
+  assert.equal(ours.length, 2);
+  for (const change of ours) assert.deepEqual([change.proof?.kind, change.proof?.label], ["verify-replacement", "chat-attributed, not signed"], JSON.stringify(change));
+});
+
+test("ADR-0100: a red new command signs nothing and writes nothing; the default configure-verify still refuses a different command", () => {
+  const fixture = verifyReplacementRepository();
+  const keys = keyDirectory();
+  const home = fixtureDir("home");
+  const stateDependencies = { architectureEntryReadiness: () => ({ status: "ready" }), ...SIGNATURE_MODE };
+  const previous = verifyTiers(fixture.root);
+  const red = runPipelineStateVerb(["configure-verify", "--verify-command", "node src/missing-entry.mjs", "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(red.code, 2, describeRun(red));
+  assert.match(red.stderr, /CVR-TEST-RUN-RED/u);
+  assert.ok(!red.stdout.includes("signature-required"), "a red test run prints no signing line");
+  assert.deepEqual(verifyTiers(fixture.root), previous);
+  const plain = runPipelineStateVerb(["configure-verify", "--verify-command", REPLACED_VERIFY], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(plain.code, 2, "without --replace an already configured command only admits its exact replay");
+  assert.deepEqual(verifyTiers(fixture.root), previous);
+  const same = runPipelineStateVerb(["configure-verify", "--verify-command", previous[0], "--replace", "--by", "PO"], { dir: fixture.root, home, keys, dependencies: stateDependencies });
+  assert.equal(same.code, 2);
+  assert.match(same.stderr, /CVR-SAME-COMMAND/u);
 });
 
 test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {
