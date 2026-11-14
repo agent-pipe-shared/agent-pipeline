@@ -2107,26 +2107,31 @@ export function requalifyNativeGoldfishItemDelivery(input={}) {
  * (SDC-AUTHORITY-CAS, a held lock, or one of the sibling races the terminal release already retries) left a delivered item "integration refused".
  * Those refusals are now repeated on a fresh boundary, as the terminal release does: at least NATIVE_BOUNDARY_REBIND_LIMIT rounds and further
  * rounds while the retry budget lasts, with a growing pause capped at one second. Every other refusal, and the last one, is returned.
- * Only race reasons are repeated: SDC-AUTHORITY-CAS also carries structural refusals (a broken binding, a duplicate member, a drifted namespace)
- * that a fresh boundary cannot cure, so the code alone never qualifies. `deadlineMs` is a hard end the caller owns (the stop hook passes what is
- * left of its own host timeout); no round starts after it, the minimum round count included. */
+ * SDC-AUTHORITY-CAS also carries structural refusals (a broken binding, a duplicate member, a drifted namespace) that a fresh boundary cannot
+ * cure, and which of its reasons a sibling stop can cause on this path is not measured (the live K-38 refusal recorded no reason). So the named
+ * race reasons get the whole budget, while any other SDC-AUTHORITY-CAS gets only the fixed NATIVE_BOUNDARY_REBIND_LIMIT rounds (a few seconds)
+ * and is then returned. `deadlineMs` is a hard end the caller owns (the stop hook passes what is left of its own host timeout); no round starts
+ * after it, the minimum round count included. */
 export const NATIVE_INTEGRATION_RACE_REFUSALS=Object.freeze({
   'SDC-LOCK-HELD':Object.freeze(['registry-lock-held']),
   'SDC-AUTHORITY-CAS':Object.freeze(['reference-preimage-changed','publication-preimage-changed','read-generation-drift','release-prefix-changed','member-record-not-current','domain-transition-registry-concurrent-writer']),
 });
 export const NATIVE_INTEGRATION_RETRY_BUDGET_MS=60_000;
-export function integrationRefusalIsSiblingRace(result){
-  if(result?.status!=='refused')return false;
-  return (NATIVE_INTEGRATION_RACE_REFUSALS[result.code]??[]).includes(result.reason)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason);
+/** 'race' (a named sibling race: whole budget), 'unclassified-cas' (any other SDC-AUTHORITY-CAS: fixed rounds only) or null (returned at once). */
+export function integrationRefusalRetryClass(result){
+  if(result?.status!=='refused')return null;
+  if((NATIVE_INTEGRATION_RACE_REFUSALS[result.code]??[]).includes(result.reason)||NATIVE_TERMINAL_SIBLING_RACES.includes(result.reason))return 'race';
+  return result.code==='SDC-AUTHORITY-CAS'?'unclassified-cas':null;
 }
 export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativeGoldfishItemDeliveryOnce,budgetMs=NATIVE_INTEGRATION_RETRY_BUDGET_MS,deadlineMs=null,now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}={}) {
   const start=now();
   for(let attempt=1;;attempt+=1){
-    const result=once(args);
-    if(!integrationRefusalIsSiblingRace(result))return result;
+    const result=once(args),retry=integrationRefusalRetryClass(result);
+    if(retry===null)return result;
     const wait=Math.min(100*attempt,1000);
     const pastDeadline=Number.isFinite(deadlineMs)&&now()+wait>deadlineMs;
-    if(pastDeadline||(attempt>=NATIVE_BOUNDARY_REBIND_LIMIT&&now()-start+wait>budgetMs))return {...result,attempts:attempt};
+    const roundsDone=attempt>=NATIVE_BOUNDARY_REBIND_LIMIT;
+    if(pastDeadline||(roundsDone&&(retry==='unclassified-cas'||now()-start+wait>budgetMs)))return {...result,attempts:attempt};
     pause(wait);
   }
 }

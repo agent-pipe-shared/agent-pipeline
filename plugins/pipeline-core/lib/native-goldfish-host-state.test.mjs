@@ -2018,7 +2018,10 @@ const cases = [
     const left = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator); assert.equal(left.prepared.ok, true, JSON.stringify(left.prepared));
     const returned = (item, id, changedPaths) => ({ ...item.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: item.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: id, candidateCommit: item.binding.candidateCommit, outcome: "succeeded", report: "K-37 chain fixture return.", changedPaths }) }] } });
     writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // K-37 chain LEFT\n");
-    assert.equal(runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned(left, "LEFT", ["src/change.mjs"]) })).status, "authored-commit-recorded");
+    const leftStop = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned(left, "LEFT", ["src/change.mjs"]) }));
+    assert.equal(leftStop.status, "authored-commit-recorded");
+    // C29 K-38: the whole stop carries the briefed slice id, which the hook writes into the stop outcome for wait-host-commit.
+    assert.equal(leftStop.delivery.sliceId, "LEFT");
     assert.equal(runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: left.prepared.sha256 })).status, "integrated");
     const head = spawnSync("git", ["-C", root, "rev-parse", "HEAD^{commit}", "HEAD^{tree}"], { encoding: "utf8" }).stdout.trim().split("\n");
     const scope = ["src/change.test.mjs", "src/second.mjs"];
@@ -2033,6 +2036,7 @@ const cases = [
     writeFileSync(join(root, "src/second.mjs"), "export const value='expected'; // K-37 chain RIGHT\n");
     const stopped = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned(right, "RIGHT", scope) }));
     assert.equal(stopped.status, "authored-commit-recorded", JSON.stringify(stopped));
+    assert.equal(stopped.delivery.sliceId, "RIGHT");
   }) },
 
   { id: "NGHS73", name: "C29 K-38: the stop's integration repeats a sibling race (CAS, held lock, terminal sibling race) on a fresh boundary within its budget and returns every other refusal at once", run: () => {
@@ -2056,10 +2060,15 @@ const cases = [
     const budgeted = scripted([cas]);
     integrateNativeGoldfishItemDelivery({}, { once: budgeted.once, budgetMs: 30_000, ...clock() });
     assert.ok(budgeted.calls.length > 8, "rounds continue while the budget lasts");
-    // The code alone never qualifies: a structural CAS refusal is not cured by a fresh boundary and is returned at once.
+    // A CAS reason outside the named races gets the fixed rounds only, never the budget: a structural refusal costs seconds, not a minute.
     const structural = scripted([{ status: "refused", code: "SDC-AUTHORITY-CAS", reason: "duplicate-member" }]);
-    assert.equal(integrateNativeGoldfishItemDelivery({}, { once: structural.once, budgetMs: 10_000, ...clock() }).reason, "duplicate-member");
-    assert.equal(structural.calls.length, 1, "a structural CAS refusal is never repeated");
+    const unclassified = integrateNativeGoldfishItemDelivery({}, { once: structural.once, budgetMs: 60_000, ...clock() });
+    assert.equal(unclassified.reason, "duplicate-member");
+    assert.equal(structural.calls.length, 8, "an unclassified CAS refusal stops at the round bound although budget is left");
+    // Any other code is returned at once.
+    const unavailable = scripted([{ status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "invalid-boundary-callback" }]);
+    integrateNativeGoldfishItemDelivery({}, { once: unavailable.once, budgetMs: 60_000, ...clock() });
+    assert.equal(unavailable.calls.length, 1);
     // The stop hook's hard deadline ends the rounds even before the minimum count: the host timeout wins.
     const late = scripted([cas]), lateClock = clock();
     const ended = integrateNativeGoldfishItemDelivery({}, { once: late.once, budgetMs: 30_000, deadlineMs: 350, ...lateClock });
