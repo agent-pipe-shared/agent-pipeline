@@ -568,6 +568,8 @@ register("GDBC18", "hook: a message to a running Critic is refused unless it is 
   assert.equal(none.status, 2, "no grant is recorded: nothing to resume on");
   assert.match(none.stderr, /DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED/u);
   assert.match(none.stderr, /grant/u);
+  // P3-3 (Claude run 3): a Critic aborted by an API error has no grant and no verdict; the refusal names the fresh round, not only a grant.
+  assert.match(none.stderr, /do not resume it: an aborted Critic left no verdict, so dispatch the same round again from the Critic template as a fresh agent/u);
   const granted = grantDispatchBudget(["--agent-id", "rc1", "--extra", "10", "--reason", "finish the remaining files", "--root", root]);
   assert.equal(granted.status, "granted", JSON.stringify(granted));
   const generated = criticResumeText({ digest: granted.result.digest });

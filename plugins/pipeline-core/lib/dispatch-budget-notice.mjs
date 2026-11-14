@@ -57,7 +57,8 @@ export function criticResumeText({ digest }) {
 export function criticResumeRefusalText({ agentId, expected }) {
   return `DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED: the message to the running Critic ${agentId} is not the generated resume text of its recorded grant. A Critic is resumed only with that text, which carries the grant digest and nothing about findings, verdicts or earlier rounds. `
     + (expected === null
-      ? "No grant is recorded for this Critic: record one first (the grant line of its checkpoint notice), then send the generated text."
+      ? "No grant is recorded for this Critic. If it stopped at its budget checkpoint, record a grant first (the grant line of its checkpoint notice), then send the generated text. "
+        + "If it stopped for any other reason (an API or infrastructure error, a cancelled or duplicate dispatch), do not resume it: an aborted Critic left no verdict, so dispatch the same round again from the Critic template as a fresh agent."
       : `Send exactly this text, unchanged: ${expected}`);
 }
 
