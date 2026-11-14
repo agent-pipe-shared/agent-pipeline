@@ -17,7 +17,7 @@ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, 
 import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
 import { EXTERNAL_DIRECTORY_FILTER_HINT, filterRefusedOnExternalDirectory, firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
-import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, separatedPartsRemediation, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
 import { controlPlaneScriptBlocked, controlPlaneScriptHit, controlPlaneShellWriteBlocked, controlPlaneShellWriteHit } from "./control-plane-script-scan.mjs";
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
 import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
@@ -639,7 +639,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           retryActions,
           firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
-          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
+          // P2-2: when no typed action could be built, a `;`/newline list still gets a per-part verdict as message text.
+          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine))
+            ?? (retryActions.length === 0 && !andChainReadScope
+              ? separatedPartsRemediation((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)
+              : null),
           null,
           false,
           firstOccurrence,

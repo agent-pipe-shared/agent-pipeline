@@ -1738,6 +1738,74 @@ function heredocFileRemediation(command) {
     + "keep any resulting command as a separate tool call.";
 }
 
+/** P2-2: a part that is exactly `cd <absolute project root>`; every command is already judged against that root, so dropping it changes nothing. */
+function isProjectRootCdPart(part, root) {
+  const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  return parsed.parseStatus === "accepted" && parsed.segments.length === 1
+    && parsed.operators.length === 0 && parsed.redirects.length === 0
+    && basename(parsed.segments[0].executable).toLowerCase() === "cd"
+    && parsed.segments[0].argv.length === 1 && isProjectRootOperand(parsed.segments[0].argv[0], root);
+}
+
+/**
+ * P2-2 (Claude greenfield run 3): the most frequent refused shape was a `;`/newline list of reads, often led by
+ * `cd <project root>` and holding an admitted pipeline such as `grep … | head -80`. retryActionsForDeniedCommand
+ * types only single-segment parts (the v1 envelope has one executable and argv per action), so such a list got an
+ * empty envelope and the agent guessed. This splits on top-level `;` and newlines only (quote- and escape-aware;
+ * nothing with a backtick or `$(` is split), drops a `cd <project root>` part, and judges every remaining part with
+ * the exact classifier a standalone call is judged by. It is message text only: it never admits anything, and a
+ * part it calls admitted is admitted when run on its own because it is that same classifier's verdict.
+ */
+function splitTopLevelSeparatedParts(command) {
+  if (typeof command !== "string" || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return null;
+  const parts = [];
+  let quote = null;
+  let escaped = false;
+  let start = 0;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (escaped) {
+      if (char === "\r" || char === "\n") return null;
+      escaped = false;
+      continue;
+    }
+    if (quote !== "'" && char === "\\") { escaped = true; continue; }
+    if (quote !== null) { if (char === quote) quote = null; continue; }
+    if (char === "'" || char === "\"") { quote = char; continue; }
+    if (char === ";" || char === "\n" || char === "\r") {
+      parts.push(command.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  if (quote !== null || escaped) return null;
+  parts.push(command.slice(start).trim());
+  const nonEmpty = parts.filter((part) => part !== "");
+  return nonEmpty.length >= 2 ? nonEmpty : null;
+}
+
+const SEPARATED_PARTS_LISTED = 8;
+const SEPARATED_PART_CHARS = 160;
+
+export function separatedPartsRemediation(command, root, extraRoots = []) {
+  const parts = splitTopLevelSeparatedParts(command);
+  if (parts === null) return null;
+  const droppedCd = parts.some((part) => isProjectRootCdPart(part, root));
+  const rest = parts.filter((part) => !isProjectRootCdPart(part, root));
+  if (rest.length === 0) return null;
+  const shown = (part) => (part.length > SEPARATED_PART_CHARS ? `${part.slice(0, SEPARATED_PART_CHARS)}…` : part);
+  const admitted = [];
+  const other = [];
+  rest.slice(0, SEPARATED_PARTS_LISTED).forEach((part, index) => {
+    (isReadOnlyDiagnosticCommand(part, root, extraRoots) ? admitted : other).push(`(${index + 1}) ${shown(part)}`);
+  });
+  const lines = ["Remediation: run each part as its own tool call; a ; or a line break joins commands the closed grammar does not compose."];
+  if (droppedCd) lines.push("Leave out the \"cd <project root>\" part: every command is already judged against the project root.");
+  if (admitted.length > 0) lines.push(`Admitted on its own, exactly as written: ${admitted.join("  ")}`);
+  if (other.length > 0) lines.push(`Not an admitted read-only form on its own (re-spell it, or use the native Read, Grep or Glob tool; any other command is judged when it runs): ${other.join("  ")}`);
+  if (rest.length > SEPARATED_PARTS_LISTED) lines.push(`${rest.length - SEPARATED_PARTS_LISTED} more part(s) not listed; judge them the same way.`);
+  return lines.join("\n");
+}
+
 export function grammarRemediation(command) {
   if (typeof command === "string" && /^\s*node(?:\.exe)?\s+(?:-e|--eval|-p|--print)(?:\s|=|$)/u.test(command)) {
     return "Remediation: arbitrary inline Node code stays refused. Write the probe to a workspace scratch/browser-probe.mjs file with Write/Edit, then run node scratch/browser-probe.mjs as a separate tool call. Ordinary lifecycle, role and filesystem guards still apply to that script route.";
@@ -1793,8 +1861,11 @@ export function retryActionsForDeniedCommand(command, root, extraRoots = []) {
   if (quote !== null || escaped || parts.length === 0) return [];
   parts.push(command.slice(start).trim());
   if (parts.some((part) => part === "")) return [];
+  // P2-2: a `cd <project root>` part changes nothing the other parts are judged against, so it is left out rather than emptying the envelope.
+  const reads = parts.filter((part) => !isProjectRootCdPart(part, root));
+  if (reads.length === 0) return [];
   const actions = [];
-  for (const part of parts) {
+  for (const part of reads) {
     const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
       || parsed.operators.length !== 0 || parsed.redirects.length !== 0

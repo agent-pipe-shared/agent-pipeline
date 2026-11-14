@@ -2644,6 +2644,44 @@ test("grammar denials return closed typed retries only for independent read diag
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// P2-2 (Claude greenfield run 3, 20 of 48 grammar refusals): `cd <project root>; <read>; <read> | head -N; ...` got an
+// empty envelope and no hint, so the agent guessed. The root `cd` is now left out of the typed actions, and a list the
+// v1 envelope cannot type (a part is a pipeline, or not a read) gets a per-part verdict as message text. The verdict
+// is the standalone classifier's; the decision itself (exit 2) never changes.
+test("P2-2: a ; list of reads led by cd <project root> gets typed actions or a per-part verdict, never a changed decision", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "one.txt"), "one\n");
+    writeFileSync(join(path, "two.txt"), "two\n");
+    const real = realpathSync(path);
+    const typed = `cd ${real}; sed -n '1,10p' one.txt; sed -n '1,10p' two.txt`;
+    assert.deepEqual(retryActionsForDeniedCommand(typed, path).map((action) => action.argv), [["-n", "1,10p", "one.txt"], ["-n", "1,10p", "two.txt"]]);
+    const typedResult = evaluateLifecycleReadyGuard(bash(typed), { projectDir: path });
+    assert.equal(typedResult.exitCode, 2);
+    assert.doesNotMatch(typedResult.stderr, /run each part as its own tool call/u, "typed actions already cover it; no duplicate text");
+
+    const mixed = `cd ${real}; grep -n one one.txt | head -80; wc -c two.txt; touch changed.txt`;
+    assert.deepEqual(retryActionsForDeniedCommand(mixed, path), []);
+    const result = evaluateLifecycleReadyGuard(bash(mixed), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(result.stderr, /Remediation: run each part as its own tool call/u);
+    assert.match(result.stderr, /Leave out the "cd <project root>" part/u);
+    assert.match(result.stderr, /Admitted on its own, exactly as written: \(1\) grep -n one one\.txt \| head -80  \(2\) wc -c two\.txt/u);
+    assert.match(result.stderr, /Not an admitted read-only form on its own[^\n]*\(3\) touch changed\.txt/u);
+    for (const part of ["grep -n one one.txt | head -80", "wc -c two.txt"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(part), { projectDir: path }).exitCode, 0, `${part} is admitted alone, as the text says`);
+    }
+
+    const elsewhere = `cd ${join(real, "..")}; wc -c two.txt; wc -c one.txt`;
+    assert.deepEqual(retryActionsForDeniedCommand(elsewhere, path), [], "a cd anywhere but the root is never left out");
+    assert.doesNotMatch(evaluateLifecycleReadyGuard(bash(elsewhere), { projectDir: path }).stderr, /Leave out the "cd <project root>" part/u);
+    assert.doesNotMatch(evaluateLifecycleReadyGuard(bash("wc -c \"$(id)\"; pwd"), { projectDir: path }).stderr, /run each part as its own tool call/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined", () => {
   const path = root();
   try {
