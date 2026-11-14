@@ -2269,6 +2269,32 @@ security:
   }
 }
 
+// ---- C29 (C2): the real CLI route the one-shot close spawns, with the real gitleaks when this host has a trusted one --------
+{
+  // The value is generated at run time (random hex behind a key name), so no secret-looking literal lives in this file.
+  const rootDir = makeRootDir("postimage-cli");
+  writeManifest(rootDir, "schema: pipeline.manifest.v0\n\ngates:\n  security:\n    mode: blocking\n    type: automated\n\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: true\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: false\n    license-check:\n      enabled: false\n");
+  writeFileSync(join(rootDir, "README.md"), "fixture\n");
+  commitFixture(rootDir);
+  const value = createHash("sha256").update(String(Math.random())).digest("hex").slice(0, 40);
+  const briefing = join(rootDir, "specs/feat-cli/briefing-copy.md");
+  mkdirSync(dirname(briefing), { recursive: true });
+  writeFileSync(briefing, `# Briefing copy\n\nservice_api_key = "${value}"\n`);
+  const cli = (args) => spawnSync(process.execPath, [fileURLToPath(new URL("./security-scan.mjs", import.meta.url)), "--root", rootDir, ...args], { encoding: "utf8", shell: false });
+  const first = cli(["--close-postimages", "feat-cli"]);
+  const parsed = (() => { try { return JSON.parse(first.stdout.trim().split("\n").pop()); } catch { return null; } })();
+  if (parsed?.status === "scanner-missing") {
+    console.log("SKIP  close postimage CLI: no trusted gitleaks on this host (host limitation; the parity block above covers the verdict)");
+  } else {
+    assertEqual("close postimage CLI: a key in a generated close file stops the close (exit 2, one finding at its path and line)", [first.status, parsed?.blocking, parsed?.findings?.map((f) => [f.path, f.line])], [2, true, [["specs/feat-cli/briefing-copy.md", 3]]]);
+    assertTrue("close postimage CLI: the JSON line never carries the matched value", !first.stdout.includes(value) && !first.stderr.includes(value), "the value leaked");
+    assertTrue("close postimage CLI: the scan copy under scratch/ is removed", !existsSync(join(rootDir, "scratch")) || spawnSync("find", [join(rootDir, "scratch"), "-name", "close-postimage-scan-*"], { encoding: "utf8" }).stdout.trim() === "", "a scan copy was left behind");
+    writeFileSync(briefing, "# Briefing copy\n\nservice_api_key = \"<redacted>\"\n");
+    const again = cli(["--close-postimages", "feat-cli"]);
+    assertEqual("close postimage CLI: after the source is redacted the identical command passes", [again.status, JSON.parse(again.stdout.trim()).status], [0, "pass"]);
+  }
+}
+
 // ---- Summary -------------------------------------------------------------------------------------
 try {
   rmSync(FIXTURE_ROOT, { recursive: true, force: true });
