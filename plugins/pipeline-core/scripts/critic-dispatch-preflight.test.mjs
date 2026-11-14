@@ -1947,6 +1947,44 @@ test("N25 a stale architecture map is refused CDP-ARCHITECTURE-MAP-STALE naming 
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+// C29 A2 (test round 28d): every refusal of the Critic preparation revealed only the next prerequisite. The empty-evidence refusal keeps
+// its code and stage and lists the later prerequisites in their fixed order: a stale map first (a map commit voids evidence already
+// produced for the candidate), then the evidence, then the feature-package steps this preflight cannot observe yet, labelled unchecked.
+test("A2 the empty-evidence refusal lists a stale map first and the feature-package steps in order; without either its field set is unchanged", () => {
+  const fx = fixture();
+  try {
+    mkdirSync(join(fx.root, "src"), { recursive: true });
+    mkdirSync(join(fx.root, "architecture", "map"), { recursive: true });
+    mkdirSync(join(fx.root, "specs", "pkg"), { recursive: true });
+    writeFileSync(join(fx.root, "src", "contract.mjs"), "export const value = 1;\n");
+    writeFileSync(join(fx.root, "architecture", "map", "index.md"), "# Map\n");
+    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core\n");
+    const commitPaths = (paths, message) => { git(fx.root, ["add", "--", ...paths]); git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(fx.root, ["rev-parse", "HEAD"]); };
+    commitPaths(["src", "architecture"], "adopt map");
+    writeFileSync(join(fx.root, "src", "contract.mjs"), "export const value = 2;\n");
+    const stale = commitPaths(["src"], "contract change without a map update");
+    const mapOnly = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: stale, evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
+    assert.deepEqual(mapOnly.details.checks.map(({ order, id, ok, status }) => [order, id, ok, status]),
+      [[1, "architecture-map", false, "stale"], [2, "candidate-evidence", false, "missing"]]);
+    assert.match(mapOnly.details.checks[0].remedy, /architecture\/map\/core\.md/u);
+    assert.match(mapOnly.details.reason, /^Repair the architecture map FIRST .*evidence produced before the map commit is stale/u);
+    assert.match(mapOnly.details.reason, /--evidence <file>/u, "the producers are still named");
+    writeFileSync(join(fx.root, "architecture", "map", "core.md"), "---\nid: core\npublicContracts:\n  - src/contract.mjs\n---\n# Core, covers value 2\n");
+    writeFileSync(join(fx.root, "specs", "pkg", "lifecycle.json"), "{}\n");
+    const packaged = commitPaths(["architecture", "specs/pkg"], "refresh map, add a feature package");
+    const pkg = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: packaged, specPath: "specs/pkg/spec.md", evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
+    assert.deepEqual(pkg.details.checks.map(({ order, id, ok, status }) => [order, id, ok, status]), [
+      [1, "candidate-evidence", false, "missing"], [2, "diagnostic-evidence", null, "unchecked"],
+      [3, "diagnostic-registration", null, "unchecked"], [4, "registration-commit", null, "unchecked"]]);
+    assert.match(pkg.details.checks[1].remedy, /specs\/pkg\/evidence\/.*CDI-OUTPUT-EXISTS.*CDI-FULL-VERIFY/u);
+    assert.match(pkg.details.checks[2].remedy, /--add-diagnostic-evidence <path> BEFORE committing.*ONE evidence-only commit/u);
+    assert.match(pkg.details.checks[3].remedy, /--registration-commit/u);
+    assert.doesNotMatch(pkg.details.reason, /^Repair the architecture map FIRST/u, "a current map is not named");
+    const plain = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: packaged, evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
+    assert.equal(Object.hasOwn(plain.details, "checks"), false, "a current map and no feature package: the refusal keeps its field set");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 // N33 D (D212): early detection. The ready result a person or script reads lists the Critic-required records of the reviewed range that no
 // Critic evidence covers yet, so the Critic dispatch can include them. Additive and advisory: no refusal, and the library result the
 // session finalizer binds by digest is left byte-identical.

@@ -362,7 +362,13 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   if (evidence.length === 0) {
     // Candidate 17 (Toolbox): the refusal carried no reason; name what is admitted, the exact producers and the flag that passes it.
     const reason = `No --evidence was given. Produce evidence for the exact candidate ${candidateCommit}, then pass it with --evidence <file> (repeatable): either a Verify evidence of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --base <base> --commit ${candidateCommit} --out <evidence file>) or a Critic diagnostic evidence (node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, see its --help). Security evidence is not admitted here. Produce it while HEAD is the candidate and the tree is clean.`;
-    fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.", { reason });
+    // C29 A2 (test round 28d): each refusal of the Critic preparation revealed only the next prerequisite. The first refusal an agent meets
+    // now lists the later ones in their fixed order, as push-init lists its unmet checks; the code, the stage and the field set of a
+    // project without a map or a feature package are unchanged.
+    const checks = evidenceRequiredPrerequisites(realRoot, candidateCommit, spec, courseContext);
+    const mapFirst = checks.some((check) => check.id === "architecture-map" && check.ok === false)
+      ? `Repair the architecture map FIRST (checks[0]): evidence binds to the exact candidate commit, so evidence produced before the map commit is stale and must be produced again. Then: ` : "";
+    fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.", { reason: `${mapFirst}${reason}`, ...(checks.length === 0 ? {} : { checks }) });
   }
   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
@@ -665,6 +671,40 @@ const PACKAGE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
  * and the active feature id of the project state whose package at the candidate names exactly this Spec path. Otherwise the folder name.
  * Null only for a path outside specs/<folder>/. Read-only.
  */
+/**
+ * C29 A2: the ordered prerequisites a refused empty-evidence request still faces, read-only. `ok: false` is measured, `ok: null` is a
+ * later step this preflight cannot observe yet (labelled "unchecked"). Empty when there is nothing beyond the evidence itself to name,
+ * so the refusal of a project without a stale map or a feature package keeps its field set. Any fault leaves the list out, never the refusal.
+ */
+function evidenceRequiredPrerequisites(root, candidateCommit, specPath, courseContext) {
+  try {
+    const checks = [];
+    const currency = inspectArchitecturePushCurrency({ projectDir: root, commit: candidateCommit });
+    if (currency.ok && currency.stale) {
+      const refusal = describeArchitectureCurrencyRefusal(currency);
+      checks.push({ id: "architecture-map", ok: false, status: "stale", code: "CDP-ARCHITECTURE-MAP-STALE", remedy: refusal.remedy, staleContracts: refusal.staleContracts });
+    }
+    const featureId = packageFeatureIdForSpec(root, candidateCommit, specPath, isObject(courseContext) && typeof courseContext.featureId === "string" ? [courseContext.featureId] : []);
+    let packaged = false;
+    if (featureId !== null) { try { packaged = JSON.parse(candidateText(root, candidateCommit, `specs/${featureId}/lifecycle.json`)) !== null; } catch { packaged = false; } }
+    if (checks.length === 0 && !packaged) return [];
+    checks.push({ id: "candidate-evidence", ok: false, status: "missing", code: "CDP-EVIDENCE-REQUIRED", remedy: `produce evidence for ${candidateCommit} while HEAD is that commit and the tree is clean, and pass it with --evidence <file> (see reason)` });
+    if (packaged) {
+      const evidenceDir = `specs/${featureId}/evidence/`;
+      checks.push(
+        { id: "diagnostic-evidence", ok: null, status: "unchecked", code: "CCA-DETERMINISTIC-UNAVAILABLE",
+          remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs with --log and --out under ${evidenceDir} (FPR-DIAG-PATH refuses a bare evidence/ path), both names new (CDI-OUTPUT-EXISTS: evidence is never overwritten), and --full-verify only with a FULL Verify evidence (CDI-FULL-VERIFY)` },
+        { id: "diagnostic-registration", ok: null, status: "unchecked", code: "CCA-DETERMINISTIC-UNAVAILABLE",
+          remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path> BEFORE committing (registration reads the working tree), then commit the artifact, its log and the manifest in ONE evidence-only commit` },
+        { id: "registration-commit", ok: null, status: "unchecked", code: "CDP-ARGUMENT",
+          remedy: "rerun this preflight with --evidence <file> and --registration-commit <full 40-hex id of that evidence-only commit>" });
+    }
+    return checks.map((check, index) => ({ order: index + 1, ...check }));
+  } catch {
+    return [];
+  }
+}
+
 function packageFeatureIdForSpec(root, candidateCommit, specPath, preferred = []) {
   const match = /^specs\/([^/]+)\//u.exec(specPath ?? "");
   if (match === null) return null;
