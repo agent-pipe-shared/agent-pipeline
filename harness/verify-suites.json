@@ -4927,6 +4927,12 @@
       "file": "plugins/pipeline-core/scripts/maintenance-red-check.test.mjs",
       "invariantPinned": "maintenance-red-check.mjs observe runs one check on the clean HEAD of a real repository and records the first result at that commit; an untracked or non-test check, a dirty tree, no active feature, a timeout, a command the shell cannot run and a run that changes the tree are refused and record nothing",
       "nonOverlapNote": "Unique script suite (ADR-0097, K-28); maintenance-delivery-tests pins the library it writes through"
+    },
+    {
+      "name": "shipped-modules-stay-under-the-authority-source-bound-tests",
+      "file": "plugins/pipeline-core/lib/pins/shipped-modules-stay-under-the-authority-source-bound.test.mjs",
+      "invariantPinned": "Every shipped plugin module (.mjs/.cjs/.js, tests excluded) stays at least 4 KiB below the session authority's 1 MiB source-entry bound, so an installed participant source is never refused WIN-AUTH-SIZE or source-entry-bound for its size",
+      "nonOverlapNote": "Unique size pin over the whole plugin tree; session-authority-registry-fewer-checks.test.mjs exercises the reads that refuse an oversize source"
     }
   ]
 }
