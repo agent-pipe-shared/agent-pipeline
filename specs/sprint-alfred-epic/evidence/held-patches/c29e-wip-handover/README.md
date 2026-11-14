@@ -1,8 +1,9 @@
 # Candidate 29e — work-in-progress handover for the PC switch (2026-11-14)
 
-**Status: WIP, NOT exported, NOT rehearsed, NOT applied, NOT stamped.** Do not run the apply script in `chain/` on the
-main tree. It exists only because `scripts/export-held-chain.mjs` writes one; the real export happens after the steps
-below. Main is at candidate 29d (applied `fe117d6e9`, stamped `c970646cd`, installed on the Claude runner of the
+**Status 2026-11-14 (second machine): EXPORTED and REHEARSED, NOT applied, NOT stamped.** The deliverable is
+`../candidate29e/apply-candidate-29e.sh` (25 patches). Read "Result of the second session" at the end of this file; the
+`chain/` folder and the steps below are the superseded WIP state (its apply script does NOT apply: `docs/state.md` changed
+on main after the chain base). Main is at candidate 29d (applied `fe117d6e9`, stamped `c970646cd`, installed on the Claude runner of the
 first machine; Codex/Antigravity runner updates not verified).
 
 Candidate 29e is the final candidate of the 29 line (PO goal "Kandidat 29 finalisieren"; PO 2026-11-14: "everything,
@@ -120,3 +121,29 @@ acceptance. Nothing here is "done".
 - Every push needs the PO's signature (`gates.push_approval: signature`); `--by` only with a value the PO names.
 - PO decisions go as tiles (at most 4, recommendation first, plain explanation). Chat with the PO in German.
 - Parallelize actively within those limits; time comparisons net of PO waiting, always as a table.
+
+## Result of the second session (2026-11-14, second machine)
+
+Deliverable: `../candidate29e/apply-candidate-29e.sh` with 25 patches (`NN-<sha>.patch`, `.msg`), committed on the feature
+branch. Rebuilt on the current main base `7c539d75d` (the first export did not rehearse: `docs/state.md` had been
+condensed on main after `c970646cd`, patch 04 failed its context; the 25 commits were cherry-picked onto `7c539d75d` with
+no conflict). The build clone moved to `scratch/agent-out/c29e/clone2` (tip `57709f656`); the old clone is superseded.
+
+- The chain is the 23 commits of the table above plus two test restatements found by the pre-export affected run
+  (453 files, 6 red): 24 `security-scanner-failure-provenance` and `security-scan-large-inventory` disable Trivy in
+  their fixtures (it is default-enabled, ADR-0103); 25 `close-quality-readback` now expects `trivy: not applicable` and
+  `project-onboarding-v3` SECGATE-2 copies `trivy.mjs` and `trivy-baseline.mjs` into its installed-plugin fixture.
+- Rehearsal `reh29e2` (fresh clone of the commit that holds the export): apply script exit 0, registration check 1227
+  registered / 0 unregistered, case-completion registry valid (393 entries), derived-file refresh wrote 5 files in one
+  chore commit. The AC-121 pin (17/17) is green after that refresh: its three reds were exactly the three new Verify
+  suites missing from the committed `sourceBaseline`, as suspected.
+- `check-dispatch-provenance` over the applied range: 15 findings, all `stage0-claim-caps-exceeded`, none
+  `malformed-trailer` (the `Dispatch:` body lines of 05, 09, 10 are re-wrapped). The labelling question is the PO's.
+- Repo-wide run on the rehearsed tree (all `harness/scripts/check-*.test.mjs`, all `lib/pins/*.test.mjs`, the six
+  formerly red files and the new Trivy and parallel-reminder suites, 252 files): 251 green. The one red,
+  `native-goldfish-host-stop-pair.test.mjs`, is a pre-existing race and not caused by the chain: it failed on the
+  UNCHANGED 29d main tree too (NGSP1, `SDC-AUTHORITY-CAS reference-preimage-changed`), it is green on some runs and red
+  on others, a different case each time (NGSP1, NGSP9E), and the chain does not touch that area. Run alone it needs
+  about 100 s when it fails.
+- Not done: no Critic, no Full Verify, no Windows native proof, no PO acceptance, no stamp, no install. Time tables
+  were not measured.
