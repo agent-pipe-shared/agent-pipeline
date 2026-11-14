@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 29d: 46 held patches exported from the build clone chain 64e8dfbcc..459153f6a
+# PO apply script for candidate 29d: 47 held patches exported from the build clone chain 64e8dfbcc..6bb5827a3
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -60,6 +60,7 @@ step 43-9c474c234 'fix(pipeline-state): keep pipeline-state.mjs under the author
 step 44-8c350c4f2 'test(native-host): drive a no-edit checkpoint through the stop finalizer'
 step 45-85f2df21b 'docs(backlog): record the further stop-pair reds of the 29d runs'
 step 46-459153f6a 'test(pins): split the source-bound pin into two cases'
+step 47-6bb5827a3 'test(verify-case-completion): restate five outgrown VCR01 site counts'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
