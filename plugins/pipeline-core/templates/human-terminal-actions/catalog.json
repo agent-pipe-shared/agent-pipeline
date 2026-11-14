@@ -485,6 +485,66 @@
       "platforms": null
     },
     {
+      "id": "spec-addendum",
+      "inventoryId": "spec-addendum",
+      "revision": 1,
+      "purpose": "Record the Spec addendum approval terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-spec-addendum"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "acknowledge-gate-definition-changes",
+      "inventoryId": "acknowledge-gate-definition-changes",
+      "revision": 1,
+      "purpose": "Record the gate-definition change acknowledgement terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-gate-change-acknowledgement"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "acknowledge-maintenance-red-check",
+      "inventoryId": "acknowledge-maintenance-red-check",
+      "revision": 1,
+      "purpose": "Record the pre-existing red check acknowledgement terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-maintenance-red-check"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
       "id": "critical-action-family",
       "inventoryId": "critical-action-family",
       "revision": 1,
