@@ -1357,7 +1357,7 @@ function printSummary(evidence, critical = false, exceptions = null) {
  * blocks unless the security gate mode is warn or off; a missing scanner is coverage (SKIPPED), not blocking.
  * Output carries path, rule and line only, never a matched value.
  */
-export async function scanClosePostimages({ rootDir, featureId, env = process.env, spawnFn, platform = process.platform, timeoutMs = DEFAULT_TIMEOUT_MS, gitStatusFn } = {}) {
+export async function scanClosePostimages({ rootDir, featureId, env = process.env, spawnFn, platform = process.platform, timeoutMs = DEFAULT_TIMEOUT_MS, gitStatusFn, assessTrustedExecutablePath: assessTrusted = assessTrustedExecutablePath } = {}) {
   const root = resolve(rootDir);
   const authority = resolveProjectAuthorityPaths({ rootDir: root });
   const authorityBlocked = new Set(["mixed", "invalid"]).has(authority.status);
@@ -1382,7 +1382,7 @@ export async function scanClosePostimages({ rootDir, featureId, env = process.en
   if (scanned.length === 0) return { ...base, status: "nothing-to-scan", blocking: false, scanned: 0, findings: [] };
   let inst = gitleaksAdapter.isInstalled(env);
   if (inst.installed) {
-    const assessed = assessTrustedExecutablePath(inst.path, { platform });
+    const assessed = assessTrusted(inst.path, { platform });
     inst = assessed.ok ? { installed: true, path: assessed.path } : { installed: false, status: assessed.status };
   }
   if (!inst.installed && typeof env?.HOME === "string" && env.HOME.length > 0) {

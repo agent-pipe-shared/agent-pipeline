@@ -2223,6 +2223,52 @@ security:
   assertTrue("rule provenance: the close summary lines carry the rule set of each scanner that ran", closeLines.find((l) => l.startsWith("semgrep: "))?.includes("pipeline-default-hardcoded-private-key"), JSON.stringify(closeLines));
 }
 
+// ---- C29 (C2): the close postimage scan decides blocking exactly as the full scan does ----------
+{
+  // Same gitleaks binary, same manifest, same root: the pre-transition check of the close's own generated files must block
+  // exactly when the full post-freeze scan would (exit 2), so a close that the final scan refuses is stopped before the
+  // irreversible State close, and one the final scan accepts is not stopped early. A missing scanner is coverage, not a block.
+  const scenarios = [];
+  for (const mode of ["blocking", "warn", "off"]) for (const [binary, path] of [["findings", gitleaksFindings], ["clean", gitleaksClean], ["crash", gitleaksCrash]]) scenarios.push({ mode, binary, env: { PIPELINE_GITLEAKS_PATH: path } });
+  scenarios.push({ mode: "blocking", binary: "missing", env: { PIPELINE_GITLEAKS_PATH: join(FIXTURE_ROOT, "does-not-exist") } });
+  for (const { mode, binary, env } of scenarios) {
+    const rootDir = makeRootDir(`postimage-parity-${mode}-${binary}`);
+    writeManifest(rootDir, `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: ${mode}
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+  thresholds:
+    block_on:
+      - critical
+      - high
+`);
+    writeFileSync(join(rootDir, "README.md"), "fixture\n");
+    commitFixture(rootDir);
+    mkdirSync(join(rootDir, "specs/feat-parity"), { recursive: true });
+    writeFileSync(join(rootDir, "specs/feat-parity/briefing-copy.md"), "generated close artifact\n");
+    // In the real close the postimage check runs on the uncommitted close outputs and the full scan on the frozen close commit.
+    const post = await scanModule.scanClosePostimages({ rootDir, featureId: "feat-parity", env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+    git(rootDir, "add", "-A");
+    git(rootDir, "commit", "-qm", "close commit");
+    const full = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+    assertEqual(`close postimage parity: mode ${mode}, gitleaks ${binary} -> blocks exactly when the full scan exits 2`, [post.blocking, post.scanned], [full.exitCode === 2, 1]);
+    assertTrue(`close postimage parity: mode ${mode}, gitleaks ${binary} -> no matched value in the result`, !JSON.stringify(post).includes("fixture-access-key") && !JSON.stringify(post).includes("fixture-api-key"), JSON.stringify(post));
+  }
+}
+
 // ---- Summary -------------------------------------------------------------------------------------
 try {
   rmSync(FIXTURE_ROOT, { recursive: true, force: true });
