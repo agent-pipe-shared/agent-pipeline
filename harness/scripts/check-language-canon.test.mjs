@@ -76,9 +76,10 @@ test("the complete German Operating Model copy retains its boundary-aware Verify
   assert.match(english, /Verify is boundary-aware \(ADR-0081\)/);
   assert.match(german, /Verify ist grenzbewusst \(ADR-0081\)/);
   // Restated N33c (D190): the English text states one full review, then correction-diff reviews until genuine PASS or an explicit PO
-  // decision, with no count; the German reference lines below are pinned unchanged until their own translation pass.
+  // decision, with no count. Restated candidate 29d: the German translation pass (29b C14) followed D190, so the German copy is pinned
+  // to the same rule as the English one: one full review, then correction-diff reviews, no round count, and no "at most four" line.
   assert.match(english, /one full independent Critic review and correction-diff reviews until genuine PASS or an explicit PO decision/);
   assert.doesNotMatch(english, /Four Critic calls total is the maximum/);
-  assert.match(german, /eine vollständige unabhängige Critic-Prüfung und bis zu drei Prüfungen des/);
-  assert.match(german, /Insgesamt sind höchstens vier/);
+  assert.match(german, /eine vollständige unabhängige Critic-Prüfung und Prüfungen des\s+Korrektur-Diffs bis zum echten PASS oder zu einer ausdrücklichen\s+PO-Entscheidung \(D190: keine Rundenzahl\)/);
+  assert.doesNotMatch(german, /Insgesamt sind höchstens vier/);
 });
