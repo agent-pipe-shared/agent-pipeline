@@ -145,5 +145,14 @@ no conflict). The build clone moved to `scratch/agent-out/c29e/clone2` (tip `577
   UNCHANGED 29d main tree too (NGSP1, `SDC-AUTHORITY-CAS reference-preimage-changed`), it is green on some runs and red
   on others, a different case each time (NGSP1, NGSP9E), and the chain does not touch that area. Run alone it needs
   about 100 s when it fails.
+- Final rehearsal `reh29e3` on the commit `1d2559300` (after the last change to any chain-touched path; later commits
+  touch only this README): apply script exit 0, registration 1227/0, case-completion valid, derived refresh 5 files in
+  one commit; a focused run of 14 suites on that tree (AC-121 pin 17/17, doc contracts, reference paths, doc
+  reconciliation, provenance checker, registration and case-completion checkers, module reachability, kernel closure,
+  toolchain, Trivy adapter and baseline, parallel reminder) is all green. The apply script was read: it names the new
+  patch files, holds no machine-specific path, needs a clean tree and the repository root, skips an already applied
+  subject.
+- `docs/state.md` is far over its 30000-byte cap (39 KB); the apply adds three decision paragraphs (ADR-0101..0103), so a
+  handover rotation (`handover-rotate.mjs`, extraction review first) is due before the post-apply state update.
 - Not done: no Critic, no Full Verify, no Windows native proof, no PO acceptance, no stamp, no install. Time tables
   were not measured.
