@@ -31,7 +31,8 @@ was needed; capability evidence is not an Advisor answer.
    arithmetic from prose. Preserve the separately adopted Reader-review course
    and evidence; it is not the independent technical design review.
    Spec acceptance criteria (shape of `templates/spec.md` §5; `submit-plan`
-   refuses otherwise with `PLR-HANDOFF-NO-CRITERION` / `PLR-HANDOFF-NO-JOURNEY`):
+   refuses otherwise with `PLR-HANDOFF-NO-CRITERION` / `PLR-HANDOFF-CRITERION-UNSUPPORTED` /
+   `PLR-HANDOFF-NO-JOURNEY`):
    a normative table with a header row and rows like
    `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |` (or numbered
    `1` / `R-2` rows under an acceptance-criteria heading). Each user-facing

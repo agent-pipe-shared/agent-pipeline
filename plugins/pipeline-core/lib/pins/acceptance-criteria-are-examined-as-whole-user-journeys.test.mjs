@@ -90,6 +90,8 @@ test("J1/G6 a criterion row the registration cannot locate is refused at the han
   assert.match(verdict.message, /Also: .*AC-1/u, "the journey gap of the same Spec is named in the same refusal");
   const text = planHandoffRefusal("submit-plan", verdict);
   assert.match(text, /Repair: re-render every named criterion row/u);
+  assert.match(text, /registration refuses the same rows as CAC-CRITERION-UNSUPPORTED/u, "the registration's own code is named");
+  assert.match(text, /re-rendered user-facing row needs its `Journeys:` and `Asserts:`/u, "an unlocatable row's journey gap is not visible yet, so the repair names it");
   assert.match(text, /then run submit-plan again/u);
   const alone = await handoff(spec(JOURNEYED, INTERNAL, "", unlocated));
   assert.equal(alone.code, "PLR-HANDOFF-CRITERION-UNSUPPORTED");

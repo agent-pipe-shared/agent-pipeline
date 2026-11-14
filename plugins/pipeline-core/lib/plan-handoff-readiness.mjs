@@ -95,7 +95,7 @@ function checkState(root, path) {
 // One runnable repair per not-ready code. Every repair is an edit the author can make plus the command to re-run.
 const HANDOFF_REPAIRS = Object.freeze({
   'PLR-HANDOFF-NO-CRITERION': 'add a normative acceptance-criterion table to the Spec (header row, then rows such as `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |`, or numbered `1` / `R-2` rows under an acceptance-criteria heading), commit it',
-  'PLR-HANDOFF-CRITERION-UNSUPPORTED': 're-render every named criterion row in one of the supported shapes listed above (the criterion text need not change) and, where the refusal also names criteria without a journey, add the journey and its asserted effect in the same edit, commit it',
+  'PLR-HANDOFF-CRITERION-UNSUPPORTED': 're-render every named criterion row in one of the supported shapes listed above (the criterion text need not change); a re-rendered user-facing row needs its `Journeys:` and `Asserts:` clause in the same edit, because a row the parser cannot locate is not checked for it yet; add the clause to every criterion the refusal also names as without a journey, commit it',
   // A getter: spec-journey-coverage.mjs and this module sit in one import cycle through the host parser, so the constant is read at call time.
   get 'PLR-HANDOFF-NO-JOURNEY'() { return JOURNEY_REPAIR; },
   'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
@@ -167,9 +167,10 @@ export function inspectPlanDeliveryHandoff(input, deps = {}) {
       : `${unjourneyed.length} user-facing acceptance criteri${unjourneyed.length === 1 ? 'on' : 'a'} of the Spec ${unjourneyed.length === 1 ? 'is' : 'are'} not examined as a whole journey: ${unjourneyed.slice(0, 20).map((entry) => `${entry.id} (no ${entry.missing.map((part) => (part === 'journeys' ? 'journey named' : 'asserted effect')).join(', no ')})`).join('; ')}${unjourneyed.length > 20 ? '; ...' : ''}`;
     // C29 G6 (Glossover): one admitted row was enough here, so a row the registration cannot locate (`- **AC-1 (part 1):** ...`) passed this
     // check and was refused by submit-plan's registration afterwards, and the journey gaps only surfaced on the next attempt. The registration's
-    // own row check runs here too, and every not-ready class is named in ONE refusal, so one Spec edit can fix all of them.
+    // own row check runs here too, and both classes it can see are named in ONE refusal. A row the parser cannot locate is not
+    // checked for its journeys yet, so the repair tells the author to give a re-rendered user-facing row its journeys in the same edit.
     const rows = inspectSpecCriterionRows(source);
-    if (!rows.ok) return refuse('PLR-HANDOFF-CRITERION-UNSUPPORTED', `${rows.message}${journeyText === null ? '' : ` Also: ${journeyText}`}`);
+    if (!rows.ok) return refuse('PLR-HANDOFF-CRITERION-UNSUPPORTED', `${rows.message} (The registration refuses the same rows as ${rows.code}.)${journeyText === null ? '' : ` Also: ${journeyText}`}`);
     if (journeyText !== null) return refuse('PLR-HANDOFF-NO-JOURNEY', journeyText);
 
     // Check paths: shape (the briefing validator's own rule) first for every path, then trackability and presence.
