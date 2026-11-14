@@ -2151,7 +2151,7 @@ export function observeGovernedItemIntegrationReadiness({root,admissionDeadline=
     // integration record, so commit evidence alone decides; every other registry fault still refuses.
     let native,nativeRegistry='read';
     // C19I-W236: the admission's readiness read waits for a sibling launch's registry lock within the admission deadline (only a lock met before the read ran is retried).
-    try{native=retryPublishWhileLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{entered.value=true;return readNativeIntegratedSlices({governed,repository,boundary}).integrated;}),admissionDeadline,publishRetry);}
+    try{native=retryPublishWhileLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{entered.value=true;return readNativeIntegratedSlices({governed,repository,boundary,checkSource:'worktree'}).integrated;}),admissionDeadline,publishRetry);}
     catch(error){if(!sessionAuthorityRegistryAbsent(error))throw error;native=[];nativeRegistry='absent';}
     const integrated=[...new Set([...native,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})])];
     const handle=Object.freeze({});itemReadinessHandles.set(handle,{queueSha256:nativeManagedDigest(governed.queue),integrated,observedAt:Date.now()});
@@ -2273,12 +2273,16 @@ export function inspectNativeMemberRecords({boundary,port,producer,inspectMany=i
   const refs=producer.record.members.map(row=>row.memberRef);
   return memoPerAdmission(boundary,JSON.stringify(['native-member-records',refs]),()=>inspectMany({boundary,producerPort:port,memberRefs:refs}));
 }
-export function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
-  const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null]);
-  const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}));
+// C29 K-37 follow-up: checkSource 'commit' (default) reads an integrated item's check sources from the candidate commit, so an in-flight
+// edit never aborts a stop; 'worktree' is the dependency-readiness read of observeGovernedItemIntegrationReadiness, which still refuses
+// while an integrated item's checker differs in the working tree (a weakened checker must not release a dependent, NGHS12).
+export function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null,checkSource='commit'}) {
+  if(checkSource!=='commit'&&checkSource!=='worktree')throw new TypeError('checkSource must be commit or worktree');
+  const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null,checkSource]);
+  const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only,checkSource}));
   return {integrated:[...memo.integrated],releasedPendingHashes:[...memo.releasedPendingHashes]};
 }
-function computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}) {
+function computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only,checkSource}) {
   const cancelled=new Set(skipCancelled?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[]);
   const port=createNativeGoldfishAuthorityProducerPort({repository});
       const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port}),read=readNativeManagedInventory(repository,'native-goldfish')[0];
@@ -2301,7 +2305,9 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
         // C29 K-37 (Glossover): integration is a fact about commits. The working-tree snapshot threw item-check-source-not-candidate whenever an
         // in-flight dispatch had edited an earlier item's check file in its own scope, and that aborted the whole stop of the dispatch before its
         // host commit. The earlier item's check sources are read from the candidate commit itself; a later commit that changed them still drops it.
-        const current=itemCheckCommittedFiles(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate);
+        const current=checkSource==='worktree'
+          ?itemCheckSnapshot(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate).files
+          :itemCheckCommittedFiles(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate);
         if(current===null||nativeManagedDigest(current)!==nativeManagedDigest(row.value.files))continue;
         integrated.push(item.id);
       }
