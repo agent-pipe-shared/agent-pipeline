@@ -555,6 +555,18 @@ const cases = [
     assert.equal(facts.commits, 1);
     assert.deepEqual(diagEntries(commonDir), []);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF17b", name: "C29 K-36/K-45: a stop before any edit (checkpoint, changedPaths []) is recorded as a checkpoint with no stop-failure diagnostic and no commit", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "checkpoint", report: "Stopped on a briefed stop condition before any edit. CONTINUATION CARD -- done: recon; remaining: all; next step: coordinator decides.", changedPaths: [] }) } }] } })}\n`);
+    const stopped = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
+    assert.equal(stopped.status, "checkpoint-recorded", `${stopped.code} ${JSON.stringify(stopped)}`);
+    assert.equal(stopped.code, "NGHF-CHECKPOINT-RESERVATION-LIVE");
+    assert.equal(stopped.commit, null);
+    assert.deepEqual(diagEntries(commonDir), [], "no stop-failure diagnostic, so nothing to heal");
+    assert.equal(facts.commits, 0);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
   { id: "NGHF18", name: "A checkpoint leaves the reservation live and names both continuation routes; a repeated checkpoint is idempotent", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
     writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
     const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
