@@ -294,7 +294,7 @@ test("PF-64: the grant script's success result carries a continuationMessage nam
 test("PF-69: the native-host checkpoint lets a child whose every targeted check is green return succeeded, otherwise blocked with the interim report", () => {
   const text = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
   assert.match(text, /if every targeted check of your briefing is already green and no work remains, return the succeeded contract with your report instead of blocked/u);
-  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "checkpoint" \(changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form\) and a report carrying the condensed report plus a continuation card/u);
+  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "checkpoint" \(changedPaths listing the files changed so far; if no file changed so far, changedPaths is \[\] and the form stays this JSON\) and a report carrying the condensed report plus a continuation card/u);
   // D31 pin update: validateNativeGoldfishFinal accepts only succeeded|checkpoint, so asserting "blocked" here pinned a refused word.
   const plain = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: false });
   assert.doesNotMatch(plain, /succeeded contract/u, "only the native-host variant changes for PF-69");
@@ -309,7 +309,7 @@ test("D31-BUDGET-NOTICE-1: the native-host checkpoint notice names outcome check
   assert.match(text, /changedPaths/u);
   assert.match(text, /done \/ remaining \/ next step/u);
   assert.match(text, /CONTINUATION CARD -- done: \.\.\.; remaining: \.\.\.; next step: \.\.\./u);
-  assert.match(text, /no file changed so far, the plain-text stop report is the only legal form/u);
+  assert.match(text, /no file changed so far, changedPaths is \[\] and the form stays this JSON/u, "C29 K-36: the host never read a plain-text stop report");
 });
 
 test("D31-BUDGET-NOTICE-2: no native-host budget text instructs outcome blocked any more", () => {

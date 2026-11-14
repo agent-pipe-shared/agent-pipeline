@@ -127,7 +127,9 @@ function finalShapeCondition(value, binding, allowCheckpoint) {
   if (value.report.trim() === "") return named("report-empty");
   if (Buffer.byteLength(value.report, "utf8") > 1024 * 1024) return named("report-oversize");
   if (!Array.isArray(value.changedPaths)) return named("changed-paths-type");
-  if (value.changedPaths.length === 0) return named("changed-paths-empty");
+  // C29 K-36 (Glossover): a Goldfish that stops on a stop condition before any edit hands back a checkpoint with no changed path; the
+  // checkpoint commits nothing and keeps the reservation live, so an empty list is admitted for it. A success still names its files.
+  if (value.changedPaths.length === 0 && value.outcome !== "checkpoint") return named("changed-paths-empty");
   if (value.changedPaths.length > 64) return named("changed-paths-too-many");
   if (!value.changedPaths.every(normalizedPath)) return named("path-not-normalized");
   if (new Set(value.changedPaths).size !== value.changedPaths.length) return named("paths-duplicate");

@@ -609,10 +609,18 @@ test("(xiii) D31: the built briefing tells the Goldfish to return outcome checkp
   assert.match(paragraph, /Never invent another `outcome` word/u);
 });
 
-test("(xiv) D31: the plain-text stop report is no longer the unconditional stop form, only the no-file case", () => {
-  const { paragraph } = renderedReturnContract();
+test("(xiv) D31, C29 K-36: no stop is a plain-text report; a stop before any edit is the checkpoint JSON with changedPaths [], and the host admits it", () => {
+  const { paragraph, binding, text } = renderedReturnContract();
   assert.doesNotMatch(paragraph, /otherwise stop and return a plain-text stop report instead of the JSON/u);
-  assert.match(paragraph, /no file at all[^.]*plain-text stop report/u);
+  assert.doesNotMatch(paragraph, /plain-text stop report is the one legal form/u, "Glossover K-36: the host never read that form; it failed NGHR-FINAL-JSON");
+  assert.match(paragraph, /no file at all has been changed[^.]*`checkpoint` and `changedPaths` `\[\]`/u);
+  const noChange = exampleWith(text, { outcome: "checkpoint", report: "Stopped on a stop condition before any edit. CONTINUATION CARD -- done: recon; remaining: all; next step: coordinator decides.", changedPaths: [] });
+  const stopped = validateNativeGoldfishFinal(noChange, { binding, allowCheckpoint: true });
+  assert.equal(stopped.ok, true, JSON.stringify(stopped));
+  assert.deepEqual(stopped.final.changedPaths, []);
+  const emptySuccess = validateNativeGoldfishFinal(exampleWith(text, { report: "report", changedPaths: [] }), { binding, allowCheckpoint: true });
+  assert.equal(emptySuccess.ok, false, "a success still names the files it changed");
+  assert.equal(emptySuccess.detail?.condition, "changed-paths-empty");
 });
 
 test("(xv) D31: the briefing's JSON example still validates with outcome succeeded", () => {
