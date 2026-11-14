@@ -1,0 +1,2 @@
+plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs

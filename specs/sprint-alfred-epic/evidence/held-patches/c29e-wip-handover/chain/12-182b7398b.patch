@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 348cda4745c7cc33f559f06397c7759e4c123b11..48f2ee5b3edc6bc92464293c9a40ca33836420d9 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -1393,7 +1393,7 @@ check("Antigravity Critic template carries a guard-admissible native envelope",
+   assert.equal(ROOT_CRITIC_TEMPLATE, VENDORED_CRITIC_TEMPLATE);
+   assert.match(ROOT_CRITIC_TEMPLATE, /Antigravity native dispatch has a deliberately different carrier/);
+   assert.ok(RENDERED_AGY_CRITIC_ENVELOPE.startsWith("templates/prompts/critic-review.md\n"));
+-  assert.match(RENDERED_AGY_CRITIC_ENVELOPE, /^scope-marker: scope:group-1$/mu, "the rendered split-part envelope carries its scope-marker row");
++  assert.match(RENDERED_AGY_CRITIC_ENVELOPE, /^\s*scope-marker: scope:group-1$/mu, "the rendered split-part envelope carries its scope-marker row");
+   assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /\{\{/u, "every placeholder is rendered");
+   assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /(?<![\w-])(you are|please|examine|look at|review)\b/i);
+ });

@@ -1,0 +1,190 @@
+diff --git a/plugins/pipeline-core/lib/critic-briefing-build.mjs b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+index b11e2cceda05eebb31e9a8603e37b6ab613583fe..68d463e25aa146692d50541c4d253fcb15a700cd 100644
+--- a/plugins/pipeline-core/lib/critic-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+@@ -172,7 +172,9 @@ function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, r
+     else if (name === "TRIGGER_ROW") lines.push(line.replace(`{{${name}}}`, trigger));
+     else if (name === "RULESET_SHA") lines.push(line.replace(`{{${name}}}`, facts.rulesetSha));
+     else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the Antigravity route model of the Critic duty"))); }
++    // C29e T5: one part of a split review names its scope marker; the template tells the Critic to begin trajectory_evidence with it. A whole-range review has no row.
++    else if (name === "SCOPE_MARKER") { if (entry) lines.push(line.replace(`{{${name}}}`, entry.scopeMarker)); }
+     else refuse("CBB-TEMPLATE-PLACEHOLDER", `the Antigravity envelope holds a placeholder this builder does not know: ${name}`);
+   }
+-  return { entryId: entry?.id ?? null, text: `${lines.join("\n")}\n`, placeholders, ...(entry ? { limitation: `a split entry on Antigravity: the envelope cannot carry the instruction to begin trajectory_evidence with "${entry.scopeMarker} "` } : {}) };
++  return { entryId: entry?.id ?? null, text: `${lines.join("\n")}\n`, placeholders };
+ }
+diff --git a/plugins/pipeline-core/roles/critic.md b/plugins/pipeline-core/roles/critic.md
+index 1bb875441bcd9e16290c17bb3983da986e91627d..598cc5737ddf34894f1ae9bd07a6cd4c50f2db6e 100644
+--- a/plugins/pipeline-core/roles/critic.md
++++ b/plugins/pipeline-core/roles/critic.md
+@@ -133,7 +133,7 @@ What you explicitly examined and found in order — including dropped Phase-1 ca
+ 
+ ### 5.3 Trajectory check (mandatory section)
+ 
+-- **Rule:** Verify against the **machine evidence artifacts**: were the checks required by spec/briefing actually executed — right command, on the reviewed state, exit code recorded? Any verification step skipped, substituted, or "not verifiable" without justification? **Standard check item: authorship** — do the production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records in the briefing/evidence), or from the orchestrator session itself? Orchestrator-authored production diffs outside the stage-0 fast path (`roles/elephant.md` — *EL-01*) = a lifecycle-violation finding (EL-01/EL-16), severity at least major. Verdict three-valued (vocabulary identical to the plugin artifacts): `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
++- **Rule:** Verify against the **machine evidence artifacts**: were the checks required by spec/briefing actually executed — right command, on the reviewed state, exit code recorded? Any verification step skipped, substituted, or "not verifiable" without justification? **Standard check item: authorship** — do the production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records in the briefing/evidence), or from the orchestrator session itself? Orchestrator-authored production diffs outside the stage-0 fast path (`roles/elephant.md` — *EL-01*) = a lifecycle-violation finding (EL-01/EL-16), severity at least major. A commit with the trailer `Dispatch: stage-0 (elephant)` that touches no production path (only tests, pins, documents or generated files) is no finding; one that touches production code is judged against the stage-0 criteria in EL-01. Verdict three-valued (vocabulary identical to the plugin artifacts): `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
+ - **Why:** A fluent output with skipped verification is more dangerous than a visible failure (output- AND trajectory-evaluation).
+ - **Check:** Section present in every report; verdict references the artifact paths.
+ 
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index cc564c0c0e14c53351429403606db6d43f06249d..75c5efc8e76b7c2d3fba94d7157d818d1edaa862 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -36,11 +36,11 @@
+     },
+     {
+       "path": "roles/critic.md",
+-      "rawSha256": "b9b8ec8f6b1c7b20242f1c32355cd181ea4397536a2ef7276f05c9ab281b4689"
++      "rawSha256": "859d0ce62fbb4027dcca323490a678604b6ff569620adeb7460152f964186e51"
+     },
+     {
+       "path": "templates/prompts/critic-review.md",
+-      "rawSha256": "d35c9d6e95d911ae854ecf256012c31fe618afac6e848ca1944bf9689f8d0716"
++      "rawSha256": "93c6b34e47a6ae657d899905bec7bee477dba05aa9dac83216fcc80263140a7a"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index 814040d350a23d8fcdb1818eca5b1a1a9cdff173..606c0ef7f4dba68491dc65ccccbb7f0ae00d69c9 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -10,6 +10,7 @@ import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatc
+ import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
+ import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+ import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
++import { attributeVerdict } from "../lib/critic-split.mjs";
+ 
+ const TEMPLATE = readFileSync(fileURLToPath(new URL("../templates/prompts/critic-review.md", import.meta.url)), "utf8");
+ 
+@@ -286,6 +287,30 @@ test("Antigravity gets the template's paths-only envelope with absolute paths, w
+   for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
+ });
+ 
++test("C29e T5: each Antigravity split part carries its scope-marker row, the Contamination Rule admits it, and a verdict that begins with it is attributed to that part", () => {
++  const preflight = deltaSplitPreflight();
++  const { briefings } = criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" });
++  assert.deepEqual(briefings.map(({ entryId }) => entryId), ["group-1", "group-2"]);
++  for (const { entryId, text, placeholders, limitation } of briefings) {
++    const lines = text.trimEnd().split("\n");
++    assert.equal(lines.filter((line) => line.startsWith("scope-marker: ")).length, 1, "exactly one scope-marker row per part");
++    assert.ok(lines.includes(`scope-marker: scope:${entryId}`));
++    assert.deepEqual(placeholders, ["MODEL"]);
++    assert.equal(limitation, undefined, "the envelope now carries the marker, so no limitation is reported");
++    assert.doesNotMatch(text, CRITIC_DISPATCH_PROSE);
++    for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
++    const verdict = { trajectory_evidence: `scope:${entryId} the evidence artifacts match the claims` };
++    assert.equal(attributeVerdict(preflight.split, verdict), entryId);
++  }
++  const whole = criticBriefingLib.renderCriticBriefings({ preflight: { ...preflight, split: undefined }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" }).briefings[0];
++  assert.doesNotMatch(whole.text, /^scope-marker:/mu, "a whole-range review has no scope-marker row");
++});
++
++test("C29e T5: the Critic template tells a split part to begin trajectory_evidence with its marker", () => {
++  assert.match(TEMPLATE, /^ {3}scope-marker: \{\{SCOPE_MARKER\}\}$/mu);
++  assert.match(TEMPLATE, /begin `trajectory_evidence` with that marker and a space/u);
++});
++
+ test("R14 (Antigravity run 3): on Antigravity the briefing use names the prepare step a read-only Critic call needs", () => {
+   const steps = stub({ "critic-dispatch-preflight.mjs": ok({ ...deltaSplitPreflight(), split: undefined }), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
+   const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
+diff --git a/plugins/pipeline-core/templates/prompts/critic-review.md b/plugins/pipeline-core/templates/prompts/critic-review.md
+index 0650bfd78c11e4bd86337cdbe87628bb637d7c00..dd7c896f03777128e0563560d25b01912c4653c3 100644
+--- a/plugins/pipeline-core/templates/prompts/critic-review.md
++++ b/plugins/pipeline-core/templates/prompts/critic-review.md
+@@ -182,7 +182,8 @@ USAGE (Elephant)
+    contamination guard, so it MUST contain the rendered reference envelope,
+    never the full body below. Copy this exact envelope after replacing only its
+    placeholders; repeat a `commit`, `guardrail`, or `evidence` row when there
+-   is more than one. The first line is this canonical template path; the
++   is more than one. The `scope-marker` row appears only for one part of a
++   split review and is dropped otherwise. The first line is this canonical template path; the
+    Critic reads it itself, then resolves the remaining bare references. Do not
+    add a greeting, role description, summary, or any other prose around it.
+ 
+@@ -196,6 +197,7 @@ USAGE (Elephant)
+    route: {{TRIGGER_ROW}}
+    ruleset-sha: {{RULESET_SHA}}
+    model: {{MODEL}}
++   scope-marker: {{SCOPE_MARKER}}
+    - **Tool budget (hard cap, first-class field):** ≤30 tool uses.
+    ```
+    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
+@@ -461,7 +463,10 @@ Hunt systematically, in this order:
+    Orchestrator-authored production diffs outside the stage-0 fast
+    path (`roles/elephant.md` — EL-01) = a
+    lifecycle-violation finding (EL-01/EL-16), severity at least
+-   major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
++   major. A commit with the trailer `Dispatch: stage-0 (elephant)` that
++   touches no production path (only tests, pins, documents or generated
++   files) is no finding; one that touches production code is judged against
++   the stage-0 criteria in EL-01. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
+    primary trailer evidence for exactly ONE fact — WHICH work package the diff
+    belongs to (diff authorship) — it does NOT by itself evidence who performed
+    the commit act. A `Commit-Act: orchestrator` trailer line, when present, is
+@@ -620,6 +625,9 @@ budget does not license it.
+ 4. **Briefing violations observed** (contaminating input, missing artifacts) or "none".
+ 5. No overall score. Binary pass/fail ONLY if the dispatch requests it here:
+    {{VERDICT_REQUESTED: "yes — pass/fail required" | "no"}}
++6. **One part of a split review:** when your input names a scope marker (a
++   `scope-marker:` row, or a batch scope saying to begin trajectory_evidence
++   with one), begin `trajectory_evidence` with that marker and a space.
+ 
+ <!-- T1 runner-native isolation or standing functional-equivalent lane only:
+ request this JSON-shaped verdict through the selected runner's native mechanism
+diff --git a/roles/critic.md b/roles/critic.md
+index 1bb875441bcd9e16290c17bb3983da986e91627d..598cc5737ddf34894f1ae9bd07a6cd4c50f2db6e 100644
+--- a/roles/critic.md
++++ b/roles/critic.md
+@@ -133,7 +133,7 @@ What you explicitly examined and found in order — including dropped Phase-1 ca
+ 
+ ### 5.3 Trajectory check (mandatory section)
+ 
+-- **Rule:** Verify against the **machine evidence artifacts**: were the checks required by spec/briefing actually executed — right command, on the reviewed state, exit code recorded? Any verification step skipped, substituted, or "not verifiable" without justification? **Standard check item: authorship** — do the production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records in the briefing/evidence), or from the orchestrator session itself? Orchestrator-authored production diffs outside the stage-0 fast path (`roles/elephant.md` — *EL-01*) = a lifecycle-violation finding (EL-01/EL-16), severity at least major. Verdict three-valued (vocabulary identical to the plugin artifacts): `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
++- **Rule:** Verify against the **machine evidence artifacts**: were the checks required by spec/briefing actually executed — right command, on the reviewed state, exit code recorded? Any verification step skipped, substituted, or "not verifiable" without justification? **Standard check item: authorship** — do the production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records in the briefing/evidence), or from the orchestrator session itself? Orchestrator-authored production diffs outside the stage-0 fast path (`roles/elephant.md` — *EL-01*) = a lifecycle-violation finding (EL-01/EL-16), severity at least major. A commit with the trailer `Dispatch: stage-0 (elephant)` that touches no production path (only tests, pins, documents or generated files) is no finding; one that touches production code is judged against the stage-0 criteria in EL-01. Verdict three-valued (vocabulary identical to the plugin artifacts): `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
+ - **Why:** A fluent output with skipped verification is more dangerous than a visible failure (output- AND trajectory-evaluation).
+ - **Check:** Section present in every report; verdict references the artifact paths.
+ 
+diff --git a/templates/prompts/critic-review.md b/templates/prompts/critic-review.md
+index 0650bfd78c11e4bd86337cdbe87628bb637d7c00..dd7c896f03777128e0563560d25b01912c4653c3 100644
+--- a/templates/prompts/critic-review.md
++++ b/templates/prompts/critic-review.md
+@@ -182,7 +182,8 @@ USAGE (Elephant)
+    contamination guard, so it MUST contain the rendered reference envelope,
+    never the full body below. Copy this exact envelope after replacing only its
+    placeholders; repeat a `commit`, `guardrail`, or `evidence` row when there
+-   is more than one. The first line is this canonical template path; the
++   is more than one. The `scope-marker` row appears only for one part of a
++   split review and is dropped otherwise. The first line is this canonical template path; the
+    Critic reads it itself, then resolves the remaining bare references. Do not
+    add a greeting, role description, summary, or any other prose around it.
+ 
+@@ -196,6 +197,7 @@ USAGE (Elephant)
+    route: {{TRIGGER_ROW}}
+    ruleset-sha: {{RULESET_SHA}}
+    model: {{MODEL}}
++   scope-marker: {{SCOPE_MARKER}}
+    - **Tool budget (hard cap, first-class field):** ≤30 tool uses.
+    ```
+    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
+@@ -461,7 +463,10 @@ Hunt systematically, in this order:
+    Orchestrator-authored production diffs outside the stage-0 fast
+    path (`roles/elephant.md` — EL-01) = a
+    lifecycle-violation finding (EL-01/EL-16), severity at least
+-   major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
++   major. A commit with the trailer `Dispatch: stage-0 (elephant)` that
++   touches no production path (only tests, pins, documents or generated
++   files) is no finding; one that touches production code is judged against
++   the stage-0 criteria in EL-01. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
+    primary trailer evidence for exactly ONE fact — WHICH work package the diff
+    belongs to (diff authorship) — it does NOT by itself evidence who performed
+    the commit act. A `Commit-Act: orchestrator` trailer line, when present, is
+@@ -620,6 +625,9 @@ budget does not license it.
+ 4. **Briefing violations observed** (contaminating input, missing artifacts) or "none".
+ 5. No overall score. Binary pass/fail ONLY if the dispatch requests it here:
+    {{VERDICT_REQUESTED: "yes — pass/fail required" | "no"}}
++6. **One part of a split review:** when your input names a scope marker (a
++   `scope-marker:` row, or a batch scope saying to begin trajectory_evidence
++   with one), begin `trajectory_evidence` with that marker and a space.
+ 
+ <!-- T1 runner-native isolation or standing functional-equivalent lane only:
+ request this JSON-shaped verdict through the selected runner's native mechanism

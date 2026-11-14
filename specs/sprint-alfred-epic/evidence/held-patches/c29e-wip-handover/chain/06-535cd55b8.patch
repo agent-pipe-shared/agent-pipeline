@@ -1,0 +1,201 @@
+diff --git a/harness/scripts/check-dispatch-provenance.mjs b/harness/scripts/check-dispatch-provenance.mjs
+index aebe8d91eb60502afa4d604ba78808f4bf4f2a60..abd7b840f106a2ade1ea73d9433a7292833f9efb 100644
+--- a/harness/scripts/check-dispatch-provenance.mjs
++++ b/harness/scripts/check-dispatch-provenance.mjs
+@@ -30,14 +30,13 @@
+  *       stage-0 commit in this repo has used to date (verified against
+  *       a54f53b1, bf6abb76, 4a7a750f, 8b8181639, 034ce1d2, 14743192 via
+  *       `git log --all --grep="stage-0 fast path" -i`); AND
+- *   (b) the commit's own diff independently satisfies EL-01's two
+- *       MECHANICALLY-CHECKABLE caps: at most `STAGE0_MAX_FILES` files
+- *       changed, at most `STAGE0_MAX_LINES` changed lines (additions +
++ *   (b) the commit's own diff independently satisfies EL-01's three
++ *       MECHANICALLY-CHECKABLE caps (ADR-0101): at most `STAGE0_MAX_FILES`
++ *       files changed, at most `STAGE0_MAX_LINES` changed lines (additions +
+  *       deletions, summed over every changed file in the commit — not just
+- *       the "source" subset (b) is checked against). EL-01's own text says
+- *       "≤ 2 files, ≤ ~25 diff lines"; the "~" has no more precise number
+- *       anywhere in that text, so this module treats 25 as the literal
+- *       upper bound for a mechanical yes/no check (see STAGE0_MAX_LINES).
++ *       the "source" subset (b) is checked against), and at most
++ *       `STAGE0_MAX_PRODUCTION_LINES` of them in production paths (a code
++ *       extension and no test shape, `isStage0ProductionPath`).
+  * A commit whose message contains the phrase but which FAILS the mechanical
+  * caps is NOT treated as exempt — it is `MISSING-DISPATCH-PROVENANCE` with
+  * `reason=stage0-claim-caps-exceeded`, a reason string distinct from a bare
+@@ -240,25 +239,39 @@ export function hasStage0Phrase(message) {
+   return STAGE0_PHRASE_RE.test(message);
+ }
+ 
+-// EL-01 (roles/elephant.md): "≤ 2 files, ≤ ~25 diff lines". The "~" has no
+-// more precise number anywhere in that text; this module treats 25 as the
+-// literal upper bound for a mechanical yes/no caps check (module header).
+-export const STAGE0_MAX_FILES = 2;
+-export const STAGE0_MAX_LINES = 25;
+-
+-/** `{ filesChanged, linesChanged, withinCaps }` from a commit's own numstat
+- *  file list (module header, "THE STAGE-0 EXEMPTION", condition (b)).
+- *  `linesChanged` sums additions + deletions over EVERY changed file in the
+- *  commit, not only the "source" subset the file-type filter selects — the
+- *  caps are a whole-commit-diff property. A binary file (numstat "-\t-")
+- *  contributes 0 lines but still counts toward `filesChanged`. */
++// EL-01 (roles/elephant.md, ADR-0101): "≤ 3 files, ≤ 60 changed lines, ≤ 25
++// of those lines production logic (code files that are not tests)".
++export const STAGE0_MAX_FILES = 3;
++export const STAGE0_MAX_LINES = 60;
++export const STAGE0_MAX_PRODUCTION_LINES = 25;
++
++// ADR-0101's "production logic": a code file that is not a test. This module's
++// mechanical reading of it: a code extension, and none of the test shapes.
++const STAGE0_CODE_FILE_RE = /\.(?:mjs|cjs|js|ts|sh|bash|ps1|py)$/u;
++const STAGE0_TEST_FILE_RE = /(?:\.test\.|\.fixture\.|(?:^|\/)pins\/)/u;
++
++/** True when a changed path counts toward the production-logic cap. */
++export function isStage0ProductionPath(path) {
++  return typeof path === "string" && STAGE0_CODE_FILE_RE.test(path) && !STAGE0_TEST_FILE_RE.test(path);
++}
++
++/** `{ filesChanged, linesChanged, productionLinesChanged, withinCaps }` from
++ *  a commit's own numstat file list (module header, "THE STAGE-0 EXEMPTION",
++ *  condition (b)). `linesChanged` sums additions + deletions over EVERY
++ *  changed file in the commit, not only the "source" subset the file-type
++ *  filter selects — the caps are a whole-commit-diff property;
++ *  `productionLinesChanged` sums the same over the production paths only. A
++ *  binary file (numstat "-\t-") contributes 0 lines but still counts toward
++ *  `filesChanged`. */
+ export function stage0CapsMet(files) {
+   const filesChanged = files.length;
+   const linesChanged = files.reduce((sum, f) => sum + f.added + f.deleted, 0);
++  const productionLinesChanged = files.reduce((sum, f) => sum + (isStage0ProductionPath(f.path) ? f.added + f.deleted : 0), 0);
+   return {
+     filesChanged,
+     linesChanged,
+-    withinCaps: filesChanged <= STAGE0_MAX_FILES && linesChanged <= STAGE0_MAX_LINES,
++    productionLinesChanged,
++    withinCaps: filesChanged <= STAGE0_MAX_FILES && linesChanged <= STAGE0_MAX_LINES && productionLinesChanged <= STAGE0_MAX_PRODUCTION_LINES,
+   };
+ }
+ 
+@@ -496,8 +509,9 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate,
+ 
+     findings.push(
+       `MISSING-DISPATCH-PROVENANCE ${sha} reason=stage0-claim-caps-exceeded -- "stage-0 fast path" phrase present but ` +
+-      `mechanical caps not met (${caps.filesChanged} files / ${caps.linesChanged} changed lines; cap is ` +
+-      `<=${STAGE0_MAX_FILES} files / <=${STAGE0_MAX_LINES} lines, EL-01); not recognized as an exemption -- either a false ` +
++      `mechanical caps not met (${caps.filesChanged} files / ${caps.linesChanged} changed lines / ` +
++      `${caps.productionLinesChanged} production lines; cap is <=${STAGE0_MAX_FILES} files / <=${STAGE0_MAX_LINES} lines / ` +
++      `<=${STAGE0_MAX_PRODUCTION_LINES} production lines, EL-01, ADR-0101); not recognized as an exemption -- either a false ` +
+       `self-declaration or a caps violation, either way worth a human look`,
+     );
+   }
+@@ -546,10 +560,12 @@ export function summaryLine({ range, coverage }) {
+       `${coverage.commitsExempt} recognized stage-0 exemption(s), ${coverage.commitsSignedArtifactIntegration ?? 0} signed-artifact integration(s), ${coverage.findingCount} finding(s), ` +
+       `${coverage.recordShapeFindingCount ?? 0} dispatch-record-shape finding(s) (reported, not yet fatal -- ` +
+       `pipeline.dispatch-record-shape-is-fatal).`,
+-    "WHAT THIS CHECK CANNOT DO: it cannot verify EL-01's semantic criteria (no architecture/schema/public-API/test/" +
+-      "guardrail-hook-CI/dependency/security-surface change) or the undefined \"risk flag\" EL-01 names but nowhere " +
++    "WHAT THIS CHECK CANNOT DO: it cannot verify EL-01's semantic criteria (no architecture/schema/public-API/" +
++      "guardrail-hook-CI/dependency/security-surface change, one concern, no test of the Elephant's own new logic) or the " +
++      "undefined \"risk flag\" EL-01 names but nowhere " +
+       "defines a location/format for; the \"stage-0 fast path\" phrase match is a self-declaration read from commit " +
+-      "prose, not independent proof -- only the two mechanical caps (<=2 files, <=25 changed lines) are independently " +
++      "prose, not independent proof -- only the three mechanical caps (<=3 files, <=60 changed lines, <=25 changed lines " +
++      "in code files that are not tests) are independently " +
+       "checked. A legacy Goldfish or Critic \"Dispatch:\" trailer is validated on its shape only, never against a real task registry. A merge " +
+       "commit shows no per-file diff to this check and is silently out of scope on its own account; the commits it " +
+       "merged are still checked individually if present in the range.",
+diff --git a/harness/scripts/check-dispatch-provenance.test.mjs b/harness/scripts/check-dispatch-provenance.test.mjs
+index f7262aae317dfabbfa2965721b04871ecb4635ed..1f6af9fd3293d88c6691a3dc157cc0fef8d763c1 100644
+--- a/harness/scripts/check-dispatch-provenance.test.mjs
++++ b/harness/scripts/check-dispatch-provenance.test.mjs
+@@ -27,6 +27,7 @@ import {
+   checkDispatchRecordShape,
+   formatRange,
+   hasStage0Phrase,
++  isStage0ProductionPath,
+   parseDispatchTrailer,
+   stage0CapsMet,
+   summaryLine,
+@@ -116,13 +117,29 @@ check("hasStage0Phrase: case-insensitive", () => {
+   assert.equal(hasStage0Phrase("an ordinary commit"), false);
+ });
+ 
+-check("stage0CapsMet: exactly-at-cap passes, one over either cap fails", () => {
+-  const twoFiles = [{ added: 10, deleted: 0 }, { added: 15, deleted: 0 }]; // 2 files, 25 lines
+-  assert.equal(stage0CapsMet(twoFiles).withinCaps, true);
+-  const threeFiles = [{ added: 1, deleted: 0 }, { added: 1, deleted: 0 }, { added: 1, deleted: 0 }];
+-  assert.equal(stage0CapsMet(threeFiles).withinCaps, false);
+-  const tooManyLines = [{ added: 26, deleted: 0 }];
++check("stage0CapsMet: exactly-at-cap passes, one over any cap fails (ADR-0101: 3 files, 60 lines, 25 production lines)", () => {
++  const atCap = [
++    { path: "lib/a.mjs", added: 20, deleted: 5 }, // 25 production lines
++    { path: "lib/a.test.mjs", added: 20, deleted: 0 },
++    { path: "docs/a.md", added: 15, deleted: 0 },
++  ]; // 3 files, 60 lines
++  assert.equal(stage0CapsMet(atCap).withinCaps, true);
++  const fourFiles = [{ path: "a.md", added: 1, deleted: 0 }, { path: "b.md", added: 1, deleted: 0 }, { path: "c.md", added: 1, deleted: 0 }, { path: "d.md", added: 1, deleted: 0 }];
++  assert.equal(stage0CapsMet(fourFiles).withinCaps, false);
++  const tooManyLines = [{ path: "docs/a.md", added: 61, deleted: 0 }];
+   assert.equal(stage0CapsMet(tooManyLines).withinCaps, false);
++  const tooMuchProduction = [{ path: "scripts/a.mjs", added: 26, deleted: 0 }];
++  assert.equal(stage0CapsMet(tooMuchProduction).withinCaps, false);
++  assert.equal(stage0CapsMet(tooMuchProduction).productionLinesChanged, 26);
++});
++
++check("isStage0ProductionPath: a code file counts, a test, pin or fixture does not, nor a document", () => {
++  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/x.mjs"), true);
++  assert.equal(isStage0ProductionPath("scripts/run.sh"), true);
++  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/x.test.mjs"), false);
++  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/pins/x.mjs"), false);
++  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/x.fixture.mjs"), false);
++  assert.equal(isStage0ProductionPath("roles/elephant.md"), false);
+ });
+ 
+ // --------------------------------------------------- behaviour: no trailer, no phrase
+@@ -162,26 +179,43 @@ check("behaviour: missing trailer + phrase present + caps NOT met -> flagged, re
+   const root = buildRoot();
+   writeFile(root, "src/seed.txt", "seed\n");
+   const base = commit(root, "base");
+-  writeFile(root, "src/alpha.txt", nLines(30, "alpha")); // 30 > STAGE0_MAX_LINES
++  writeFile(root, "src/alpha.txt", nLines(61, "alpha")); // 61 > STAGE0_MAX_LINES
+   const candidate = commit(root, "fix(x): large repair\n\nClaims the stage-0 fast path.\n\nAI-Assisted: true\n");
+ 
+   const result = run(root, base, candidate);
+   assert.equal(result.ok, false);
+   const findings = findingsOf(result, "MISSING-DISPATCH-PROVENANCE");
+   assert.ok(
+-    findings.some((f) => f.includes(candidate) && f.includes("reason=stage0-claim-caps-exceeded") && f.includes("30 changed lines")),
++    findings.some((f) => f.includes(candidate) && f.includes("reason=stage0-claim-caps-exceeded") && f.includes("61 changed lines")),
+     findings.join("\n"),
+   );
+   cleanup(root);
+ });
+ 
+-check("behaviour: phrase present + files cap exceeded (3 files) -> flagged even with tiny diffs", () => {
++check("behaviour: phrase present + 26 lines in one code file -> flagged by the production-line cap alone", () => {
++  const root = buildRoot();
++  writeFile(root, "src/seed.txt", "seed\n");
++  const base = commit(root, "base");
++  writeFile(root, "src/alpha.mjs", nLines(26, "alpha")); // 26 > STAGE0_MAX_PRODUCTION_LINES, within 60
++  const candidate = commit(root, "fix(x): code repair\n\nWithin the stage-0 fast path.\n\nAI-Assisted: true\n");
++
++  const result = run(root, base, candidate);
++  assert.equal(result.ok, false);
++  assert.ok(
++    findingsOf(result, "MISSING-DISPATCH-PROVENANCE").some((f) => f.includes("reason=stage0-claim-caps-exceeded") && f.includes("26 production lines")),
++    result.findings.join("\n"),
++  );
++  cleanup(root);
++});
++
++check("behaviour: phrase present + files cap exceeded (4 files) -> flagged even with tiny diffs", () => {
+   const root = buildRoot();
+   writeFile(root, "src/seed.txt", "seed\n");
+   const base = commit(root, "base");
+   writeFile(root, "src/a.txt", "a\n");
+   writeFile(root, "src/b.txt", "b\n");
+   writeFile(root, "src/c.txt", "c\n");
++  writeFile(root, "src/d.txt", "d\n");
+   const candidate = commit(root, "fix(x): touch three files\n\nWithin the stage-0 fast path.\n\nAI-Assisted: true\n");
+ 
+   const result = run(root, base, candidate);

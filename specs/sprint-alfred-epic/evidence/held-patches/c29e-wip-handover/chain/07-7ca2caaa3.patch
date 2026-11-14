@@ -1,0 +1,51 @@
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index da7d101e8bd50abfd3b9c403ad190597634f5656..abc41866a4fec0c48c5236abb812726477d8fe70 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -1256,9 +1256,9 @@ function validStage0Selfcheck(value) {
+     && typeof value.touchesTestFile === "boolean";
+ }
+ 
+-/** EL-01's own stage-0 fast-path arithmetic: <=2 files, <=~25 diff lines, no test-file changes. Presumes `validStage0Selfcheck(value)` already passed. */
++/** EL-01's stage-0 fast-path arithmetic (ADR-0101): <=3 files, <=60 diff lines; a window never admits a test-file change (ADR-0101 Decision 5). Presumes `validStage0Selfcheck(value)` already passed. */
+ function stage0Qualifies(value) {
+-  return value.filesChanged <= 2 && value.diffLines <= 25 && value.touchesTestFile === false;
++  return value.filesChanged <= 3 && value.diffLines <= 60 && value.touchesTestFile === false;
+ }
+ 
+ /** Non-throwing counterpart of assertStage0Declaration, for the read path (currentGuardMaintenanceWindow), which reports "absent" rather than throwing. */
+@@ -1313,7 +1313,7 @@ function assertStage0Declaration(authorshipMode, stage0Selfcheck) {
+     if (!stage0Qualifies(stage0Selfcheck)) {
+       fail(
+         "GMW-STAGE0-NOT-QUALIFIED",
+-        "the declared diff does not meet EL-01's stage-0 fast-path definition (<=2 files, <=~25 diff lines, no test-file changes) -- an Elephant-authored commit to a protected path requires a Goldfish dispatch instead of direct authorship under this window",
++        "the declared diff does not meet EL-01's stage-0 fast-path definition under a window (<=3 files, <=60 diff lines, no test-file changes; ADR-0101) -- an Elephant-authored commit to a protected path requires a Goldfish dispatch instead of direct authorship under this window",
+       );
+     }
+   }
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
+index 9c4dc0349fefa223d778c4e56991aa1295a5ab08..85605d776783e1415ebfea4dfa0998e7c6ea994d 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
+@@ -1509,9 +1509,9 @@ try {
+     const plugin = pluginRootFixture();
+     const { planSha256, specSha256 } = planSpecShas(root);
+     for (const stage0Selfcheck of [
+-      { filesChanged: 3, diffLines: 10, touchesTestFile: false }, // too many files
+-      { filesChanged: 1, diffLines: 40, touchesTestFile: false }, // too many diff lines
+-      { filesChanged: 1, diffLines: 10, touchesTestFile: true }, // test-file change (EL-01 excludes these categorically)
++      { filesChanged: 4, diffLines: 10, touchesTestFile: false }, // too many files (ADR-0101 cap 3)
++      { filesChanged: 1, diffLines: 61, touchesTestFile: false }, // too many diff lines (ADR-0101 cap 60)
++      { filesChanged: 1, diffLines: 10, touchesTestFile: true }, // test-file change (a window never admits one, ADR-0101 Decision 5)
+     ]) {
+       assert.throws(
+         () => prepareGuardMaintenanceWindowRequest({
+@@ -1530,7 +1530,7 @@ try {
+     const root = repoFixture("gmw-stage0-qualified-");
+     const plugin = pluginRootFixture();
+     const { planSha256, specSha256 } = planSpecShas(root);
+-    const stage0Selfcheck = { filesChanged: 1, diffLines: 12, touchesTestFile: false };
++    const stage0Selfcheck = { filesChanged: 3, diffLines: 60, touchesTestFile: false }; // exactly at the ADR-0101 caps
+     const { intent, request } = prepareGuardMaintenanceWindowRequest({
+       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "qualifying stage-0 fix", featureId: "f",
+       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,

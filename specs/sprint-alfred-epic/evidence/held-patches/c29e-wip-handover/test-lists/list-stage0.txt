@@ -1,0 +1,5 @@
+plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
+plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs
+plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs
+harness/scripts/check-doc-contracts.test.mjs
+plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
