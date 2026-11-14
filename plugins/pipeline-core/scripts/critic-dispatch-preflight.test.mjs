@@ -1975,7 +1975,8 @@ test("A2 the empty-evidence refusal lists a stale map first and the feature-pack
     const pkg = cdpRefusal(() => preflightCriticDispatch(input(fx, { candidate: packaged, specPath: "specs/pkg/spec.md", evidencePaths: [] })), "CDP-EVIDENCE-REQUIRED");
     assert.deepEqual(pkg.details.checks.map(({ order, id, ok, status }) => [order, id, ok, status]), [
       [1, "candidate-evidence", false, "missing"], [2, "diagnostic-evidence", null, "unchecked"],
-      [3, "diagnostic-registration", null, "unchecked"], [4, "registration-commit", null, "unchecked"]]);
+      [3, "diagnostic-registration", null, "unchecked"], [4, "registration-commit", null, "unchecked"], [5, "one-command-route", null, "unchecked"]]);
+    assert.match(pkg.details.checks[4].remedy, /prepare-dispatch\.mjs critic .*--label <name> -- <check command>/u, "the one-command route is named");
     assert.match(pkg.details.checks[1].remedy, /specs\/pkg\/evidence\/.*CDI-OUTPUT-EXISTS.*CDI-FULL-VERIFY/u);
     assert.match(pkg.details.checks[2].remedy, /--add-diagnostic-evidence <path> BEFORE committing.*ONE evidence-only commit/u);
     assert.match(pkg.details.checks[3].remedy, /--registration-commit/u);

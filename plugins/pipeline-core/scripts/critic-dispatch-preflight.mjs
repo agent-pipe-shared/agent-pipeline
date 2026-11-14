@@ -697,7 +697,9 @@ function evidenceRequiredPrerequisites(root, candidateCommit, specPath, courseCo
         { id: "diagnostic-registration", ok: null, status: "unchecked", code: "CCA-DETERMINISTIC-UNAVAILABLE",
           remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path> BEFORE committing (registration reads the working tree), then commit the artifact, its log and the manifest in ONE evidence-only commit` },
         { id: "registration-commit", ok: null, status: "unchecked", code: "CDP-ARGUMENT",
-          remedy: "rerun this preflight with --evidence <file> and --registration-commit <full 40-hex id of that evidence-only commit>" });
+          remedy: "rerun this preflight with --evidence <file> and --registration-commit <full 40-hex id of that evidence-only commit>" },
+        { id: "one-command-route", ok: null, status: "unchecked", code: null,
+          remedy: `node \${PIPELINE_PLUGIN_ROOT}/scripts/prepare-dispatch.mjs critic --root <root> --spec ${specPath} --base <ref> --candidate ${candidateCommit} --label <name> -- <check command> runs the diagnostic evidence, its registration and this preflight for you and stops once for the evidence-only commit (prepare-dispatch.mjs --help)` });
     }
     return checks.map((check, index) => ({ order: index + 1, ...check }));
   } catch {
