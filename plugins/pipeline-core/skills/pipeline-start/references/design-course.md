@@ -27,7 +27,11 @@ was needed; capability evidence is not an Advisor answer.
 1. Complete the material input, PRD, Spec and bound companions in draft. Finish
    relevant document corrections before binding the final source hashes.
    Run deterministic checks for paths, hashes, references and configured
-   verification. Check explicit machine-checkable rules; do not invent
+   verification. A project check script runs in draft from `tools/checks/`
+   (`node tools/checks/<name>.mjs [args]`) when it is committed and unchanged
+   against HEAD (ADR-0098); in draft you cannot write there yourself, so a new
+   check is added during implementation or by a human, and a one-off probe
+   stays `node scratch/<name>.mjs` with no argument. Check explicit machine-checkable rules; do not invent
    arithmetic from prose. Preserve the separately adopted Reader-review course
    and evidence; it is not the independent technical design review.
    Spec acceptance criteria (shape of `templates/spec.md` §5; `submit-plan`

@@ -13871,6 +13871,35 @@ test("C28-GL-3: in design draft a test run of REGISTERED suites is admitted (wri
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// C29 G3 (Glossover; PO tile 2026-11-13 "fixed locations"): design-course.md asks for deterministic checks before binding. A project check script in the fixed
+// folder tools/checks/ runs in draft when it is committed and unchanged against HEAD: in draft the agent's own edit there is refused, so it cannot plant one.
+test("C29-G3: in design draft a committed, unchanged tools/checks/ script runs; an edited, untracked, linked or misplaced one stays a refused write", () => {
+  const path = devPlanShellFixture();
+  const git = (...args) => { const run = spawnSync("git", ["-C", path, ...args], { encoding: "utf8" }); assert.equal(run.status, 0, run.stderr); };
+  try {
+    mkdirSync(join(path, "tools", "checks"), { recursive: true });
+    mkdirSync(join(path, "tools", "other"), { recursive: true });
+    for (const rel of ["tools/checks/links.mjs", "tools/checks/edited.mjs", "tools/other/links.mjs"]) writeFileSync(join(path, rel), "// check\n");
+    git("init", "-q");
+    git("add", "--", "tools");
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "checks");
+    writeFileSync(join(path, "tools", "checks", "edited.mjs"), "// check, edited\n");
+    writeFileSync(join(path, "tools", "checks", "untracked.mjs"), "// check\n");
+    let linked = false;
+    try { symlinkSync(join(path, "tools", "checks", "links.mjs"), join(path, "tools", "checks", "linked.mjs"), "file"); linked = true; } catch { /* host without file links */ }
+    for (const command of ["node tools/checks/links.mjs", "node tools/checks/links.mjs specs/feature/spec.md --strict"]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a committed project check: ${command}\n${result.stderr}`);
+    }
+    for (const command of ["node tools/checks/edited.mjs", "node tools/checks/untracked.mjs", "node tools/other/links.mjs", "node tools/checks/../other/links.mjs",
+      ...(linked ? ["node tools/checks/linked.mjs"] : [])]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted a check that is not committed and unchanged under tools/checks/: ${command}`);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("C28-GL-4: a refusal that is about a read names the admitted read form and never offers a signature or override", () => {
   const path = c28DraftFixture();
   try {

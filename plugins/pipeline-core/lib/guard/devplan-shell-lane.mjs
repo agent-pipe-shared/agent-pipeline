@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "devplan-shell-lane" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
+import { spawnSync } from "node:child_process";
 import { lstatSync } from "node:fs";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadDeclarativeVerifySuites } from "../verify-suite-registration.mjs";
@@ -233,6 +234,29 @@ function isRegisteredSuiteRun(operands, root) {
   });
 }
 
+// C29 G3 (Glossover; PO tile 2026-11-13 "fixed locations", ADR-0098): design-course.md asks for deterministic checks before binding, but every
+// project check script was an opaque write in draft. A script in the fixed folder tools/checks/ that is committed and unchanged against HEAD is
+// reviewed project content, not an ad-hoc write: in draft the dev-plan gate refuses the agent's own edit there, so the agent cannot plant one.
+// Exactly a plain .mjs/.cjs/.js file directly in tools/checks/, no symlink on the way, tracked and identical to HEAD; anything else is what it was.
+const PROJECT_CHECK_SCRIPT = /^tools\/checks\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(?:mjs|cjs|js)$/u;
+function isCommittedProjectCheck(operand, root, dependencies = {}) {
+  if (typeof operand !== "string" || operand === "" || operand.startsWith("-")) return false;
+  const rootReal = resolve(root);
+  const rel = relative(rootReal, resolve(rootReal, operand)).split(sep).join("/");
+  if (!PROJECT_CHECK_SCRIPT.test(rel)) return false;
+  try {
+    let current = rootReal;
+    const parts = rel.split("/");
+    for (let index = 0; index < parts.length; index += 1) {
+      current = join(current, parts[index]);
+      const entry = lstatSync(current);
+      if (entry.isSymbolicLink() || (index < parts.length - 1 ? !entry.isDirectory() : !entry.isFile())) return false;
+    }
+  } catch { return false; }
+  const gitStatus = dependencies.projectCheckGitFn ?? ((args) => spawnSync("git", ["-C", rootReal, ...args], { encoding: "utf8", timeout: 3000 }).status);
+  return gitStatus(["ls-files", "--error-unmatch", "--", rel]) === 0 && gitStatus(["diff", "--quiet", "HEAD", "--", rel]) === 0;
+}
+
 function opaqueScriptExecutionCandidate(words, root) {
   if (!Array.isArray(words) || words.length < 2) return null;
   const executable = basename(words[0]).toLowerCase();
@@ -247,6 +271,7 @@ function opaqueScriptExecutionCandidate(words, root) {
       return args[1] && !args[1].startsWith("-") ? args[1] : ".pipeline-opaque-execution";
     }
     if (["-e", "--eval", "-p", "--print"].includes(first)) return ".pipeline-opaque-execution";
+    if (!first.startsWith("-") && isCommittedProjectCheck(first, root)) return null;
     if (!first.startsWith("-")) script = first;
     else return ".pipeline-opaque-execution";
   } else if (["python", "python3", "python.exe", "python3.exe"].includes(executable)) {
