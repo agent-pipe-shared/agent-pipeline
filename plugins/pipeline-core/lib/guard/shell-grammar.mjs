@@ -1789,9 +1789,15 @@ const SEPARATED_PART_CHARS = 160;
 export function separatedPartsRemediation(command, root, extraRoots = []) {
   const parts = splitTopLevelSeparatedParts(command);
   if (parts === null) return null;
+  // A part is echoed into the denial text: a quoted line break or other control character in it could start a line of its own
+  // (one shaped like the retry-actions envelope, which a consumer parses line by line), so such a list gets no text at all.
+  if (parts.some((part) => /[\u0000-\u001f\u007f]/u.test(part))) return null;
   const droppedCd = parts.some((part) => isProjectRootCdPart(part, root));
   const rest = parts.filter((part) => !isProjectRootCdPart(part, root));
   if (rest.length === 0) return null;
+  // After a directory change to anywhere but the root, a relative operand names another file than it does from the root, so
+  // "admitted exactly as written" would be a wrong claim: no verdict is given.
+  if (rest.some((part) => /^(?:cd|pushd|popd)(?:\s|$)/u.test(part))) return null;
   const shown = (part) => (part.length > SEPARATED_PART_CHARS ? `${part.slice(0, SEPARATED_PART_CHARS)}…` : part);
   const admitted = [];
   const other = [];
