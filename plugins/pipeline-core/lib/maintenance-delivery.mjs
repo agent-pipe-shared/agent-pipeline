@@ -251,6 +251,16 @@ export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit, 
   return null;
 }
 
+/** The committed verify command of the calibration at `commit` (project tier first), or null when none reads. */
+function calibratedVerifyAt(git, commit) {
+  for (const path of ["project/pipeline.json", ".claude/pipeline.json"]) {
+    const shown = git(["show", `${commit}:${path}`]);
+    if (!gitOk(shown)) continue;
+    try { const value = JSON.parse(String(shown.stdout)); return typeof value?.verify === "string" ? value.verify : null; } catch { return null; }
+  }
+  return null;
+}
+
 /**
  * Green after the maintenance delivery (ADR-0097 Decision 4) for a check the host could not run at finalize (verify:configured): a
  * sealed GREEN receipt of the check's suite whose commit lies strictly after the slice's base commit (where the check was observed
@@ -260,11 +270,15 @@ export function greenAfterDeliveryReceipt({ commonDir, root, check, baseCommit, 
   const suite = maintenanceReceiptSuite(check);
   if (suite === null || typeof commonDir !== "string" || !OID.test(baseCommit ?? "") || !OID.test(candidateCommit ?? "")) return null;
   const git = runGit ?? gitRunner(root);
+  // ADR-0100 Decision 6: a replaced verify command never turns the red check green by itself; the receipt counts only under the command
+  // the check was observed red with.
+  const baseVerify = isConfiguredVerifyCheck(check) ? calibratedVerifyAt(git, baseCommit) : null;
   for (const receipt of sealedSuiteReceipts(commonDir, suite)) {
     const commit = receipt.candidate.commit;
     if (receipt.exitCode !== 0 || commit === baseCommit) continue;
     if (!gitOk(git(["merge-base", "--is-ancestor", baseCommit, commit]))) continue;
     if (commit !== candidateCommit && !gitOk(git(["merge-base", "--is-ancestor", commit, candidateCommit]))) continue;
+    if (baseVerify !== null && calibratedVerifyAt(git, commit) !== baseVerify) continue;
     return Object.freeze({ kind: "verify-receipt", ref: receipt.receiptSha256, runId: receipt.runId, commit, suite });
   }
   return null;

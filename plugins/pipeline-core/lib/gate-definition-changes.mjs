@@ -14,6 +14,8 @@
  *   first-appearance        no ancestor of the commit names the path (the commit adds it); free by PO decision
  *   trust-anchor-bootstrap  GS-2 only: the exact no-anchor -> one-anchor upgrade the pre-commit hook admits
  *   materialization         GS-17 only: the committed architecture/design-materialization.json of that commit names the blob
+ *   verify-replacement      GS-10/GS-11 only (ADR-0100): such a record that carries a `replacement` member whose approval of kind
+ *                           replace-verify-command is in this device's store; no label when signed, "chat-attributed, not signed" else
  *   configure-verify        GS-10/GS-11 only: this device's ready configure-verify transition record for that parent and those bytes;
  *                           labelled "confirmed via runner prompt, not signed" (PO tile)
  *   human-guard-override    a consumed override capability of this device for the path, authenticated by its MAC, armed at the
@@ -32,7 +34,7 @@ import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
 import { join } from "node:path";
 import { GATE_STRENGTH_FIELD_EXEMPTIONS, GATE_STRENGTH_PATHS, changedGateStrengthDottedPaths } from "../hooks/guard-gate-strength.mjs";
 import { featureRangeBase } from "./close-commit-split.mjs";
-import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
+import { GATE_CHANGE_ACKNOWLEDGEMENT_KIND, VERIFY_REPLACEMENT_KIND } from "./critical-action-approval-request.mjs";
 import { readPrivateApprovals } from "./critical-action-authorization.mjs";
 import { readConsumedOverrideCapabilities } from "./human-guard-override.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
@@ -154,9 +156,19 @@ function readConfigureVerifyReady(commonDir) {
   for (const name of names) {
     let value; try { value = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
     if (value?.schema !== "pipeline.calibration-verify-commit-transition.v1" || value.phase !== "ready" || !object(value.facts) || !Array.isArray(value.facts.entries)) continue;
-    records.push({ id: name.slice(0, 64), head: value.facts.head, entries: value.facts.entries });
+    const replacement = object(value.facts.replacement) ? value.facts.replacement : null;
+    records.push({ id: name.slice(0, 64), head: value.facts.head, entries: value.facts.entries, replacement,
+      // ADR-0100: a replacement counts only with its approval in the store, never by the record's own word.
+      replacementApproved: replacement !== null && replacementApprovalStored(commonDir, replacement.subjectSha256) });
   }
   return records;
+}
+
+function replacementApprovalStored(commonDir, subjectSha256) {
+  if (typeof subjectSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(subjectSha256)) return false;
+  let envelopes = [];
+  try { envelopes = readPrivateApprovals(commonDir, VERIFY_REPLACEMENT_KIND); } catch { envelopes = []; }
+  return envelopes.some((envelope) => envelope?.approval?.subjectSha256 === subjectSha256);
 }
 
 function trustAnchorShape(bytes) {
@@ -197,7 +209,9 @@ export function deriveGateChangeProof(change, context) {
   }
   if ((change.ruleId === "GS-10" || change.ruleId === "GS-11") && change.blobSha256 !== null) {
     const record = context.configureVerify.find((entry) => entry.head === change.parent && entry.entries.some((item) => item?.path === change.path && item?.afterSha256 === change.blobSha256));
-    if (record) return { kind: "configure-verify", ref: record.id, label: CONFIGURE_VERIFY_LABEL };
+    if (record?.replacement) {
+      if (record.replacementApproved) return { kind: "verify-replacement", ref: record.replacement.subjectSha256, label: record.replacement.mode === "signature" ? null : "chat-attributed, not signed" };
+    } else if (record) return { kind: "configure-verify", ref: record.id, label: CONFIGURE_VERIFY_LABEL };
   }
   const lower = change.path.toLowerCase();
   for (const capability of context.overrides) {
