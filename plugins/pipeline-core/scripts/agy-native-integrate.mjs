@@ -133,7 +133,7 @@ export function plan(options) {
   }
   const planSha256 = sha(JSON.stringify({ head: head.out.trim(), tip: tip.out.trim(), base: base.out.trim(), paths, patchSha256: sha(patch.out) }));
   const applyArgv = ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256];
-  const fastForward = fastForwardFacts(root, head.out.trim(), base.out.trim(), tip.out.trim());
+  const fastForward = fastForwardFacts(root, head.out.trim(), base.out.trim(), tip.out.trim(), allowed);
   if (fastForward.eligible) fastForward.next = [...applyArgv, "--keep-authorship", fastForward.dispatchId].map(shellWord).join(" ");
   return { schema: PLAN_SCHEMA, status: "ready", code: "AGYI-READY", root, branch: options.branch, head: head.out.trim(), tip: tip.out.trim(),
     base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [], fastForward,
@@ -143,9 +143,11 @@ export function plan(options) {
 /**
  * C29 R5 (ADR-0099): whether the child's own commits can land unchanged. Only when the branch was cut from the current HEAD (a fast-forward, no
  * rewrite) and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer, the same id throughout, and `AI-Assisted: true`. A
- * fast-forward runs no commit-msg hook, so the trailers are checked here, per commit. Anything else keeps the patch route.
+ * fast-forward runs no commit-msg hook, so the trailers are checked here, per commit. Every commit must also stay inside the briefed scope on its
+ * own: the plan's scope check reads only the net diff, and a commit that touched an outside path which a later one removed would land in history
+ * unchanged, where nothing may rewrite it and the attested writer refuses it. Anything else keeps the patch route.
  */
-function fastForwardFacts(root, head, base, tip) {
+function fastForwardFacts(root, head, base, tip, allowed) {
   const no = (reason) => ({ eligible: false, reason });
   if (base !== head) return no("HEAD moved on since the child's branch was cut, so its commits cannot land unchanged; the patch route below applies");
   const listed = git(root, ["rev-list", "--reverse", `${base}..${tip}`]);
@@ -161,6 +163,10 @@ function fastForwardFacts(root, head, base, tip) {
     if (dispatch.length !== 1 || dispatch[0] === null) return no(`commit ${commit.slice(0, 12)} does not carry exactly one "Dispatch: <id> (goldfish)" trailer`);
     if (!lines.includes("AI-Assisted: true")) return no(`commit ${commit.slice(0, 12)} does not carry "AI-Assisted: true"`);
     if (dispatchId !== null && dispatch[0] !== dispatchId) return no("the branch's commits name more than one dispatch id");
+    const touched = git(root, ["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", commit]);
+    if (!touched.ok) return no(`the paths of ${commit.slice(0, 12)} are not readable`);
+    const outside = touched.out.split("\0").filter(Boolean).filter((path) => !allowed.includes(path));
+    if (outside.length > 0) return no(`commit ${commit.slice(0, 12)} touched paths outside the briefed scope (${outside.slice(0, 5).join(", ")}), even if a later commit undid it; its history cannot land unchanged`);
     dispatchId = dispatch[0];
   }
   return { eligible: true, dispatchId, commits: chain };

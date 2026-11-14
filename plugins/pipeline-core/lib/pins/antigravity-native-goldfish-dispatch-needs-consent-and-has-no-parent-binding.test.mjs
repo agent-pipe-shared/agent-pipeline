@@ -667,6 +667,16 @@ test("C29 R5: no harvest with authorship for a commit without the trailer or a m
     assert.equal(moved.status, "ready", JSON.stringify(moved));
     assert.equal(moved.fastForward.eligible, false);
     assert.match(moved.fastForward.reason, /HEAD moved on/u);
+    // A commit that touched an outside path, undone by a later commit: the net diff is in scope, the history is not, so it cannot land unchanged.
+    const wt3 = worktreeFixture(fx, "subagent-third-r5");
+    childCommit(wt3, { "src/c.mjs": "export const c = 1;\n", "docs/outside.md": "x\n" }, "AI-Assisted: true\nDispatch: C29-R5C (goldfish)");
+    git(wt3.path, "rm", "-q", "docs/outside.md");
+    git(wt3.path, "-c", "user.name=Child Goldfish", "-c", "user.email=child@example.invalid", "commit", "-q", "-m", "fix: drop the stray file", "-m", "AI-Assisted: true\nDispatch: C29-R5C (goldfish)");
+    const undone = integrate.plan({ ...options, branch: wt3.branch, allowed: ["src/c.mjs"] });
+    assert.equal(undone.status, "ready", JSON.stringify(undone));
+    assert.deepEqual(undone.paths, ["src/c.mjs"], "the net diff is in scope");
+    assert.equal(undone.fastForward.eligible, false);
+    assert.match(undone.fastForward.reason, /outside the briefed scope \(docs\/outside\.md\)/u);
     const parsed = (...args) => integrate.parseArgs(args);
     const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a"];
     assert.equal(parsed("apply", ...common, "--expect-sha256", "a".repeat(64), "--keep-authorship", "C29-R5").keepAuthorship, "C29-R5");
