@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 29d: 50 held patches exported from the build clone chain 64e8dfbcc..cda24d051
+# PO apply script for candidate 29d: 51 held patches exported from the build clone chain 64e8dfbcc..70e06de44
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -64,6 +64,7 @@ step 47-6bb5827a3 'test(verify-case-completion): restate five outgrown VCR01 sit
 step 48-a4b2efa7b 'fix(toolchain-doc): name no source-only harness path in shipped files'
 step 49-9e3ab2042 'test(language-canon): pin the German Critic budget to D190'
 step 50-cda24d051 'fix(native-host): a settled sibling'"'"'s shared paths are no foreign paths'
+step 51-70e06de44 'fix(native-host): a checkpoint names the scope-change routes'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

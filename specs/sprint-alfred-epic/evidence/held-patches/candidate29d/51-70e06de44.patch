@@ -1,0 +1,72 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 4ea1fb5001dab3788d5de4a9caa95b88499c3562..160da1d7afefedb631b350067c0979e6e17c9371 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -497,10 +497,16 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
+   if (!observation?.ok) return withDetail(fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized"), observation?.detail);
+   // D31: a checkpoint is an interim hand-back of a budget stop. Nothing is consumed, committed, released or cancelled, so
+-  // the reservation stays live and a repeat is idempotent; the result names the two continuation routes.
++  // the reservation stays live and a repeat is idempotent; the result names the continuation routes.
++  // C29d T3 (PO tile 2026-11-14, K-35/K-45): a checkpoint is also where a scope decision arrives (an existing red check the child
++  // must not touch, a path outside its scope). Besides resume and the budget cancel, the result names the scope-change route
++  // (cancel as started with the class that fits, land the predecessor's diff with the recover command, dispatch a successor under
++  // a new id) and the route for work that is complete except an out-of-scope item (land it with the recover command, no cancel).
+   if (observation.final.outcome === "checkpoint") return { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE",
+     dispatchId: state.binding.dispatchId, commit: null, record: null, reservation: "live",
+-    continuation: { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" } };
++    continuation: { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget",
++      scopeChange: "slice-queue-cancel-started-class-wrong-premise-then-recover-then-successor-new-id",
++      completeExceptOutOfScope: "goldfish-host-commit-recover-without-cancel" } };
+   if (observation.final.outcome !== "succeeded") return fail("NGHF-RETURN-NOT-SUCCESS", "not-finalized");
+ 
+   const concurrent=state.binding.itemDelivery&&state.baseline?.schema===NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 58272c6dd134af577028823818c663fff9284b67..be97ecb4edb7b3223af05b8a8926248925778d4d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -577,7 +577,8 @@ const cases = [
+     const first = finalize(stopInput(binding, undefined));
+     assert.equal(first.status, "checkpoint-recorded", `${first.code} ${JSON.stringify(first)}`);
+     assert.equal(first.reservation, "live");
+-    assert.deepEqual(first.continuation, { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" });
++    assert.deepEqual(first.continuation, { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget",
++      scopeChange: "slice-queue-cancel-started-class-wrong-premise-then-recover-then-successor-new-id", completeExceptOutOfScope: "goldfish-host-commit-recover-without-cancel" });
+     assert.equal(snapshot(commonDir), before, "a checkpoint consumes and changes nothing");
+     const second = finalize(stopInput(binding, undefined));
+     assert.deepEqual(second, first);
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.mjs b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+index d5a5276c3247617728b24ea647f25170f14bb028..e09cc2d225bc3e1a2b5c63b4a6cd40b0e0cbb7a7 100644
+--- a/plugins/pipeline-core/scripts/wait-host-commit.mjs
++++ b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+@@ -45,7 +45,14 @@ function fromOutcome(outcome, waitedSeconds) {
+   // A continued child gets no new launch notice, and this record stays on disk: the next wait must start after it or it would answer "checkpoint" again before the real stop.
+   if (outcome.status === "checkpoint-recorded") {
+     const nextAfter = new Date(Date.parse(outcome.observedAt) + 1).toISOString();
+-    return { exitCode: 0, result: { ...common, status: "checkpoint", nextAfter, message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. If you continue this same child, wait for its next stop with --after ${nextAfter}. ${outcome.message}`.trim() } };
++    // C29d T3 (PO tile 2026-11-14): the four routes, named once with their commands, so a scope decision costs no search.
++    const id = outcome.dispatchId;
++    const routes = `Routes: (1) more budget, same scope: continue this child from its continuation card with SendMessage; `
++      + `(2) stop the work: slice-queue.mjs cancel ${id} --started --reason "<why>" --class budget; `
++      + `(3) the scope must change (a check it may not touch, a path it needs outside its scope): slice-queue.mjs cancel ${id} --started --reason "<why>" --class wrong-premise, `
++      + `then land any diff it left with goldfish-host-commit-recover.mjs plan/apply --dispatch-id ${id}, then dispatch a successor briefing under a NEW id (the id binds the queue row); `
++      + `(4) the work is complete except an out-of-scope item: land it with goldfish-host-commit-recover.mjs plan/apply --dispatch-id ${id}, no cancel, and brief the out-of-scope item separately.`;
++    return { exitCode: 0, result: { ...common, status: "checkpoint", nextAfter, message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. If you continue this same child, wait for its next stop with --after ${nextAfter}. ${routes} ${outcome.message}`.trim() } };
+   }
+   return { exitCode: 1, result: { ...common, status: "stop-failed", commit: outcome.commit, message: `The stop finished without a recorded host commit. Follow this recovery before committing anything by hand: ${outcome.message}`.trim() } };
+ }
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+index f76ce149c7b00808675918a9a0f8a49d2a3b5fab..5c87fcc171c16d90b2f7268b8ab58f4f222f8545 100644
+--- a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
++++ b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+@@ -88,6 +88,10 @@ test("a budget checkpoint is its own status and claims no commit", () => inside(
+   assert.equal(exitCode, 0);
+   assert.equal(result.status, "checkpoint");
+   assert.equal(result.commit, undefined);
++  // C29d T3: the four routes with their commands, the scope-change one with the fitting class and a new successor id.
++  assert.match(result.message, /slice-queue\.mjs cancel fix-1 --started --reason "<why>" --class budget/u);
++  assert.match(result.message, /slice-queue\.mjs cancel fix-1 --started --reason "<why>" --class wrong-premise, then land any diff it left with goldfish-host-commit-recover\.mjs plan\/apply --dispatch-id fix-1, then dispatch a successor briefing under a NEW id/u);
++  assert.match(result.message, /complete except an out-of-scope item: land it with goldfish-host-commit-recover\.mjs plan\/apply --dispatch-id fix-1, no cancel/u);
+   // The record stays on disk and a continued child gets no new notice: the printed time must step past it.
+   assert.equal(result.nextAfter, "2026-11-10T08:00:30.001Z");
+   assert.match(result.message, /--after 2026-11-10T08:00:30\.001Z/u);
