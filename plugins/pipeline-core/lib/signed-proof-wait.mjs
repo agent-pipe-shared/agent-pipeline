@@ -122,24 +122,34 @@ export function signCommandForProof(root, proof) {
  * The fields every signing step carries beside its sign command (one builder for all of them): the exact proof path, the bounded
  * wait the agent runs itself, and the explicit statement that the PO reports nothing back.
  */
-/** One pasteable line for a signing command in any shape a step carries: a copy-safe rendering, its `command` text, or executable plus argv. */
-function signingLine(signCommand) {
+/**
+ * The pasteable form of a signing command in any shape a step carries, in the spelling the PO is shown: the copy-safe rendering for
+ * this platform (an object with posix/powershell forms, or a string), else its `command` text, else executable plus argv.
+ */
+function signingLine(signCommand, platform = process.platform) {
   if (typeof signCommand === "string" && signCommand.trim() !== "") return signCommand;
   if (signCommand === null || typeof signCommand !== "object") return null;
-  for (const field of ["copyCommand", "command"]) if (typeof signCommand[field] === "string" && signCommand[field].trim() !== "") return signCommand[field];
-  return typeof signCommand.executable === "string" && Array.isArray(signCommand.argv) ? text(signCommand) : null;
+  const copy = signCommand.copyCommand;
+  if (typeof copy === "string" && copy.trim() !== "") return copy;
+  if (copy !== null && typeof copy === "object") {
+    const shown = platform === "win32" ? copy.powershell : copy.posix;
+    if (typeof shown === "string" && shown.trim() !== "") return shown;
+  }
+  if (typeof signCommand.command === "string" && signCommand.command.trim() !== "") return signCommand.command;
+  return typeof signCommand.executable === "string" && Array.isArray(signCommand.argv) ? text(signCommand, platform) : null;
 }
 
 /**
- * C29 P2-6 (Claude greenfield run 3: three waits ran out while the PO asked what was needed): the one fixed sentence the agent hands
- * the PO, verbatim and once, before it waits. It names the one command; without a known command it names the signing step instead
- * of inventing one.
+ * C29 P2-6 (Claude greenfield run 3: three waits ran out while the PO asked what was needed): the one fixed text the agent hands the
+ * PO, verbatim and once, before it waits. The sentence comes first, the one command last on its own lines (a copy-safe rendering can
+ * span several lines); without a known command it names the signing step instead of inventing one.
  */
-export function poNowSentence(signCommand, proofPath) {
-  const line = signingLine(signCommand);
+export function poNowSentence(signCommand, proofPath, platform = process.platform) {
+  const line = signingLine(signCommand, platform);
+  const tail = `I wait for ${proofPath} myself, so you do not need to report back.`;
   return line === null
-    ? `Now from you: run the one signing command shown above in your own terminal; nothing else is needed. I wait for ${proofPath} myself, so you do not need to report back.`
-    : `Now from you: run this one command in your own terminal, nothing else is needed: ${line}  I wait for ${proofPath} myself, so you do not need to report back.`;
+    ? `Now from you: run the one signing command shown above in your own terminal; nothing else is needed. ${tail}`
+    : `Now from you: run this one command in your own terminal; nothing else is needed. ${tail}\n${line}`;
 }
 
 export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null, signCommand = undefined }) {

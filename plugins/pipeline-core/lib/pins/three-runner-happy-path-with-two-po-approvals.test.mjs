@@ -35,7 +35,8 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
 import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
-import { awaitSignatureFields, commandText, PROOF_WAIT_CLASS, waitForSignedProof } from "../signed-proof-wait.mjs";
+import { awaitSignatureFields, commandText, poNowSentence, PROOF_WAIT_CLASS, waitForSignedProof } from "../signed-proof-wait.mjs";
+import { boundedCopySafeCommand } from "../copy-safe-command.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
@@ -894,14 +895,21 @@ test("C29-P2-6: every signing step carries one fixed 'Now from you' sentence nam
   // Claude run 3 (P2-6): three proof waits ran out while the PO asked what was needed. The sentence names the command the step
   // itself rendered; a key-directory proof derives sign-intent; a critical mirror without a passed command never invents one.
   const critical = "scratch/critical-push-proof-0123456789ab.json";
+  const head = "Now from you: run this one command in your own terminal; nothing else is needed. I wait for scratch/critical-push-proof-0123456789ab.json myself, so you do not need to report back.";
   const passed = awaitSignatureFields({ root: "/p", proofPath: critical, signCommand: { command: "node po-human-approval.mjs authorize-critical --kind push", copyCommand: "PIPELINE_SCRIPT=x node \"$PIPELINE_SCRIPT\" authorize-critical" } });
-  assert.match(passed.poNow, /^Now from you: run this one command in your own terminal, nothing else is needed: PIPELINE_SCRIPT=x node "\$PIPELINE_SCRIPT" authorize-critical  I wait for scratch\/critical-push-proof-0123456789ab\.json myself, so you do not need to report back\.$/u, "the copy-safe form wins over the raw command");
-  assert.match(awaitSignatureFields({ root: "/p", proofPath: critical, signCommand: { executable: "node", argv: ["a.mjs", "sign"] } }).poNow, /nothing else is needed: node a\.mjs sign  I wait/u);
+  assert.equal(passed.poNow, `${head}\nPIPELINE_SCRIPT=x node "$PIPELINE_SCRIPT" authorize-critical`, "sentence first, the copy-safe form last on its own line");
+  // The real copy-safe shape: an object with one rendering per shell; the PO's platform form is the one shown, wrapped lines kept.
+  const rendered = boundedCopySafeCommand({ executable: "node", argv: ["/plugin/scripts/po-human-approval.mjs", "authorize-critical", "--repo-root", "/p", "--kind", "push", "--subject-sha256", "b".repeat(64)], forceCopyCommand: true });
+  assert.equal(typeof rendered.copyCommand, "object");
+  assert.equal(poNowSentence(rendered, critical, "linux"), `${head}\n${rendered.copyCommand.posix}`);
+  assert.equal(poNowSentence(rendered, critical, "win32"), `${head}\n${rendered.copyCommand.powershell}`);
+  assert.equal(poNowSentence({ executable: "node", argv: ["a.mjs", "sign"] }, critical, "linux"), `${head}\nnode a.mjs sign`);
   const unknown = awaitSignatureFields({ root: "/p", proofPath: critical });
   assert.match(unknown.poNow, /^Now from you: run the one signing command shown above in your own terminal/u, "no command is invented for a critical mirror");
+  assert.doesNotMatch(unknown.poNow, /\n/u);
   const intent = "a".repeat(64);
   const keyDirectory = awaitSignatureFields({ root: "/p", proofPath: `/keys/proof-${intent}.json` });
-  assert.match(keyDirectory.poNow, new RegExp(`sign-intent --repo-root /p --intent-sha256 ${intent}  I wait`, "u"), "a key-directory proof derives the sign-intent command");
+  assert.match(keyDirectory.poNow, new RegExp(`report back\\.\\n.*sign-intent --repo-root /p --intent-sha256 ${intent}$`, "u"), "a key-directory proof derives the sign-intent command");
   assert.match(passed.afterSigning, /^Hand the PO the poNow sentence once, verbatim, as the last thing before the wait\./u);
   assert.equal(passed.reportBackRequired, false);
 });
