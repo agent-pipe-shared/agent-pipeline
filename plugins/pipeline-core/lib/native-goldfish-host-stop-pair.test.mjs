@@ -149,7 +149,7 @@ async function concurrentPair(root, launches, round = "", { staged = false } = {
   const dir = mkdtempSync(join(nativeContractFixtureParent(), "native-goldfish-stop-pair-markers-")), tags = launches.map((_, index) => `${round}t${index}`);
   const children = launches.map((one, index) => {
     writeFileSync(join(dir, `launch-${index}.json`), JSON.stringify(one.input)); writeFileSync(join(dir, `returned-${index}.json`), JSON.stringify(one.returned));
-    return stopChild({ root, tag: tags[index], dir, other: tags[1 - index], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? "early" : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
+    return stopChild({ root, tag: tags[index], dir, other: tags[(index + 1) % tags.length], launchPath: join(dir, `launch-${index}.json`), returnedPath: join(dir, `returned-${index}.json`), mode: staged ? (index === 0 ? "early" : staged === "simultaneous" ? "late-sim" : "late") : "sync" });
   });
   const exits = children.map((child) => new Promise((resolve) => child.once("exit", resolve)));
   try {
@@ -439,6 +439,14 @@ const cases = [
     assert.equal(git(root, "rev-parse", `${results[1].commit}^`), results[0].commit, "the late stop landed on top of the early stop's host commit");
     assertSiblingProof(repository, results[0].commit);
     assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after the simultaneous pair");
+  }) },
+  { id: "NGSP9E", name: "K-34: three real stops of one reply with disjoint scopes all land their host commits in one linear chain, although each later one meets HEAD moved by a sibling's host commit", run: () => fixture(async ({ root }) => {
+    const { launch, original } = setup(root, { ownRuntime: false });
+    const results = await concurrentPair(root, [launch(0), launch(1), launch(2)]);
+    for (const result of results) assert.equal(result.status, "authored-commit-recorded", JSON.stringify(results).slice(0, 3000));
+    const chain = git(root, "rev-list", "--reverse", `${original.candidate.commit}..HEAD`).split("\n").filter(Boolean);
+    assert.deepEqual([...chain].sort(), results.map((result) => result.commit).sort(), "the three host commits are exactly the new history");
+    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after the three stops");
   }) },
 ];
 
