@@ -627,7 +627,9 @@ function sanctionedHostCommitRecoverArgs(args, root) {
 // `plan --root <root> --branch <subagent-...> --allowed-path <p>...` or the same with `apply` and one `--expect-sha256 <64 hex>`.
 // plan writes nothing; apply changes the working tree only (never the index, HEAD or a ref), all-or-nothing.
 // C28C: `apply` may add one `--commit-dispatch-id <id>`: it then also runs the recovery route's own plan and apply (the ordinary dispatch-trailer commit of
-// exactly the paths this apply wrote). That is the only way this lane reaches HEAD; plan never does.
+// exactly the paths this apply wrote). C29 R5 (ADR-0099): apply may instead add one `--keep-authorship <id>`, a fast-forward to the child's own
+// commits after the script checked base == HEAD and each commit's `Dispatch: <id> (goldfish)` trailer. The two flags exclude each other. These are
+// the only ways this lane reaches HEAD; plan never does.
 function sanctionedAgyNativeIntegrateArgs(args, root) {
   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
   const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-") && !value.startsWith("/")
@@ -637,7 +639,7 @@ function sanctionedAgyNativeIntegrateArgs(args, root) {
     const flag = args[index], value = args[index + 1];
     if (flag === "--branch" && !branch && /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u.test(value ?? "")) branch = true;
     else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
-    else if (flag === "--commit-dispatch-id" && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
+    else if ((flag === "--commit-dispatch-id" || flag === "--keep-authorship") && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
     else if (flag === "--allowed-path" && pathValue(value) && allowedCount < 50) allowedCount += 1;
     else return false;
   }

@@ -10,6 +10,8 @@
  *   plan  --root <root> --branch <subagent-...> --allowed-path <p>...                              read-only
  *   apply --root <root> --branch <subagent-...> --allowed-path <p>... --expect-sha256 <digest>     writes the working tree only
  *   apply ... --commit-dispatch-id <id>   (C28C) the same, then the recovery route's own plan and apply commit exactly those paths with the dispatch trailer
+ *   apply ... --keep-authorship <id>      (C29 R5, ADR-0099) instead lands the child's own commits unchanged by fast-forward; only when plan's
+ *                                         `fastForward.eligible` (branch cut from the current HEAD, every commit `Dispatch: <id> (goldfish)`)
  *
  * A refusal of the commit step never undoes the applied change: the result carries `commit: {status: "refused", ...}` and `next` names the manual route.
  *
@@ -30,7 +32,7 @@ const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "ru
 const SELF = fileURLToPath(import.meta.url);
 const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
 const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
-const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id>, apply only]";
+const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id> | --keep-authorship <briefed dispatch id>, apply only]";
 const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // the same token the recovery route accepts
 const MAX_COMMITS = 200;
 
@@ -45,7 +47,7 @@ const shellWord = (value) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value : 
 export function parseArgs(argv) {
   const [verb, ...rest] = argv;
   if (verb !== "plan" && verb !== "apply") return { error: `unknown verb; usage: ${SYNTAX}` };
-  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null };
+  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null, keepAuthorship: null };
   for (let i = 0; i < rest.length; i += 2) {
     const flag = rest[i], value = rest[i + 1];
     if (typeof value !== "string" || value === "" || /[\u0000-\u001f\u007f]/u.test(value)) return { error: `flag ${flag} needs one value; usage: ${SYNTAX}` };
@@ -55,9 +57,13 @@ export function parseArgs(argv) {
     else if (flag === "--expect-sha256" && out.expect === null) out.expect = value;
     // C28C: apply may also land the ordinary dispatch-trailer commit through the recovery route in the same call (one path, no extra decision).
     else if (flag === "--commit-dispatch-id" && out.commitDispatchId === null && DISPATCH_ID.test(value)) out.commitDispatchId = value;
+    // C29 R5 (ADR-0099): apply may instead land the child's own commits unchanged by fast-forward, keeping their authorship.
+    else if (flag === "--keep-authorship" && out.keepAuthorship === null && DISPATCH_ID.test(value)) out.keepAuthorship = value;
     else return { error: `unexpected or repeated flag ${flag}; usage: ${SYNTAX}` };
   }
   if (out.commitDispatchId !== null && verb !== "apply") return { error: `--commit-dispatch-id belongs to apply; usage: ${SYNTAX}` };
+  if (out.keepAuthorship !== null && verb !== "apply") return { error: `--keep-authorship belongs to apply; usage: ${SYNTAX}` };
+  if (out.keepAuthorship !== null && out.commitDispatchId !== null) return { error: `--keep-authorship and --commit-dispatch-id exclude each other; usage: ${SYNTAX}` };
   return out;
 }
 
@@ -126,9 +132,38 @@ export function plan(options) {
     return refused("AGYI-APPLY-CONFLICT");
   }
   const planSha256 = sha(JSON.stringify({ head: head.out.trim(), tip: tip.out.trim(), base: base.out.trim(), paths, patchSha256: sha(patch.out) }));
+  const applyArgv = ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256];
+  const fastForward = fastForwardFacts(root, head.out.trim(), base.out.trim(), tip.out.trim());
+  if (fastForward.eligible) fastForward.next = [...applyArgv, "--keep-authorship", fastForward.dispatchId].map(shellWord).join(" ");
   return { schema: PLAN_SCHEMA, status: "ready", code: "AGYI-READY", root, branch: options.branch, head: head.out.trim(), tip: tip.out.trim(),
-    base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [],
-    next: ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256].map(shellWord).join(" ") };
+    base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [], fastForward,
+    next: applyArgv.map(shellWord).join(" ") };
+}
+
+/**
+ * C29 R5 (ADR-0099): whether the child's own commits can land unchanged. Only when the branch was cut from the current HEAD (a fast-forward, no
+ * rewrite) and every commit carries exactly one `Dispatch: <id> (goldfish)` trailer, the same id throughout, and `AI-Assisted: true`. A
+ * fast-forward runs no commit-msg hook, so the trailers are checked here, per commit. Anything else keeps the patch route.
+ */
+function fastForwardFacts(root, head, base, tip) {
+  const no = (reason) => ({ eligible: false, reason });
+  if (base !== head) return no("HEAD moved on since the child's branch was cut, so its commits cannot land unchanged; the patch route below applies");
+  const listed = git(root, ["rev-list", "--reverse", `${base}..${tip}`]);
+  if (!listed.ok) return no("the branch's commits are not readable");
+  const chain = listed.out.split("\n").filter(Boolean);
+  let dispatchId = null;
+  for (const commit of chain) {
+    const message = git(root, ["log", "-1", "--format=%B", commit]);
+    const trailers = message.ok ? git(root, ["interpret-trailers", "--parse"], message.out) : null;
+    if (!trailers?.ok) return no(`the trailers of ${commit.slice(0, 12)} are not readable`);
+    const lines = trailers.out.split("\n").filter(Boolean);
+    const dispatch = lines.filter((line) => /^Dispatch:/iu.test(line)).map((line) => /^Dispatch: ([A-Za-z0-9][A-Za-z0-9._-]{0,95}) \(goldfish\)$/u.exec(line)?.[1] ?? null);
+    if (dispatch.length !== 1 || dispatch[0] === null) return no(`commit ${commit.slice(0, 12)} does not carry exactly one "Dispatch: <id> (goldfish)" trailer`);
+    if (!lines.includes("AI-Assisted: true")) return no(`commit ${commit.slice(0, 12)} does not carry "AI-Assisted: true"`);
+    if (dispatchId !== null && dispatch[0] !== dispatchId) return no("the branch's commits name more than one dispatch id");
+    dispatchId = dispatch[0];
+  }
+  return { eligible: true, dispatchId, commits: chain };
 }
 
 /**
@@ -179,6 +214,7 @@ export function apply(options) {
     return { ...planned, status: "refused", code: "AGYI-PLAN-DIGEST-MISMATCH", paths: [],
       refusals: [refuse("AGYI-PLAN-DIGEST-MISMATCH", "HEAD, the branch or the change moved since plan", `run plan again and use its new planSha256: ${["node", SELF, "plan", "--root", planned.root, "--branch", planned.branch, ...options.allowed.flatMap((p) => ["--allowed-path", p])].map(shellWord).join(" ")}`)] };
   }
+  if (options.keepAuthorship != null) return landWithAuthorship(planned, options.keepAuthorship);
   try { recordIntegration(planned); } catch (error) {
     return { ...planned, status: "refused", code: "AGYI-RECORD-FAILED", paths: [],
       refusals: [refuse("AGYI-RECORD-FAILED", `the take-over record could not be written (${error?.code ?? error?.name ?? "Error"})`, "nothing was written to the working tree; repair the git directory's permissions and plan again")] };
@@ -194,6 +230,29 @@ export function apply(options) {
   const commit = commitThroughRecovery(planned, options.commitDispatchId);
   return { ...planned, status: "applied", code: "AGYI-APPLIED", commit,
     next: commit.status === "committed" ? "nothing left to do for this child: its change is committed with the dispatch trailer" : next };
+}
+
+/**
+ * C29 R5 (ADR-0099): land the child's own commits unchanged (`git merge --ff-only`, atomic: it refuses before touching anything). Authorship,
+ * trailers and tree stay the child's, so the D40b scan finds the Goldfish's own `Dispatch:` commit. The take-over record is written first, as
+ * on the patch route. No dispatch record is written here: `next` names the attested writer over exactly these commits, which labels the record
+ * orchestrator-attested (no host observation), as every take-over of a runner without a host return is.
+ */
+function landWithAuthorship(planned, dispatchId) {
+  const refused = (code, message, next) => ({ ...planned, status: "refused", code, paths: [], refusals: [refuse(code, message, next)] });
+  if (!planned.fastForward?.eligible) return refused("AGYI-FAST-FORWARD-UNAVAILABLE", planned.fastForward?.reason ?? "the branch cannot land unchanged", `use the patch route instead: ${planned.next}`);
+  if (planned.fastForward.dispatchId !== dispatchId) {
+    return refused("AGYI-FAST-FORWARD-DISPATCH-MISMATCH", `the branch's commits carry Dispatch: ${planned.fastForward.dispatchId}, not the briefed ${dispatchId}`,
+      "pass the briefed dispatch id; a branch that carries another id is not this dispatch's result");
+  }
+  try { recordIntegration(planned); } catch (error) {
+    return refused("AGYI-RECORD-FAILED", `the take-over record could not be written (${error?.code ?? error?.name ?? "Error"})`, "nothing was landed; repair the git directory's permissions and plan again");
+  }
+  const landed = git(planned.root, ["merge", "--ff-only", "--quiet", planned.tip]);
+  if (!landed.ok) return refused("AGYI-FAST-FORWARD-FAILED", String(landed.err).trim().split("\n").slice(-2).join(" | "), "nothing was landed (a fast-forward is all-or-nothing); plan again");
+  const recordWriter = fileURLToPath(new URL("./dispatch-record-write.mjs", import.meta.url));
+  return { ...planned, status: "landed", code: "AGYI-LANDED-WITH-AUTHORSHIP", landed: { commits: planned.fastForward.commits, dispatchId },
+    next: `the child's commits are on HEAD unchanged. Write the dispatch record over exactly these commits: put {"schema":"pipeline.dispatch-attested-request.v1","briefingPath":"<generated briefing>","handbackPath":"<the child's hand-back text>","commits":${JSON.stringify(planned.fastForward.commits)}} into a file under scratch/, then node ${shellWord(recordWriter)} --repo-root ${shellWord(planned.root)} --attested-request <that file>` };
 }
 
 /**

@@ -69,7 +69,10 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
   plan --root <root> --branch <the child's branch> --allowed-path <briefed path>...` (read-only; `git worktree list` names the branch), then the
   same command as `apply` with the `--expect-sha256` digest it printed. `apply` writes the branch's net change into the working tree,
   uncommitted and unstaged; it refuses a path outside the briefed scope, a path with local changes and a change that no longer applies. The
-  commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). The host owns the worktree and the
+  commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). When `plan` reports
+  `fastForward.eligible` (the branch was cut from the current HEAD and every commit carries the briefed `Dispatch: <id> (goldfish)`
+  trailer), run its `fastForward.next` instead: `apply ... --keep-authorship <id>` lands the child's own commits unchanged (ADR-0099), and
+  its `next` names the attested record over exactly those commits. The host owns the worktree and the
   branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
   <the child's branch>` read the shared object database, so no `git -C <worktree>` is needed. The tool budget is field 6 of the generated
   briefing and `guard-dispatch` reads it from there; nothing else is passed on the call. Neither step needs a look into the guard sources.

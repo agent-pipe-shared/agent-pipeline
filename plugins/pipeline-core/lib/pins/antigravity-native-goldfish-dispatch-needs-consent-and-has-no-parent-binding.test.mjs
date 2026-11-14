@@ -597,6 +597,85 @@ test("C28C: a refused commit step keeps the applied change and names the manual 
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
+// C29 R5 (AGY run 3, Toil P3; ADR-0099): the Elephant harvested branch commits by hand and the Critic noted the orchestrator commit. When the child's
+// branch was cut from the current HEAD and every commit carries the briefed Dispatch trailer, apply --keep-authorship lands those commits unchanged.
+function childCommit(wt, files, trailers) {
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(wt.path, name)), { recursive: true });
+    writeFileSync(join(wt.path, name), text);
+    git(wt.path, "add", name);
+  }
+  git(wt.path, "-c", "user.name=Child Goldfish", "-c", "user.email=child@example.invalid", "commit", "-q", "-m", "feat: child work", ...(trailers ? ["-m", trailers] : []));
+}
+
+test("C29 R5: apply --keep-authorship lands the child's own commits unchanged when the branch was cut from HEAD and every commit carries the briefed Dispatch trailer", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const wt = worktreeFixture(fx);
+    childCommit(wt, { "src/a.mjs": "export const a = 1;\n" }, "AI-Assisted: true\nDispatch: C29-R5 (goldfish)");
+    childCommit(wt, { "src/a.mjs": "export const a = 2;\n" }, "AI-Assisted: true\nDispatch: C29-R5 (goldfish)");
+    const tip = git(fx.workspace, "rev-parse", `refs/heads/${wt.branch}`);
+    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
+    const planned = integrate.plan(options);
+    assert.equal(planned.status, "ready", JSON.stringify(planned));
+    assert.equal(planned.fastForward.eligible, true, JSON.stringify(planned.fastForward));
+    assert.equal(planned.fastForward.dispatchId, "C29-R5");
+    assert.equal(planned.fastForward.commits.length, 2);
+    assert.match(planned.fastForward.next, /--keep-authorship C29-R5/u);
+    // The briefed id must be the one the commits carry; a mismatch lands nothing.
+    const mismatch = integrate.apply({ ...options, expect: planned.planSha256, keepAuthorship: "OTHER-ID" });
+    assert.equal(mismatch.code, "AGYI-FAST-FORWARD-DISPATCH-MISMATCH", JSON.stringify(mismatch));
+    assert.equal(existsSync(join(fx.workspace, "src", "a.mjs")), false, "a refused harvest lands nothing");
+    const landed = integrate.apply({ ...options, expect: planned.planSha256, keepAuthorship: "C29-R5" });
+    assert.equal(landed.status, "landed", JSON.stringify(landed));
+    assert.equal(landed.code, "AGYI-LANDED-WITH-AUTHORSHIP");
+    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), tip, "HEAD is the child's tip itself: no new commit, nothing rewritten");
+    assert.equal(git(fx.workspace, "log", "-1", "--format=%an <%ae>"), "Child Goldfish <child@example.invalid>", "the child's authorship stays");
+    assert.equal(readFileSync(join(fx.workspace, "src", "a.mjs"), "utf8"), "export const a = 2;\n");
+    assert.equal(git(fx.workspace, "status", "--porcelain", "--", "src"), "", "nothing left uncommitted");
+    assert.deepEqual(landed.landed.commits, planned.fastForward.commits);
+    assert.match(landed.next, /--attested-request/u);
+    assert.match(landed.next, new RegExp(planned.fastForward.commits[1], "u"), "the record step names exactly the landed commits");
+    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir: join(fx.workspace, ".git"), paths: ["src/a.mjs"] }), true, "the take-over record is written as on the patch route");
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+test("C29 R5: no harvest with authorship for a commit without the trailer or a moved HEAD; the patch route stays ready; parse rules", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const wt = worktreeFixture(fx);
+    childCommit(wt, { "src/a.mjs": "export const a = 1;\n" }, "AI-Assisted: true\nDispatch: C29-R5 (goldfish)");
+    childCommit(wt, { "src/a.mjs": "export const a = 2;\n" }, null);
+    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
+    const head = git(fx.workspace, "rev-parse", "HEAD");
+    const untrailed = integrate.plan(options);
+    assert.equal(untrailed.status, "ready", JSON.stringify(untrailed));
+    assert.equal(untrailed.fastForward.eligible, false);
+    assert.match(untrailed.fastForward.reason, /exactly one "Dispatch: <id> \(goldfish\)" trailer/u);
+    const refused = integrate.apply({ ...options, expect: untrailed.planSha256, keepAuthorship: "C29-R5" });
+    assert.equal(refused.code, "AGYI-FAST-FORWARD-UNAVAILABLE", JSON.stringify(refused));
+    assert.match(refused.refusals[0].next, /patch route/u);
+    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "nothing landed");
+    // The parent moved on in an unrelated path: the change still applies as a patch, but the commits cannot land unchanged.
+    git(fx.workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "parent moves on");
+    const wt2 = worktreeFixture(fx, "subagent-second-r5");
+    git(fx.workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "parent moves on again");
+    childCommit(wt2, { "src/b.mjs": "export const b = 1;\n" }, "AI-Assisted: true\nDispatch: C29-R5B (goldfish)");
+    const moved = integrate.plan({ ...options, branch: wt2.branch, allowed: ["src/b.mjs"] });
+    assert.equal(moved.status, "ready", JSON.stringify(moved));
+    assert.equal(moved.fastForward.eligible, false);
+    assert.match(moved.fastForward.reason, /HEAD moved on/u);
+    const parsed = (...args) => integrate.parseArgs(args);
+    const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a"];
+    assert.equal(parsed("apply", ...common, "--expect-sha256", "a".repeat(64), "--keep-authorship", "C29-R5").keepAuthorship, "C29-R5");
+    assert.match(parsed("plan", ...common, "--keep-authorship", "C29-R5").error, /belongs to apply/u);
+    assert.match(parsed("apply", ...common, "--keep-authorship", "C29-R5", "--commit-dispatch-id", "C29-R5").error, /exclude each other/u);
+    assert.match(parsed("apply", ...common, "--keep-authorship", "bad id").error, /unexpected/u);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
 test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
   const root = realpathSync(resolve(libDir, "..", "..", ".."));
@@ -608,6 +687,14 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)}`), true);
   // C28C: apply (never plan) may carry one dispatch id for the commit step.
   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-AGY-COMMIT`), true);
+  // C29 R5: or one --keep-authorship id instead, never both, never on plan.
+  assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5`), true);
+  for (const args of [
+    `plan --root '${root}' --branch ${branch} --allowed-path a --keep-authorship C29-R5`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5 --commit-dispatch-id C29-R5`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --keep-authorship 'bad id'`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --keep-authorship C29-R5`,
+  ]) assert.equal(admitted(args), false, args);
   for (const args of [
     `plan --root '${root}' --branch ${branch} --allowed-path a --commit-dispatch-id C28C-X`,
     `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-X --commit-dispatch-id C28C-Y`,

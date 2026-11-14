@@ -299,6 +299,7 @@
           "docs/adr/0096-a-gate-definition-change-needs-a-bound-proof-at-commit-and-at-close.md",
           "docs/adr/0097-a-pre-existing-red-check-is-repaired-by-a-maintenance-dispatch.md",
           "docs/adr/0098-design-checks-and-the-unpublished-review-original-have-fixed-locations.md",
+          "docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md",
           "docs/adr/README.md"
         ]
       },
