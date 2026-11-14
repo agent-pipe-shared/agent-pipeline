@@ -1849,6 +1849,24 @@ function itemCheckSnapshot(root,itemDelivery,candidate) {
   });
   return {repository,files,contractSha256:nativeManagedDigest(itemDelivery)};
 }
+/** C29 K-37: the check-source files of an item as the candidate COMMIT holds them (same {path,sha256,size} rows as itemCheckSnapshot), never
+ * the working tree; null when the contract is invalid or a path is not a regular blob there. Read-only, for the integrated-slice computation. */
+function itemCheckCommittedFiles(root,itemDelivery,candidate) {
+  if(!validateItemDeliveryBriefing(itemDelivery).ok||typeof candidate?.commit!=='string'||!/^[0-9a-f]{40,64}$/u.test(candidate.commit))return null;
+  const physical=realpathSync(resolve(root));
+  const paths=[...new Set(itemDelivery.checks.flatMap(check=>[check.path,...check.dependencies]))].sort();
+  const files=[];
+  for(const path of paths) {
+    const listed=spawnSync('git',['-C',physical,'ls-tree','-z',candidate.commit,'--',path],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:1024*1024});
+    const meta=listed.error||listed.status!==0?null:String(listed.stdout).split('\0')[0].split('\t')[0].split(' ');
+    if(!meta||meta[1]!=='blob'||(meta[0]!=='100644'&&meta[0]!=='100755'))return null;
+    const committed=spawnSync('git',['-C',physical,'show',`${candidate.commit}:${path}`],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
+    if(committed.error||committed.status!==0)return null;
+    const bytes=Buffer.from(committed.stdout);
+    files.push({path,sha256:digest(bytes),size:bytes.length});
+  }
+  return files;
+}
 /** Actual bounded targeted execution. Raw caller results cannot construct the
  * opaque observation handle consumed by either real delivery adapter. */
 export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,baseCommit}={}) {
@@ -2280,8 +2298,11 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
         const briefing=pending.value.binding.itemDelivery;
         if(item.delivery.baseCommit!==pending.value.binding.candidateCommit||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effectiveNativePendingState(read,pending).delivery.writeScope)
           ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(briefing))||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(briefing.checks))continue;
-        const current=itemCheckSnapshot(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate);
-        if(nativeManagedDigest(current.files)!==nativeManagedDigest(row.value.files))continue;
+        // C29 K-37 (Glossover): integration is a fact about commits. The working-tree snapshot threw item-check-source-not-candidate whenever an
+        // in-flight dispatch had edited an earlier item's check file in its own scope, and that aborted the whole stop of the dispatch before its
+        // host commit. The earlier item's check sources are read from the candidate commit itself; a later commit that changed them still drops it.
+        const current=itemCheckCommittedFiles(repository.primaryRoot,pending.value.binding.itemDelivery,repository.candidate);
+        if(current===null||nativeManagedDigest(current)!==nativeManagedDigest(row.value.files))continue;
         integrated.push(item.id);
       }
   const agy=readAgyIntegratedItemDelivery({repository,boundary,governed});

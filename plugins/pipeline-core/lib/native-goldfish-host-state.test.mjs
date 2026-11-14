@@ -1979,6 +1979,25 @@ const cases = [
     assert.equal(validateItemDeliveryBriefing(stranger).ok,false,'a document that is not among the dependencies (the write scope) is not a valid check');
     assert.equal(validateItemDeliveryBriefing({...h.delivery(),checks:[{...h.delivery().checks[0],document:'docs/manual-checklist.md'}]}).ok,false,'the document field must name the check path');
   })},
+  { id: "NGHS71", name: "C29 K-37: the integrated-slice scan reads an earlier item's check sources from the candidate commit, so an in-flight edit of them in the working tree no longer aborts a stop; a commit that changes them still drops the item", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({ root }) => {
+    // Glossover 2026-11-14 (29c): a fix dispatch edited, inside its own scope, the check file of an item integrated before it; its stop failed
+    // before the host commit with SDC-AUTHORITY-UNAVAILABLE item-check-source-not-candidate, thrown by the working-tree snapshot of that earlier item.
+    const { items, runtime } = d177Setup(root);
+    const returned = (id) => { const item = items[id]; return { ...item.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: item.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: id, candidateCommit: item.binding.candidateCommit, outcome: "succeeded", report: "K-37 fixture return.", changedPaths: [`src/${item.path}.mjs`] }) }] } }; };
+    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // K-37 LEFT\n");
+    assert.equal(runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned("LEFT") })).status, "authored-commit-recorded");
+    assert.equal(runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: items.LEFT.prepared.sha256 })).status, "integrated");
+    const scan = () => { const repo = inspectSignedDescriptorCustodyRepository(root), governed = resolveGovernedItemQueue({ root });
+      return runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, (boundary) => mod.readNativeIntegratedSlices({ governed, repository: repo, boundary }).integrated)); };
+    assert.deepEqual(scan(), ["LEFT"], "control: LEFT is integrated on a clean tree");
+    const left = items.LEFT.binding.itemDelivery, sources = [...new Set(left.checks.flatMap((check) => [check.path, ...check.dependencies]))];
+    const edited = sources.find((path) => path.endsWith(".test.mjs")) ?? sources[0];
+    const committed = readFileSync(join(root, edited), "utf8");
+    writeFileSync(join(root, edited), `${committed}// an in-flight dispatch adds one assertion here\n`);
+    assert.deepEqual(scan(), ["LEFT"], "an uncommitted edit of an earlier item's check source neither throws nor un-integrates it");
+    assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", `core.hooksPath=${devNull}`, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "later change", "--", edited]).status, 0);
+    assert.deepEqual(scan(), [], "a commit that changed the check source still drops the earlier item, as before");
+  }); } },
 
 ];
 
