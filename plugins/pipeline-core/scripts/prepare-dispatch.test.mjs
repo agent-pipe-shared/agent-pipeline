@@ -286,6 +286,16 @@ test("Antigravity gets the template's paths-only envelope with absolute paths, w
   for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
 });
 
+test("R14 (Antigravity run 3): on Antigravity the briefing use names the prepare step a read-only Critic call needs", () => {
+  const steps = stub({ "critic-dispatch-preflight.mjs": ok({ ...deltaSplitPreflight(), split: undefined }), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
+  const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
+    { exists: () => false, mkdir: () => {}, writeFile: () => {}, env: { AI_AGENT: "antigravity" }, runCommand: steps.runCommand });
+  assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
+  assert.match(result.next.briefingUse, /antigravity-native-dispatch-prepare\.mjs prepare --root <root> --request <file>/u);
+  assert.match(result.next.briefingUse, /AGY-NATIVE-ARTIFACT-MISSING/u);
+  assert.match(result.next.briefingUse, /TypeName critic, no Model/u);
+});
+
 test("a template that lost its copy marker or holds an unknown placeholder refuses instead of handing on an unfilled briefing", () => {
   const render = (templateText) => () => criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText, commits: [MID, HEAD], runner: "claude", root: ROOT, projectName: "p" });
   assert.throws(render(TEMPLATE.replace("COPY EVERYTHING BELOW THIS LINE", "COPY BELOW")), { code: "CBB-TEMPLATE-MARKER" });

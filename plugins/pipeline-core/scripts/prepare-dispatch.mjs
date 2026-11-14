@@ -187,7 +187,7 @@ export function prepareCriticDispatch(input, deps = {}) {
       briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
       ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
       briefingUse: briefing.runner === "antigravity"
-        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing."
+        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md)."
         : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
       nextStep: value.nextStep,
       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
