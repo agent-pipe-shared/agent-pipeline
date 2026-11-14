@@ -23,7 +23,8 @@ export function writeNativeGoldfishStopOutcome({ commonDir, dispatchId, result, 
       integration: result?.integration?.status ?? null,
       // C29 K-38 (Glossover): a refused integration named no code, so the waiter could not say why or whether a step was needed.
       integrationCode: typeof result?.integration?.code === "string" ? result.integration.code.slice(0, 120) : null,
-      integrationReason: typeof result?.integration?.reason === "string" ? result.integration.reason.slice(0, 300) : null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
+      integrationReason: typeof result?.integration?.reason === "string" ? result.integration.reason.slice(0, 300) : null,
+      sliceId: typeof result?.delivery?.sliceId === "string" ? result.delivery.sliceId.slice(0, 128) : null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
     renameSync(temporary, path);
     return true;
   } catch { return false; }

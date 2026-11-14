@@ -10,7 +10,7 @@
 
 An Antigravity code-writing child runs in its own git worktree on a `subagent-<...>` branch, cut from the parent's committed HEAD. Its commits land in the shared object database. Nothing is merged back. The take-over route (`agy-native-integrate.mjs`, candidate 20, C28C) applies the branch's net change to the Elephant's working tree. The recovery route then makes one new commit, `Commit-Act: orchestrator`, and writes an `orchestrator-attested` dispatch record.
 
-In the test run the Elephant harvested several branches by hand. The Critic noted as a minor that the landed commit was the orchestrator's, not the child's. The child's commits, its authorship and its own `Dispatch:` trailers were dropped. The D40b commit scan already counts a Goldfish's own commit with the exact trailer as integrated, so nothing beyond keeping those commits is needed.
+In the test run the Elephant harvested several branches by hand. The Critic noted as a minor that the landed commit was the orchestrator's, not the child's. The child's commits, its authorship and its own `Dispatch:` trailers were dropped. The D40b commit scan counts a Goldfish's own commit as integrated when its `Dispatch:` trailer names the slice id. The generated briefing makes the slice id the dispatch id (self-check DBG-SELFCHECK-SLICE), so for a briefed slice keeping those commits is enough; a hand-written briefing with a different id gets no such release.
 
 ## Decision
 

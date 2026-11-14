@@ -39,6 +39,15 @@ test("C29 K-38: a refused Main integration names its code and reason and says th
   assert.match(result.message, /refused \(SDC-AUTHORITY-CAS: reference-preimage-changed\)/u);
   assert.match(result.message, /do not re-dispatch/u);
   assert.match(result.message, /Dispatch: fix-1 \(goldfish\)/u);
+  assert.match(result.message, /the stop recorded no slice id/u, "without a recorded slice id the release stays conditional");
+  // With the recorded slice id the message states the fact: the same id releases the dependents, a different one does not.
+  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-3", result: { ...refused, delivery: { pendingSha256: "a".repeat(64), sliceId: "fix-3" } }, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
+  const same = waitForHostCommit({ root: "unused", dispatch: "fix-3", after: AFTER }, { commonDir, ...clock() }).result;
+  assert.equal(same.sliceId, "fix-3");
+  assert.match(same.message, /names slice fix-3, so the commit evidence releases its dependents/u);
+  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-4", result: { ...refused, delivery: { pendingSha256: "a".repeat(64), sliceId: "ITEM-B" } }, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
+  const other = waitForHostCommit({ root: "unused", dispatch: "fix-4", after: AFTER }, { commonDir, ...clock() }).result;
+  assert.match(other.message, /names fix-4 but the slice is ITEM-B, so the commit evidence does not release its dependents/u);
   // An integrated stop carries no integration detail and no note.
   writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-2", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
   const clean = waitForHostCommit({ root: "unused", dispatch: "fix-2", after: AFTER }, { commonDir, ...clock() }).result;

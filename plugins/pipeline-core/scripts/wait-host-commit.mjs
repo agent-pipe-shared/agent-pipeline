@@ -32,8 +32,14 @@ function fromOutcome(outcome, waitedSeconds) {
     // C29 K-38 (Glossover): a refused Main integration names its code and reason, and what it means. The host commit is in; the commit
     // evidence (D40) counts the slice as integrated for its dependents when the commit's Dispatch trailer names the slice id. Nothing is re-run.
     const refused = outcome.integration === "refused";
-    const integrationDetail = refused ? { integrationCode: outcome.integrationCode ?? null, integrationReason: outcome.integrationReason ?? null } : {};
-    const note = refused ? ` The stop's Main integration step was refused (${outcome.integrationCode ?? "no code recorded"}${outcome.integrationReason ? `: ${outcome.integrationReason}` : ""}). The delivery itself is committed; do not re-dispatch it. Its dependents are released by the commit evidence when the commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names the slice id (the usual case). Read slice-queue next: if a dependent still lists this slice as held, report that refusal.` : "";
+    const integrationDetail = refused ? { integrationCode: outcome.integrationCode ?? null, integrationReason: outcome.integrationReason ?? null, sliceId: outcome.sliceId ?? null } : {};
+    // The stop records the briefed slice id; the generated briefing makes it the dispatch id (DBG-SELFCHECK-SLICE), so the trailer names it.
+    const release = typeof outcome.sliceId !== "string"
+      ? `Its dependents are released by the commit evidence when the commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names the slice id; the stop recorded no slice id. Read slice-queue next: if a dependent still lists this slice as held, report that refusal.`
+      : outcome.sliceId === outcome.dispatchId
+        ? `The commit's "Dispatch: ${outcome.dispatchId} (goldfish)" trailer names slice ${outcome.sliceId}, so the commit evidence releases its dependents. Read slice-queue next to continue.`
+        : `The commit's trailer names ${outcome.dispatchId} but the slice is ${outcome.sliceId}, so the commit evidence does not release its dependents. Report this refusal; do not integrate by hand.`;
+    const note = refused ? ` The stop's Main integration step was refused (${outcome.integrationCode ?? "no code recorded"}${outcome.integrationReason ? `: ${outcome.integrationReason}` : ""}). The delivery itself is committed; do not re-dispatch it. ${release}` : "";
     return { exitCode: 0, result: { ...common, status: "committed", commit: outcome.commit, integration: outcome.integration, ...integrationDetail, message: `The host commit is in and the stop has finished.${note} ${CONTINUE}` } };
   }
   // A continued child gets no new launch notice, and this record stays on disk: the next wait must start after it or it would answer "checkpoint" again before the real stop.

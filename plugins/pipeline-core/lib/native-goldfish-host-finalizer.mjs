@@ -576,7 +576,8 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
     const terminalAssociation = writeNativeGoldfishAttemptTerminalAssociation({ repoRoot: physical, record: drafted.record, attempt });
     postCommitStage = "authority-terminal-release";
     const delivery=publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record:drafted.record,lockWait:dependencies.lockWait??null});
-    const deliveryResult = state.delivery?{...delivery,pendingSha256:pending.sha256}:null;
+    // C29 K-38: the briefed slice id rides along, so the stop outcome states which slice the commit evidence releases instead of assuming it.
+    const deliveryResult = state.delivery?{...delivery,pendingSha256:pending.sha256,...(typeof state.delivery.sliceId==='string'?{sliceId:state.delivery.sliceId}:{})}:null;
     let checks = null;
     if (deliveryResult?.checkStatus) {
       postCommitStage = "checks-publication";
