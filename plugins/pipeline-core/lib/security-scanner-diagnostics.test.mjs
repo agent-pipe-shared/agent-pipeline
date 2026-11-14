@@ -17,7 +17,13 @@ import { publishScannerDiagnostics } from "./security-scanner-diagnostics-public
 const completionCases=[];
 function test(name,run,options={}){completionCases.push({id:"G13D"+String(completionCases.length+1).padStart(3,"0"),name,run:options.skip?async context=>{context.skip(options.skip);}:run});}
 const symlinkSkip=process.platform==="win32"&&"host limitation: creating symlinks needs a privilege this win32 account lacks (EPERM)";
-const socketSkip=process.platform==="win32"&&"host limitation: Unix-domain socket listen on a filesystem path is not permitted on win32 (EACCES)";
+// A Unix-domain socket path is bounded by sun_path (108 bytes with its terminator on Linux). The socket case listens on
+// <tmpdir>/g13-publish-XXXXXX/evidence/security-latest.diagnostics.json, so a deep TMPDIR (a parallel runner's private one) cannot
+// bind it at all; the case then names that limit instead of failing in its setup.
+const SOCKET_PATH_MAX_BYTES=107;
+const socketPathBytes=Buffer.byteLength(join(tmpdir(),'g13-publish-XXXXXX','evidence/security-latest.diagnostics.json'));
+const socketSkip=process.platform==="win32"?"host limitation: Unix-domain socket listen on a filesystem path is not permitted on win32 (EACCES)"
+  :socketPathBytes>SOCKET_PATH_MAX_BYTES&&`host limitation: the socket path under this TMPDIR is ${socketPathBytes} bytes, above the ${SOCKET_PATH_MAX_BYTES}-byte Unix socket path limit`;
 const publisherSkip=process.platform==="win32"&&"host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32";
 const hash='a'.repeat(64);
 const evidence={payloadSha256:hash,candidate:{commit:'b'.repeat(40),tree:'c'.repeat(40),inputSha256:'d'.repeat(64)}};
