@@ -83,6 +83,11 @@ export function heldDependencyRepair() {
  * It gets its own code and the one repair that applies. Every other unreadable registry keeps the dependency code and the full repair route.
  */
 export function integrationReadinessRefusal(readiness) {
+  // C29 K-37 follow-up: the readiness read compares an integrated dependency's check sources in the working tree with the commit. A change there
+  // (an in-flight edit, or a weakened checker) is no registry fault, so it never gets the inspect/heal/move-aside route.
+  if (readiness.reason === "item-check-source-not-candidate") return { ...fail("NGHS-ITEM-INTEGRATION-CHECKER-CHANGED"),
+    reason: "integration readiness refused: a check source of an integrated dependency differs between the working tree and the commit",
+    repair: "a dependency's check file was edited and not committed (git status names it). Wait for the dispatch that edits it to land its host commit, or commit or restore that change, then dispatch this one again; the session registry needs no repair" };
   if (readiness.code !== "SDC-LOCK-HELD") return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
   return { ...fail("NGHS-ITEM-INTEGRATION-LOCK-HELD"), reason: `integration readiness not observed (${readiness.code}): the session registry lock was held by another launch`,
     repair: "another launch held the session registry lock until this admission's wait ran out; the dependency itself was not judged. Send this dispatch again, alone, with one Agent call per message; nothing else needs repair" };
@@ -1157,7 +1162,9 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
       const item=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
       // PF-49: one integration source for every check of a dispatch — native records united with the D40 commit
-      // evidence, exactly as observeGovernedItemIntegrationReadiness reads it for the admission before this.
+      // evidence, as observeGovernedItemIntegrationReadiness reads it for the admission before this. C29 K-37: this
+      // in-boundary re-check reads the integrated items' check sources from the commit; the working-tree comparison
+      // (a weakened checker refuses) already ran in that observer, which every launch with a dependency passes first.
       // D177: only the item's own dependencies are proven here; the settled set below is computed once per admission.
       checkpoint('integrated-slice-read');
       const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});

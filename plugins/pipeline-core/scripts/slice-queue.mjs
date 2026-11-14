@@ -34,7 +34,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, statSync, lstatSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice, importGovernedHandoverQueue } from "../lib/native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, integrationReadinessRefusal, cancelUnstartedGovernedItemSlice, importGovernedHandoverQueue } from "../lib/native-goldfish-host-state.mjs";
 import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue } from "../lib/slice-queue-location.mjs";
 import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-support.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
@@ -298,7 +298,9 @@ function deriveStatus(flags, loaded) {
     ? []
     : ledgerCall(() => liveSlices({ ...target, evidenceDir, sliceIds, now, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) }));
   let integrationReadiness;
-  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:queueRoot()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
+  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:queueRoot()});if(observed.status!=='observed'){const refusal=observed.reason==='item-check-source-not-candidate'?integrationReadinessRefusal(observed):null;
+    throw new CliError(refusal?.code??observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,refusal?refusal.reason:'Source integration readiness is unavailable.',refusal?{repair:refusal.repair}:{});}
+  integrationReadiness=observed.handle;}
   const status = readyAndLive({ queue: loaded.raw, records, live, now, integrationReadiness }, { platform: process.platform, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) });
   return { status, target, now };
 }
