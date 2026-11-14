@@ -2,7 +2,9 @@
 
 Load this when a session reaches, explains, or is about to discuss the push
 gate. Everything here is about the moment a **human** has to act; the session's
-own job is to state it clearly once and then wait. Waiting means the step's own
+own job is to state it clearly once and then wait. Stating it means relaying the
+step's `poNow` sentence verbatim, once: it names the one command and says the
+PO reports nothing back. Waiting means the step's own
 bounded `waitAction` (`proof-wait.mjs`), run silently: no status message and no
 repeated request between waits, never a re-run of the driver; after a
 `PROOF-WAIT-TIMEOUT` run the same wait again. The waited time is labelled PO

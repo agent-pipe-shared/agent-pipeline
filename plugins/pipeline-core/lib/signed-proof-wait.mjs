@@ -122,16 +122,37 @@ export function signCommandForProof(root, proof) {
  * The fields every signing step carries beside its sign command (one builder for all of them): the exact proof path, the bounded
  * wait the agent runs itself, and the explicit statement that the PO reports nothing back.
  */
-export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null }) {
+/** One pasteable line for a signing command in any shape a step carries: a copy-safe rendering, its `command` text, or executable plus argv. */
+function signingLine(signCommand) {
+  if (typeof signCommand === "string" && signCommand.trim() !== "") return signCommand;
+  if (signCommand === null || typeof signCommand !== "object") return null;
+  for (const field of ["copyCommand", "command"]) if (typeof signCommand[field] === "string" && signCommand[field].trim() !== "") return signCommand[field];
+  return typeof signCommand.executable === "string" && Array.isArray(signCommand.argv) ? text(signCommand) : null;
+}
+
+/**
+ * C29 P2-6 (Claude greenfield run 3: three waits ran out while the PO asked what was needed): the one fixed sentence the agent hands
+ * the PO, verbatim and once, before it waits. It names the one command; without a known command it names the signing step instead
+ * of inventing one.
+ */
+export function poNowSentence(signCommand, proofPath) {
+  const line = signingLine(signCommand);
+  return line === null
+    ? `Now from you: run the one signing command shown above in your own terminal; nothing else is needed. I wait for ${proofPath} myself, so you do not need to report back.`
+    : `Now from you: run this one command in your own terminal, nothing else is needed: ${line}  I wait for ${proofPath} myself, so you do not need to report back.`;
+}
+
+export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null, signCommand = undefined }) {
   const wait = proofWaitCommand(root, proofPath, seconds, subjectSha256);
   return {
     proofPath,
+    poNow: poNowSentence(signCommand === undefined ? signCommandForProof(root, proofPath) : signCommand, proofPath),
     reportBackRequired: false,
     waitAction: {
       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
     },
-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
+    afterSigning: `Hand the PO the poNow sentence once, verbatim, as the last thing before the wait. Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
   };
 }

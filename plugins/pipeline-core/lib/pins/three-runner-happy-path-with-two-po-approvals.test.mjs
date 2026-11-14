@@ -890,6 +890,22 @@ test("C29-C9: the signature wait is silent and its time is PO wait: a timeout do
   assert.match(fields.afterSigning, /is PO wait, never active agent time/u);
 });
 
+test("C29-P2-6: every signing step carries one fixed 'Now from you' sentence naming its one command, handed over once before the wait", () => {
+  // Claude run 3 (P2-6): three proof waits ran out while the PO asked what was needed. The sentence names the command the step
+  // itself rendered; a key-directory proof derives sign-intent; a critical mirror without a passed command never invents one.
+  const critical = "scratch/critical-push-proof-0123456789ab.json";
+  const passed = awaitSignatureFields({ root: "/p", proofPath: critical, signCommand: { command: "node po-human-approval.mjs authorize-critical --kind push", copyCommand: "PIPELINE_SCRIPT=x node \"$PIPELINE_SCRIPT\" authorize-critical" } });
+  assert.match(passed.poNow, /^Now from you: run this one command in your own terminal, nothing else is needed: PIPELINE_SCRIPT=x node "\$PIPELINE_SCRIPT" authorize-critical  I wait for scratch\/critical-push-proof-0123456789ab\.json myself, so you do not need to report back\.$/u, "the copy-safe form wins over the raw command");
+  assert.match(awaitSignatureFields({ root: "/p", proofPath: critical, signCommand: { executable: "node", argv: ["a.mjs", "sign"] } }).poNow, /nothing else is needed: node a\.mjs sign  I wait/u);
+  const unknown = awaitSignatureFields({ root: "/p", proofPath: critical });
+  assert.match(unknown.poNow, /^Now from you: run the one signing command shown above in your own terminal/u, "no command is invented for a critical mirror");
+  const intent = "a".repeat(64);
+  const keyDirectory = awaitSignatureFields({ root: "/p", proofPath: `/keys/proof-${intent}.json` });
+  assert.match(keyDirectory.poNow, new RegExp(`sign-intent --repo-root /p --intent-sha256 ${intent}  I wait`, "u"), "a key-directory proof derives the sign-intent command");
+  assert.match(passed.afterSigning, /^Hand the PO the poNow sentence once, verbatim, as the last thing before the wait\./u);
+  assert.equal(passed.reportBackRequired, false);
+});
+
 test("G20-76: the shell grammar admits the proof wait with --subject only as a 64 hex value after --timeout", async () => {
   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
   const root = join(DESIGN_REPO_ROOT, "scratch", ".proof-wait-fixture");

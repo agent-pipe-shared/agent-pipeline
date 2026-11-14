@@ -4520,9 +4520,10 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       const observed = observeDesignApprovalRequest({ dir, presentation, submission, deps, signature: mode?.mode === "signature" });
       if (!observed.ok) {
         if (observed.code !== "DAB-APPROVAL-PROOF-INVALID") return { kind: "repair-required", code: observed.code, mutation: false, requiresConfirmation: false, guidance: "Recheck sources and use present-plan --review-receipt." };
-        return { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, presentation.designApprovalRequestPath)], forceCopyCommand: true }), invocation: "user-copy-only", executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true,
-          // G20-30: the exact proof path and the agent's own bounded wait; the PO reports nothing back after signing.
-          ...awaitSignatureFields({ root: resolve(dir), proofPath: presentation.designApprovalRequestPath.replace("request-", "proof-") }) };
+        const signDesign = boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, presentation.designApprovalRequestPath)], forceCopyCommand: true });
+        return { kind: "command", ...signDesign, invocation: "user-copy-only", executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true,
+          // G20-30: the exact proof path and the agent's own bounded wait; the PO reports nothing back after signing. P2-6: poNow names this same command.
+          ...awaitSignatureFields({ root: resolve(dir), proofPath: presentation.designApprovalRequestPath.replace("request-", "proof-"), signCommand: signDesign }) };
       }
       if (mode?.mode === "signature") return { kind: "command", executable: process.execPath, argv: [script, "approve-plan", "--design-approval-request", presentation.designApprovalRequestPath], mutation: true, requiresConfirmation: false };
       if (mode?.mode !== "chat") return { kind: "repair-required", code: "DAB-APPROVAL-MODE-UNAVAILABLE", mutation: false, requiresConfirmation: false };
@@ -10206,7 +10207,7 @@ function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
       // C21C: the signing step mirrors its public artifacts to these exact scratch names, so the agent waits for the proof itself and the PO reports nothing back.
       const mirrorCommon = defaultGitCommonDir(dir);
       const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
-      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
+      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256, signCommand: rendered });
       console.log(JSON.stringify({ schema: "pipeline.critic-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
         ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run acknowledgeCommand unchanged and the identical close command again")}` }),
@@ -10275,7 +10276,7 @@ function runApproveSpecAddendum({ dir, rest, base, now, deps }) {
       const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path ?? subject.specPath, subjectSha256, expiresAt, addendum: subject.addendumPath });
       const mirrorCommon = defaultGitCommonDir(dir);
       const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
-      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
+      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256, signCommand: rendered });
       console.log(JSON.stringify({ schema: "pipeline.spec-addendum-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
         ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged")}` }),
@@ -10348,7 +10349,7 @@ function runApproveGateChangeAcknowledgement({ dir, rest, base, now, deps }) {
       const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
       const mirrorCommon = defaultGitCommonDir(dir);
       const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
-      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
+      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256, signCommand: rendered });
       console.log(JSON.stringify({ schema: "pipeline.gate-change-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
         ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged and the identical close command again")}` }),
@@ -10411,7 +10412,7 @@ function runApproveMaintenanceRedCheck({ dir, rest, base, now, deps }) {
       const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
       const mirrorCommon = defaultGitCommonDir(dir);
       const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
-      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
+      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256, signCommand: rendered });
       console.log(JSON.stringify({ schema: "pipeline.maintenance-red-check-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
         ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run recordCommand unchanged and generate the maintenance binding again")}` }),
