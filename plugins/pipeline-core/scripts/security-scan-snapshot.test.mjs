@@ -67,6 +67,8 @@ security:
       enabled: false
     license-check:
       enabled: true
+    trivy:
+      enabled: false
 `;
 
 const MIT = { dependencies: [{ name: "fixture-dependency", license: "MIT" }] };

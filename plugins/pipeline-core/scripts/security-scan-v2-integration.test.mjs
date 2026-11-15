@@ -190,8 +190,9 @@ test("v2 envelope is valid for a real clean Git candidate and captures all three
   assert.equal(validateSecurityEvidenceV2(onDisk).valid, true);
   assert.deepEqual(onDisk, evidenceV2);
 
-  assert.deepEqual(evidenceV2.capabilities.map((c) => c.capabilityId), ["cap.secrets", "cap.sca", "cap.sast"]);
-  assert.deepEqual(evidenceV2.capabilities.map((c) => c.status), ["PASS", "PASS", "PASS"]);
+  // C29e (ADR-0103): trivy contributes cap.iac; the fixture has no infrastructure file, so it is SKIPPED and not required.
+  assert.deepEqual(evidenceV2.capabilities.map((c) => c.capabilityId), ["cap.secrets", "cap.sca", "cap.sast", "cap.iac"]);
+  assert.deepEqual(evidenceV2.capabilities.map((c) => c.status), ["PASS", "PASS", "PASS", "SKIPPED"]);
   assert.equal(evidenceV2.input.commit, evidence.candidate.commit);
   assert.equal(evidenceV2.input.tree, evidence.candidate.tree);
   assert.equal(evidenceV2.policy.configurationSha256, evidence.policy.configurationSha256);
@@ -266,7 +267,7 @@ test("EXIT-NEUTRALITY divergence: all-skipped is v1 exit 0 while the v2 policy-c
   assert.equal(verdictV2.verdict.blocking, true, "v2: required capabilities missing -> blocking (evidence only)");
   assert.deepEqual(
     Object.values(verdictV2.capabilityOutcomes).sort(),
-    ["required-capability-missing", "required-capability-missing", "required-capability-missing"],
+    ["not-applicable", "required-capability-missing", "required-capability-missing", "required-capability-missing"],
   );
   assert.equal(verdictV2.verdict.offendingCapabilities.length, 3);
 });
@@ -274,7 +275,7 @@ test("EXIT-NEUTRALITY divergence: all-skipped is v1 exit 0 while the v2 policy-c
 test("per-capability RUN_OUTCOMES mapping: pass, findings, required-capability-missing", async () => {
   const passRoot = makeGitFixture("v2-map-pass", { license: true });
   const passRes = await runSecurityScan({ rootDir: passRoot, env: CLEAN_ENV, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
-  assert.deepEqual(passRes.verdictV2.capabilityOutcomes, { "cap.secrets": "pass", "cap.sca": "pass", "cap.sast": "pass" });
+  assert.deepEqual(passRes.verdictV2.capabilityOutcomes, { "cap.secrets": "pass", "cap.sca": "pass", "cap.sast": "pass", "cap.iac": "not-applicable" });
 
   const findRoot = makeGitFixture("v2-map-findings");
   const findRes = await runSecurityScan({ rootDir: findRoot, env: { PIPELINE_GITLEAKS_PATH: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
@@ -326,7 +327,7 @@ test("dirty/uncertain candidate: v1 exit 2 and v2 marks every capability invalid
   assert.equal(exitCode, 2, "v1: a dirty candidate is blocking-class");
   assert.ok(evidenceV2, "v2 still emitted: a dirty candidate still carries a Git identity");
   assert.equal(validateSecurityEvidenceV2(evidenceV2).valid, true);
-  assert.deepEqual(Object.values(verdictV2.capabilityOutcomes), ["invalid", "invalid", "invalid"]);
+  assert.deepEqual(Object.values(verdictV2.capabilityOutcomes), ["invalid", "invalid", "invalid", "invalid"]);
   assert.equal(verdictV2.verdict.blocking, true);
 });
 

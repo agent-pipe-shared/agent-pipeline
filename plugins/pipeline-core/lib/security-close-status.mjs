@@ -17,7 +17,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
-export const SECURITY_ELEMENTS = Object.freeze(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
+// C29e (ADR-0103): trivy is the fifth element; it reads "not applicable" for a candidate without infrastructure or container files.
+export const SECURITY_ELEMENTS = Object.freeze(["gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"]);
 export const SECURITY_RUN_COMMAND = "node <plugin-root>/scripts/security-scan.mjs";
 export const SECURITY_PREFLIGHT_COMMAND = "node <plugin-root>/scripts/toolchain-preflight.mjs";
 export const SCANNER_NOT_EXECUTED_CODE = "SEC-CLOSE-SCANNER-NOT-EXECUTED";
@@ -40,6 +41,8 @@ export function deriveReportStatus({ tool, status, classification }) {
   // osv-scanner's ONE non-binary_missing SKIPPED shape is its own "no package sources in project" honest signal (classification
   // "success") -- a project state, not a broken tool.
   if (tool === "osv-scanner" && classification === "success") return "not-applicable";
+  // C29e (ADR-0103): trivy's one non-binary_missing SKIPPED shape is "no infrastructure or container files" -- a project state too.
+  if (tool === "trivy" && classification === "success") return "not-applicable";
   // Every other SKIPPED shape for a binary-backed scanner means the tool itself could not be used: absent from PATH/trusted locations
   // ("binary_missing") or rejected as untrusted. No working scan happened, and it is not the project's own "nothing to scan" signal.
   return "tool-unavailable";

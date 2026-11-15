@@ -1021,13 +1021,14 @@ process.exit(0);
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("runner: manifest absent -> exit 0 (nothing installed/configured, nothing blocking)", exitCode, 0);
   assertEqual(
-    "runner: manifest absent -> all 4 scanners attempted (defaults enabled) and SKIPPED",
+    "runner: manifest absent -> all 5 scanners attempted (defaults enabled) and SKIPPED",
     evidence.scanners.map((s) => [s.tool, s.status]),
     [
       ["gitleaks", "SKIPPED"],
       ["osv-scanner", "SKIPPED"],
       ["semgrep", "SKIPPED"],
       ["license-check", "SKIPPED"],
+      ["trivy", "SKIPPED"],
     ],
   );
   assertEqual("runner: manifest absent -> default thresholds", evidence.thresholds, { block_on: ["critical", "high"] });
@@ -1102,6 +1103,7 @@ governance:
       ["osv-scanner", "PASS"],
       ["semgrep", "ERROR"],
       ["license-check", "PASS"],
+      ["trivy", "SKIPPED"],
     ],
   );
   assertEqual("runner: mixed statuses -> exit 2 (ERROR + high findings, mode blocking)", exitCode, 2);
@@ -1203,6 +1205,8 @@ security:
       enabled: false
     license-check:
       enabled: true
+    trivy:
+      enabled: false
 
 governance:
   policies_path: governance/neutral-policies
@@ -1277,6 +1281,7 @@ governance:
       ["ERROR", "project_authority"],
       ["ERROR", "project_authority"],
       ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
     ],
   });
   assertEqual("runner: mixed authority evidence binds no legacy manifest", {
@@ -1341,6 +1346,8 @@ security:
     semgrep:
       enabled: true
     license-check:
+      enabled: false
+    trivy:
       enabled: false
   thresholds:
     block_on:
@@ -1494,6 +1501,8 @@ security:
     semgrep:
       enabled: false
     license-check:
+      enabled: false
+    trivy:
       enabled: false
 `,
   );
@@ -1727,6 +1736,8 @@ security:
       enabled: true
     license-check:
       enabled: false
+    trivy:
+      enabled: false
 `,
   );
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: { HOME: fakeHome, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
@@ -1770,9 +1781,9 @@ gates:
   assertEqual("fresh consumer (no catalog): v2 required-capability plan is empty (catalog-unavailable)", verdictV2?.plan?.required, []);
   assertEqual("fresh consumer (no catalog): v2 verdict is non-blocking", verdictV2?.verdict?.blocking, false);
   assertEqual(
-    "fresh consumer (no catalog): every attempted scanner reads tool-unavailable/not-configured, never an unlabeled success",
+    "fresh consumer (no catalog): every attempted scanner reads tool-unavailable/not-configured/not-applicable, never an unlabeled success",
     evidence.scanners.map((s) => s.reportStatus),
-    ["tool-unavailable", "tool-unavailable", "tool-unavailable", "not-configured"],
+    ["tool-unavailable", "tool-unavailable", "tool-unavailable", "not-configured", "not-applicable"],
   );
 
   const commit = git(rootDir, "rev-parse", "HEAD");
@@ -1946,6 +1957,7 @@ security:
       ["osv-scanner", "findings"],
       ["semgrep", "error"],
       ["license-check", "not-configured"],
+      ["trivy", "not-applicable"],
     ],
   );
 }
@@ -1968,6 +1980,8 @@ security:
     semgrep:
       enabled: false
     license-check:
+      enabled: false
+    trivy:
       enabled: false
 `,
   );
@@ -2215,7 +2229,7 @@ security:
   assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");
   assertEqual("rule provenance: license-check names the allowlist it used", [byTool("license-check")?.ruleSet?.source, byTool("license-check")?.ruleSet?.ref], ["plugin-default", "plugin:config/security/license-allowlist.default.json"]);
   const lines = scanModule.formatRuleSetLines(evidence.scanners);
-  assertTrue("rule provenance: one printed line per scanner, semgrep's with its rule ids", lines.length === 4 && lines.some((l) => l.startsWith("semgrep: ") && l.includes("pipeline-default-hardcoded-private-key")), JSON.stringify(lines));
+  assertTrue("rule provenance: one printed line per scanner, semgrep's with its rule ids", lines.length === 5 && lines.some((l) => l.startsWith("semgrep: ") && l.includes("pipeline-default-hardcoded-private-key")), JSON.stringify(lines));
   assertTrue("rule provenance: a scanner that did not run reads as not run, never with a rule set", scanModule.formatRuleSetLines([{ tool: "semgrep", status: "SKIPPED", classification: "binary_missing" }])[0] === "semgrep: no rules ran (scanner did not execute)", "skipped line");
   assertEqual("rule provenance: the v2 verdict names the plan source and says what it means", [verdictV2?.plan?.source, /by design/u.test(verdictV2?.plan?.sourceNote ?? ""), /exit code/u.test(verdictV2?.plan?.sourceNote ?? "")], ["catalog-unavailable", true, true]);
   assertEqual("rule provenance: the v2 rule pack ref agrees with the v1 rule set ref", scanModule.formatRuleSetLines(evidence.scanners).find((l) => l.startsWith("semgrep: ")).includes(semgrep.ref), true);

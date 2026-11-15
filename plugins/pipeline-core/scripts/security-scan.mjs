@@ -123,6 +123,8 @@ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
+import * as trivyAdapter from "./security-adapters/trivy.mjs";
+import { blockingTrivyFindingFilter, existingTrivyFindings, formatTrivyBaselineLines, resolveTrivyBaselineCommit, TRIVY_BASELINE_SCHEMA } from "../lib/trivy-baseline.mjs";
 
 // CYB-2E -- additive `pipeline.security-evidence.v2` policy-complete emission. Import-only:
 // none of these modules is edited by this task; every one is a pure, side-effect-free library.
@@ -165,6 +167,9 @@ const SCANNER_DEFS = [
   { key: "osv-scanner", adapter: osvScannerAdapter },
   { key: "semgrep", adapter: semgrepAdapter },
   { key: "license-check", adapter: licenseCheckAdapter },
+  // C29e (ADR-0103): last, so the order of the four earlier entries is unchanged. It needs its binary only when the candidate holds an
+  // infrastructure or container file; otherwise its entry is "not applicable" without a spawn.
+  { key: "trivy", adapter: trivyAdapter },
 ];
 
 const DEFAULT_ENABLED = Object.freeze({
@@ -172,6 +177,7 @@ const DEFAULT_ENABLED = Object.freeze({
   "osv-scanner": true,
   semgrep: true,
   "license-check": true,
+  trivy: true,
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -334,6 +340,9 @@ function describeRuleSet(key, builtConfig, scanRoot) {
   }
   if (key === "osv-scanner") {
     return { source: "builtin", ref: "osv-scanner:auto-detect", sha256: null, description: "the osv.dev advisory database matched against the lockfiles and manifests found in the candidate tree; there is no rule file" };
+  }
+  if (key === "trivy") {
+    return { source: "builtin", ref: "trivy:embedded-checks", sha256: null, description: "the misconfiguration checks embedded in the trivy binary (offline, no check download; a candidate trivy.yaml or .trivyignore is not read)" };
   }
   const shipped = builtConfig.allowlistPathSource === "plugin-default";
   return {
@@ -632,6 +641,49 @@ async function semgrepBaselineStep({ rootDir, scanRoot, candidate, remoteName, a
   return { ...resolved, existing, newCount: candidates.length - existing.length, worktreeCleanup: cleanup.status };
 }
 
+/**
+ * C29e T8b (ADR-0103): which blocking-severity Trivy findings existed before the feature. Runs only when the full Trivy scan has a
+ * finding at a blocking severity. The base commit comes from the candidate snapshot (lib/trivy-baseline.mjs); the same adapter,
+ * binary and neutral invocation scan a throwaway detached worktree of that commit, which is removed afterwards whatever happened.
+ * Any failure leaves the record `unavailable`, and then every blocking-severity Trivy finding blocks.
+ */
+async function trivyBaselineStep({ rootDir, scanRoot, authority, trivyRun, blockOn, timeoutMs, env, spawnFn }) {
+  const blockOnSet = new Set(blockOn);
+  const candidates = (trivyRun?.findings ?? []).filter((finding) => blockOnSet.has(finding.severity));
+  if (trivyRun === null || candidates.length === 0) return { schema: TRIVY_BASELINE_SCHEMA, status: "not-needed" };
+  const resolved = resolveTrivyBaselineCommit({ rootDir: scanRoot, authority, runGit: (args) => gitResult(scanRoot, args) });
+  if (resolved.status !== "applied") return { ...resolved };
+  let parent;
+  try { parent = mkdtempSync(join(tmpdir(), "pipeline-trivy-base-")); } catch { return { ...resolved, status: "unavailable", code: "TRIVY-BASELINE-WORKTREE", reason: "a temporary directory for the base worktree could not be created" }; }
+  const baseRoot = join(parent, "tree");
+  const added = gitResult(rootDir, ["worktree", "add", "--detach", baseRoot, resolved.commit]);
+  if (added?.status !== 0) {
+    try { rmSync(parent, { recursive: true, force: true }); } catch { /* bounded temp cleanup */ }
+    return { ...resolved, status: "unavailable", code: "TRIVY-BASELINE-WORKTREE", reason: "the worktree of the base commit could not be created" };
+  }
+  let result;
+  let cleanup;
+  try {
+    const { triggers: _candidateTriggers, ...config } = trivyRun.config;
+    const runArgs = { rootDir: baseRoot, config, timeoutMs, env };
+    if (spawnFn) runArgs.spawnFn = spawnFn;
+    result = await trivyRun.adapter.run(runArgs);
+  } catch (error) {
+    result = { status: "ERROR", reason: `adapter threw: ${error?.message ?? "unknown error"}` };
+  } finally {
+    const removed = gitResult(rootDir, ["worktree", "remove", "--force", baseRoot]);
+    try { rmSync(parent, { recursive: true, force: true }); } catch { /* bounded temp cleanup */ }
+    cleanup = removed?.status === 0 ? "removed" : "retained";
+  }
+  // A base without any trigger file had nothing of this kind: every candidate finding is new (applied, zero existing).
+  const baseFindings = result?.status === "SKIPPED" && result.classification === "success" ? [] : result?.findings;
+  if (!(result?.status === "PASS" || result?.status === "FINDINGS" || (result?.status === "SKIPPED" && result.classification === "success"))) {
+    return { ...resolved, status: "unavailable", code: "TRIVY-BASELINE-PASS-FAILED", reason: String(result?.reason ?? "the base scan did not complete").slice(0, 300), worktreeCleanup: cleanup };
+  }
+  const existing = existingTrivyFindings(trivyRun.findings, baseFindings, blockOn);
+  return { ...resolved, existing, newCount: candidates.length - existing.length, worktreeCleanup: cleanup };
+}
+
 function childProcessError({ tool, error, timeoutMs }) {
   if (error?.code === "EPERM" || error?.code === "EACCES") {
     return {
@@ -732,6 +784,7 @@ function familyRoot(capabilityId) {
 const V2_RULE_PACK_REF = Object.freeze({
   gitleaks: "gitleaks:builtin-default",
   "osv-scanner": "osv-scanner:auto-detect",
+  trivy: "trivy:embedded-checks",
 });
 
 /** Non-empty rule-pack/config ref per scanner (AC4 identity); semgrep's tracks its rules_dir. */
@@ -797,6 +850,11 @@ function sourceCapabilityPlan(rootDir, suiteCapabilityIds, applicabilityInputs =
 
 function observedApplicabilityInputs(capabilityDefs) {
   const inputs = { "repo.gitHistory": true };
+  // C29e (ADR-0103): only Trivy's own completed "no trigger file" signal says the candidate has no infrastructure files; anything
+  // else (missing binary, error) leaves the input absent, so an IaC control stays `unknown` rather than not applicable.
+  const iac = capabilityDefs.find(({ contract }) => contract.capabilityId === "cap.iac")?.entry;
+  if (iac?.status === "SKIPPED" && iac.classification === "success" && iac.reason === trivyAdapter.TRIVY_NOT_APPLICABLE_REASON) inputs["repo.hasInfrastructureFiles"] = false;
+  else if (iac?.status === "PASS" || iac?.status === "FINDINGS") inputs["repo.hasInfrastructureFiles"] = true;
   const sca = capabilityDefs.find(({ contract }) => contract.capabilityId === "cap.sca")?.entry;
   if (!sca) return inputs;
 
@@ -1061,6 +1119,7 @@ export async function runSecurityScan({
   const rawByTool = {};
   const diagnosticRecords = [];
   let semgrepRun = null; // C28e: the completed full Semgrep scan, for the baseline step after the loop
+  let trivyRun = null; // C29e T8b: the completed full Trivy scan, for its baseline step after the loop
   const childProcessPreflight = scanRoot
     ? runChildProcessPreflight({ rootDir: scanRoot, timeoutMs, spawnFn })
     : { status: "ERROR", classification: "candidate_snapshot", reason: snapshot.reason };
@@ -1085,7 +1144,14 @@ export async function runSecurityScan({
       // environment cannot start children. Every binary-backed scanner is
       // classified as an execution-environment failure before PATH discovery,
       // so a sandbox EPERM can never masquerade as a missing binary.
-      if (key !== "license-check" && childProcessPreflight.status !== "PASS") {
+      // C29e (ADR-0103): Trivy's applicability is decided first, from the snapshot alone: a candidate without an infrastructure or
+      // container file needs no binary and no child process, and reads "not applicable".
+      const trivyTriggers = key === "trivy" ? trivyAdapter.trivyTriggerFiles(scanRoot) : null;
+      if (trivyTriggers?.error) {
+        entry = { tool: adapter.name, status: "ERROR", classification: "scanner_error", findingCount: 0, reason: `trivy applicability could not be decided: ${trivyTriggers.error}` };
+      } else if (trivyTriggers && trivyAdapter.triggerCount(trivyTriggers) === 0) {
+        entry = { tool: adapter.name, status: "SKIPPED", classification: "success", findingCount: 0, reason: trivyAdapter.TRIVY_NOT_APPLICABLE_REASON };
+      } else if (key !== "license-check" && childProcessPreflight.status !== "PASS") {
         entry = {
           tool: adapter.name,
           status: "ERROR",
@@ -1113,7 +1179,7 @@ export async function runSecurityScan({
           // config value that failed containment; see buildAdapterConfig's own doc comment.
           entry = { tool: adapter.name, status: "ERROR", classification: "manifest_config_invalid", findingCount: 0, reason: builtConfig.configViolation };
         } else {
-          const adapterConfig = { ...builtConfig, binaryPath: inst.path };
+          const adapterConfig = { ...builtConfig, binaryPath: inst.path, ...(trivyTriggers ? { triggers: trivyTriggers } : {}) };
           const runArgs = { rootDir: scanRoot, config: adapterConfig, timeoutMs, env };
           if (spawnFn) runArgs.spawnFn = spawnFn;
           const rulesBefore = key === "semgrep" ? observeLocalRules(scanRoot, builtConfig.rulesDir) : null;
@@ -1123,6 +1189,13 @@ export async function runSecurityScan({
           entry.ruleSet = describeRuleSet(key, builtConfig, scanRoot); // CGR-10: what really ran, from the config the adapter was handed
           if (key === "semgrep" && (result.status === "PASS" || result.status === "FINDINGS")) {
             semgrepRun = { adapter, config: adapterConfig, findings: result.findings };
+          }
+          if (key === "trivy" && (result.status === "PASS" || result.status === "FINDINGS")) {
+            // C29e T8b: the evidence shows the tool version, what was scanned and every inline ignore (counted, never blocking).
+            entry.toolVersion = result.version ?? null;
+            entry.triggers = result.triggers ?? null;
+            entry.inlineIgnores = Array.isArray(result.inlineIgnores) ? result.inlineIgnores : [];
+            trivyRun = { adapter, config: adapterConfig, findings: result.findings };
           }
           if (key === "semgrep") {
             // SEM-F: a degraded-coverage result (warn-level PartialParsing only) is merged onto the
@@ -1154,9 +1227,14 @@ export async function runSecurityScan({
   const semgrepBaseline = scanRoot
     ? await semgrepBaselineStep({ rootDir, scanRoot, candidate: candidateBefore, remoteName, authority, semgrepRun, blockOn, timeoutMs, env, spawnFn })
     : { schema: SEMGREP_BASELINE_SCHEMA, status: "not-needed" };
+  const trivyBaseline = scanRoot
+    ? await trivyBaselineStep({ rootDir, scanRoot, authority, trivyRun, blockOn, timeoutMs, env, spawnFn })
+    : { schema: TRIVY_BASELINE_SCHEMA, status: "not-needed" };
   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
-  // C28e: the one verdict function (lib/semgrep-baseline.mjs); every gate reading exitCode inherits it.
-  const hasBlockingFinding = blockingFindings(findings, blockOn, semgrepBaseline).length > 0;
+  // C28e: the one verdict function (lib/semgrep-baseline.mjs); every gate reading exitCode inherits it. C29e T8b: a Trivy finding the
+  // baseline names as existing before the feature does not block either (lib/trivy-baseline.mjs).
+  const trivyExempt = blockingTrivyFindingFilter(trivyBaseline);
+  const hasBlockingFinding = blockingFindings(findings, blockOn, semgrepBaseline).filter(trivyExempt).length > 0;
   const snapshotAfter = scanRoot ? observeCandidate(scanRoot, remoteName) : null;
   const candidateAfter = observeSubject(rootDir);
   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
@@ -1207,6 +1285,7 @@ export async function runSecurityScan({
       },
       snapshotCleanup: cleanup,
       semgrepBaseline,
+      trivyBaseline,
     },
     scanners,
     findings,
@@ -1326,6 +1405,13 @@ function printSummary(evidence, critical = false, exceptions = null) {
   for (const line of formatRuleSetLines(evidence.scanners)) console.log(`  ${line}`);
   // C28e (D242): Semgrep findings that existed before the feature are listed and named non-blocking.
   for (const line of formatSemgrepBaselineLines(evidence.execution?.semgrepBaseline)) console.log(line);
+  // C29e T8b: the same for Trivy, plus every inline trivy:ignore the scan honoured (counted, never blocking).
+  for (const line of formatTrivyBaselineLines(evidence.execution?.trivyBaseline)) console.log(line);
+  const trivyEntry = evidence.scanners.find((s) => s?.tool === "trivy");
+  if (Array.isArray(trivyEntry?.inlineIgnores) && trivyEntry.inlineIgnores.length > 0) {
+    console.log(`Trivy inline ignores honoured: ${trivyEntry.inlineIgnores.length} (listed in the evidence, not blocking)`);
+    for (const item of trivyEntry.inlineIgnores.slice(0, 20)) console.log(`  trivy:ignore ${item.rule} ${item.path}:${item.line}`);
+  }
   // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
   // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
   // executed and shows every applied named exception on its line.

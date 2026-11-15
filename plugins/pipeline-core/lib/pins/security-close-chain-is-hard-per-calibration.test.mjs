@@ -125,12 +125,13 @@ test("C4 a finding reads failed", () => {
 test("C5 four states only; unconfigured is not applicable, configured without a run is not executed, no evidence at all is not executed", () => {
   assert.deepEqual([...SECURITY_STATES], ["passed", "failed", "not executed", "not applicable"]);
   const elements = securityCloseElements({
-    scanners: scanners(["gitleaks", "PASS"], ["osv-scanner", "SKIPPED", "success"], ["semgrep", "ERROR", "scanner_error"], ["license-check", "SKIPPED", "success"]),
+    scanners: scanners(["gitleaks", "PASS"], ["osv-scanner", "SKIPPED", "success"], ["semgrep", "ERROR", "scanner_error"], ["license-check", "SKIPPED", "success"], ["trivy", "SKIPPED", "success"]),
   });
   const state = Object.fromEntries(elements.map((e) => [e.element, e.state]));
-  assert.deepEqual(state, { gitleaks: "passed", "osv-scanner": "not applicable", semgrep: "not executed", "license-check": "not applicable" });
+  // C29e (ADR-0103): trivy's "no infrastructure or container files" is not applicable, like osv-scanner's "no package sources".
+  assert.deepEqual(state, { gitleaks: "passed", "osv-scanner": "not applicable", semgrep: "not executed", "license-check": "not applicable", trivy: "not applicable" });
   const none = securityCloseElements({ scanners: null, enabled: { semgrep: false } });
-  assert.deepEqual(Object.fromEntries(none.map((e) => [e.element, e.state])), { gitleaks: "not executed", "osv-scanner": "not executed", semgrep: "not applicable", "license-check": "not executed" });
+  assert.deepEqual(Object.fromEntries(none.map((e) => [e.element, e.state])), { gitleaks: "not executed", "osv-scanner": "not executed", semgrep: "not applicable", "license-check": "not executed", trivy: "not executed" });
   for (const line of formatSecurityCloseStatus(none)) assert.match(line, /: (passed|failed|not executed|not applicable)\b/u);
 });
 
@@ -438,7 +439,7 @@ test("C14b a scanner the capability plan marks required is covered by its own ex
 test("C15 an expired, malformed or unknown entry is ignored for admission and named in the refusal", () => {
   const cases = [
     ["expired", exception({ expires: PAST }), /expired/u],
-    ["unknown scanner", exception({ scanner: "trivy" }), /unknown scanner/u],
+    ["unknown scanner", exception({ scanner: "checkov" }), /unknown scanner/u],
     ["reason too long", exception({ reason: "x".repeat(501) }), /500/u],
     ["blank reason", exception({ reason: "   " }), /reason/u],
     ["missing confirmedBy", exception({ confirmedBy: undefined }), /confirmedBy/u],
@@ -498,6 +499,7 @@ test("C17 the close.pre entry point: critical + skipped license-check exits 2; w
     writeJson(fixture.dir, "evidence/security-latest.json", { scanners: [
       { tool: "gitleaks", status: "PASS", classification: "success" }, { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" },
       { tool: "semgrep", status: "PASS", classification: "success" }, { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy configured" },
+      { tool: "trivy", status: "SKIPPED", classification: "success", reason: "no infrastructure or container files in project" },
     ] });
     return runClose(fixture.dir);
   };
@@ -645,7 +647,9 @@ function declaredClose({ required = null, mode = "blocking", scannerList, stakes
 const pass = (tool) => ({ tool, status: "PASS", classification: "success" });
 const skippedLicenseEntry = { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy or declaration is configured" };
 // A real scan lists every scanner the project enables, so the close fixtures do too (a missing entry then reads "not executed").
-const fullScan = (over = {}) => ["gitleaks", "osv-scanner", "semgrep", "license-check"].map((tool) => over[tool] ?? pass(tool));
+// C29e (ADR-0103): a real scan now also lists trivy; without infrastructure or container files it reads not applicable.
+const noInfraEntry = { tool: "trivy", status: "SKIPPED", classification: "success", reason: "no infrastructure or container files in project" };
+const fullScan = (over = {}) => ["gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"].map((tool) => over[tool] ?? (tool === "trivy" ? noInfraEntry : pass(tool)));
 const noSourcesEntry = { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" };
 const notRunSemgrep = { tool: "semgrep", status: "PASS", classification: "success", reportStatus: "not-run", notRun: "zero-rules", reason: "semgrep loaded zero rules from the configured rule set; a scan without rules is not a result" };
 
@@ -692,6 +696,7 @@ test("C23 warnings: a skipped, not-configured or partial capability is a WARNING
       { tool: "osv-scanner", status: "SKIPPED", classification: "binary_missing", reason: "osv-scanner not found on PATH" },
       { tool: "semgrep", status: "PASS", classification: "success", coverage: { status: "degraded", reason: "partial-parsing", files: ["a.js", "b.js"] } },
       skippedLicenseEntry,
+      noInfraEntry,
     ],
   });
   const warnings = statusLib.securityCloseWarnings(elements);
