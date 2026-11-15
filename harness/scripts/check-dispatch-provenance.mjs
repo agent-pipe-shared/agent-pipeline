@@ -30,14 +30,13 @@
  *       stage-0 commit in this repo has used to date (verified against
  *       a54f53b1, bf6abb76, 4a7a750f, 8b8181639, 034ce1d2, 14743192 via
  *       `git log --all --grep="stage-0 fast path" -i`); AND
- *   (b) the commit's own diff independently satisfies EL-01's two
- *       MECHANICALLY-CHECKABLE caps: at most `STAGE0_MAX_FILES` files
- *       changed, at most `STAGE0_MAX_LINES` changed lines (additions +
+ *   (b) the commit's own diff independently satisfies EL-01's three
+ *       MECHANICALLY-CHECKABLE caps (ADR-0101): at most `STAGE0_MAX_FILES`
+ *       files changed, at most `STAGE0_MAX_LINES` changed lines (additions +
  *       deletions, summed over every changed file in the commit — not just
- *       the "source" subset (b) is checked against). EL-01's own text says
- *       "≤ 2 files, ≤ ~25 diff lines"; the "~" has no more precise number
- *       anywhere in that text, so this module treats 25 as the literal
- *       upper bound for a mechanical yes/no check (see STAGE0_MAX_LINES).
+ *       the "source" subset (b) is checked against), and at most
+ *       `STAGE0_MAX_PRODUCTION_LINES` of them in production paths (a code
+ *       extension and no test shape, `isStage0ProductionPath`).
  * A commit whose message contains the phrase but which FAILS the mechanical
  * caps is NOT treated as exempt — it is `MISSING-DISPATCH-PROVENANCE` with
  * `reason=stage0-claim-caps-exceeded`, a reason string distinct from a bare
@@ -240,25 +239,39 @@ export function hasStage0Phrase(message) {
   return STAGE0_PHRASE_RE.test(message);
 }
 
-// EL-01 (roles/elephant.md): "≤ 2 files, ≤ ~25 diff lines". The "~" has no
-// more precise number anywhere in that text; this module treats 25 as the
-// literal upper bound for a mechanical yes/no caps check (module header).
-export const STAGE0_MAX_FILES = 2;
-export const STAGE0_MAX_LINES = 25;
+// EL-01 (roles/elephant.md, ADR-0101): "≤ 3 files, ≤ 60 changed lines, ≤ 25
+// of those lines production logic (code files that are not tests)".
+export const STAGE0_MAX_FILES = 3;
+export const STAGE0_MAX_LINES = 60;
+export const STAGE0_MAX_PRODUCTION_LINES = 25;
 
-/** `{ filesChanged, linesChanged, withinCaps }` from a commit's own numstat
- *  file list (module header, "THE STAGE-0 EXEMPTION", condition (b)).
- *  `linesChanged` sums additions + deletions over EVERY changed file in the
- *  commit, not only the "source" subset the file-type filter selects — the
- *  caps are a whole-commit-diff property. A binary file (numstat "-\t-")
- *  contributes 0 lines but still counts toward `filesChanged`. */
+// ADR-0101's "production logic": a code file that is not a test. This module's
+// mechanical reading of it: a code extension, and none of the test shapes.
+const STAGE0_CODE_FILE_RE = /\.(?:mjs|cjs|js|ts|sh|bash|ps1|py)$/u;
+const STAGE0_TEST_FILE_RE = /(?:\.test\.|\.fixture\.|(?:^|\/)pins\/)/u;
+
+/** True when a changed path counts toward the production-logic cap. */
+export function isStage0ProductionPath(path) {
+  return typeof path === "string" && STAGE0_CODE_FILE_RE.test(path) && !STAGE0_TEST_FILE_RE.test(path);
+}
+
+/** `{ filesChanged, linesChanged, productionLinesChanged, withinCaps }` from
+ *  a commit's own numstat file list (module header, "THE STAGE-0 EXEMPTION",
+ *  condition (b)). `linesChanged` sums additions + deletions over EVERY
+ *  changed file in the commit, not only the "source" subset the file-type
+ *  filter selects — the caps are a whole-commit-diff property;
+ *  `productionLinesChanged` sums the same over the production paths only. A
+ *  binary file (numstat "-\t-") contributes 0 lines but still counts toward
+ *  `filesChanged`. */
 export function stage0CapsMet(files) {
   const filesChanged = files.length;
   const linesChanged = files.reduce((sum, f) => sum + f.added + f.deleted, 0);
+  const productionLinesChanged = files.reduce((sum, f) => sum + (isStage0ProductionPath(f.path) ? f.added + f.deleted : 0), 0);
   return {
     filesChanged,
     linesChanged,
-    withinCaps: filesChanged <= STAGE0_MAX_FILES && linesChanged <= STAGE0_MAX_LINES,
+    productionLinesChanged,
+    withinCaps: filesChanged <= STAGE0_MAX_FILES && linesChanged <= STAGE0_MAX_LINES && productionLinesChanged <= STAGE0_MAX_PRODUCTION_LINES,
   };
 }
 
@@ -496,8 +509,9 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate, 
 
     findings.push(
       `MISSING-DISPATCH-PROVENANCE ${sha} reason=stage0-claim-caps-exceeded -- "stage-0 fast path" phrase present but ` +
-      `mechanical caps not met (${caps.filesChanged} files / ${caps.linesChanged} changed lines; cap is ` +
-      `<=${STAGE0_MAX_FILES} files / <=${STAGE0_MAX_LINES} lines, EL-01); not recognized as an exemption -- either a false ` +
+      `mechanical caps not met (${caps.filesChanged} files / ${caps.linesChanged} changed lines / ` +
+      `${caps.productionLinesChanged} production lines; cap is <=${STAGE0_MAX_FILES} files / <=${STAGE0_MAX_LINES} lines / ` +
+      `<=${STAGE0_MAX_PRODUCTION_LINES} production lines, EL-01, ADR-0101); not recognized as an exemption -- either a false ` +
       `self-declaration or a caps violation, either way worth a human look`,
     );
   }
@@ -546,10 +560,12 @@ export function summaryLine({ range, coverage }) {
       `${coverage.commitsExempt} recognized stage-0 exemption(s), ${coverage.commitsSignedArtifactIntegration ?? 0} signed-artifact integration(s), ${coverage.findingCount} finding(s), ` +
       `${coverage.recordShapeFindingCount ?? 0} dispatch-record-shape finding(s) (reported, not yet fatal -- ` +
       `pipeline.dispatch-record-shape-is-fatal).`,
-    "WHAT THIS CHECK CANNOT DO: it cannot verify EL-01's semantic criteria (no architecture/schema/public-API/test/" +
-      "guardrail-hook-CI/dependency/security-surface change) or the undefined \"risk flag\" EL-01 names but nowhere " +
+    "WHAT THIS CHECK CANNOT DO: it cannot verify EL-01's semantic criteria (no architecture/schema/public-API/" +
+      "guardrail-hook-CI/dependency/security-surface change, one concern, no test of the Elephant's own new logic) or the " +
+      "undefined \"risk flag\" EL-01 names but nowhere " +
       "defines a location/format for; the \"stage-0 fast path\" phrase match is a self-declaration read from commit " +
-      "prose, not independent proof -- only the two mechanical caps (<=2 files, <=25 changed lines) are independently " +
+      "prose, not independent proof -- only the three mechanical caps (<=3 files, <=60 changed lines, <=25 changed lines " +
+      "in code files that are not tests) are independently " +
       "checked. A legacy Goldfish or Critic \"Dispatch:\" trailer is validated on its shape only, never against a real task registry. A merge " +
       "commit shows no per-file diff to this check and is silently out of scope on its own account; the commits it " +
       "merged are still checked individually if present in the range.",

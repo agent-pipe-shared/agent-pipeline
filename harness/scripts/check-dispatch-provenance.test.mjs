@@ -27,6 +27,7 @@ import {
   checkDispatchRecordShape,
   formatRange,
   hasStage0Phrase,
+  isStage0ProductionPath,
   parseDispatchTrailer,
   stage0CapsMet,
   summaryLine,
@@ -116,13 +117,29 @@ check("hasStage0Phrase: case-insensitive", () => {
   assert.equal(hasStage0Phrase("an ordinary commit"), false);
 });
 
-check("stage0CapsMet: exactly-at-cap passes, one over either cap fails", () => {
-  const twoFiles = [{ added: 10, deleted: 0 }, { added: 15, deleted: 0 }]; // 2 files, 25 lines
-  assert.equal(stage0CapsMet(twoFiles).withinCaps, true);
-  const threeFiles = [{ added: 1, deleted: 0 }, { added: 1, deleted: 0 }, { added: 1, deleted: 0 }];
-  assert.equal(stage0CapsMet(threeFiles).withinCaps, false);
-  const tooManyLines = [{ added: 26, deleted: 0 }];
+check("stage0CapsMet: exactly-at-cap passes, one over any cap fails (ADR-0101: 3 files, 60 lines, 25 production lines)", () => {
+  const atCap = [
+    { path: "lib/a.mjs", added: 20, deleted: 5 }, // 25 production lines
+    { path: "lib/a.test.mjs", added: 20, deleted: 0 },
+    { path: "docs/a.md", added: 15, deleted: 0 },
+  ]; // 3 files, 60 lines
+  assert.equal(stage0CapsMet(atCap).withinCaps, true);
+  const fourFiles = [{ path: "a.md", added: 1, deleted: 0 }, { path: "b.md", added: 1, deleted: 0 }, { path: "c.md", added: 1, deleted: 0 }, { path: "d.md", added: 1, deleted: 0 }];
+  assert.equal(stage0CapsMet(fourFiles).withinCaps, false);
+  const tooManyLines = [{ path: "docs/a.md", added: 61, deleted: 0 }];
   assert.equal(stage0CapsMet(tooManyLines).withinCaps, false);
+  const tooMuchProduction = [{ path: "scripts/a.mjs", added: 26, deleted: 0 }];
+  assert.equal(stage0CapsMet(tooMuchProduction).withinCaps, false);
+  assert.equal(stage0CapsMet(tooMuchProduction).productionLinesChanged, 26);
+});
+
+check("isStage0ProductionPath: a code file counts, a test, pin or fixture does not, nor a document", () => {
+  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/x.mjs"), true);
+  assert.equal(isStage0ProductionPath("scripts/run.sh"), true);
+  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/x.test.mjs"), false);
+  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/pins/x.mjs"), false);
+  assert.equal(isStage0ProductionPath("plugins/pipeline-core/lib/x.fixture.mjs"), false);
+  assert.equal(isStage0ProductionPath("roles/elephant.md"), false);
 });
 
 // --------------------------------------------------- behaviour: no trailer, no phrase
@@ -162,26 +179,43 @@ check("behaviour: missing trailer + phrase present + caps NOT met -> flagged, re
   const root = buildRoot();
   writeFile(root, "src/seed.txt", "seed\n");
   const base = commit(root, "base");
-  writeFile(root, "src/alpha.txt", nLines(30, "alpha")); // 30 > STAGE0_MAX_LINES
+  writeFile(root, "src/alpha.txt", nLines(61, "alpha")); // 61 > STAGE0_MAX_LINES
   const candidate = commit(root, "fix(x): large repair\n\nClaims the stage-0 fast path.\n\nAI-Assisted: true\n");
 
   const result = run(root, base, candidate);
   assert.equal(result.ok, false);
   const findings = findingsOf(result, "MISSING-DISPATCH-PROVENANCE");
   assert.ok(
-    findings.some((f) => f.includes(candidate) && f.includes("reason=stage0-claim-caps-exceeded") && f.includes("30 changed lines")),
+    findings.some((f) => f.includes(candidate) && f.includes("reason=stage0-claim-caps-exceeded") && f.includes("61 changed lines")),
     findings.join("\n"),
   );
   cleanup(root);
 });
 
-check("behaviour: phrase present + files cap exceeded (3 files) -> flagged even with tiny diffs", () => {
+check("behaviour: phrase present + 26 lines in one code file -> flagged by the production-line cap alone", () => {
+  const root = buildRoot();
+  writeFile(root, "src/seed.txt", "seed\n");
+  const base = commit(root, "base");
+  writeFile(root, "src/alpha.mjs", nLines(26, "alpha")); // 26 > STAGE0_MAX_PRODUCTION_LINES, within 60
+  const candidate = commit(root, "fix(x): code repair\n\nWithin the stage-0 fast path.\n\nAI-Assisted: true\n");
+
+  const result = run(root, base, candidate);
+  assert.equal(result.ok, false);
+  assert.ok(
+    findingsOf(result, "MISSING-DISPATCH-PROVENANCE").some((f) => f.includes("reason=stage0-claim-caps-exceeded") && f.includes("26 production lines")),
+    result.findings.join("\n"),
+  );
+  cleanup(root);
+});
+
+check("behaviour: phrase present + files cap exceeded (4 files) -> flagged even with tiny diffs", () => {
   const root = buildRoot();
   writeFile(root, "src/seed.txt", "seed\n");
   const base = commit(root, "base");
   writeFile(root, "src/a.txt", "a\n");
   writeFile(root, "src/b.txt", "b\n");
   writeFile(root, "src/c.txt", "c\n");
+  writeFile(root, "src/d.txt", "d\n");
   const candidate = commit(root, "fix(x): touch three files\n\nWithin the stage-0 fast path.\n\nAI-Assisted: true\n");
 
   const result = run(root, base, candidate);
