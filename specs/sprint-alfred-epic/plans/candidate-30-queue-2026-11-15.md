@@ -3,6 +3,20 @@
 Items the PO names for candidate 30 (C30-1 was named first, C30-2 second). Nothing here is built; each item says where the change lives, what must
 not change, and how it is proven. Candidate 29e is applied, stamped and installed; candidate 30 starts from it.
 
+## Scope decided by the PO (2026-11-15)
+
+Candidate 30 is ONE candidate that collects everything below; nothing is cut into an earlier one. Order of work:
+
+1. The Full Verify of the installed candidate 29e state first (clone outside the repository, label `fv29e`, candidate
+   commit `2f99da888`, documentation commits after the stamp included).
+2. Then, together in 30: the private-name and path scrub (C30-2), the fixes for what that Full Verify finds (C30-3), the
+   new topics named so far (C30-1) and later ones.
+3. In parallel the PO runs new greenfield tests; their findings and the toil they show are fixed in 30 as well (C30-4).
+
+Placeholders, filled as the results arrive: C30-3 findings of the Full Verify of 29e (the red steps, each triaged by
+rerunning it alone and comparing with the 29d tree; the known intermittent `native-goldfish-host-stop-pair` race is one
+of them to decide), C30-4 findings and toil of the PO's new greenfield tests.
+
 ## C30-2: private project names and machine paths must leave the repository (PO, 2026-11-15, "later, in candidate 30")
 
 **Finding.** Names of the PO's consumer projects and the PO's machine-specific absolute paths are private data and must
