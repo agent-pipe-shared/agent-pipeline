@@ -1256,9 +1256,9 @@ function validStage0Selfcheck(value) {
     && typeof value.touchesTestFile === "boolean";
 }
 
-/** EL-01's own stage-0 fast-path arithmetic: <=2 files, <=~25 diff lines, no test-file changes. Presumes `validStage0Selfcheck(value)` already passed. */
+/** EL-01's stage-0 fast-path arithmetic (ADR-0101): <=3 files, <=60 diff lines; a window never admits a test-file change (ADR-0101 Decision 5). Presumes `validStage0Selfcheck(value)` already passed. */
 function stage0Qualifies(value) {
-  return value.filesChanged <= 2 && value.diffLines <= 25 && value.touchesTestFile === false;
+  return value.filesChanged <= 3 && value.diffLines <= 60 && value.touchesTestFile === false;
 }
 
 /** Non-throwing counterpart of assertStage0Declaration, for the read path (currentGuardMaintenanceWindow), which reports "absent" rather than throwing. */
@@ -1313,7 +1313,7 @@ function assertStage0Declaration(authorshipMode, stage0Selfcheck) {
     if (!stage0Qualifies(stage0Selfcheck)) {
       fail(
         "GMW-STAGE0-NOT-QUALIFIED",
-        "the declared diff does not meet EL-01's stage-0 fast-path definition (<=2 files, <=~25 diff lines, no test-file changes) -- an Elephant-authored commit to a protected path requires a Goldfish dispatch instead of direct authorship under this window",
+        "the declared diff does not meet EL-01's stage-0 fast-path definition under a window (<=3 files, <=60 diff lines, no test-file changes; ADR-0101) -- an Elephant-authored commit to a protected path requires a Goldfish dispatch instead of direct authorship under this window",
       );
     }
   }

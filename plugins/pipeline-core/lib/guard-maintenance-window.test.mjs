@@ -1509,9 +1509,9 @@ try {
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
     for (const stage0Selfcheck of [
-      { filesChanged: 3, diffLines: 10, touchesTestFile: false }, // too many files
-      { filesChanged: 1, diffLines: 40, touchesTestFile: false }, // too many diff lines
-      { filesChanged: 1, diffLines: 10, touchesTestFile: true }, // test-file change (EL-01 excludes these categorically)
+      { filesChanged: 4, diffLines: 10, touchesTestFile: false }, // too many files (ADR-0101 cap 3)
+      { filesChanged: 1, diffLines: 61, touchesTestFile: false }, // too many diff lines (ADR-0101 cap 60)
+      { filesChanged: 1, diffLines: 10, touchesTestFile: true }, // test-file change (a window never admits one, ADR-0101 Decision 5)
     ]) {
       assert.throws(
         () => prepareGuardMaintenanceWindowRequest({
@@ -1530,7 +1530,7 @@ try {
     const root = repoFixture("gmw-stage0-qualified-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const stage0Selfcheck = { filesChanged: 1, diffLines: 12, touchesTestFile: false };
+    const stage0Selfcheck = { filesChanged: 3, diffLines: 60, touchesTestFile: false }; // exactly at the ADR-0101 caps
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "qualifying stage-0 fix", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
