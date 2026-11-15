@@ -20,7 +20,7 @@ import { acceptanceQuestion, acceptanceTarget, acceptanceYesAnswersText, accepta
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
-import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-close-status.mjs";
+import { closeSecurityScope, closeSecurityCoverage, describeCloseSecurityScope, CLOSE_FOLLOWUP_SENTENCE as FOLLOWUP_SENTENCE } from "../lib/security-close-status.mjs";
 import { declaredRepositoryMode } from "./repository-freshness.mjs";
 import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
 import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
@@ -770,7 +770,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       const directory = observed.value.evidenceDirectory;
       const evidencePath = join(directory, "final-verification.json");
       ensurePrivateDirectory(directory);
-      writePrivateJsonAtomic(evidencePath, { schema: "pipeline.close-final-verification.v1", candidateOid: head, candidateTree: tree, verifyStatus: "green", verifySha256: sha256Hex(readFileSync(resolve(root, "evidence/verify-candidate.json"))), securityStatus: "green", securitySha256: sha256Hex(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"))) });
+      // C29e T4 (PO tile 2026-11-14, Claude run 3 L5): "green" for an empty capability plan reads like every control passed; the record also
+      // says what the green result covers, from the same v2 verdict whose digest it binds.
+      let coverageDocument = null; try { coverageDocument = JSON.parse(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"), "utf8")); } catch { coverageDocument = null; }
+      writePrivateJsonAtomic(evidencePath, { schema: "pipeline.close-final-verification.v1", candidateOid: head, candidateTree: tree, verifyStatus: "green", verifySha256: sha256Hex(readFileSync(resolve(root, "evidence/verify-candidate.json"))), securityStatus: "green", securitySha256: sha256Hex(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"))), securityCoverage: closeSecurityCoverage(closeSecurityScope(coverageDocument)) });
       // PO tile 2026-11-10: the exact bytes those digests name, kept next to the record: a later scan may overwrite the working-tree files, and the evidence follow-up carries these.
       for (const { source, copy } of Object.values(FOLLOWUP_EVIDENCE)) writeFileSync(join(directory, copy), readFileSync(resolve(root, source)), { mode: 0o600 });
       return transition("final-verify-green", { evidence: evidencePath });
@@ -808,7 +811,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
     const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Correct it before the push, in this same feature, as its own commit with repository-mode-promote.mjs --root <repo> --to remote-tracked (push-init names the step; no signature): the Critic carry admits exactly that one-token change, and Verify runs again on the new HEAD." };
     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)} ${securitySentence}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)} ${securitySentence}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init. ${FOLLOWUP_SENTENCE}` });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }

@@ -915,8 +915,12 @@ test("process: drive names the missing input, plans without writing, applies one
   assert.equal(missing.phase, "candidate-frozen");
   assert.equal(missing.chain.remaining[0].phase, "final-verify-green");
 
+  // C29e T4: the coverage label is optional (earlier closes wrote none) but, when present, one of the closed words.
+  const badCoveragePath = join(f.evidenceDirectory, "drive-verify-bad-coverage.json");
+  writePrivateJsonAtomic(badCoveragePath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7"), securityCoverage: "all-passed" });
+  assert.equal(drive(["--evidence", badCoveragePath], 2).code, "CLOSE-VERIFY");
   const verifyPath = join(f.evidenceDirectory, "drive-verify.json");
-  writePrivateJsonAtomic(verifyPath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7") });
+  writePrivateJsonAtomic(verifyPath, { schema: "pipeline.close-final-verification.v1", candidateOid: f.candidateOid, candidateTree: f.candidateTree, verifyStatus: "green", verifySha256: h("6"), securityStatus: "green", securitySha256: h("7"), securityCoverage: "empty-plan" });
   const planned = drive(["--evidence", verifyPath]);
   assert.equal(planned.status, "planned");
   assert.match(planned.planSha256, /^[0-9a-f]{64}$/u);

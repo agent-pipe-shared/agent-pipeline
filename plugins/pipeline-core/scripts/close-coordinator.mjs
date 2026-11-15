@@ -42,6 +42,7 @@ import { describeLapsedFinding, lapsedFindingsRepair, readLapsedCriticFindings }
 import { describeGateDefinitionChange, gateChangeAcknowledgementRepair, gateDefinitionChangeReadback, specDirectoryOf } from "../lib/gate-definition-changes.mjs";
 import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
 import { maintenanceSlicesLackingGreenVerify } from "../lib/maintenance-delivery.mjs";
+import { CLOSE_SECURITY_COVERAGE } from "../lib/security-close-status.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
@@ -888,11 +889,12 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     const verified = evidence(root, common, values.lifecycle, values.evidence, "pipeline.close-final-verification.v1", [
       "schema", "candidateOid", "candidateTree", "verifyStatus", "verifySha256",
       "securityStatus", "securitySha256",
-    ], { privateOnly: true });
+    ], { privateOnly: true, optionalKeys: ["securityCoverage"] }); // C29e T4: coverage label, absent on records of earlier closes
     if (verified.value.candidateOid !== stored.coordinator.candidateOid
       || verified.value.candidateTree !== stored.coordinator.candidateTree
       || verified.value.verifyStatus !== "green" || !SHA256.test(verified.value.verifySha256 ?? "")
-      || verified.value.securityStatus !== "green" || !SHA256.test(verified.value.securitySha256 ?? "")) {
+      || verified.value.securityStatus !== "green" || !SHA256.test(verified.value.securitySha256 ?? "")
+      || (Object.hasOwn(verified.value, "securityCoverage") && !CLOSE_SECURITY_COVERAGE.includes(verified.value.securityCoverage))) {
       fail("CLOSE-VERIFY", "final Verify/Security evidence is not green for the frozen candidate");
     }
     const candidate = gitCandidate(root);

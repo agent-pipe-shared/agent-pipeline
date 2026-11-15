@@ -335,6 +335,20 @@ export function describeCloseSecurityScope(scope) {
 }
 
 /** C29 (C3): the short scope note the close quality readback adds to its security row, read from the v2 verdict document. */
+/**
+ * C29e T4 (PO tile 2026-11-14, Claude run 3 L5): the coverage label the close's private final record carries next to securityStatus,
+ * so "green" with an empty capability plan is told apart from "green" over required checks. One closed word per case.
+ */
+export const CLOSE_SECURITY_COVERAGE = Object.freeze(["required-checks", "optional-checks-only", "empty-plan", "unavailable"]);
+export function closeSecurityCoverage(scope) {
+  if (scope?.status !== "read") return "unavailable";
+  if (scope.capabilityPlan.required > 0) return "required-checks";
+  return scope.capabilityPlan.optional > 0 ? "optional-checks-only" : "empty-plan";
+}
+
+/** C29e T4: the close is committed before its full security scan, so the bundle gets the final Verify and the security verdict only with the follow-up of the next push. */
+export const CLOSE_FOLLOWUP_SENTENCE = "The security verdict and the final Verify reach the audit bundle only with the evidence follow-up of the next push; until then this feature's audit bundle holds no security evidence.";
+
 export function closeSecurityScopeNote(doc) {
   const scope = closeSecurityScope(doc);
   if (scope.status !== "read") return "v2 scope unavailable";

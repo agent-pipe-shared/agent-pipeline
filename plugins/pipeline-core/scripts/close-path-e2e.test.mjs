@@ -592,6 +592,10 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         assert.deepEqual(seen, ["ONESHOT-ACCEPTANCE-REQUIRED", "commit-required", "closed-local"], `${identity.runner}: the whole close is one question, one commit request and the end at closed-local: ${JSON.stringify(last.result).slice(0, 800)}`);
         for (const stage of ["verify-candidate-frozen", "security-scan", "final-verify-green", "cleanup-complete", "closed-local"]) assert.ok(last.result.stages.includes(stage), `${identity.runner}: the resumed close ran ${stage}: ${last.result.stages}`);
         assert.match(last.result.pushEvidence?.command ?? "", /--mode release --critic-packet-id/u, "the push boundary names the Critic-bound Verify, which the close never writes itself");
+        // C29e T4: the private final record says what the green security result covers, one closed word.
+        const finalRecord = JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "publication-close", last.result.lifecycleId, "evidence", "final-verification.json"), "utf8"));
+        assert.ok(["required-checks", "optional-checks-only", "empty-plan", "unavailable"].includes(finalRecord.securityCoverage), `${identity.runner}: coverage label ${finalRecord.securityCoverage}`);
+        assert.match(last.result.message, /until then this feature's audit bundle holds no security evidence\.$/u);
         assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
         if (selfExport) {
           const exportDir = `specs/${FEATURE_ID}/evidence/critic/${packetId}`;

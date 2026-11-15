@@ -1282,6 +1282,8 @@ test("R8: closed-local states what the security result covers, read from the v2 
     assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
     assert.equal(none.securityScope.status, "unavailable");
     assert.match(none.message, /Security scope: unavailable \(the v2 security verdict could not be read\); what the security result covers is open\./u); // C29 (C3): said, not left out.
+    // C29e T4: the last sentence names where the security verdict and final Verify reach the bundle.
+    assert.match(none.message, /reach the audit bundle only with the evidence follow-up of the next push; until then this feature's audit bundle holds no security evidence\.$/u);
     mkdirSync(join(f.root, "evidence"), { recursive: true });
     // The shape a real scan writes: scanners under capabilityOutcomes, only the checks without a capability under controls.
     writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: ["cap.sast", "cap.secrets"], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
