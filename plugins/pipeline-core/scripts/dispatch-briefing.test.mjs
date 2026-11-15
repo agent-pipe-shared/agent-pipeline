@@ -1922,6 +1922,8 @@ test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINT
   assert.match(warning.message, /SendMessage/u);
   assert.match(warning.message, /elephant-restart, owner-lost, context-poisoned or new-vertical-outcome/u);
   assert.match(warning.message, /slice-queue\.mjs cancel ALF-T0 --started --reason "<why>" --class budget/u);
+  // C29e (T3 doc follow-up): the scope-change route is named next to the budget release.
+  assert.match(warning.message, /cancel it with --class wrong-premise instead, land the diff it left with node <plugin>\/scripts\/goldfish-host-commit-recover\.mjs plan, then brief the successor under a new id/u);
   const binding = runDispatchBriefing(argvOf(fx), depsOf(fx, { startedOwners: () => [startedOwner()] }));
   assert.equal(binding.ok, true, JSON.stringify(binding));
   assert.ok(warningCodes(binding).includes("DBG-CHECKPOINTED-OWNER"), "the binding route warns too");
