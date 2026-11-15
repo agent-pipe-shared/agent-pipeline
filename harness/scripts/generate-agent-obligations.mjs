@@ -274,8 +274,9 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("    excludes the work — that is the failure this pair exists to make visible.");
   put("  - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded");
   put("    fast-path fix. Implementation self-execution still requires every");
-  put("    fast-path criterion in operating-model §3.3, including at most 2 files and");
-  put("    roughly 25 diff lines. The trailer does not establish those criteria or");
+  put("    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,");
+  put("    at most 60 changed lines, at most 25 of them production logic, tests green.");
+  put("    The trailer does not establish those criteria or");
   put("    waive path, phase, signature or protected-source gates.");
   put("  - `Dispatch: design (elephant)` — the direct-Elephant trailer for");
   put("    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch");

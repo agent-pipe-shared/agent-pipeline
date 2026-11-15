@@ -182,8 +182,9 @@ deliberately carries no static copy of that; a second copy is the drift.
     excludes the work — that is the failure this pair exists to make visible.
   - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded
     fast-path fix. Implementation self-execution still requires every
-    fast-path criterion in operating-model §3.3, including at most 2 files and
-    roughly 25 diff lines. The trailer does not establish those criteria or
+    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,
+    at most 60 changed lines, at most 25 of them production logic, tests green.
+    The trailer does not establish those criteria or
     waive path, phase, signature or protected-source gates.
   - `Dispatch: design (elephant)` — the direct-Elephant trailer for
     design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch

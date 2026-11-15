@@ -93,7 +93,7 @@ Per-check results inside reports are three-valued as well: **pass / fail / not v
 
 Invariant first: **A1–A5 (verify + evidence) are mandatory at every level — there is no path around the deterministic gates** (`docs/operating-model.md` — *Rigor, risk and gates*). Everything else scales with the rigor level:
 
-**Rigor-0 eligibility (canonical definition):** `roles/elephant.md` — *EL-01* carries the full stage-0 fast-path definition — size limits and exclusion list — and is the sole place it is defined. This table does not repeat it, it only lists the resulting DoD toll per rigor column; a task that fails those criteria is not rigor-0 regardless of what this table shows.
+**Stage-0 fast path (canonical definition):** `roles/elephant.md` — *EL-01* carries the full stage-0 fast-path definition — size limits and exclusion list — and is the sole place it is defined. It decides who may author a change, not the rigor level: it applies at every rigor (ADR-0101). This table does not repeat it; it only lists the DoD toll per rigor column.
 
 | Requirement | Rigor 0 (issue-only) | Rigor 1 (delta spec) | Rigor 2 (spec-anchored) | DoD item |
 |---|---|---|---|---|

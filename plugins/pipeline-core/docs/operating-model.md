@@ -154,21 +154,28 @@ sanitized receipt rather than an implementation decision.
 ### 3.3 Stage-0 fast path
 
 The stage-0 fast path is a narrow, self-contained exception (EL-01) letting an
-interactive Elephant session execute a fix itself instead of dispatching a
-Goldfish. It applies only when a task meets ALL of the following criteria:
+interactive Elephant session execute a change itself instead of dispatching a
+Goldfish, at any rigor level
+(ADR-0101).
+It applies only when a task meets ALL of the following criteria:
 
-1. Touches at most 2 files.
-2. Is at most roughly 25 diff lines.
-3. Makes no architecture, schema, public-API, test, guardrail-hook-CI,
-   dependency, or security-surface change.
-4. Is trivially `git revert`-able.
-5. Has no risk flag set.
+1. Touches at most 3 files.
+2. Is at most 60 changed lines (additions plus deletions) and one concern.
+3. At most 25 of those lines are production logic (code files that are not
+   tests).
+4. Makes no architecture, schema, public-API, guardrail-hook-CI, dependency,
+   or security-surface change. Tests and pins may be changed or added, except
+   a test that checks the Elephant's own new logic from the same change.
+5. Is trivially `git revert`-able.
+6. Has no risk flag set.
 
-If ALL five criteria hold, the interactive Elephant session MAY execute the
-fix itself. `verify` and the evidence artifact remain mandatory regardless. A
-Critic run is required only if the risk flag is set. This exception is scoped
-exclusively to this definition — it is not extended by local judgment;
-anything outside these criteria still requires a Goldfish dispatch.
+If ALL six criteria hold, the interactive Elephant session MAY execute the
+change itself. The affected tests are green before the commit; `verify` and
+the evidence artifact remain mandatory regardless; the commit carries the
+trailer `Dispatch: stage-0 (elephant)`. A Critic run is required only if the
+risk flag is set. This exception is scoped exclusively to this definition — it
+is not extended by local judgment; anything outside these criteria still
+requires a Goldfish dispatch.
 
 ### 3.4 Administrative role work and local commits
 

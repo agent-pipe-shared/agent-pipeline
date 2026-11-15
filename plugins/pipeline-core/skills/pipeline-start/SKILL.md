@@ -197,7 +197,7 @@ this machine's `operatorLabel` · EL-37 A protected or guard-denied mutation
 goes only through its sanctioned route. Print verbatim under the Model/Effort
 line:
 
-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35/EL-36/EL-37 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35/EL-36/EL-37 — implementation only via Goldfish dispatch (stage-0 fast path per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
 <!-- END GENERATED: role-prohibitions block -->
 
 ### Kickoff intake, durable design package, and document quality
