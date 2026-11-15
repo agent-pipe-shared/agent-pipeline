@@ -66,6 +66,37 @@ test("applicability: container, Terraform and Kubernetes trigger files are named
   }
   assert.equal(isKubernetesManifestText("x.yaml", "kind: Service\n"), false, "apiVersion is required");
   assert.equal(isKubernetesManifestText("x.json", "[1]"), false);
+  // Measured on 0.76.2: Trivy reports no target for a List document, so it must not be a trigger (else every close ERRORs).
+  assert.equal(isKubernetesManifestText("x.yaml", "apiVersion: v1\nkind: List\nitems: []\n"), false, "kind List is no trigger");
+  assert.equal(isKubernetesManifestText("x.yaml", "apiVersion: v1\nkind: ConfigMapList\nitems: []\n"), false, "kind <X>List is no trigger");
+  assert.equal(isKubernetesManifestText("x.json", "{\"apiVersion\":\"v1\",\"kind\":\"List\",\"items\":[]}"), false);
+  assert.equal(isKubernetesManifestText("x.yaml", "apiVersion: v1\nkind: List\nitems: []\n---\napiVersion: v1\nkind: ConfigMap\n"), true, "a real document next to a List still triggers");
+});
+
+test("applicability at a Git top level counts tracked regular files only; a subdirectory of a repository is walked", () => {
+  const root = tree({
+    "Dockerfile": "FROM alpine\n",
+    "k8s/svc.yaml": "apiVersion: v1\nkind: Service\n",
+    "scratch/clone/Dockerfile": "FROM alpine\n",
+    "build/main.tf": "resource \"x\" \"y\" {}\n",
+  });
+  const git = (...args) => {
+    const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false });
+    if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
+  };
+  try {
+    git("init", "-q");
+    writeFileSync(join(root, ".gitignore"), "build/\n");
+    git("add", "--", ".gitignore", "Dockerfile", "k8s/svc.yaml");
+    // An untracked clone and an ignored build folder are no part of the candidate.
+    assert.deepEqual(trivyTriggerFiles(root), { container: ["Dockerfile"], terraform: [], kubernetes: ["k8s/svc.yaml"] });
+    // Below the top level the tracked listing is not used: the root is walked as a plain directory.
+    assert.deepEqual(trivyTriggerFiles(join(root, "scratch")), { container: ["clone/Dockerfile"], terraform: [], kubernetes: [] });
+    // The walk stays reachable on its own (the archive snapshot is not a repository).
+    assert.deepEqual(trivyTriggerFiles(root, { trackedFilesFn: null }).container, ["Dockerfile", "scratch/clone/Dockerfile"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("no trigger file: SKIPPED as not applicable, no binary lookup and no spawn", async () => {

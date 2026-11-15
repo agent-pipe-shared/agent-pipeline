@@ -6,13 +6,15 @@
  *
  * Same dependency-free adapter interface as ./osv-scanner.mjs (resolveBinary()/config.binaryPath/env param).
  *
- * APPLICABILITY (decided by the Pipeline, never by the binary): `trivyTriggerFiles(rootDir)` walks the scan root (the
- * detached candidate snapshot, so only committed bytes) and names
+ * APPLICABILITY (decided by the Pipeline, never by the binary): `trivyTriggerFiles(rootDir)` reads the tracked files when
+ * the root is the top level of a Git work tree (the detached candidate snapshot, or a working copy whose untracked and
+ * ignored bytes are no part of the candidate), and walks the root otherwise (the archive snapshot), and names
  *   - container files: basename `Dockerfile`, `Containerfile`, `Dockerfile.*`, `Containerfile.*` or `*.dockerfile`;
  *   - Terraform files: `*.tf`;
  *   - Kubernetes manifests: `*.yaml`/`*.yml` with a column-0 `apiVersion:` and `kind:` line (any document), or `*.json`
- *     whose top-level object has string `apiVersion` and `kind`; a `Kustomization`/`Component` kind and a file holding
- *     a template marker (`{{`) are not manifests (measured: Trivy does not scan them as Kubernetes).
+ *     whose top-level object has string `apiVersion` and `kind`; a `Kustomization`/`Component` kind, a `List`/`<X>List`
+ *     kind and a file holding a template marker (`{{`) are not triggers (measured: Trivy reports no target for a
+ *     Kustomization or List document; a Component is scanned but does not make a project infrastructure).
  * No trigger file -> SKIPPED with classification "success" and no spawn at all: the project has nothing of this kind.
  *
  * INVOCATION (always offline and neutral; measured on 0.76.2): `trivy --version`, then
@@ -32,7 +34,7 @@
  * FINDINGS: Status FAIL only. Severity CRITICAL/HIGH/MEDIUM/LOW map to the lower-case value, anything else to medium.
  * rule = ID, path = Target (scan-root-relative, forward slashes), line = CauseMetadata.StartLine or null.
  */
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
+import { lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter as PATH_DELIM, dirname, join as pathJoin, relative, sep } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
@@ -46,7 +48,9 @@ const SEVERITY_MAP = Object.freeze({ CRITICAL: "critical", HIGH: "high", MEDIUM:
 const MAX_WALK_ENTRIES = 200000;
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const SKIP_DIRS = new Set([".git"]);
-const NOT_MANIFEST_KINDS = new Set(["Kustomization", "Component"]);
+const NOT_MANIFEST_KIND_SET = new Set(["Kustomization", "Component"]);
+// Trivy 0.76.2 reports no target for a `kind: List` or `kind: <X>List` document (measured), so such a document is no trigger.
+const NOT_MANIFEST_KINDS = Object.freeze({ has: (kind) => NOT_MANIFEST_KIND_SET.has(kind) || /List$/u.test(kind) });
 const EXPECTED_ERROR = /^\[misconfig\] Falling back to embedded checks(?:\t|$)/u;
 const IGNORE_COMMENT = /trivy:ignore:([A-Za-z0-9][A-Za-z0-9_.-]*)/gu;
 export const TRIVY_NOT_APPLICABLE_REASON = "no infrastructure or container files in project (Dockerfile/Containerfile, *.tf, Kubernetes manifests)";
@@ -94,15 +98,65 @@ export function isKubernetesManifestText(fileName, text) {
   return false;
 }
 
+/** Sorts one root-relative file into `found` when it is a trigger file (module header). */
+function classifyTriggerFile(found, rel, full, readText, stat) {
+  const fileName = basename(rel);
+  if (isContainerFile(fileName)) { found.container.push(rel); return; }
+  if (/\.tf$/u.test(fileName)) { found.terraform.push(rel); return; }
+  if (!/\.(?:ya?ml|json)$/iu.test(fileName)) return;
+  let size;
+  try { size = stat(full).size; } catch { return; }
+  if (size > MAX_MANIFEST_BYTES) return;
+  let text;
+  try { text = readText(full); } catch { return; }
+  if (isKubernetesManifestText(fileName, text)) found.kubernetes.push(rel);
+}
+
+/**
+ * The tracked files of `rootDir` as root-relative forward-slash paths when `rootDir` is the top level of a Git work tree,
+ * else null (not a repository, a subdirectory of one, or Git unavailable: the caller walks instead). A working tree
+ * carries untracked and ignored bytes (build output, dependency folders, scratch clones) that are no part of a candidate;
+ * the walk over such a tree is both wrong and unbounded (measured: 28 s and over the entry bound on a working copy).
+ */
+function trackedFiles(rootDir, spawnFn) {
+  const run = (args) => {
+    try { return spawnFn("git", ["-C", rootDir, ...args], { encoding: "utf8", shell: false, timeout: 30000, maxBuffer: 256 * 1024 * 1024 }); } catch { return null; }
+  };
+  const top = run(["rev-parse", "--show-toplevel"]);
+  if (top === null || top.status !== 0 || top.error) return null;
+  let same;
+  try { same = realpathSync(String(top.stdout).trim()) === realpathSync(rootDir); } catch { return null; }
+  if (!same) return null;
+  const listing = run(["ls-files", "-z", "--cached"]);
+  if (listing === null || listing.status !== 0 || listing.error) return null;
+  return String(listing.stdout).split("\0").filter((entry) => entry.length > 0).sort();
+}
+
 /**
  * The trigger files under `rootDir` as `{ container, terraform, kubernetes }` lists of scan-root-relative forward-slash
  * paths, or `{ error }` when the walk could not complete (an unreadable directory, or more than the bounded entry count).
+ * At the top level of a Git work tree only the tracked files count; elsewhere (the archive snapshot, a plain directory)
+ * every file under the root is walked.
  */
 export function trivyTriggerFiles(rootDir, deps = {}) {
   const readdir = deps.readdirSyncFn ?? ((path) => readdirSync(path, { withFileTypes: true }));
   const readText = deps.readFileSyncFn ?? ((path) => readFileSync(path, "utf8"));
   const stat = deps.statSyncFn ?? statSync;
   const found = { container: [], terraform: [], kubernetes: [] };
+  const tracked = deps.trackedFilesFn === null ? null : (deps.trackedFilesFn ?? ((root) => trackedFiles(root, deps.spawnFn ?? nodeSpawnSync)))(rootDir);
+  if (Array.isArray(tracked)) {
+    const lstat = deps.lstatSyncFn ?? lstatSync;
+    for (const rel of tracked) {
+      if (rel.split("/").some((part) => SKIP_DIRS.has(part))) continue;
+      const full = pathJoin(rootDir, ...rel.split("/"));
+      // As in the walk below, only a regular file counts (a tracked symlink or a submodule entry does not).
+      let entry;
+      try { entry = lstat(full); } catch { continue; }
+      if (!entry.isFile()) continue;
+      classifyTriggerFile(found, rel, full, readText, stat);
+    }
+    return found;
+  }
   const queue = [rootDir];
   let entries = 0;
   while (queue.length > 0) {
@@ -115,16 +169,7 @@ export function trivyTriggerFiles(rootDir, deps = {}) {
       const full = pathJoin(dir, dirent.name);
       if (dirent.isDirectory()) { if (!SKIP_DIRS.has(dirent.name)) queue.push(full); continue; }
       if (!dirent.isFile()) continue;
-      const rel = posix(relative(rootDir, full));
-      if (isContainerFile(dirent.name)) { found.container.push(rel); continue; }
-      if (/\.tf$/u.test(dirent.name)) { found.terraform.push(rel); continue; }
-      if (!/\.(?:ya?ml|json)$/iu.test(dirent.name)) continue;
-      let size;
-      try { size = stat(full).size; } catch { continue; }
-      if (size > MAX_MANIFEST_BYTES) continue;
-      let text;
-      try { text = readText(full); } catch { continue; }
-      if (isKubernetesManifestText(dirent.name, text)) found.kubernetes.push(rel);
+      classifyTriggerFile(found, posix(relative(rootDir, full)), full, readText, stat);
     }
   }
   return found;
