@@ -298,6 +298,8 @@ test("C29e T5: each Antigravity split part carries its scope-marker row, the Con
     assert.deepEqual(placeholders, ["MODEL"]);
     assert.equal(limitation, undefined, "the envelope now carries the marker, so no limitation is reported");
     assert.doesNotMatch(text, CRITIC_DISPATCH_PROSE);
+    const contamination = dispatchFindings({ subagentType: "critic", prompt: text, transport: "antigravity" }).findings.filter(({ code }) => code.startsWith("DISPATCH-CONTAMINATION-"));
+    assert.deepEqual(contamination, [], "the dispatch-policy contamination rules admit the split-part envelope");
     for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
     const verdict = { trajectory_evidence: `scope:${entryId} the evidence artifacts match the claims` };
     assert.equal(attributeVerdict(preflight.split, verdict), entryId);

@@ -1385,12 +1385,16 @@ const RENDERED_AGY_CRITIC_ENVELOPE = AGY_ENVELOPE
   .replace("{{EVIDENCE_PATH}}", "evidence/verify-latest.json")
   .replace("{{TRIGGER_ROW}}", "T1")
   .replace("{{RULESET_SHA}}", "b6e2db657d078f023773853e8571a941bb29c2a5")
-  .replace("{{MODEL}}", "gemini-3.7");
+  .replace("{{MODEL}}", "gemini-3.7")
+  // C29e T5: the rendered envelope of one split part, so the admission below covers the scope-marker row.
+  .replace("{{SCOPE_MARKER}}", "scope:group-1");
 
 check("Antigravity Critic template carries a guard-admissible native envelope", () => {
   assert.equal(ROOT_CRITIC_TEMPLATE, VENDORED_CRITIC_TEMPLATE);
   assert.match(ROOT_CRITIC_TEMPLATE, /Antigravity native dispatch has a deliberately different carrier/);
   assert.ok(RENDERED_AGY_CRITIC_ENVELOPE.startsWith("templates/prompts/critic-review.md\n"));
+  assert.match(RENDERED_AGY_CRITIC_ENVELOPE, /^scope-marker: scope:group-1$/mu, "the rendered split-part envelope carries its scope-marker row");
+  assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /\{\{/u, "every placeholder is rendered");
   assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /(?<![\w-])(you are|please|examine|look at|review)\b/i);
 });
 
