@@ -302,6 +302,7 @@
           "docs/adr/0099-an-antigravity-branch-result-lands-with-the-childs-own-commits.md",
           "docs/adr/0100-configure-verify-may-replace-the-verify-command-with-one-signature.md",
           "docs/adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md",
+          "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
           "docs/adr/README.md"
         ]
       },
