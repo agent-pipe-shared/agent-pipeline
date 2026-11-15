@@ -19,8 +19,10 @@
  *
  * INVOCATION (always offline and neutral; measured on 0.76.2): `trivy --version`, then
  *   trivy config --format json --skip-check-update --cache-dir <private> --exit-code 0
- *     --config <empty file> --ignorefile <empty file> --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL <rootDir>
- * with a private working directory and every `TRIVY_*` variable removed from the environment. Without the neutral
+ *     --config <empty file> --ignorefile <empty file> --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+ *     --disable-telemetry --skip-version-check <rootDir>
+ * with a private working directory and every `TRIVY_*` variable removed from the environment. The last two switches keep
+ * Trivy from sending usage data to its vendor and from asking for a newer release (its help names both as network uses). Without the neutral
  * config, ignore file and environment, a `trivy.yaml`, `.trivyignore` or `TRIVY_SEVERITY` of the scanned candidate would
  * silently narrow its own scan (measured: a candidate `trivy.yaml` with `severity: [CRITICAL]` hid a HIGH finding).
  * Inline `trivy:ignore:<ID>` comments are honoured by Trivy; the adapter lists every one it finds in a trigger file as
@@ -292,7 +294,8 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     const identity = versionIdentity({ binaryPath: resolved.path, workDir, spawnFn, timeoutMs, env: runEnv });
     if (identity.failure) return identity.failure;
     const args = ["config", "--format", "json", "--skip-check-update", "--cache-dir", pathJoin(workDir, "cache"), "--exit-code", "0",
-      "--config", neutralConfig, "--ignorefile", neutralIgnore, "--severity", "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL", rootDir];
+      "--config", neutralConfig, "--ignorefile", neutralIgnore, "--severity", "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL",
+      "--disable-telemetry", "--skip-version-check", rootDir];
     let res;
     try { res = spawnFn(resolved.path, args, { cwd: workDir, encoding: "utf8", timeout: timeoutMs, shell: false, env: runEnv, maxBuffer: 64 * 1024 * 1024 }); } catch (error) { return spawnFailure(error); }
     if (res.error?.code === "ETIMEDOUT") return scannerError(`trivy timed out after ${timeoutMs}ms`);

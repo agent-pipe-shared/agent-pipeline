@@ -130,7 +130,7 @@ test("invocation is offline and neutral: empty config and ignore file, private c
     assert.equal(result.status, "FINDINGS");
     const scan = spawn.calls[1];
     assert.deepEqual(scan.args.slice(0, 7), ["config", "--format", "json", "--skip-check-update", "--cache-dir", scan.args[5], "--exit-code"]);
-    for (const flag of ["--config", "--ignorefile", "--severity"]) assert.ok(scan.args.includes(flag), flag);
+    for (const flag of ["--config", "--ignorefile", "--severity", "--disable-telemetry", "--skip-version-check"]) assert.ok(scan.args.includes(flag), flag);
     assert.equal(scan.args.at(-1), root);
     assert.notEqual(scan.options.cwd, root, "never the candidate's own directory");
     assert.equal(Object.keys(scan.options.env).some((key) => key.toUpperCase().startsWith("TRIVY_") && key !== "TRIVY_NO_PROGRESS"), false);
