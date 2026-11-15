@@ -13,14 +13,14 @@
     "platform": { "enum": ["linux", "darwin", "win32", "unsupported"] },
     "results": {
       "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
+      "minItems": 7,
+      "maxItems": 7,
       "items": {
         "type": "object",
         "required": ["tool", "status", "version", "capabilities", "preparedHandleDigest", "affectedClaim", "installCommand", "installAttempted", "guidance"],
         "additionalProperties": false,
         "properties": {
-          "tool": { "enum": ["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"] },
+          "tool": { "enum": ["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"] },
           "status": { "type": "string" },
           "version": { "type": ["string", "null"] },
           "capabilities": { "type": "array", "items": { "type": "string" } },

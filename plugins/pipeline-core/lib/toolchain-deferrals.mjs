@@ -58,11 +58,11 @@ export function readToolDeferral(id, dependencies = {}) {
 
 /**
  * Records that the person deferred installing `id`, with their answer word for word (bounded). Only a tool of the registry whose class is
- * `required` or `required-to-sign` can be deferred; an optional tool needs no deferral. An invalid existing file is never overwritten.
+ * `required`, `required-with-infrastructure` or `required-to-sign` can be deferred; an optional tool needs no deferral. An invalid existing file is never overwritten.
  */
 export function recordToolDeferral(id, answer, dependencies = {}) {
   const entry = toolchainEntry(id);
-  if (entry === null || !["required", "required-to-sign"].includes(entry.class)) throw new Error(`TOOLCHAIN-DEFER-REFUSED: ${String(id).slice(0, 64)} is not a required tool of the registry`);
+  if (entry === null || !["required", "required-with-infrastructure", "required-to-sign"].includes(entry.class)) throw new Error(`TOOLCHAIN-DEFER-REFUSED: ${String(id).slice(0, 64)} is not a required tool of the registry`);
   const quote = String(answer ?? "").replace(/\s+/gu, " ").trim().slice(0, ANSWER_MAX);
   if (quote === "") throw new Error("TOOLCHAIN-DEFER-REFUSED: the person's answer is required, word for word");
   const read = readToolchainDeferrals(dependencies);

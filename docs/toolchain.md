@@ -60,6 +60,20 @@ The feature close runs these. Onboarding checks them and asks you to install a m
 - **macOS:** `brew install semgrep`.
 - **Windows:** not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\Program Files\Semgrep`, `%USERPROFILE%\.local\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close.
 
+## Required where the project has infrastructure or container files
+
+The feature close runs this only when the project's tracked files hold a Dockerfile or Containerfile, a Terraform file or a Kubernetes manifest; anywhere else the scan reads not applicable and needs no install. Where such files exist, a missing tool is treated like a missing required one, and it may be deferred the same way.
+
+### trivy
+
+- **Purpose:** misconfiguration scan of the project's Dockerfiles, Terraform files and Kubernetes manifests at every feature close, offline with its built-in rules.
+- **Used by:** the security gate of the feature close, in a project with infrastructure or container files.
+- **Minimum:** a release whose `trivy config` has `--format`, `--skip-check-update`, `--cache-dir`, `--ignorefile`, `--disable-telemetry` and `--skip-version-check`.
+- **Check:** `trivy --version`.
+- **Linux and WSL:** download `trivy_<version>_Linux-64bit.tar.gz` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy` into `~/.local/bin` (no sudo).
+- **macOS:** `brew install trivy`.
+- **Windows:** download `trivy_<version>_windows-64bit.zip` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy.exe` into `%USERPROFILE%\.local\bin`.
+
 ## Required on the machine of the person who signs
 
 Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.

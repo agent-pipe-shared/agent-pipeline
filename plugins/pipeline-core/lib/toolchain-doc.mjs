@@ -8,12 +8,14 @@ import { TOOLCHAIN_REGISTRY } from "./toolchain-registry.mjs";
 const PLATFORM_NAMES = Object.freeze({ linux: "Linux and WSL", darwin: "macOS", win32: "Windows" });
 const CLASS_TITLES = Object.freeze({
   required: "Required on every machine",
+  "required-with-infrastructure": "Required where the project has infrastructure or container files",
   "required-to-sign": "Required on the machine of the person who signs",
   optional: "Optional",
   "project-setting": "Settings in the project's own build",
 });
 const CLASS_INTROS = Object.freeze({
   required: "The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.",
+  "required-with-infrastructure": "The feature close runs this only when the project's tracked files hold a Dockerfile or Containerfile, a Terraform file or a Kubernetes manifest; anywhere else the scan reads not applicable and needs no install. Where such files exist, a missing tool is treated like a missing required one, and it may be deferred the same way.",
   "required-to-sign": "Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.",
   optional: "A feature that works without these, or has a fallback. Install one when you use the feature it names.",
   "project-setting": "Not programs: switches in the project's build that produce the files the SBOM of the close reads. The close names the one that is missing.",

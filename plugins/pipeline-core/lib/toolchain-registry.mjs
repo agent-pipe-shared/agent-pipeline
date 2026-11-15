@@ -8,7 +8,8 @@
  *   - the toolchain preflight (scripts/toolchain-preflight.mjs): the major-version floors it checks and the document pointer it prints,
  *   - the environment readiness findings the start preflight carries (each scanner finding names its class and its section of the document).
  *
- * Classes: `required` (every machine that runs the Pipeline: the close needs it), `required-to-sign` (the machine of the person who signs approvals,
+ * Classes: `required` (every machine that runs the Pipeline: the close needs it), `required-with-infrastructure` (C29e, ADR-0103: needed only
+ * where the project's tracked files hold a Dockerfile/Containerfile, a Terraform file or a Kubernetes manifest), `required-to-sign` (the machine of the person who signs approvals,
  * the default push gate), `optional` (a feature that works without it, or has a fallback), `project-setting` (a switch in the project's own build,
  * not a program; named so the SBOM help and this list agree).
  *
@@ -19,7 +20,7 @@
  */
 
 export const TOOLCHAIN_REGISTRY_SCHEMA = "pipeline.toolchain-registry.v1";
-export const TOOL_CLASSES = Object.freeze(["required", "required-to-sign", "optional", "project-setting"]);
+export const TOOL_CLASSES = Object.freeze(["required", "required-with-infrastructure", "required-to-sign", "optional", "project-setting"]);
 export const TOOL_PLATFORMS = Object.freeze(["linux", "darwin", "win32"]);
 
 const tool = (entry) => Object.freeze({ ...entry, floor: Object.freeze({ ...entry.floor }), install: Object.freeze({ ...entry.install }), usedBy: Object.freeze([...entry.usedBy]) });
@@ -74,6 +75,16 @@ export const TOOLCHAIN_REGISTRY = Object.freeze([
       linux: "`pipx install semgrep` (installs into `~/.local/bin`)",
       darwin: "`brew install semgrep`",
       win32: "not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\\Program Files\\Semgrep`, `%USERPROFILE%\\.local\\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close",
+    },
+  }),
+  tool({
+    id: "trivy", class: "required-with-infrastructure", purpose: "misconfiguration scan of the project's Dockerfiles, Terraform files and Kubernetes manifests at every feature close, offline with its built-in rules",
+    usedBy: ["the security gate of the feature close, in a project with infrastructure or container files"], probe: "trivy --version",
+    floor: { text: "a release whose `trivy config` has `--format`, `--skip-check-update`, `--cache-dir`, `--ignorefile`, `--disable-telemetry` and `--skip-version-check`" },
+    install: {
+      linux: "download `trivy_<version>_Linux-64bit.tar.gz` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy` into `~/.local/bin` (no sudo)",
+      darwin: "`brew install trivy`",
+      win32: "download `trivy_<version>_windows-64bit.zip` from github.com/aquasecurity/trivy/releases, check it against the release's checksums file, and put `trivy.exe` into `%USERPROFILE%\\.local\\bin`",
     },
   }),
   tool({

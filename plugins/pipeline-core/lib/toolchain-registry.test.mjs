@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { renderToolchainDoc } from "./toolchain-doc.mjs";
 import { TOOLCHAIN_REGISTRY, TOOL_CLASSES, TOOL_PLATFORMS, meetsVersionFloor, toolchainDocPointer, toolchainEntry } from "./toolchain-registry.mjs";
 import { readToolDeferral, readToolchainDeferrals, recordToolDeferral, clearToolDeferral, toolchainDeferralsPath } from "./toolchain-deferrals.mjs";
-import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport } from "../scripts/toolchain-preflight.mjs";
+import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport, runToolchainPreflight } from "../scripts/toolchain-preflight.mjs";
 import { buildHandle } from "../scripts/tool-identity.mjs";
 import { scannerEntryReadiness } from "./security-close-status.mjs";
 import { runToolchainDefer } from "../scripts/toolchain-defer.mjs";
@@ -27,8 +27,43 @@ test("the registry: unique ids, known classes, an install route for every platfo
     assert.ok(entry.purpose.length > 0 && entry.floor.text.length > 0 && entry.usedBy.length > 0, entry.id);
     assert.ok(Object.isFrozen(entry) && Object.isFrozen(entry.install), entry.id);
   }
-  for (const toolId of FIXED_TOOLS.filter((id) => id !== "license-check")) assert.equal(toolchainEntry(toolId)?.class, "required", `${toolId} is a required tool of the registry`);
+  for (const toolId of FIXED_TOOLS.filter((id) => !["license-check", "trivy"].includes(id))) assert.equal(toolchainEntry(toolId)?.class, "required", `${toolId} is a required tool of the registry`);
+  assert.equal(toolchainEntry("trivy").class, "required-with-infrastructure", "C29e: Trivy is needed only where infrastructure or container files exist");
   assert.equal(toolchainEntry("openssl").class, "required-to-sign");
+});
+
+test("C29e: the preflight asks for Trivy only where the tracked files hold infrastructure or container files", () => {
+  const dir = home();
+  try {
+    let probed = 0;
+    const base = {
+      probeNodeFn: () => observed("node", "24.15.0", ["spawn-shell-false"]), probeGitFn: () => observed("git", "2.50.1", ["object-format", "diff-paths"]),
+      resolveExecutableFn: (name) => (name === "trivy" ? null : `/tools/${name}`), resolveInstallerFn: () => null,
+      scannerProbes: { trivy: () => { probed += 1; return observed("trivy", "0.76.2", []); } },
+    };
+    const manifestResult = { status: "ok", manifest: { security: { scanners: { trivy: { enabled: true } } } } };
+    const none = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, { ...base, trivyTriggerFilesFn: () => ({ container: [], terraform: [], kubernetes: [] }) });
+    assert.equal(none.results.find((entry) => entry.tool === "trivy").status, "not_required");
+    assert.equal(none.status, "ready", "an explicit trivy entry is a known scanner, never TCP-UNSUPPORTED-SCANNER");
+    const some = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, { ...base, trivyTriggerFilesFn: () => ({ container: ["Dockerfile"], terraform: [], kubernetes: [] }) });
+    const entry = some.results.find((candidate) => candidate.tool === "trivy");
+    assert.equal(entry.status, "binary_missing");
+    assert.match(entry.guidance, /docs\/toolchain\.md#trivy/u);
+    assert.equal(probed, 0, "a missing binary is never probed");
+    const undecided = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, { ...base, trivyTriggerFilesFn: () => ({ error: "x" }) });
+    assert.equal(undecided.results.find((candidate) => candidate.tool === "trivy").status, "probe_error");
+    const ready = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, {
+      ...base, resolveExecutableFn: (name) => `/tools/${name}`, trivyTriggerFilesFn: () => ({ container: [], terraform: ["main.tf"], kubernetes: [] }),
+      scannerProbes: { trivy: () => observed("trivy", "0.76.2", ["--format", "--skip-check-update", "--cache-dir", "--ignorefile", "--disable-telemetry", "--skip-version-check"]) },
+    });
+    assert.equal(ready.results.find((candidate) => candidate.tool === "trivy").status, "ready");
+    const old = runToolchainPreflight({ rootDir: dir, manifestResult, platform: "linux", tempDir: dir }, {
+      ...base, resolveExecutableFn: (name) => `/tools/${name}`, trivyTriggerFilesFn: () => ({ container: ["Dockerfile"], terraform: [], kubernetes: [] }),
+      scannerProbes: { trivy: () => observed("trivy", "0.40.0", ["--format", "--skip-check-update", "--cache-dir", "--ignorefile"]) },
+    });
+    assert.equal(old.results.find((candidate) => candidate.tool === "trivy").status, "incompatible_capability", "a release without the offline switches cannot run the close scan");
+    assert.deepEqual(recordToolDeferral("trivy", "later", deps(dir)).status, "recorded", "Trivy may be deferred like a required tool");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("docs/toolchain.md is the registry's rendering, in the repository and in the plugin's vendored copy", () => {
@@ -131,8 +166,9 @@ test("the onboarding consent names every required tool, and only the deferral re
   const step = ONBOARDING_CONSENT_COVERED_STEPS.find((entry) => entry.id === "toolchain");
   assert.ok(step, "the consent lists the tool check");
   const names = { node: "Node.js", git: "Git", openssl: "OpenSSL" };
-  for (const entry of TOOLCHAIN_REGISTRY.filter((candidate) => ["required", "required-to-sign"].includes(candidate.class))) {
-    for (const language of ["en", "de"]) assert.ok(step[language].includes(names[entry.id] ?? entry.id), `${language}: ${entry.id}`);
+  const consentNames = { ...names, trivy: "Trivy" };
+  for (const entry of TOOLCHAIN_REGISTRY.filter((candidate) => ["required", "required-with-infrastructure", "required-to-sign"].includes(candidate.class))) {
+    for (const language of ["en", "de"]) assert.ok(step[language].includes(consentNames[entry.id] ?? entry.id), `${language}: ${entry.id}`);
   }
   assert.equal(coveringStepForArgv(["toolchain-defer.mjs", "--tool", "semgrep"])?.id, "toolchain");
   assert.equal(coveringStepForArgv(["toolchain-preflight.mjs", "--repair", "git-hooks"]), null, "no installer or other script is covered by it");

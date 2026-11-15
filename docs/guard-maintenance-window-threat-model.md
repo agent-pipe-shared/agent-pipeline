@@ -562,8 +562,11 @@ the kernel closure test found imported by kernel modules but not yet listed:
 `lib/hardened-private-directory.mjs`,
 `lib/hook-currentness.mjs`, `scripts/toolchain-preflight.mjs`,
 `scripts/security-readiness/gitleaks-readiness.mjs`,
-`scripts/security-readiness/osv-scanner-readiness.mjs`, and
-`scripts/security-readiness/semgrep-readiness.mjs`. These modules decide the
+`scripts/security-readiness/osv-scanner-readiness.mjs`,
+`scripts/security-readiness/semgrep-readiness.mjs`,
+`scripts/security-readiness/trivy-readiness.mjs`, and
+`scripts/security-adapters/trivy.mjs` (candidate 29e: the toolchain preflight
+decides with the adapter's own trigger rule whether Trivy is needed at all). These modules decide the
 central-refresh and start-hint behavior of the agy runner, checkpoint-push
 approval and critical-action authorization, the continuity-authority drift
 projection, durable filesystem writes and private-directory hardening, hook

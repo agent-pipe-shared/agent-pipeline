@@ -65,8 +65,8 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   // in their own terminal or defers, and only the deferral record is a covered action (an old record without this id simply does not cover it).
   Object.freeze({
     id: "toolchain",
-    en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
-    de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
+    en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy where the project has infrastructure or container files; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
+    de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
     routes: Object.freeze([{ script: "toolchain-defer.mjs", verbs: null }]),
   }),
   Object.freeze({

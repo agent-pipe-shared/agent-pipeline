@@ -127,7 +127,7 @@ check("invalid manifest blocks before every identity or capability probe", () =>
   const repo = root(); let calls = 0;
   try {
     const result = runToolchainPreflight({ rootDir: repo, manifestResult: { status: "invalid", errors: [{}] } }, { probeNodeFn: () => { calls++; }, probeGitFn: () => { calls++; }, scannerProbes: new Proxy({}, { get: () => () => { calls++; } }) });
-    assert.equal(result.code, "TCP-MANIFEST-INVALID"); assert.equal(result.exitCode, 2); assert.equal(calls, 0); assert.equal(result.results.length, 6);
+    assert.equal(result.code, "TCP-MANIFEST-INVALID"); assert.equal(result.exitCode, 2); assert.equal(calls, 0); assert.equal(result.results.length, 7);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 check("absent manifest requires only compatible Node and Git", () => {
@@ -135,7 +135,7 @@ check("absent manifest requires only compatible Node and Git", () => {
   try {
     const result = runToolchainPreflight({ rootDir: repo, manifestResult: { status: "absent" } }, { probeNodeFn: nodeReady, probeGitFn: gitReady });
     assert.equal(result.code, "TCP-READY"); assert.equal(result.exitCode, 0); assert.deepEqual(result.results.map(({ tool }) => tool), FIXED_TOOLS);
-    assert.deepEqual(result.results.slice(2).map(({ status }) => status), ["not_required", "not_required", "not_required", "not_required"]);
+    assert.deepEqual(result.results.slice(2).map(({ status }) => status), ["not_required", "not_required", "not_required", "not_required", "not_required"]);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 check("enabled scanners are probed under warn and carry exact prepared handles", () => {
@@ -317,7 +317,7 @@ check("Semgrep probes use bounded temporary settings instead of writing the user
 // mapping, a real runToolchainPreflight()-shaped integration fixture, and the
 // zero-mutation proof.
 check("capability-completeness: tool-to-capability-root mapping matches the CYB-1F frozen assignment", () => {
-  assert.deepEqual(CAPABILITY_TOOL_ROOTS, { gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast" });
+  assert.deepEqual(CAPABILITY_TOOL_ROOTS, { gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast", trivy: "cap.iac" });
 });
 check("capability-completeness: a required capability with a ready tool reports \"required\"", () => {
   const output = evaluateCapabilityCompleteness({ results: [entry("gitleaks", "ready")] }, ["cap.secrets"]);
@@ -917,6 +917,8 @@ check("W7-2c: every actionable result names the tool, its probe, a source hint a
 check("W7-2d: the readiness status values are unchanged by the capability contract", () => {
   for (const { mode, result } of w7NoSudoActions()) {
     if (result.tool === "license-check") continue;
+    // C29e: trivy is not enabled in this fixture, so it is never asked for (not_required, no actionable text).
+    if (result.tool === "trivy") { assert.equal(result.status, "not_required", `${mode}/trivy`); continue; }
     if (result.tool === "node") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_version", `${mode}/node`);
     else if (result.tool === "git") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_capability", `${mode}/git`);
     else assert.equal(result.status, "binary_missing", `${mode}/${result.tool}`);

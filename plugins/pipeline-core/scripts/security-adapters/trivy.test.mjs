@@ -2,9 +2,10 @@
 // C29e (ADR-0103): the Trivy adapter -- applicability without the binary, neutral offline invocation, fail-closed parsing.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter as PATH_DELIMITER, join } from "node:path";
+import { probeTrivy, TRIVY_REQUIRED_FLAGS } from "../security-readiness/trivy-readiness.mjs";
 import { spawnSync } from "node:child_process";
 import {
   CAPABILITY_CONTRACT_V2, TRIVY_NOT_APPLICABLE_REASON, extractTrivyFindings, inlineIgnores, isKubernetesManifestText, neutralTrivyEnv,
@@ -230,6 +231,19 @@ test("real binary (skipped without trivy): a clean, a failing and a self-suppres
     assert.ok(result.findings.some((f) => f.rule === "DS-0002" && f.severity === "high"), "the candidate's own trivy.yaml and .trivyignore are not read");
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("real binary readiness (skipped without trivy): version and every switch the close scan passes", { skip: realTrivy.status !== 0 ? "trivy is not installed" : false }, () => {
+  const binary = String(process.env.PATH ?? "").split(PATH_DELIMITER).map((dir) => join(dir, process.platform === "win32" ? "trivy.exe" : "trivy")).find((path) => existsSync(path));
+  const work = mkdtempSync(join(tmpdir(), "trivy-readiness-"));
+  try {
+    const observed = probeTrivy({ executablePath: binary, rootDir: work, tempDir: work });
+    assert.equal(observed.ok, true, JSON.stringify(observed));
+    assert.match(observed.handle.version, /^\d+\.\d+\.\d+$/u);
+    assert.deepEqual(observed.handle.capabilities, [...TRIVY_REQUIRED_FLAGS]);
+  } finally {
     rmSync(work, { recursive: true, force: true });
   }
 });

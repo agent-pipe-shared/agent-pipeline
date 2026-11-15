@@ -800,9 +800,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs",
   "plugins/pipeline-core/lib/hardened-private-directory.mjs",
   "plugins/pipeline-core/lib/hook-currentness.mjs",
+  // Candidate 29e (ADR-0103, GMWKC01): the toolchain preflight imports the Trivy adapter's trigger rule and the Trivy readiness probe.
+  "plugins/pipeline-core/scripts/security-adapters/trivy.mjs",
   "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
   "plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs",
   "plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs",
+  "plugins/pipeline-core/scripts/security-readiness/trivy-readiness.mjs",
   "plugins/pipeline-core/scripts/toolchain-preflight.mjs",
   // Approved design retirement and actual imported-module closure: these modules
   // execute with kernel authority and remain unreachable through maintenance windows.

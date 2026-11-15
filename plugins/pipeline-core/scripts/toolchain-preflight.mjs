@@ -17,6 +17,7 @@
  *   gitleaks     -> cap.secrets
  *   osv-scanner  -> cap.sca
  *   semgrep      -> cap.sast
+ *   trivy        -> cap.iac (C29e; probed only where the tracked files hold infrastructure or container files)
  * `node` and `git` are toolchain prerequisites, not security capabilities,
  * and are excluded from the capability-level report entirely. `license-check`
  * is a catalog CONTROL, not a capability family (CYB-1F F-4, ratified
@@ -68,38 +69,40 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
 import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
+import { probeTrivy, TRIVY_REQUIRED_FLAGS } from "./security-readiness/trivy-readiness.mjs";
+import { trivyTriggerFiles, triggerCount } from "./security-adapters/trivy.mjs";
 import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { meetsVersionFloor, toolchainDocAnchor, toolchainDocPointer, toolchainEntry } from "../lib/toolchain-registry.mjs";
 import { readToolDeferral } from "../lib/toolchain-deferrals.mjs";
 
 export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
-export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
-const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
+export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"]);
+const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-check", "trivy"]);
 const STATUS_PRECEDENCE = Object.freeze(["execution_environment", "untrusted_path", "binary_missing", "input_missing", "probe_timeout", "probe_error", "incompatible_version", "incompatible_capability"]);
-const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"] });
+const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"], trivy: [...TRIVY_REQUIRED_FLAGS] });
 const GUIDANCE = Object.freeze({
-  linux: { node: "Install a Node.js release that meets the pipeline minimum from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install a supported OSV-Scanner major release in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
-  darwin: { node: "Install a Node.js release that meets the pipeline minimum through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
-  win32: { node: "Install a Node.js release that meets the pipeline minimum through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
-  unsupported: { node: "Use a supported linux, darwin, or win32 runner.", git: "Use a supported linux, darwin, or win32 runner.", gitleaks: "Use a supported runner.", "osv-scanner": "Use a supported runner.", semgrep: "Use a supported runner.", "license-check": "Use a supported runner." },
+  linux: { node: "Install a Node.js release that meets the pipeline minimum from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install a supported OSV-Scanner major release in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files.", trivy: "Install a compatible Trivy binary in a recognized system or ~/.local/bin location." },
+  darwin: { node: "Install a Node.js release that meets the pipeline minimum through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs.", trivy: "Install managed Trivy." },
+  win32: { node: "Install a Node.js release that meets the pipeline minimum through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs.", trivy: "Install a compatible trivy.exe in a recognized location." },
+  unsupported: { node: "Use a supported linux, darwin, or win32 runner.", git: "Use a supported linux, darwin, or win32 runner.", gitleaks: "Use a supported runner.", "osv-scanner": "Use a supported runner.", semgrep: "Use a supported runner.", "license-check": "Use a supported runner.", trivy: "Use a supported runner." },
 });
 const INSTALLER_NAMES = Object.freeze(["apt-get", "brew", "go", "pipx", "sudo", "winget"]);
 
 // Capability contract (W7-2): the preflight names the tool, the probe that proves it present and the kind of
 // source the human uses. It emits no command string, no sudo and no pinned version; the human installs, then
 // re-reads the preflight. Installer discovery (INSTALLER_NAMES) is still read but no longer shapes a command.
-const PROBES = Object.freeze({ node: "node --version", git: "git --version", gitleaks: "gitleaks version", "osv-scanner": "osv-scanner --version", semgrep: "semgrep --version" });
+const PROBES = Object.freeze({ node: "node --version", git: "git --version", gitleaks: "gitleaks version", "osv-scanner": "osv-scanner --version", semgrep: "semgrep --version", trivy: "trivy --version" });
 const SOURCE_HINTS = Object.freeze({
-  linux: { node: "the distribution package source or the official Node.js download page", git: "the distribution package source", gitleaks: "the official Gitleaks release page or a trusted package source", "osv-scanner": "the official OSV-Scanner release page or a trusted package source", semgrep: "the official Semgrep page or an isolated pipx environment" },
-  darwin: { node: "the managed macOS package source or the official Node.js download page", git: "Xcode Command Line Tools or a managed package source", gitleaks: "a managed macOS package source or the official Gitleaks release page", "osv-scanner": "a managed macOS package source or the official OSV-Scanner release page", semgrep: "a managed macOS package source or an isolated pipx environment" },
-  win32: { node: "the official Node.js download page or a managed Windows package source", git: "the official Git for Windows page", gitleaks: "the official Gitleaks release page", "osv-scanner": "the official OSV-Scanner release page", semgrep: "the official Semgrep page or an isolated pipx environment" },
+  linux: { node: "the distribution package source or the official Node.js download page", git: "the distribution package source", gitleaks: "the official Gitleaks release page or a trusted package source", "osv-scanner": "the official OSV-Scanner release page or a trusted package source", semgrep: "the official Semgrep page or an isolated pipx environment", trivy: "the official Trivy release page with its checksums file" },
+  darwin: { node: "the managed macOS package source or the official Node.js download page", git: "Xcode Command Line Tools or a managed package source", gitleaks: "a managed macOS package source or the official Gitleaks release page", "osv-scanner": "a managed macOS package source or the official OSV-Scanner release page", semgrep: "a managed macOS package source or an isolated pipx environment", trivy: "a managed macOS package source or the official Trivy release page" },
+  win32: { node: "the official Node.js download page or a managed Windows package source", git: "the official Git for Windows page", gitleaks: "the official Gitleaks release page", "osv-scanner": "the official OSV-Scanner release page", semgrep: "the official Semgrep page or an isolated pipx environment", trivy: "the official Trivy release page with its checksums file" },
 });
 function attendedContract(platform, tool) {
   const probe = PROBES[tool];
   if (probe === undefined) return null;
   const source = SOURCE_HINTS[platform]?.[tool] ?? "the vendor's official page";
-  const scannerNote = ["gitleaks", "osv-scanner", "semgrep"].includes(tool) ? " npm is not an approved installer for these scanners." : "";
+  const scannerNote = ["gitleaks", "osv-scanner", "semgrep", "trivy"].includes(tool) ? " npm is not an approved installer for these scanners." : "";
   return `Capability contract for ${tool}: probe: ${probe}; source: ${source}. Run the install yourself, then re-read the preflight; the preflight installs nothing and emits no command.${scannerNote}`;
 }
 
@@ -157,6 +160,7 @@ function readyCompatibility(tool, observed) {
   if (tool === "gitleaks" && !parsed) return result(tool, "incompatible_version", observed);
   if (tool === "osv-scanner" && !meetsVersionFloor("osv-scanner", parsed)) return result(tool, "incompatible_version", observed);
   if (tool === "semgrep" && !parsed) return result(tool, "incompatible_version", observed);
+  if (tool === "trivy" && !parsed) return result(tool, "incompatible_version", observed);
   const required = REQUIRED_CAPABILITIES[tool] ?? [];
   if (!required.every((capability) => observed.handle.capabilities.includes(capability))) return result(tool, "incompatible_capability", observed);
   return result(tool, "ready", observed);
@@ -240,12 +244,21 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const gateMode = manifest?.gates?.security?.mode ?? "blocking";
   const enabled = Object.entries(manifest?.security?.scanners ?? {}).filter(([, config]) => config?.enabled === true).map(([name]) => name).sort();
   const unsupported = enabled.some((name) => !KNOWN_SCANNERS.has(name));
-  const probes = deps.scannerProbes ?? { gitleaks: probeGitleaks, "osv-scanner": probeOsvScanner, semgrep: probeSemgrep };
+  const probes = { gitleaks: probeGitleaks, "osv-scanner": probeOsvScanner, semgrep: probeSemgrep, trivy: probeTrivy, ...(deps.scannerProbes ?? {}) };
   const resolver = deps.resolveExecutableFn ?? resolveTrustedSystemExecutable;
   const installerResolver = deps.resolveInstallerFn ?? resolveSystemExecutable;
   const installers = new Set(INSTALLER_NAMES.filter((name) => installerResolver(name, { platform }) !== null));
-  for (const tool of ["gitleaks", "osv-scanner", "semgrep"]) {
+  // C29e (ADR-0103): Trivy is needed only where the tracked files hold infrastructure or container files, the same rule the close scan applies
+  // (security-adapters/trivy.mjs trivyTriggerFiles). Without one it stays not_required; a tree whose applicability cannot be decided is a probe error.
+  let trivyApplicable = false;
+  if (enabled.includes("trivy")) {
+    const triggers = (deps.trivyTriggerFilesFn ?? trivyTriggerFiles)(root);
+    if (triggers?.error) baseResults.trivy = result("trivy", "probe_error");
+    else trivyApplicable = triggerCount(triggers) > 0;
+  }
+  for (const tool of ["gitleaks", "osv-scanner", "semgrep", "trivy"]) {
     if (!enabled.includes(tool)) continue;
+    if (tool === "trivy" && !trivyApplicable) continue;
     const trusted = resolvedTool(resolver, tool, platform);
     const observed = !trusted.ok ? trusted : probes[tool]({ executablePath: trusted.path, rootDir: root, tempDir }, { now });
     baseResults[tool] = readyCompatibility(tool, observed); if (baseResults[tool].status === "ready") handles[tool] = observed.handle;
@@ -268,7 +281,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   };
 }
 
-export const CAPABILITY_TOOL_ROOTS = Object.freeze({ gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast" });
+export const CAPABILITY_TOOL_ROOTS = Object.freeze({ gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast", trivy: "cap.iac" });
 
 export function evaluateCapabilityCompleteness(preflightResult, requiredCapabilities) {
   if (!preflightResult || !Array.isArray(preflightResult.results)) throw new TypeError("evaluateCapabilityCompleteness: preflightResult.results must be the results array produced by runToolchainPreflight()");
