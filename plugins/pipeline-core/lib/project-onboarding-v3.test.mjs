@@ -6190,6 +6190,9 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
       ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
       ["../scripts/security-adapters/license-check.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "license-check.mjs"]],
+      // QG-04 restatement (C29e T8, ADR-0103): security-scan.mjs imports the Trivy adapter (node: imports only) and lib/trivy-baseline.mjs (local import: semgrep-baseline.mjs, copied below).
+      ["../scripts/security-adapters/trivy.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "trivy.mjs"]],
+      ["./trivy-baseline.mjs", ["plugins", "pipeline-core", "lib", "trivy-baseline.mjs"]],
       ["../scripts/pipeline-manifest.schema.json", ["plugins", "pipeline-core", "scripts", "pipeline-manifest.schema.json"]],
       ["./manifest.mjs", ["plugins", "pipeline-core", "lib", "manifest.mjs"]],
       ["./project-authority.mjs", ["plugins", "pipeline-core", "lib", "project-authority.mjs"]],

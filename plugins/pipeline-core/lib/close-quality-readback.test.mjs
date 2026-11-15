@@ -77,7 +77,7 @@ test("C29-C3 security-scan: an empty or unreadable v2 capability plan is named o
   const scan = JSON.stringify({ scanners: [{ tool: "semgrep", status: "PASS", classification: "success" }] });
   const verdict = (plan) => JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan, verdict: { blocking: false }, capabilityOutcomes: {}, controls: [] });
   const withVerdict = (text) => rows(full({ readBytes: (p) => { if (p === "evidence/security-latest.json") return Buffer.from(scan); if (p === SEC_VERDICT && text !== null) return Buffer.from(text); throw new Error("absent"); } }))["security-scan"];
-  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; v2 capability plan empty, reporting only: capability controls open\)$/u);
+  assert.match(withVerdict(verdict({ required: [], optional: [] })).evidence, /semgrep: passed; license-check: not applicable; trivy: not applicable; v2 capability plan empty, reporting only: capability controls open\)$/u);
   assert.match(withVerdict(null).evidence, /; v2 scope unavailable\)$/u);
   const planned = withVerdict(verdict({ required: ["cap.sast"], optional: [] })).evidence;
   assert.match(planned, /v2 verdict reporting only, exit by v1\)$/u); assert.doesNotMatch(planned, /plan empty|unavailable/u);
