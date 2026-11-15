@@ -1,0 +1,25 @@
+# ADR-0103: the close scans infrastructure files with Trivy and blocks only new findings
+
+> Agent-Pipeline · Sprint Alfred · 2026-11-14
+
+**Status:** accepted (2026-11-14, register D255). The PO decided the scope in tiles 28d 4 and 5 (a Trivy adapter for infrastructure and container files, offline built-in rules, run only where such files exist, installed from the official release with its checksum, no sudo), 29d T8b (a Trivy finding blocks only when the feature introduced it) and 29e (Trivy goes into the one final candidate 29e). The rules below that go further than those tiles were decided while building; they are marked "built rule" and the PO may overrule any of them. Built in candidate 29e. Not yet run on a consumer repository.
+
+**Context source:** ADR-0092 named Trivy as required "only where a project has infrastructure or container files" and left the adapter to its own decision. Bank consumer repositories carry Dockerfiles, Terraform and Kubernetes manifests that no current scanner reads.
+
+## Decision
+
+1. **A fifth scanner.** `plugins/pipeline-core/scripts/security-adapters/trivy.mjs` runs `trivy config` in the close scan (`scripts/security-scan.mjs`), enabled by default like the other four; `security.scanners.trivy.enabled: false` turns it off. It maps to `cap.iac`.
+2. **Applicability is decided by the Pipeline, without the binary.** A trigger file is a `Dockerfile`, `Containerfile`, `Dockerfile.*`, `Containerfile.*` or `*.dockerfile`; a `*.tf`; or a YAML/JSON file with a top-level `apiVersion` and `kind`. Without one the scanner reads not applicable, spawns nothing and blocks nothing. Built rules (measured on Trivy 0.76.2): a `Kustomization`, `Component`, `List` or `<X>List` document and a file with a template marker (`{{`) are no triggers, since Trivy reports no target for most of them; at the top level of a Git work tree only tracked regular files count (a working copy's untracked and ignored bytes are no part of the candidate, and walking them took 28 s and exceeded the entry bound), elsewhere the root is walked.
+3. **The call is neutral and offline.** An empty `--config` file and `--ignorefile`, a private working directory and cache, no `TRIVY_*` variable, `--skip-check-update`, and (built rule) `--disable-telemetry` and `--skip-version-check`, which Trivy's own help names as network uses. A candidate's own `trivy.yaml`, `.trivyignore` or environment therefore cannot narrow its scan.
+4. **Fail closed.** A nonzero exit, a timeout, unparseable JSON, a schema version other than 2, a stderr line at level ERROR or FATAL other than the expected embedded-checks fallback, or a trigger file that Trivy did not report as a target is a scanner error.
+5. **Only new findings block (T8b).** `lib/trivy-baseline.mjs` scans the base commit of the active feature in a temporary detached worktree, removed afterwards. A candidate finding counts as existing when the base had the same rule at the same path; the line is ignored and the count per rule and path is kept, so a moved finding stays existing and an extra one is new. Existing findings are listed and never block; new ones block at the configured severities. Without a named feature or base commit every finding at a blocking severity blocks, and the summary says why.
+6. **Inline ignores are shown, never applied as a block.** Trivy honours `trivy:ignore:<ID>` comments; the evidence lists each one with path, line and rule.
+7. **The toolchain asks for Trivy only where it is needed.** The tool registry gets the class `required-with-infrastructure` and the entry `trivy`; `docs/toolchain.md` is regenerated. The toolchain preflight probes Trivy only when the tracked files hold a trigger file, needs every switch the scan passes, and lets a person defer it like a required tool. The onboarding consent names Trivy for such projects. Built rule: the start-time environment readiness report gets no Trivy finding, because it would walk and parse the tracked YAML and JSON at every session start.
+8. **The catalog control `ctl.stack.iac-cloud.state-encryption`** (revision 2) applies only when the tree has infrastructure files.
+
+## Consequences
+
+- A consumer manifest that names the four older scanners explicitly gets Trivy on as well; in a project without trigger files it reads not applicable. A test fixture that enables one scanner only now disables Trivy explicitly.
+- A project whose only infrastructure is a Helm chart reads not applicable (template files are no triggers), and a Backstage `Component` file is scanned when other triggers exist but does not make a project infrastructure.
+- Trivy's built-in rules are its own; the evidence names them as `trivy:embedded-checks` and the version that ran. The stderr grammar the fail-closed rule reads is pinned by fixtures of 0.76.2; a later release that changes it shows up as a scanner error, not as a silent pass.
+- Not covered: image scanning (`cap.container`), a project-owned Trivy rule set, and a `required_capabilities` value for `iac`. The close of this repository itself is unaffected: its tracked files hold no trigger file.
