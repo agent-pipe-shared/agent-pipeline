@@ -208,6 +208,24 @@ check("behaviour: phrase present + 26 lines in one code file -> flagged by the p
   cleanup(root);
 });
 
+check("behaviour: the Dispatch: stage-0 (elephant) trailer is the stage-0 self-declaration: within caps clears, over the production cap is flagged", () => {
+  const root = buildRoot();
+  writeFile(root, "src/seed.txt", "seed\n");
+  const base = commit(root, "base");
+  writeFile(root, "src/alpha.mjs", nLines(20, "alpha"));
+  writeFile(root, "src/alpha.test.mjs", nLines(30, "alpha-test"));
+  const within = commit(root, "fix(x): small repair with its test\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  const clean = run(root, base, within);
+  assert.equal(clean.ok, true, clean.findings.join("\n"));
+  assert.equal(clean.coverage.commitsExempt, 1);
+  writeFile(root, "src/beta.mjs", nLines(26, "beta"));
+  const over = commit(root, "fix(x): larger repair\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  const flagged = run(root, within, over);
+  assert.equal(flagged.ok, false);
+  assert.ok(findingsOf(flagged, "MISSING-DISPATCH-PROVENANCE").some((f) => f.includes("reason=stage0-claim-caps-exceeded")), flagged.findings.join("\n"));
+  cleanup(root);
+});
+
 check("behaviour: phrase present + files cap exceeded (4 files) -> flagged even with tiny diffs", () => {
   const root = buildRoot();
   writeFile(root, "src/seed.txt", "seed\n");
