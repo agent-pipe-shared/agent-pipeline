@@ -94,6 +94,8 @@ below assumes it holds and is written to catch a change that would break it.
   (`pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array`,
   2026-08-25 -- 13 entries were previously present in the code array with no
   mention here): `lib/chat-gate-ceremony.mjs`,
+  `lib/closed-evidence-repair.mjs` (the closed-evidence restore/repin verbs of
+  pipeline-state.mjs),
   `lib/codex-host-layout.mjs`,
   `lib/codex-onboarding-app-server.mjs`,
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
