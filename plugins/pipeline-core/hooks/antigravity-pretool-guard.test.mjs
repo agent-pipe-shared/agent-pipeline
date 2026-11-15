@@ -1393,7 +1393,7 @@ check("Antigravity Critic template carries a guard-admissible native envelope", 
   assert.equal(ROOT_CRITIC_TEMPLATE, VENDORED_CRITIC_TEMPLATE);
   assert.match(ROOT_CRITIC_TEMPLATE, /Antigravity native dispatch has a deliberately different carrier/);
   assert.ok(RENDERED_AGY_CRITIC_ENVELOPE.startsWith("templates/prompts/critic-review.md\n"));
-  assert.match(RENDERED_AGY_CRITIC_ENVELOPE, /^scope-marker: scope:group-1$/mu, "the rendered split-part envelope carries its scope-marker row");
+  assert.match(RENDERED_AGY_CRITIC_ENVELOPE, /^\s*scope-marker: scope:group-1$/mu, "the rendered split-part envelope carries its scope-marker row");
   assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /\{\{/u, "every placeholder is rendered");
   assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /(?<![\w-])(you are|please|examine|look at|review)\b/i);
 });
