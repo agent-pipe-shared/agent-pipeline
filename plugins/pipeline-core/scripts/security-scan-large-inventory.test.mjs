@@ -40,6 +40,8 @@ security:
       enabled: false
     license-check:
       enabled: true
+    trivy:
+      enabled: false
 `;
 
 const BULK_FILES = 5000;
