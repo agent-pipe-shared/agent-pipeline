@@ -480,6 +480,21 @@ test("V3 projects keep-awake explicitly and maps an omitted legacy source to dis
   }
 });
 
+test("C29e T10: parallel_reminder_every stays in pipeline.user.yaml; the runtime session block keeps only keep_awake", () => {
+  const root = fixtureRoot();
+  try {
+    const intent = completeIntent();
+    intent.session = { keep_awake: true, parallel_reminder_every: 10 };
+    const plan = planRuntimeProjectionV3(intent, { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready");
+    const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+    assert.match(bytes, /session:\n  keep_awake: true\n/u);
+    assert.equal(bytes.includes("parallel_reminder_every"), false, "the hooks read N from pipeline.user.yaml, never from the projection");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("V3 rejects unknown or non-boolean keep-awake input before baseline access", () => {
   for (const session of [{ keep_awake: "true" }, { keep_awake: true, command: "sleep" }]) {
     const intent = completeIntent();
