@@ -10,6 +10,7 @@ import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatc
 import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
+import { attributeVerdict } from "../lib/critic-split.mjs";
 
 const TEMPLATE = readFileSync(fileURLToPath(new URL("../templates/prompts/critic-review.md", import.meta.url)), "utf8");
 
@@ -284,6 +285,30 @@ test("Antigravity gets the template's paths-only envelope with absolute paths, w
   assert.doesNotMatch(text, CRITIC_DISPATCH_PROSE);
   assert.doesNotMatch(text, /Repository root|Rationale|Batch scope/u, "no prose and no Claude MP-07 line in the envelope");
   for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
+});
+
+test("C29e T5: each Antigravity split part carries its scope-marker row, the Contamination Rule admits it, and a verdict that begins with it is attributed to that part", () => {
+  const preflight = deltaSplitPreflight();
+  const { briefings } = criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" });
+  assert.deepEqual(briefings.map(({ entryId }) => entryId), ["group-1", "group-2"]);
+  for (const { entryId, text, placeholders, limitation } of briefings) {
+    const lines = text.trimEnd().split("\n");
+    assert.equal(lines.filter((line) => line.startsWith("scope-marker: ")).length, 1, "exactly one scope-marker row per part");
+    assert.ok(lines.includes(`scope-marker: scope:${entryId}`));
+    assert.deepEqual(placeholders, ["MODEL"]);
+    assert.equal(limitation, undefined, "the envelope now carries the marker, so no limitation is reported");
+    assert.doesNotMatch(text, CRITIC_DISPATCH_PROSE);
+    for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
+    const verdict = { trajectory_evidence: `scope:${entryId} the evidence artifacts match the claims` };
+    assert.equal(attributeVerdict(preflight.split, verdict), entryId);
+  }
+  const whole = criticBriefingLib.renderCriticBriefings({ preflight: { ...preflight, split: undefined }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" }).briefings[0];
+  assert.doesNotMatch(whole.text, /^scope-marker:/mu, "a whole-range review has no scope-marker row");
+});
+
+test("C29e T5: the Critic template tells a split part to begin trajectory_evidence with its marker", () => {
+  assert.match(TEMPLATE, /^ {3}scope-marker: \{\{SCOPE_MARKER\}\}$/mu);
+  assert.match(TEMPLATE, /begin `trajectory_evidence` with that marker and a space/u);
 });
 
 test("R14 (Antigravity run 3): on Antigravity the briefing use names the prepare step a read-only Critic call needs", () => {

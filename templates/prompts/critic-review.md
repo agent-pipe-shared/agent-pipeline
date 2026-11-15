@@ -182,7 +182,8 @@ USAGE (Elephant)
    contamination guard, so it MUST contain the rendered reference envelope,
    never the full body below. Copy this exact envelope after replacing only its
    placeholders; repeat a `commit`, `guardrail`, or `evidence` row when there
-   is more than one. The first line is this canonical template path; the
+   is more than one. The `scope-marker` row appears only for one part of a
+   split review and is dropped otherwise. The first line is this canonical template path; the
    Critic reads it itself, then resolves the remaining bare references. Do not
    add a greeting, role description, summary, or any other prose around it.
 
@@ -196,6 +197,7 @@ USAGE (Elephant)
    route: {{TRIGGER_ROW}}
    ruleset-sha: {{RULESET_SHA}}
    model: {{MODEL}}
+   scope-marker: {{SCOPE_MARKER}}
    - **Tool budget (hard cap, first-class field):** ≤30 tool uses.
    ```
    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
@@ -461,7 +463,10 @@ Hunt systematically, in this order:
    Orchestrator-authored production diffs outside the stage-0 fast
    path (`roles/elephant.md` — EL-01) = a
    lifecycle-violation finding (EL-01/EL-16), severity at least
-   major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
+   major. A commit with the trailer `Dispatch: stage-0 (elephant)` that
+   touches no production path (only tests, pins, documents or generated
+   files) is no finding; one that touches production code is judged against
+   the stage-0 criteria in EL-01. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
    primary trailer evidence for exactly ONE fact — WHICH work package the diff
    belongs to (diff authorship) — it does NOT by itself evidence who performed
    the commit act. A `Commit-Act: orchestrator` trailer line, when present, is
@@ -620,6 +625,9 @@ budget does not license it.
 4. **Briefing violations observed** (contaminating input, missing artifacts) or "none".
 5. No overall score. Binary pass/fail ONLY if the dispatch requests it here:
    {{VERDICT_REQUESTED: "yes — pass/fail required" | "no"}}
+6. **One part of a split review:** when your input names a scope marker (a
+   `scope-marker:` row, or a batch scope saying to begin trajectory_evidence
+   with one), begin `trajectory_evidence` with that marker and a space.
 
 <!-- T1 runner-native isolation or standing functional-equivalent lane only:
 request this JSON-shaped verdict through the selected runner's native mechanism

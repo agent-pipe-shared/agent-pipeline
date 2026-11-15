@@ -36,11 +36,11 @@
     },
     {
       "path": "roles/critic.md",
-      "rawSha256": "b9b8ec8f6b1c7b20242f1c32355cd181ea4397536a2ef7276f05c9ab281b4689"
+      "rawSha256": "859d0ce62fbb4027dcca323490a678604b6ff569620adeb7460152f964186e51"
     },
     {
       "path": "templates/prompts/critic-review.md",
-      "rawSha256": "d35c9d6e95d911ae854ecf256012c31fe618afac6e848ca1944bf9689f8d0716"
+      "rawSha256": "93c6b34e47a6ae657d899905bec7bee477dba05aa9dac83216fcc80263140a7a"
     }
   ]
 }
