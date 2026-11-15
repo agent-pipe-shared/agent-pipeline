@@ -17,6 +17,39 @@ Placeholders, filled as the results arrive: C30-3 findings of the Full Verify of
 rerunning it alone and comparing with the 29d tree; the known intermittent `native-goldfish-host-stop-pair` race is one
 of them to decide), C30-4 findings and toil of the PO's new greenfield tests.
 
+## C30-5: tests and Verify leave their temporary folders in the home folder, nothing cleans them (PO, 2026-11-15)
+
+**Finding.** Measured on 2026-11-15 in the PO's home folder: 62 leftover entries, 40.7 GB. The PO's rule: it is fine that
+test and Verify folders exist while a run is going (a failing run may keep them), but they must be cleaned up
+automatically afterwards. Today nothing does:
+
+- `scripts/run-quiet.mjs` keeps a private TMPDIR per labelled run under `<home>/pipeline-test-tmp/<label>` and never
+  removes it: 33.7 GB and 2.2 million files from about ten days of runs.
+- Suites create test homes in the home folder with `mkdtemp` (a world-writable system temp folder is the wrong place
+  for the permission and ancestor checks) and do not remove them: `signing-disclosure-sweep.test.mjs`
+  (`.pipeline-signing-method-*`, 35 folders), `existing-public-anchor.test.mjs`, `design-approval-route.e2e.test.mjs`
+  (`design-route-*`), and the local-supervisor and k79-scan suites.
+- Full Verify clones named by hand (`fv*`, `fx19h`) stay forever (about 7 GB).
+- The same two names `scratch/` and `fixtures/` also appear next to the repository in the PO's source folder, which
+  points at a suite creating them relative to the wrong directory.
+
+**Wanted.**
+
+- Every suite that creates a folder outside the system temp folder removes it in a `finally`/`after` hook, including
+  on a failing run unless a documented keep switch asks to keep it for a diagnosis.
+- `run-quiet.mjs` and `scripts/full-verify.mjs` remove their per-run folders when the run ends (green: always; red: the
+  run record and the red excerpts stay, the bulk goes), and a start-of-run sweep removes older leftovers of the same
+  kind through one shared cleaner.
+- The one shared cleaner is `scripts/clean-test-leftovers.mjs` (built 2026-11-15 as the manual, name-matched form with an
+  age guard); candidate 30 wires it into Verify's end and into the bootstrap's housekeeping report, adds its test, and
+  extends its allowlist only by measured names.
+- Verify gets a check that fails when a run leaves a new unlisted folder in the home folder.
+- The `scratch/` and `fixtures/` next to the repository: find the creating suite and fix its base directory.
+
+**Proof.** After one full Verify on a clean home folder the cleaner's plan is empty; the new check pins it.
+
+**Done so far.** The one-time cleanup was run on 2026-11-15 with the PO's approval.
+
 ## C30-2: private project names and machine paths must leave the repository (PO, 2026-11-15, "later, in candidate 30")
 
 **Finding.** Names of the PO's consumer projects and the PO's machine-specific absolute paths are private data and must
