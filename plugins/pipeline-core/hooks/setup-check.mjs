@@ -74,6 +74,7 @@ import { join } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { parallelReminderEvery, parallelReminderSessionStartStdout } from "../lib/parallel-reminder.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
@@ -278,7 +279,11 @@ export function decideFromProjectDir(rootDir) {
       parsed = null; // malformed/outside yaml-lite's strict subset -> ambiguous, fail-open
     }
   }
-  return decideOutput({ fileExists, parsed });
+  const decided = decideOutput({ fileExists, parsed });
+  // C29e T10: when setup has nothing to say, the session start carries the parallel reminder instead (context only;
+  // `session.parallel_reminder_every: 0` turns it off). An incomplete setup keeps its own message alone.
+  if (decided.stdout === "" && parallelReminderEvery(parsed) > 0) return { stdout: parallelReminderSessionStartStdout(), json: true, observation: null };
+  return decided;
 }
 
 // ---- CLI entrypoint: real environment, always exit 0 ------------------------------------------

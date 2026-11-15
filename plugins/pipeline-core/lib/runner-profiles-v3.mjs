@@ -233,9 +233,16 @@ function validateRoles(value, errors) {
 
 function validateSession(value, errors) {
   if (!Object.hasOwn(value, "session")) return;
-  if (!validateClosedObject(value.session, "$.session", ["keep_awake"], errors, "supply exactly the optional keep_awake boolean")) return;
+  if (!validateClosedObject(value.session, "$.session", ["keep_awake"], errors, "supply the keep_awake boolean and, optionally, the parallel_reminder_every integer", ["parallel_reminder_every"])) return;
   if (typeof value.session.keep_awake !== "boolean") {
     add(errors, "$.session.keep_awake", "type", "keep_awake must be a boolean", "use true or false; commands and arguments are never configurable");
+  }
+  // C29e T10: how often the main session gets the parallel reminder (lib/parallel-reminder.mjs); 0 turns it off.
+  if (Object.hasOwn(value.session, "parallel_reminder_every")) {
+    const every = value.session.parallel_reminder_every;
+    if (!Number.isSafeInteger(every) || every < 0 || every > 1000) {
+      add(errors, "$.session.parallel_reminder_every", "type", "parallel_reminder_every must be an integer from 0 to 1000", "use a whole number of tool calls (default 25), or 0 to turn the reminder off");
+    }
   }
 }
 

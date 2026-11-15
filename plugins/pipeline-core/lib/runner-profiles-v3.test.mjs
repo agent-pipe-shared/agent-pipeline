@@ -196,6 +196,20 @@ const cases = [
     const checked = validatePipelineUserV3(malformed);
     assert.equal(checked.ok, false); assert.ok(has(checked, "$.session.command", "additional_property"));
   }],
+  ["C29e T10: parallel_reminder_every is an optional integer 0..1000 next to keep_awake", () => {
+    for (const every of [0, 1, 25, 1000]) {
+      const intent = completeIntent(); intent.session = { keep_awake: false, parallel_reminder_every: every };
+      assert.equal(validatePipelineUserV3(intent).ok, true, `accepts ${every}`);
+    }
+    for (const bad of [-1, 1001, 2.5, "25", true, null]) {
+      const intent = completeIntent(); intent.session = { keep_awake: false, parallel_reminder_every: bad };
+      const checked = validatePipelineUserV3(intent);
+      assert.equal(checked.ok, false, `refuses ${JSON.stringify(bad)}`);
+      assert.ok(has(checked, "$.session.parallel_reminder_every", "type"));
+    }
+    const onlyEvery = completeIntent(); onlyEvery.session = { parallel_reminder_every: 10 };
+    assert.equal(validatePipelineUserV3(onlyEvery).ok, false, "keep_awake stays required");
+  }],
   ["advisor export consent is an optional closed public-safe V3 authority", () => {
     const schema = loadPipelineUserV3Schema();
     assert.deepEqual(schema.properties.advisor_export, { "$ref": "#/$defs/advisor_export" });

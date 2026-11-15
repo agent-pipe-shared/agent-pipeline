@@ -900,6 +900,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
   "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
   "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
+  // C29e T10: parallel-reminder <- hooks/guard-dispatch-budget (every-N context line).
+  "plugins/pipeline-core/lib/parallel-reminder.mjs",
   "plugins/pipeline-core/lib/node-sandbox-probe.mjs", "plugins/pipeline-core/lib/onboarding-driver-output.mjs",
   "plugins/pipeline-core/lib/pipeline-owned-files.mjs",
   "plugins/pipeline-core/lib/session-authority-observers.mjs",

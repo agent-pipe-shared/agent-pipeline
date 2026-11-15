@@ -120,6 +120,10 @@ const RUNNER_SOURCE = [
   "  };",
   "  if (!scenario.realBudgetBinding) o.dispatchBudgetContractForRoleFn = (agentType) => ({ applicable: false, role: agentType });",
   "  if (!scenario.rootDirAbsent) o.rootDir = scenario.rootDir;",
+  "  if (Object.prototype.hasOwnProperty.call(scenario, 'parallelEvery')) {",
+  "    o.parallelReminderEveryFn = () => scenario.parallelEvery;",
+  "    o.statSyncFn = (p) => { if (!files.has(canon(p))) { const e = new Error('ENOENT ' + p); e.code = 'ENOENT'; throw e; } return { size: files.get(canon(p)).length }; };",
+  "  }",
   "  return o;",
   "}",
   "",
@@ -129,6 +133,9 @@ const RUNNER_SOURCE = [
   "  if (step.op === 'guard') {",
   "    const r = mod.evaluateDispatchBudgetGuard(step.input, baseOpts());",
   "    results.push({ exitCode: r.exitCode, stderr: r.stderr });",
+  "  } else if (step.op === 'guardFull') {",
+  "    const r = mod.evaluateDispatchBudgetGuard(step.input, baseOpts());",
+  "    results.push({ exitCode: r.exitCode, stderr: r.stderr, stdout: r.stdout ?? null });",
   "  } else if (step.op === 'identity') {",
   "    results.push(mod.subagentIdentity(step.input, { existsSyncFn, readFileSyncFn, pluginRoot: scenario.rootDir ? fakePluginRoot() : undefined }));",
   "  } else if (step.op === 'maxTurns') {",
@@ -464,6 +471,35 @@ test("evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded 
   steps.push({ op: "getWriteCount" });
   const { results } = run({ rootDir: FAKE_ROOT, steps });
   assert.equal(results[results.length - 1], 0, "once the marker exists for this session, no further write should ever occur");
+});
+
+test("evaluateDispatchBudgetGuard (C29e T10): the orchestrator gets the parallel reminder on every N-th call, as context only, never a permission decision", () => {
+  const steps = [];
+  for (let i = 1; i <= 7; i += 1) steps.push({ op: "guardFull", input: orchestratorInputObj() });
+  steps.push({ op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/top-level.calls` });
+  const { results } = run({ rootDir: FAKE_ROOT, parallelEvery: 3, steps });
+  const fired = [];
+  for (let i = 0; i < 7; i += 1) {
+    assert.equal(results[i].exitCode, 0);
+    if (results[i].stdout) {
+      fired.push(i + 1);
+      const out = JSON.parse(results[i].stdout);
+      assert.equal(out.hookSpecificOutput.hookEventName, "PreToolUse");
+      assert.match(out.hookSpecificOutput.additionalContext, /^Parallel by default: /u);
+      assert.equal(out.hookSpecificOutput.permissionDecision, undefined, "an allow would skip the permission prompt");
+    }
+  }
+  assert.deepEqual(fired, [3, 6]);
+  assert.equal(results[7], ".......", "one byte per orchestrator call");
+});
+
+test("evaluateDispatchBudgetGuard (C29e T10): N 0 turns the every-N reminder off and writes no counter", () => {
+  const steps = [];
+  for (let i = 1; i <= 4; i += 1) steps.push({ op: "guardFull", input: orchestratorInputObj() });
+  steps.push({ op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/top-level.calls` });
+  const { results } = run({ rootDir: FAKE_ROOT, parallelEvery: 0, steps });
+  for (let i = 0; i < 4; i += 1) assert.ok(!results[i].stdout, `call ${i + 1} prints nothing`);
+  assert.equal(results[4], null);
 });
 
 test("evaluateDispatchBudgetGuard: rootDir precedence -- assert the actual resolveGitCommonDirFn argument in all three precedence cases", () => {
@@ -931,7 +967,10 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): the three identity shapes
   for (const r of results.slice(0, 3)) assert.equal(r.exitCode, 0);
   const allFiles = results[3];
   const counterFiles = allFiles.filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.includes("unresolved-observations"));
-  const markerFiles = allFiles.filter((p) => p.includes("/orchestrator-seen/"));
+  // The orchestrator-seen directory also holds the C29e T10 parallel-reminder call counter (`<session>.calls`), which
+  // belongs to the same orchestrator call; the once-per-session marker is the `.json` file.
+  const markerFiles = allFiles.filter((p) => p.includes("/orchestrator-seen/") && p.endsWith(".json"));
+  assert.deepEqual(allFiles.filter((p) => p.includes("/orchestrator-seen/") && p.endsWith(".calls")), [`${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/other.calls`], "the reminder counter belongs to the genuine orchestrator call only");
   const unresolvedFiles = unresolvedObservationFiles(allFiles);
   assert.equal(counterFiles.length, 1, "exactly one per-agent counter file, for the genuine subagent call");
   assert.equal(markerFiles.length, 1, "exactly one orchestrator marker, for the genuine orchestrator call");

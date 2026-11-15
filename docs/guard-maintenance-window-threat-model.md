@@ -754,6 +754,8 @@ receipt that `scripts/advisory-host-bridge.mjs` accepts),
 briefing whose admission `hooks/guard-dispatch.mjs` decides),
 `plugins/pipeline-core/lib/dispatch-budget-notice.mjs` (the budget notice
 `hooks/guard-dispatch-budget.mjs` announces),
+`plugins/pipeline-core/lib/parallel-reminder.mjs` (the every-N parallel
+reminder `hooks/guard-dispatch-budget.mjs` adds as context, candidate 29e),
 `plugins/pipeline-core/lib/node-sandbox-probe.mjs` (the sandbox probe
 `scripts/pipeline-start-preflight.mjs` relies on),
 `plugins/pipeline-core/lib/pipeline-owned-files.mjs` (which files the push and

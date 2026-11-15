@@ -30,6 +30,7 @@ import {
   decideFromProjectDir, reconcileSetupObservation,
 } from "./setup-check.mjs";
 import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
+import { parallelReminderSessionStartStdout } from "../lib/parallel-reminder.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./setup-check.mjs", import.meta.url));
 
@@ -204,7 +205,21 @@ function runCli(rootDir) {
   );
   const { status, stdout } = runCli(rootDir);
   ok("CLI: fully set up -> exit 0", status === 0);
-  ok("CLI: fully set up -> silent (empty stdout)", stdout === "", stdout);
+  // C29e T10: a complete setup has nothing to say, so the session start carries only the parallel reminder (context only).
+  const reminder = stdout.trim() === "" ? null : JSON.parse(stdout);
+  ok("CLI: fully set up -> only the parallel reminder, as context", reminder !== null && reminder.systemMessage === undefined
+    && reminder.hookSpecificOutput?.hookEventName === "SessionStart" && /^Parallel by default: /u.test(reminder.hookSpecificOutput?.additionalContext ?? ""), stdout);
+}
+
+{
+  const rootDir = fixtureDir("cli-fully-set-up-reminder-off");
+  writeRaw(
+    join(rootDir, "pipeline.user.yaml"),
+    `setup:\n  intent: "maintainer"\nsession:\n  keep_awake: false\n  parallel_reminder_every: 0\n`,
+  );
+  const { status, stdout } = runCli(rootDir);
+  ok("CLI: fully set up, reminder off -> exit 0", status === 0);
+  ok("CLI: fully set up, reminder off -> silent (empty stdout)", stdout === "", stdout);
 }
 
 {
@@ -213,7 +228,7 @@ function runCli(rootDir) {
   writeRaw(join(rootDir, "pipeline.user.yaml"), `setup: { intent: "consumer" }\n`);
   const { status, stdout } = runCli(rootDir);
   ok("CLI: malformed/unsupported YAML -> exit 0 (fail-open, never blocks)", status === 0);
-  ok("CLI: malformed/unsupported YAML -> silent (empty stdout)", stdout === "", stdout);
+  ok("CLI: malformed/unsupported YAML -> no setup message, only the parallel reminder (fail-open)", /Parallel by default: /u.test(stdout) && !/setup\.mjs/u.test(stdout), stdout);
 }
 
 {
@@ -223,7 +238,7 @@ function runCli(rootDir) {
   writeRaw(join(rootDir, "pipeline.user.yaml"), `- one\n- two\n`);
   const { status, stdout } = runCli(rootDir);
   ok("CLI: top-level YAML array (non-object document) -> exit 0", status === 0);
-  ok("CLI: top-level YAML array (non-object document) -> silent (ambiguous, fail-open)", stdout === "", stdout);
+  ok("CLI: top-level YAML array (non-object document) -> no setup message, only the parallel reminder (ambiguous, fail-open)", /Parallel by default: /u.test(stdout) && !/setup\.mjs/u.test(stdout), stdout);
 }
 
 // ======================================================================================
@@ -261,8 +276,8 @@ function runCli(rootDir) {
   );
   const { stdout, observation } = decideFromProjectDir(rootDir);
   ok(
-    "onboarding-generated shape (no setup: key at all) -> the hook is silent (default-markers never fires)",
-    stdout === "" && observation === null,
+    "onboarding-generated shape (no setup: key at all) -> no setup message (default-markers never fires), only the parallel reminder (C29e T10)",
+    stdout === parallelReminderSessionStartStdout() && observation === null,
     stdout,
   );
 }
@@ -392,7 +407,7 @@ function preflightAt(rootDir, installedVersion = "0.5.3+test") {
   writeRaw(join(rootDir, "pipeline.user.yaml"), `setup:\n  intent: "maintainer"\n`);
   const hook = decideFromProjectDir(rootDir);
   const preflight = preflightAt(rootDir);
-  ok("(b) setup complete: the hook is silent", hook.stdout === "", hook.stdout);
+  ok("(b) setup complete: no setup message, only the parallel reminder (C29e T10)", hook.stdout === parallelReminderSessionStartStdout(), hook.stdout);
   ok("(b) setup complete: the hook emits no observation at all", hook.observation === null);
   ok("(b) setup complete: preflight is ready", preflight.status === "ready", preflight.status);
   const verdict = reconcileSetupObservation({ preflight, observation: hook.observation });

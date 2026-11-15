@@ -40,6 +40,7 @@ import { liveSlices } from "../lib/fanout-ledger.mjs";
 import { resolveFanoutConfig } from "../lib/fanout-governor.mjs";
 import { loadSliceQueue, readyAndLive } from "../lib/slice-queue.mjs";
 import { resolveGovernedItemQueue, inspectNativeGoldfishItemDelivery, itemDeliveryUnobservedLine } from "../lib/native-goldfish-host-state.mjs";
+import { PARALLEL_REMINDER, readParallelReminderEvery } from "../lib/parallel-reminder.mjs";
 
 const FANOUT_MAX_RECORD_BYTES = 1024 * 1024;
 const FANOUT_SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -365,6 +366,8 @@ export function decideOutput(input, state, { rootDir = null, env = process.env }
         : `\n${itemDeliveryUnobservedLine(ownership.code)}`;
     }
   }
+  // C29e T10: the re-grounding repeats the parallel reminder (off with `session.parallel_reminder_every: 0`).
+  if (rootDir && readParallelReminderEvery(rootDir) > 0) message += `\n${PARALLEL_REMINDER}`;
   const measurement = measureBootstrapPayload(message, { mode: "compact" });
   const payload = {
     systemMessage: message,

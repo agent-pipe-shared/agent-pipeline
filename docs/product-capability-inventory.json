@@ -706,6 +706,7 @@
         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:parallel-reminder-tests",
         "verify-phase:harness/scripts/verify.mjs:partial-readiness-restore-advice-tests",
         "verify-phase:harness/scripts/verify.mjs:passive-read-credential-follow-tests",
         "verify-phase:harness/scripts/verify.mjs:passive-read-policy-tests",

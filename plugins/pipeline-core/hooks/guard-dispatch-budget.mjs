@@ -221,6 +221,7 @@ import { normalizeDispatchRecordPath, validateDispatchRecord, isTerminalOutcome 
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { parallelReminderPreToolUseStdout, readParallelReminderEvery, tickParallelReminder } from "../lib/parallel-reminder.mjs";
 import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
 import { criticExcludedRole } from "../lib/critic-correction-input-bindings.mjs";
@@ -1782,6 +1783,11 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     recordOrchestratorObservation(commonDir, {
       branch: "orchestrator", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
     }, options);
+    // C29e T10: every N-th orchestrator call carries the parallel reminder as context only (no permission decision).
+    const every = (options.parallelReminderEveryFn ?? readParallelReminderEvery)(rootDir);
+    if (tickParallelReminder({ commonDir, transcriptPath: rawTranscriptPath, every }, options)) {
+      return { exitCode: 0, stderr: "", stdout: parallelReminderPreToolUseStdout() };
+    }
     return verdict(0); // never limited, by construction
   }
 

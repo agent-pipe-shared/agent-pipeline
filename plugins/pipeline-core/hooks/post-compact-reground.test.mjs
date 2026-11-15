@@ -27,6 +27,7 @@ import {
   writeModelIdentityObservation,
 } from "../lib/main-session-route-attestation.mjs";
 import { STATE_EXCERPT_MAX_BYTES, STATE_EXCERPT_TRUNCATION_MARKER } from "../lib/bootstrap-payload-budget.mjs";
+import { PARALLEL_REMINDER } from "../lib/parallel-reminder.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./post-compact-reground.mjs", import.meta.url));
 const FEATURE = "phase26-test";
@@ -239,6 +240,16 @@ check("decideOutput with rootDir embeds the docs/state.md live excerpt bilingual
   assert.ok(deMessage.includes("A live paragraph with real content."));
   assert.equal(deMessage.includes("old stuff"), false);
   assert.match(deMessage, /Falls hier etwas unklar ist oder unvollständig wirkt, lies docs\/state\.md direkt, bevor du doppelte Arbeit riskierst\./);
+});
+
+check("C29e T10: the compact re-grounding ends with the parallel reminder unless pipeline.user.yaml sets it to 0", () => {
+  const root = freshRoot("parallel-reminder");
+  const withDefault = decideOutput({ source: "compact" }, outer(), { rootDir: root }).payload.systemMessage;
+  assert.ok(withDefault.endsWith(`\n${PARALLEL_REMINDER}`), "no pipeline.user.yaml: the default N > 0 keeps the reminder");
+  writeFileSync(join(root, "pipeline.user.yaml"), "session:\n  keep_awake: false\n  parallel_reminder_every: 0\n");
+  const off = decideOutput({ source: "compact" }, outer(), { rootDir: root }).payload.systemMessage;
+  assert.equal(off.includes(PARALLEL_REMINDER), false, "0 turns it off");
+  assert.equal(decideOutput({ source: "compact" }, outer()).payload.systemMessage.includes(PARALLEL_REMINDER), false, "no rootDir, no reminder");
 });
 
 check("host payload mirrors deterministic context and exposes pure projection", () => {

@@ -52,7 +52,8 @@
       "required": ["keep_awake"],
       "additionalProperties": false,
       "properties": {
-        "keep_awake": { "type": "boolean" }
+        "keep_awake": { "type": "boolean" },
+        "parallel_reminder_every": { "type": "integer", "minimum": 0, "maximum": 1000 }
       }
     },
     "critic_export": {
