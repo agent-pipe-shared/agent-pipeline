@@ -207,7 +207,7 @@ const canonical=value=>value===null||typeof value!=='object'?JSON.stringify(valu
 function producerFixture(){
  const base=mkdtempSync(join(tmpdir(),'g13-producer-'));const root=join(base,'project');mkdirSync(root,{mode:0o700});mkdirSync(join(root,'.claude'));
  writeFileSync(join(root,'.gitignore'),'evidence/\n');
- writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n');
+ writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n    trivy:\n      enabled: false\n');
  const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',shell:false});assert.equal(r.status,0,r.stderr);};
  git(['init','-q']);git(['config','user.name','G13 Synthetic Fixture']);git(['config','user.email','g13@example.invalid']);
  // G32-SECURITY-REMOTE: the candidate snapshot is bound to the effective push remote, so the producer needs one.
