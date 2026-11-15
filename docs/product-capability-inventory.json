@@ -1195,6 +1195,8 @@
         "verify-phase:harness/scripts/verify.mjs:tmp-leak-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:toolchain-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:transfer-classification-tests",
+        "verify-phase:harness/scripts/verify.mjs:trivy-baseline-tests",
+        "verify-phase:harness/scripts/verify.mjs:trivy-tests",
         "verify-phase:harness/scripts/verify.mjs:trust-anchor-bootstrap-circularity-repro-tests",
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",

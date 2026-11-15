@@ -844,6 +844,10 @@ const TEST_SUITES = [
   { name: "held-git-author-tests", file: join(libDir, "held-git-author.test.mjs") },
   // Candidate 29e T10: the parallel reminder (N from pipeline.user.yaml, lock-free counter, context-only outputs).
   { name: "parallel-reminder-tests", file: join(libDir, "parallel-reminder.test.mjs") },
+  // Candidate 29e T8/T8b (ADR-0103): the Trivy adapter (trigger rule, neutral offline call, fail-closed parsing, readiness probe) and the
+  // baseline that lets only findings the feature added block.
+  { name: "trivy-tests", file: join(pluginScriptsDir, "security-adapters", "trivy.test.mjs") },
+  { name: "trivy-baseline-tests", file: join(libDir, "trivy-baseline.test.mjs") },
   { name: "dispatch-budget-binding-tests", file: join(libDir, "dispatch-budget-binding.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `DBB${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
   { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },
