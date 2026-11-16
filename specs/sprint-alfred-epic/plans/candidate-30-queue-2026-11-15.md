@@ -25,6 +25,32 @@ Placeholders, filled as the results arrive: C30-3 findings of the Full Verify of
 rerunning it alone and comparing with the 29d tree; the known intermittent `native-goldfish-host-stop-pair` race is one
 of them to decide), C30-4 findings and toil of the PO's new greenfield tests.
 
+## C30-3: findings of the Full Verify of the stamped candidate 30 (2026-11-16, commit `026ae7960`, run `fv30`)
+
+The 29e Full Verify was aborted, so this run is the first full one since 29d. 1229 steps, 4575 s, **15 red**. Each red suite was rerun alone in the
+same private home (`rerun-reds.mjs`): **12 are green alone** (load effects of the parallel run: `agy-host-commit-execution`,
+`post-compact-reground`, `commit-message-policy`, `dispatch-provenance`, `critic-dispatch-preflight`, `antigravity-pretool-guard`,
+`native-goldfish-host-state`, `native-goldfish-host-finalizer`, `native-goldfish-host-stop-pair` (known race), `design-approval-route-e2e`,
+`pin-antigravity-design-phase-scripts-refused-in-draft`, `po-only-discard-boundary`). **Three stay red alone; none comes from candidate 30**
+(the files are unchanged between `5df67f885` and HEAD, or the case is identical red on a clone of `5df67f885`):
+
+1. `license-contract-check`: `plugins/pipeline-core/lib/feature-id.mjs` (added 2026-11-13) and `lib/maintenance-delivery.mjs` (2026-11-13/14)
+   lack the SPDX `SUL-1.0` header. Fix: one header line each (plugin source, so a held patch and the PO's apply).
+2. `security-scan` (gitleaks, 2 findings): two reviewed `.gitleaksignore` entries went stale because their lines moved
+   (`lib/security-scanner-diagnostics.test.mjs` 268 to 274, `scripts/po-human-approval.test.mjs` 160 to 161; moved by commits of
+   2026-11-14/15). Fix: re-line the two entries with `gitleaks-repair-ignore.mjs`, the reviewed values unchanged.
+3. `architecture-public-greenfield-route`: cases G27-PUBLIC-001 and G20-36 fail with a JSON parse error because the in-process output of
+   `materialize-architecture` has a second line (a `console.warn`/`console.error` that the fixture joins into the text). Identical on a clone
+   of `5df67f885`. Cause not yet found; first step: print the second line, then decide whether the warning or the test is wrong.
+
+Also seen, not a Verify red: `revised-native-design-cannot-reach-a-new-advisor-course` case (iii) `SDC-AUTHORITY-UNAVAILABLE` is red in
+the Elephant's own shell and green in the Verify run (environment).
+
+**Cleanup check of the run.** The wrapper's cleanup line reported the private home kept (a red run keeps it for the reruns) and 0 home-level
+leftovers; the cleaner's plan is empty afterwards and the leak check printed nothing. The green-run removal of the private home is not yet
+observed on a real run (this one was red). Old finished Verify homes and clones under `.fv` and `fvc` (5.5 GB, plan with
+`--verify-homes 0`) are not removed without the PO's word.
+
 ## C30-6: the design review does not converge, cap it at one full round plus two diff rounds (PO, 2026-11-16, greenfield run 070_4 on Claude)
 
 **Observation (a greenfield handover, measured).** A feature design got twelve independent `readiness-reviewer` rounds and
