@@ -707,7 +707,13 @@ export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir
   // Only the two approvals of this push can be carried, and a signed one must be the very proof the private store recorded for it: a proof object signed by
   // any other key (the agent's own, for instance) is refused. Both are compared by the digest the store recorded, sha256 over the canonical proof object, which covers
   // the public key and the signature: the signature check further down only proves the file is self-consistent, its key travels in the file. A chat or waiver approval has no proof file.
-  const recordedProofSha256 = { push: pushRecord?.approval.criticalProof?.proofSha256 ?? null, "release-preflight": release?.mode === "signature" ? release.criticalProof?.proofSha256 : null };
+  // C30d (Antigravity greenfield): the writer carries EVERY push proof the store holds for the approved commit, so a commit the PO signed twice (the first branch name was taken on the
+  // remote) puts two proofs into the bundle. Each one is admitted when it is the proof of a recorded, consumed push approval of this very commit to this remote, whatever its branch; the
+  // decision stays that of the store (a proof under any other key, or of another commit, is still refused).
+  const pushProofDigests = new Set(readPrivateApprovals(common, "push")
+    .filter((entry) => entry.approval?.forCommit === parent && entry.approval.remote === remote && pushApprovalProofHolds({ common, anchorDir, approval: entry.approval }))
+    .map((entry) => entry.approval.criticalProof?.proofSha256).filter((digest) => SHA256.test(digest ?? "")));
+  const recordedProofSha256 = { "release-preflight": release?.mode === "signature" ? release.criticalProof?.proofSha256 : null };
   if (!attributions.every((entry) => entry.kind === "push" || entry.kind === "release-preflight")) return refuse("LIST", "the follow-up list carries an approval other than the push and the release approval");
   if (entries.some((entry) => entry?.kind === "release-preflight") || attributions.some((entry) => entry.kind === "release-preflight")) {
     if (release === null) return refuse("NO-RELEASE-APPROVAL", "the list carries a release approval the parent commit does not have");
@@ -725,7 +731,8 @@ export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir
     const { bytes, parsed } = blobs.get(`${bundle}/${entry.path}`) ?? {};
     const intent = parsed?.intentSha256;
     const expected = Object.hasOwn(recordedProofSha256, entry.kind) ? recordedProofSha256[entry.kind] : null;
-    const bound = object(parsed) && SHA256.test(expected ?? "") && createHash("sha256").update(canonical(parsed)).digest("hex") === expected;
+    const digest = object(parsed) ? createHash("sha256").update(canonical(parsed)).digest("hex") : null;
+    const bound = digest !== null && (entry.kind === "push" ? pushProofDigests.has(digest) : SHA256.test(expected ?? "") && digest === expected);
     if (!bound) return refuse("CONTENT", `${entry.path} is not the signed proof recorded for the ${entry.kind} approval`);
     if (!exactKeys(entry, ["kind", "path", "sha256", "intentSha256"]) || !/^[a-z-]{1,40}$/u.test(entry.kind) || bytes === undefined || createHash("sha256").update(bytes).digest("hex") !== entry.sha256
       || !exactKeys(parsed, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || parsed.schema !== FOLLOWUP_PROOF_SCHEMA || !SHA256.test(intent ?? "") || intent !== entry.intentSha256

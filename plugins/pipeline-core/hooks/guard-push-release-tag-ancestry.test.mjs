@@ -410,7 +410,7 @@ function followUpProof(intentSha256) {
   return { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: "po-key-1", publicKey: publicKey.export({ type: "spki", format: "pem" }), signatureBase64: cryptoSign(null, Buffer.from(intentSha256, "utf8"), privateKey).toString("base64") };
 }
 /** A consumer project at P (bundle committed, release approval + push approval recorded, annotated tag at P, origin/main = P) and the follow-up files on disk. */
-function followUpScenario(prefix, { tag = true, releaseApproval = true, origin = "published", recordedPushIntent = "a".repeat(64), foreignKey = null, destination = "refs/heads/main", pushApproval = true, carry = ["push", "release-preflight"] } = {}) {
+function followUpScenario(prefix, { tag = true, releaseApproval = true, origin = "published", recordedPushIntent = "a".repeat(64), foreignKey = null, destination = "refs/heads/main", pushApproval = true, carry = ["push", "release-preflight"], abandonedPush = false } = {}) {
   const { dir, head: bundleCommit } = freshRepo(prefix);
   writeManifest(dir, manifestPush({ approval: "required" }));
   const bundle = `audit-bundles/${FOLLOWUP_FEATURE}/${bundleCommit}`;
@@ -425,6 +425,9 @@ function followUpScenario(prefix, { tag = true, releaseApproval = true, origin =
   // the push approval's recorded proof: the guard admits only the very proof the private store holds for it (a proof signed by any other key is refused)
   const recorded = recordedPushIntent === "a".repeat(64) ? pushProof : followUpProof(recordedPushIntent);
   if (pushApproval && writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination, approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(recorded)), proof: recorded } } }).ok !== true) throw new Error("fixture push approval was not recorded");
+  // C30d (Antigravity greenfield): a second signed push approval of the SAME commit for a destination that was never pushed to (the first branch name was taken on the remote).
+  const abandoned = abandonedPush ? followUpProof("c".repeat(64)) : null;
+  if (abandoned !== null && writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination: "refs/heads/abandoned", approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(abandoned)), proof: abandoned } } }).ok !== true) throw new Error("fixture abandoned push approval was not recorded");
   if (releaseApproval) {
     // the digest the private store really holds: sha256 over the canonical proof object (release-preflight-cli.mjs, verified.proofSha256)
     const proofSha256 = sha256Hex(canonical(releaseProof));
@@ -435,7 +438,7 @@ function followUpScenario(prefix, { tag = true, releaseApproval = true, origin =
   // foreignKey: the carried file holds the recorded intent, validly signed, but under a key the private store never saw
   const carriedPush = foreignKey === "push" ? followUpProof(pushProof.intentSha256) : pushProof;
   const carriedRelease = foreignKey === "release" ? followUpProof(releaseProof.intentSha256) : releaseProof;
-  const files = [["proofs/003-push.json", carriedPush, "push"], ["proofs/004-release-preflight.json", carriedRelease, "release-preflight"]].filter(([, , kind]) => carry.includes(kind)).map(([path, proof, kind]) => {
+  const files = [...(abandoned === null ? [] : [["proofs/002-push.json", abandoned, "push"]]), ["proofs/003-push.json", carriedPush, "push"], ["proofs/004-release-preflight.json", carriedRelease, "release-preflight"]].filter(([, , kind]) => carry.includes(kind)).map(([path, proof, kind]) => {
     const bytes = Buffer.from(`${JSON.stringify(proof)}\n`);
     return { path, bytes, kind, sha256: sha256Hex(bytes), intentSha256: proof.intentSha256 };
   });
@@ -556,6 +559,24 @@ function branchFollowUp(prefix, overrides = {}) {
   s.write({ evidence: [{ kind: "final-verify", path: "proofs/005-final-verify.json", sha256: sha256Hex(bytes) }] });
   writeFileSync(join(s.dir, s.bundle, "proofs/005-final-verify.json"), bytes); s.commit();
   check("PO-F3 allow  the follow-up may carry the final Verify record the close recorded", "git push origin HEAD:refs/heads/feat-x", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
+}
+{
+  // C30d: the writer carries every push proof the store holds for the approved commit; two signatures for one commit (the first branch name was taken) used to refuse the whole follow-up.
+  const s = branchFollowUp("followup-second-signature", { abandonedPush: true }); s.write(); s.commit();
+  check("C30d-F1 allow  the follow-up carries the proof of a second signed push approval of the same commit for another destination", "git push origin HEAD:refs/heads/feat-x", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
+  const admitted = authorizeAuditProofFollowUp({ projectDir: s.dir, anchorDir: s.dir, commit: headOf(s.dir), remote: "origin", destination: "refs/heads/feat-x" });
+  if (admitted.ok === true && admitted.paths.some((path) => path.endsWith("proofs/002-push.json"))) { pass++; } else failures.push(`C30d-F1b: expected both push proofs admitted, got ${JSON.stringify(admitted)}`);
+}
+{
+  // the second proof must still be a proof the private store recorded: the same intent signed by a key the store never saw is refused.
+  const s = branchFollowUp("followup-second-signature-foreign", { abandonedPush: true });
+  const foreign = followUpProof("c".repeat(64)); const bytes = Buffer.from(`${JSON.stringify(foreign)}\n`);
+  s.write(); writeFileSync(join(s.dir, s.bundle, "proofs/002-push.json"), bytes);
+  const listPath = join(s.dir, s.bundle, "proofs", "follow-up.json"); const list = JSON.parse(readFileSync(listPath, "utf8"));
+  list.proofs = list.proofs.map((entry) => (entry.path === "proofs/002-push.json" ? { ...entry, sha256: sha256Hex(bytes) } : entry));
+  writeFileSync(listPath, `${JSON.stringify(list)}\n`); s.commit();
+  const refused = authorizeAuditProofFollowUp({ projectDir: s.dir, anchorDir: s.dir, commit: headOf(s.dir), remote: "origin", destination: "refs/heads/feat-x" });
+  if (refused.ok === false && refused.code === "AUDIT-FOLLOWUP-CONTENT") { pass++; } else failures.push(`C30d-F2: expected AUDIT-FOLLOWUP-CONTENT for a proof of a foreign key, got ${JSON.stringify(refused)}`);
 }
 for (const [id, mutate, why, close, expected] of [
   ["PO-F4", (record) => record, "a well-formed record of the right schema whose digest no close recorded", () => ({}), "AUDIT-FOLLOWUP-CONTENT"],
