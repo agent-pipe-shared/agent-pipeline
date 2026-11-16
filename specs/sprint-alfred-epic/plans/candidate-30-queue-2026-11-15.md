@@ -155,7 +155,17 @@ automatically afterwards. Today nothing does:
 
 **Proof.** After one full Verify on a clean home folder the cleaner's plan is empty; the new check pins it.
 
-**Done so far.** The one-time cleanup was run on 2026-11-15 with the PO's approval.
+**Done so far.** The one-time cleanup was run on 2026-11-15 with the PO's approval. Built 2026-11-16: the shared removal, the wiring into
+`run-quiet`, `full-verify` and the two suites, and the leak check (see the build status at the top).
+
+**Repository `scratch/` (PO question 2026-11-16, proposal, nothing deleted yet).** Measured 2026-11-15: the checkout is about 236 GB, of
+which `scratch/clones` about 130 GB and `scratch/agent-out` about 92 GB. `scratch/clones` holds about 330 build and rehearsal clones of
+earlier candidates (the `k*` series, `pw-*` run-parallel work clones, `dress*`, `r2-*`, `g*` and similar); their results are held
+patches or commits, so a clone is only a cache. `scratch/agent-out` holds about 90 GB of per-candidate working folders and old checkouts
+next to the small helper scripts. Proposal: a tracked script `scripts/clean-repo-scratch.mjs` with `plan` (default, deletes nothing) and
+`apply`, an allowlist of what stays (the helper scripts, `fixtures`, the newest candidate's build clone and rehearsal clone, anything
+younger than a set age), and a row in `docs/operating-tools.md`, so the other PC runs the same command. The PO's greenfield test folders
+are outside this repository and are never in scope. Run it only after the PO's explicit OK and when no Full Verify or test run is active.
 
 ## C30-2: private project names and machine paths must leave the repository (PO, 2026-11-15, "later, in candidate 30")
 
