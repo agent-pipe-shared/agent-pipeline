@@ -46,6 +46,16 @@ same private home (`rerun-reds.mjs`): **12 are green alone** (load effects of th
 Also seen, not a Verify red: `revised-native-design-cannot-reach-a-new-advisor-course` case (iii) `SDC-AUTHORITY-UNAVAILABLE` is red in
 the Elephant's own shell and green in the Verify run (environment).
 
+**Fixed in candidate 30b (2026-11-16):** a held chain of three patches against `ffb7b8b8e` under `evidence/held-patches/candidate30b/`, rehearsed
+clean: the two SPDX headers (license contract check PASS on the 30b tree), the two gitleaks entries re-lined by hand because the repair script's
+gate admits only domains and public keys (the security scan is CLEAN, 0 findings, on the 30b tree), and the architecture greenfield route test
+now parsing the JSON line (the second line is the writer's intended next-step commit guidance; the suite is 10 of 10 green). The wrapper change below
+is on main, not in the chain.
+
+**Orphaned Verify homes (PO question 2026-11-16).** A green run removed only its own home, a red run kept it and no later run removed it, so mostly red
+runs would orphan one home each. `scripts/full-verify.mjs` now passes `VERIFY_HOME_KEEP_DAYS` (3) to the sweep on every run: the homes and
+clones of earlier finished runs older than three days go, a recent red home stays for the reruns; a case pins it.
+
 **Cleanup check of the run.** The wrapper's cleanup line reported the private home kept (a red run keeps it for the reruns) and 0 home-level
 leftovers; the cleaner's plan is empty afterwards and the leak check printed nothing. The green-run removal of the private home is not yet
 observed on a real run (this one was red). Old finished Verify homes and clones under `.fv` and `fvc` (5.5 GB, plan with
