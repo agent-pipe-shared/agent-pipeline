@@ -3,7 +3,7 @@
 Items the PO names for candidate 30 (C30-1 was named first, C30-2 second). Each item says where the change lives, what must
 not change, and how it is proven. Candidate 29e is applied, stamped and installed; candidate 30 starts from it.
 
-**Build status (2026-11-16): implementation complete for C30-1, C30-5 and C30-6; Critic, Full Verify, native Windows proof and PO acceptance pending.**
+**Build status (2026-11-16): implementation complete for C30-1, C30-5 and C30-6; Full Verify (after the install, PO 2026-11-16), native Windows proof and PO acceptance pending; Critic not run (suspended permanently by the PO, 2026-11-16).**
 Four patches against `5df67f885` (consent text, design review cap, test and Verify cleanup, kernel path entry for
 `lib/design-review-observation.mjs`) are held under `evidence/held-patches/candidate30/` with `apply-candidate30.mjs`; rehearsed clean in a fresh
 clone (registration and case-completion checks green, derived files refreshed in one chore commit). The 183-suite affected run is green except the
