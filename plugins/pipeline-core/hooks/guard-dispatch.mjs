@@ -851,6 +851,8 @@ if (isDirectInvocation(import.meta.url)) {
 
   // D183: a Claude Agent/Task prompt may be the generator marker line plus one pipeline-briefing-file pointer.
   // Expand it here, before every later consumer, so they judge the real briefing; the child receives the verified file bytes.
+  // C30D-G3: a pipeline-core:critic dispatch may carry the Critic generator marker; the child then receives the filled body (no marker line),
+  // the exact text an inline paste carries, so the contamination, policy, shape and binding checks below judge it unchanged.
   let expandedInput = null;
   {
     const pointerRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
@@ -862,7 +864,7 @@ if (isDirectInvocation(import.meta.url)) {
         process.stderr.write("BLOCKED (guard-dispatch): DBG-REF-CARRIER: a pipeline-briefing-file pointer is admitted only in the prompt of a direct Claude Task/Agent call; Workflow, Codex and Antigravity dispatches must carry the full generated briefing text.\n");
         process.exit(2);
       }
-      const loaded = loadReferencedBriefing({ root: pointerRoot, prompt: dispatch.prompt });
+      const loaded = loadReferencedBriefing({ root: pointerRoot, prompt: dispatch.prompt, subagentType: dispatch.subagentType });
       if (loaded === null) continue;
       if (!loaded.ok) {
         process.stderr.write(`BLOCKED (guard-dispatch): ${loaded.code}: ${loaded.message}\n`);

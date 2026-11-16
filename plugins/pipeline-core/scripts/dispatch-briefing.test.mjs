@@ -2821,3 +2821,79 @@ test("ADR-0097 --maintenance never takes a criterion, a document check, a non-te
   const twice = runDispatchBriefing(maintenanceArgv(fx, {}, ["--maintenance"]), deps);
   assert.equal(twice.code, "DBG-FLAG-REPEATED", twice.message);
 });
+
+// --- C30D-G3 (AC-108): a Critic briefing is handed over as a verified pointer. One parser and one loader serve both generators; the marker says which wrote the file. ---
+const pointerLib = () => import("../lib/briefing-file-reference.mjs");
+const CRITIC_POINTER_DIR = "scratch/critic-briefing/aaaaaaaaaaaa-bbbbbbbbbbbb";
+const CRITIC_POINTER_BODY = "You are the **Critic** of the Agent-Pipeline.\n- Requested route: claude-opus-5 at max\n- Spec (the contract): specs/f/spec.md\n";
+async function criticPointerFixture(body = CRITIC_POINTER_BODY, { name = "critic.final.md" } = {}) {
+  const ref = await pointerLib();
+  const root = mkdtempSync(join(tmpdir(), "critic-pointer-"));
+  roots.push(root);
+  mkdirSync(join(root, CRITIC_POINTER_DIR), { recursive: true });
+  const text = ref.stampCriticBriefing(body);
+  const path = `${CRITIC_POINTER_DIR}/${name}`;
+  writeFileSync(join(root, path), text);
+  return { ref, root, text, body, path, prompt: ref.renderPointerPrompt({ text, path }) };
+}
+const CRITIC_ROLE = "pipeline-core:critic";
+
+test("C30D-G3 the Critic marker is its own generator marker: the Goldfish verifier does not accept it and the Critic verifier does not accept a Goldfish text", async () => {
+  const fx = await criticPointerFixture();
+  const { verifyGeneratedBriefing, GENERATOR_MARKER_PREFIX } = await buildLib();
+  assert.equal(fx.ref.CRITIC_GENERATOR_MARKER_PREFIX.includes("<!-- pipeline-briefing-generator:"), false, "the Goldfish guard rules key on that substring");
+  assert.ok(fx.text.endsWith(`${fx.ref.CRITIC_GENERATOR_MARKER_PREFIX}${sha(fx.body)} -->\n`), "the digest covers every other byte of the file");
+  assert.equal(fx.ref.verifyCriticBriefing(fx.text).ok, true);
+  assert.equal(fx.ref.verifyCriticBriefing(fx.text).body, fx.body);
+  assert.equal(verifyGeneratedBriefing(fx.text).ok, false);
+  const goldfish = `${fx.body}${GENERATOR_MARKER_PREFIX}${sha(fx.body)} -->\n`;
+  assert.equal(verifyGeneratedBriefing(goldfish).ok, true);
+  assert.equal(fx.ref.verifyCriticBriefing(goldfish).ok, false);
+  assert.equal(fx.ref.parseBriefingFileReference(fx.prompt).kind, "critic");
+  assert.equal(fx.ref.parseBriefingFileReference(`${GENERATOR_MARKER_PREFIX}${"a".repeat(64)} -->\npipeline-briefing-file: scratch/x.md sha256=${"b".repeat(64)}\n`).kind, "goldfish");
+});
+
+test("C30D-G3 a Critic pointer loads the body exactly (no marker line) for a pipeline-core:critic dispatch, and for no other role", async () => {
+  const fx = await criticPointerFixture();
+  const loaded = fx.ref.loadReferencedBriefing({ root: fx.root, prompt: fx.prompt, subagentType: CRITIC_ROLE });
+  assert.equal(loaded.ok, true, JSON.stringify(loaded));
+  assert.equal(loaded.text, fx.body, "the child receives what an inline paste of the filled briefing carries");
+  assert.equal(loaded.path, fx.path);
+  for (const role of ["pipeline-core:goldfish-implementor", "critic", undefined]) {
+    const refused = fx.ref.loadReferencedBriefing({ root: fx.root, prompt: fx.prompt, subagentType: role });
+    assert.equal(refused.ok, false, String(role));
+    assert.equal(refused.code, "DBG-REF-AMBIGUOUS", String(role));
+  }
+});
+
+test("C30D-G3 a Critic pointer is refused with the existing codes: path, digest, open slot, extra marker, inline text", async () => {
+  const fx = await criticPointerFixture();
+  const load = (prompt, root = fx.root) => fx.ref.loadReferencedBriefing({ root, prompt, subagentType: CRITIC_ROLE });
+  const pointerTo = (path, digest) => `${fx.prompt.split("\n")[0]}\npipeline-briefing-file: ${path} sha256=${digest}\n`;
+  const digest = sha(fx.text);
+  for (const path of ["scratch/other.md", "scratch/critic-briefing/x/../../other.md", `${CRITIC_POINTER_DIR}/missing.final.md`, "/etc/hosts", "docs/critic.final.md", "scratch/critic-briefing/critic.final.md"]) {
+    assert.equal(load(pointerTo(path, digest)).code, "DBG-REF-PATH", path);
+  }
+  assert.equal(load(pointerTo(fx.path, "0".repeat(64))).code, "DBG-REF-DIGEST", "a wrong pointer digest");
+  writeFileSync(join(fx.root, fx.path), `${fx.text}An extra line.\n`);
+  assert.equal(load(fx.prompt).code, "DBG-REF-DIGEST", "an edited file");
+  const open = await criticPointerFixture(`${CRITIC_POINTER_BODY}- model: <FILL MODEL_ID: the concrete model id the dispatch call passes as model>\n`, { name: "critic-open.final.md" });
+  assert.equal(load(open.prompt, open.root).code, "DBG-REF-DIGEST", "a file with an open slot, even with a recomputed marker");
+  assert.equal(load(`${fx.prompt}${fx.body}`).code, "DBG-REF-AMBIGUOUS", "a pointer plus inline text");
+  assert.equal(load(`${fx.prompt.split("\n")[0]}\n${fx.prompt}`).code, "DBG-REF-AMBIGUOUS", "two marker lines");
+});
+
+test("C30D-G3 the Goldfish pointer and its marker are unchanged: kind goldfish, the whole file including its marker, with or without a role", async () => {
+  const ref = await pointerLib();
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const built = runDispatchBriefing([...argv, "--out", "scratch/briefing-ALF-T1.md"], depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const written = readFileSync(join(fx.root, "scratch/briefing-ALF-T1.md"), "utf8");
+  for (const subagentType of [undefined, "pipeline-core:goldfish-implementor"]) {
+    const loaded = ref.loadReferencedBriefing({ root: fx.root, prompt: built.dispatchCall.promptPointer, subagentType });
+    assert.equal(loaded.ok, true, JSON.stringify(loaded));
+    assert.equal(loaded.text, written);
+  }
+  assert.equal(ref.renderPointerPrompt({ text: written, path: "scratch/briefing-ALF-T1.md" }), built.dispatchCall.promptPointer);
+});

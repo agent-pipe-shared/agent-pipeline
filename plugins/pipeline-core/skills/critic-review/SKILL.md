@@ -57,6 +57,15 @@ only after an identical second consume readback. A caller must not invent
 Git blob references for ignored local evidence: the complete preflight digest
 binds that evidence to the session packet instead.
 
+**Handing the briefing over (Elephant):** `scripts/prepare-dispatch.mjs critic` writes the filled briefing file under
+`scratch/critic-briefing/`. On Claude, hand it to the Critic as a verified pointer, not as retyped text: run
+`prepare-dispatch.mjs critic-fill --root <root> --briefing <that file> --fill MODEL_ID=<concrete model id> --fill EFFORT=<effort>`,
+which accepts only those fixed-vocabulary values for the file's `<FILL ...>` slots, writes the final file with a Critic generator marker
+and prints the two-line pointer prompt; pass it, alone and unchanged, as the prompt of a direct Claude Agent call of `pipeline-core:critic`.
+The dispatch guard verifies the file against its marker and expands it, so the Critic receives the filled briefing exactly and every
+dispatch check judges that text. A pointer carries no prose; a pointer plus inline text, an edited file or a Workflow carrier is refused.
+The Antigravity and Codex carriers still carry the full briefing text.
+
 The canonical before/after commands are:
 
 ```bash

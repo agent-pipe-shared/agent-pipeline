@@ -12,7 +12,9 @@ import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
-import { renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
+import { createHash } from "node:crypto";
+import { fillCriticBriefing, renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
+import { CRITIC_BRIEFING_ROLE, renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
 import { criticRunnerFromEnv } from "../lib/critic-route-assurance.mjs";
 
 export const DISPATCH_PREPARATION_SCHEMA = "pipeline.dispatch-preparation.v1";
@@ -27,6 +29,7 @@ export const PREPARE_DISPATCH_HELP = `Usage:
   node <plugin-root>/scripts/prepare-dispatch.mjs goldfish --root <root> --package <package.json> [--out scratch/<briefing>.md] [--no-goldfish-running]
   node <plugin-root>/scripts/prepare-dispatch.mjs critic --root <root> --spec <path> --base <ref> --candidate <full commit id> [--guardrail <path>]... [--evidence <path>]...
        [--task-id <id>] [--prior-critic <path>] [--delta-request <path>] [--correction-input-bindings <file>] [--registration-commit <full commit id>] [--label <name> -- <check command> <args>]
+  node <plugin-root>/scripts/prepare-dispatch.mjs critic-fill --root <root> --briefing <path> --fill NAME=value [--fill NAME=value]...
   node <plugin-root>/scripts/prepare-dispatch.mjs --help | -h
 
 Prints one JSON object of schema ${DISPATCH_PREPARATION_SCHEMA}: status "ready" (exit 0), "commit-required" or "stopped" (exit 2).
@@ -41,6 +44,12 @@ critic: with --label, runs the check command as Critic diagnostic evidence under
   It then runs the preflight and writes ${ADMIT_REQUEST_FILE}; "next.placeholders" names the values only you can fill before "next.admitCommand".
   A request you had already filled is kept and named in "previousRequest": if that Critic still runs, finalize it with that file. A --label that recorded another candidate is refused.
   --candidate must be the full commit id, because the evidence commit moves HEAD. The preflight derives the registration commit itself; pass --registration-commit only when it reports several candidates.
+critic-fill: the Claude route to hand a Critic its briefing as a verified pointer instead of retyping the ~12k-token file. --briefing is a draft the critic verb wrote
+  (scratch/critic-briefing/<folder>/critic[-<part>].briefing.md); every <FILL ...> slot needs one --fill NAME=value: MODEL_ID takes the concrete model id (one token, never
+  inherit) and EFFORT one of low, medium, high, xhigh, max. A value for no slot, an open slot, a value outside that vocabulary and a draft with a Codex or Antigravity slot are
+  refused; nothing else in the file can change. It writes critic[-<part>].final.md beside the draft (never over it) with a Critic generator marker and prints "promptPointer": the two-line prompt
+  to pass, unchanged and alone, to a direct Claude Agent call of pipeline-core:critic. The dispatch guard verifies the file and the Critic receives the filled briefing exactly.
+  Antigravity and Codex carriers still carry the full text; a Workflow carrier refuses a pointer.
 `;
 
 const lastJson = (text) => {
@@ -187,11 +196,48 @@ export function prepareCriticDispatch(input, deps = {}) {
       briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
       ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
       briefingUse: briefing.runner === "antigravity"
-        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. The `model:` row takes the concrete model id this session runs on (the Critic inherits it), never the word inherit; the call itself still passes no Model. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md)."
-        : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
+        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. The `model:` row takes the concrete model id this session runs on (the Critic inherits it), never the word inherit; the call itself still passes no Model. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md). This carrier carries the full text; the pointer route (critic-fill) is for a direct Claude call only."
+        : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary). "
+          + "On Claude hand the briefing over as a pointer instead of retyping it: run `prepare-dispatch.mjs critic-fill --root <root> --briefing <file> --fill MODEL_ID=<concrete model id> --fill EFFORT=<effort>` and pass the printed promptPointer (two lines) as the whole prompt of the Agent call; the dispatch guard verifies the file against its marker and every later check judges the expanded text. The Antigravity and Codex carriers still carry the full text.",
       nextStep: value.nextStep,
       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
   });
+}
+
+// C30D-G3: the fill step of the Critic pointer route. It reads ONE generated draft (scratch/critic-briefing/<folder>/critic[-<part>].briefing.md), takes explicit
+// NAME=value pairs for its <FILL ...> slots (a closed vocabulary, lib/critic-briefing-build.mjs), writes the FINAL file beside it (never over the draft)
+// and prints the two-line pointer prompt for a direct Claude Agent call. The dispatch guard verifies the file against its Critic marker.
+const CRITIC_DRAFT_PATH = /^scratch\/critic-briefing\/([A-Za-z0-9][A-Za-z0-9._-]*)\/(critic(?:-[A-Za-z0-9][A-Za-z0-9._-]*)?)\.briefing\.md$/u;
+
+export function prepareCriticFill({ root, briefing, fills = [] }, deps = {}) {
+  const verb = "critic-fill";
+  const refuse = (code, reason, repair = PREPARE_DISPATCH_HELP) => stopped(verb, code.startsWith("PREP-") ? "arguments" : "fill", { code, reason, repair }, code);
+  const match = typeof briefing === "string" ? CRITIC_DRAFT_PATH.exec(briefing.replace(/\\/gu, "/")) : null;
+  if (match === null) return refuse("PREP-FILL-PATH", "--briefing must be a generated draft: scratch/critic-briefing/<folder>/critic[-<part>].briefing.md, the file `prepare-dispatch.mjs critic` wrote", "pass the path printed in next.briefings of the critic verb");
+  const values = new Map();
+  for (const entry of fills) {
+    const at = String(entry).indexOf("=");
+    const name = at < 1 ? "" : String(entry).slice(0, at);
+    if (!/^[A-Z0-9_]+$/u.test(name)) return refuse("PREP-ARGUMENT", `--fill takes NAME=value with an upper-case slot name (got ${JSON.stringify(String(entry).slice(0, 40))})`);
+    if (values.has(name)) return refuse("PREP-ARGUMENT", `--fill ${name} was given twice`);
+    values.set(name, String(entry).slice(at + 1));
+  }
+  const draftPath = briefing.replace(/\\/gu, "/");
+  let text;
+  try { text = (deps.readFile ?? readFileSync)(resolve(root, ...draftPath.split("/")), "utf8"); } catch (error) {
+    return refuse("PREP-FILL-PATH", `the draft cannot be read (${error?.code ?? "error"})`, "run `prepare-dispatch.mjs critic` again; it writes the draft");
+  }
+  let filled;
+  try { filled = fillCriticBriefing({ text: String(text), values }); } catch (error) {
+    return refuse(error?.code ?? "PREP-FILL-FAILED", String(error?.message ?? error), "fix the named value or slot and run the identical command again; never edit the draft by hand");
+  }
+  const path = `scratch/critic-briefing/${match[1]}/${match[2]}.final.md`;
+  (deps.mkdir ?? mkdirSync)(dirname(resolve(root, path)), { recursive: true });
+  (deps.writeFile ?? writeFileSync)(resolve(root, path), filled.text, "utf8");
+  const promptPointer = renderPointerPrompt({ text: filled.text, path });
+  return outcome(verb, "ready", { path, sha256: createHash("sha256").update(filled.text, "utf8").digest("hex"), slots: filled.slots, promptPointer,
+    next: { tool: "Agent", subagent_type: CRITIC_BRIEFING_ROLE, prompt: promptPointer,
+      use: "Pass promptPointer unchanged as the WHOLE prompt of one direct Claude Agent call to pipeline-core:critic: it is a pointer prompt (the generator marker line plus one pipeline-briefing-file line), nothing before, between or after. The dispatch guard checks the file against its marker and hands the Critic exactly the filled briefing; every later check judges that expanded text. A Workflow, Codex or Antigravity carrier takes the full briefing text instead and refuses a pointer." } });
 }
 
 const TEMPLATE_PATH = join(HERE, "..", "templates", "prompts", "critic-review.md");
@@ -240,14 +286,15 @@ function criticArgv(input) {
 }
 
 const SINGLE_FLAGS = { goldfish: { "--root": "root", "--package": "packagePath", "--out": "out" },
+  "critic-fill": { "--root": "root", "--briefing": "briefing" },
   critic: { "--root": "root", "--spec": "spec", "--base": "base", "--candidate": "candidate", "--task-id": "taskId", "--prior-critic": "priorCritic", "--delta-request": "deltaRequest", "--correction-input-bindings": "correctionInputBindings", "--registration-commit": "registrationCommit", "--label": "label" } };
 
 export function parsePrepareDispatchArgv(argv) {
   const verb = argv[0];
-  if (verb !== "goldfish" && verb !== "critic") return { error: `the verbs are goldfish and critic; got ${JSON.stringify(verb ?? null)}` };
+  if (verb !== "goldfish" && verb !== "critic" && verb !== "critic-fill") return { error: `the verbs are goldfish, critic and critic-fill; got ${JSON.stringify(verb ?? null)}` };
   const split = argv.indexOf("--");
   const flags = split < 0 ? argv.slice(1) : argv.slice(1, split);
-  const options = { verb, guardrails: [], evidence: [], command: split < 0 ? [] : argv.slice(split + 1) };
+  const options = { verb, guardrails: [], evidence: [], fills: [], command: split < 0 ? [] : argv.slice(split + 1) };
   for (let index = 0; index < flags.length; index += 1) {
     const flag = flags[index];
     if (verb === "goldfish" && flag === "--no-goldfish-running") { options.noGoldfishRunning = true; continue; }
@@ -256,6 +303,7 @@ export function parsePrepareDispatchArgv(argv) {
     index += 1;
     if (verb === "critic" && flag === "--guardrail") options.guardrails.push(value);
     else if (verb === "critic" && flag === "--evidence") options.evidence.push(value);
+    else if (verb === "critic-fill" && flag === "--fill") options.fills.push(value);
     else {
       const key = SINGLE_FLAGS[verb][flag];
       if (key === undefined) return { error: `unknown flag ${flag}` };
@@ -269,7 +317,8 @@ export function parsePrepareDispatchArgv(argv) {
 
 export function runPrepareDispatch(argv, deps = {}) {
   const parsed = parsePrepareDispatchArgv(argv);
-  if (parsed.error !== undefined) return stopped(argv[0] === "critic" ? "critic" : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: "run prepare-dispatch.mjs --help for every verb and flag" }, "PREP-ARGUMENT");
+  if (parsed.error !== undefined) return stopped(["critic", "critic-fill"].includes(argv[0]) ? argv[0] : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: "run prepare-dispatch.mjs --help for every verb and flag" }, "PREP-ARGUMENT");
+  if (parsed.options.verb === "critic-fill") return prepareCriticFill(parsed.options, deps);
   return parsed.options.verb === "goldfish" ? prepareGoldfishDispatch(parsed.options, deps) : prepareCriticDispatch(parsed.options, deps);
 }
 

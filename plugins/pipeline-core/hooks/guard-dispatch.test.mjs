@@ -37,6 +37,7 @@ import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs"
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
+import * as criticRef from "../lib/briefing-file-reference.mjs";
 
 // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
 // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
@@ -1365,9 +1366,89 @@ manualCheck("GD20c allow  G20-48: an item-governed generated ANTIGRAVITY Goldfis
   assert.ok(!result.stderr.includes("BLOCKED"), result.stderr.slice(0, 600));
 });
 
+// C30D-G3 (AC-108): a Critic briefing is handed over as a verified pointer. The Critic's own file (fill step output) carries the Critic
+// generator marker; the guard expands it BEFORE every consumer, so each later check judges exactly the text an inline paste would carry.
+const CRITIC_FINAL_DIR = "scratch/critic-briefing/aaaaaaaaaaaa-bbbbbbbbbbbb";
+function criticBodyText(extra = "") {
+  const filled = filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" });
+  return `${filled.endsWith("\n") ? filled : `${filled}\n`}${extra}`;
+}
+function criticPointerFixture(body, { dir = CRITIC_FINAL_DIR, name = "critic.final.md", path } = {}) {
+  const text = criticRef.stampCriticBriefing(body);
+  mkdirSync(join(bindingRepo, dir), { recursive: true });
+  writeFileSync(join(bindingRepo, dir, name), text);
+  return { text, prompt: criticRef.renderPointerPrompt({ text, path: path ?? `${dir}/${name}` }) };
+}
+const criticCall = (id, prompt, subagentType = "pipeline-core:critic") => ({ tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: subagentType, model: "opus", prompt } });
+
+manualCheck("GD81 allow  C30D-G3: a Critic pointer prompt is admitted and the PreToolUse answer carries updatedInput.prompt equal to the filled body (no marker line), every other field kept", () => {
+  const body = criticBodyText();
+  const { prompt } = criticPointerFixture(body);
+  const { code, stderr, stdout } = runAtOut(criticCall("gd81", prompt), bindingRepo);
+  assert.equal(code, ALLOW, `exit ${code} -- ${stderr.trim().slice(0, 300)}`);
+  const answer = JSON.parse(stdout);
+  assert.equal(answer.hookSpecificOutput.permissionDecision, "allow");
+  assert.equal(answer.hookSpecificOutput.updatedInput.prompt, body, "the Critic receives the filled briefing exactly, the way an inline paste would carry it");
+  assert.equal(answer.hookSpecificOutput.updatedInput.subagent_type, "pipeline-core:critic");
+  assert.equal(answer.hookSpecificOutput.updatedInput.model, "opus");
+});
+
+manualCheck("GD82 differential  C30D-G3: the same Critic text by pointer and inline gives the same exit, the same findings text and the same advisor-prohibition binding digest; a claims list is refused by pointer with the inline code", () => {
+  const body = criticBodyText(`- ${ADVISOR_PROHIBITION_LINE} (MP-26)\n`);
+  const inline = runAtOut(criticCall("gd82-inline", body), bindingRepo);
+  const pointed = runAtOut(criticCall("gd82-pointer", criticPointerFixture(body).prompt), bindingRepo);
+  assert.equal(inline.code, ALLOW, inline.stderr.slice(0, 300));
+  assert.equal(pointed.code, inline.code, pointed.stderr.slice(0, 300));
+  assert.equal(pointed.stderr, inline.stderr, "no check sees a different text");
+  const digestOf = (id) => JSON.parse(readFileSync(join(bindingRepo, ".git", "agent-pipeline", "advisor-prohibition", "pending", `${createHash("sha256").update(id).digest("hex")}.json`), "utf8")).bindings[0].promptSha256;
+  assert.equal(digestOf("gd82-pointer"), digestOf("gd82-inline"), "the binding digest is taken over the expanded text");
+  const contaminated = criticBodyText("\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x\n");
+  const inlineBlocked = runAtOut(criticCall("gd82c-inline", contaminated), bindingRepo);
+  const pointerBlocked = runAtOut(criticCall("gd82c-pointer", criticPointerFixture(contaminated).prompt), bindingRepo);
+  assert.equal(inlineBlocked.code, BLOCK, inlineBlocked.stderr.slice(0, 300));
+  assert.equal(pointerBlocked.code, BLOCK, pointerBlocked.stderr.slice(0, 300));
+  assert.ok(pointerBlocked.stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST") && inlineBlocked.stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST"), pointerBlocked.stderr.slice(0, 300));
+});
+
+manualCheck("GD83 block  C30D-G3: an edited Critic file, an open <FILL> slot, a file outside scratch/critic-briefing/ and a .. segment keep DBG-REF-DIGEST / DBG-REF-PATH", () => {
+  const body = criticBodyText();
+  const edited = criticPointerFixture(body, { name: "critic-edited.final.md" });
+  writeFileSync(join(bindingRepo, CRITIC_FINAL_DIR, "critic-edited.final.md"), `${edited.text}An extra line added after the fill step.\n`);
+  const open = criticPointerFixture(`${body}- model: <FILL MODEL_ID: the concrete model id the dispatch call passes as model>\n`, { name: "critic-open.final.md" });
+  const outside = criticPointerFixture(body, { dir: "scratch", name: "critic-outside.final.md" });
+  const dotdot = criticPointerFixture(body, { name: "critic-dotdot.final.md", path: `${CRITIC_FINAL_DIR}/../critic-briefing/aaaaaaaaaaaa-bbbbbbbbbbbb/critic-dotdot.final.md` });
+  for (const [label, prompt, expected] of [["edited", edited.prompt, "DBG-REF-DIGEST"], ["open slot", open.prompt, "DBG-REF-DIGEST"], ["outside", outside.prompt, "DBG-REF-PATH"], ["dotdot", dotdot.prompt, "DBG-REF-PATH"]]) {
+    const { code, stderr } = runAtOut(criticCall(`gd83-${label}`, prompt), bindingRepo);
+    assert.equal(code, BLOCK, `${label}: ${stderr.slice(0, 300)}`);
+    assert.ok(stderr.includes(expected), `${label}: ${stderr.slice(0, 300)}`);
+  }
+});
+
+manualCheck("GD84 block  C30D-G3: a Critic marker on a Goldfish role and a Critic pointer plus inline text are refused DBG-REF-AMBIGUOUS", () => {
+  const { prompt } = criticPointerFixture(criticBodyText(), { name: "critic-role.final.md" });
+  const wrongRole = runAtOut(criticCall("gd84-role", prompt, "pipeline-core:goldfish-implementor"), bindingRepo);
+  assert.equal(wrongRole.code, BLOCK, wrongRole.stderr.slice(0, 300));
+  assert.ok(wrongRole.stderr.includes("DBG-REF-AMBIGUOUS"), wrongRole.stderr.slice(0, 300));
+  const mixed = runAtOut(criticCall("gd84-mixed", `${prompt}${criticBodyText()}`), bindingRepo);
+  assert.equal(mixed.code, BLOCK, mixed.stderr.slice(0, 300));
+  assert.ok(mixed.stderr.includes("DBG-REF-AMBIGUOUS"), mixed.stderr.slice(0, 300));
+});
+
+manualCheck("GD85 block  C30D-G3: a Critic pointer carried by a Workflow script, a Codex spawn_agent message or an Antigravity Subagents prompt is refused DBG-REF-CARRIER", () => {
+  const { prompt } = criticPointerFixture(criticBodyText(), { name: "critic-carrier.final.md" });
+  const workflow = runAtOut({ cwd: bindingRepo, session_id: "gd85", tool_name: "Workflow", tool_input: { script: `agent({ agentType: "pipeline-core:critic", prompt: ${JSON.stringify(prompt)} })` } }, bindingRepo);
+  const codex = runAtOut({ cwd: bindingRepo, session_id: "gd85", tool_name: "spawn_agent", tool_input: { agent_type: "pipeline-core:critic", message: prompt } }, bindingRepo);
+  const anti = runAtOut({ cwd: bindingRepo, session_id: "gd85", tool_name: "Agent", tool_input: { Subagents: [{ TypeName: "pipeline-core:critic", Prompt: prompt }] } }, bindingRepo);
+  for (const [name, result] of [["workflow", workflow], ["codex", codex], ["antigravity", anti]]) {
+    assert.equal(result.code, BLOCK, `${name}: ${result.stderr.slice(0, 300)}`);
+    assert.ok(result.stderr.includes("DBG-REF-CARRIER"), `${name}: ${result.stderr.slice(0, 300)}`);
+  }
+});
+
 // QG-04 restatement (candidate 20b, G20-47/G20-48): the corpus grew by the Antigravity bare-name and generated-briefing cases.
 // C23 (QG-04, restated in place): 85 -> 88, the three GD2-C23 cases for a call that carries an effort.
-assert.equal(cases.length, 88, "the complete dispatch guard corpus must register before execution");
+// C30D-G3 (QG-04, restated in place): 88 -> 93, the five GD81-GD85 cases for a Critic briefing handed over as a pointer.
+assert.equal(cases.length, 93,"the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

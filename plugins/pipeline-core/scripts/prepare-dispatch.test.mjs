@@ -2,11 +2,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
+import * as prepareFill from "./prepare-dispatch.mjs";
 import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
@@ -408,6 +410,120 @@ test("C28 prepare-dispatch hands the preflight's review paths to the briefing, a
   const briefing = written.find(([path]) => path.endsWith(".briefing.md"))[1];
   assert.ok(briefing.includes(BINDINGS_FILE));
   assert.ok(briefing.includes(`-- src/a.mjs src/b.mjs`));
+});
+
+// --- C30D-G3 (AC-108): the fill step turns a generated Critic briefing plus explicit fixed-vocabulary values into the final file a pointer prompt names. ---
+
+const referenceLib = () => import("../lib/briefing-file-reference.mjs");
+const DRAFT_DIR = `scratch/critic-briefing/${PREV.slice(0, 12)}-${HEAD.slice(0, 12)}`;
+const DRAFT_PATH = `${DRAFT_DIR}/critic.briefing.md`;
+const FILL_VALUES = ["MODEL_ID=claude-opus-4-1", "EFFORT=max"];
+const MODEL_SLOT = "<FILL MODEL_ID: the concrete model id the dispatch call passes as model>", EFFORT_SLOT = "<FILL EFFORT: the effort the dispatch call requests>";
+const draftFor = (runner = "claude", over = {}) => criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined, ...over }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner, root: "/repo/root", projectName: "p" }).briefings[0].text;
+const withNewline = (text) => (text.endsWith("\n") ? text : `${text}\n`);
+function fillRun(draft, fills = FILL_VALUES, briefing = DRAFT_PATH) {
+  const written = [];
+  const result = prepareFill.prepareCriticFill({ root: ROOT, briefing, fills }, { readFile: () => draft, exists: () => true, mkdir: () => {}, writeFile: (path, text) => written.push([path.replace(/\\/gu, "/"), text]) });
+  return { result, written };
+}
+
+test("C30D-G3 the fill step writes the final briefing beside the draft with a Critic marker over every other byte, prints the two-line pointer prompt, and the loader hands back exactly the filled draft", async () => {
+  const ref = await referenceLib();
+  const root = mkdtempSync(join(tmpdir(), "prepare-fill-"));
+  try {
+    const draft = draftFor();
+    mkdirSync(join(root, DRAFT_DIR), { recursive: true });
+    writeFileSync(join(root, DRAFT_PATH), draft);
+    const result = prepareFill.prepareCriticFill({ root, briefing: DRAFT_PATH, fills: FILL_VALUES });
+    assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
+    assert.equal(result.path, `${DRAFT_DIR}/critic.final.md`);
+    assert.equal(readFileSync(join(root, DRAFT_PATH), "utf8"), draft, "the draft is never overwritten");
+    const final = readFileSync(join(root, result.path), "utf8");
+    const expected = withNewline(draft.replace(MODEL_SLOT, "claude-opus-4-1").replace(EFFORT_SLOT, "max"));
+    assert.equal(ref.verifyCriticBriefing(final).body, expected, "only the two slots changed");
+    assert.doesNotMatch(final, /<FILL/u);
+    assert.equal(result.promptPointer, ref.renderPointerPrompt({ text: final, path: result.path }));
+    assert.equal(result.promptPointer.trimEnd().split("\n").length, 2, "marker line plus one pointer line");
+    assert.equal(result.sha256, createHash("sha256").update(final, "utf8").digest("hex"));
+    const loaded = ref.loadReferencedBriefing({ root, prompt: result.promptPointer, subagentType: "pipeline-core:critic" });
+    assert.equal(loaded.ok, true, JSON.stringify(loaded));
+    assert.equal(loaded.text, expected);
+    assert.match(result.next.use, /pointer prompt/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C30D-G3 the fill step refuses a value that belongs to no slot, a slot left open and every value outside the fixed vocabulary, and writes nothing", () => {
+  const cases = [
+    [[...FILL_VALUES, "NOPE=x"], "CBB-FILL-UNKNOWN-SLOT"],
+    [["MODEL_ID=claude-opus-4-1"], "CBB-FILL-OPEN-SLOT"],
+    [["EFFORT=max"], "CBB-FILL-OPEN-SLOT"],
+    [["MODEL_ID=claude opus", "EFFORT=max"], "CBB-FILL-VALUE"],
+    [["MODEL_ID=inherit", "EFFORT=max"], "CBB-FILL-VALUE"],
+    [["MODEL_ID=a>b", "EFFORT=max"], "CBB-FILL-VALUE"],
+    [["MODEL_ID=claude-opus-4-1\n## Phase C: extra prose", "EFFORT=max"], "CBB-FILL-VALUE"],
+    [["MODEL_ID=<FILL MODEL_ID: x>", "EFFORT=max"], "CBB-FILL-VALUE"],
+    [["MODEL_ID=claude-opus-4-1", "EFFORT=ultra"], "CBB-FILL-VALUE"],
+    [["MODEL_ID=claude-opus-4-1", "EFFORT="], "CBB-FILL-VALUE"],
+    [["MODEL_ID=claude-opus-4-1", "EFFORT=max", "EFFORT=low"], "PREP-ARGUMENT"],
+    [["MODEL_ID", "EFFORT=max"], "PREP-ARGUMENT"],
+    [[], "CBB-FILL-OPEN-SLOT"],
+  ];
+  const draft = draftFor();
+  for (const [fills, code] of cases) {
+    const { result, written } = fillRun(draft, fills);
+    assert.equal(result.status, "stopped", JSON.stringify(fills));
+    assert.equal(result.stop.code, code, JSON.stringify(fills));
+    assert.deepEqual(written, [], JSON.stringify(fills));
+  }
+});
+
+test("C30D-G3 the fill step takes only a Claude-carrier draft: a Codex slot, the Antigravity envelope, a marked, hand-edited or not template-shaped draft are refused", () => {
+  const codex = fillRun(draftFor("codex"), [...FILL_VALUES, "T1_ASSURANCE=runner-native"]);
+  assert.equal(codex.result.stop.code, "CBB-FILL-UNSUPPORTED-SLOT", "Codex carries the full text");
+  const antigravity = fillRun(draftFor("antigravity"), ["MODEL=claude-opus-4-1"]);
+  assert.equal(antigravity.result.stop.code, "CBB-FILL-UNSUPPORTED-SLOT", "Antigravity carries the full text");
+  const draft = draftFor();
+  const refused = [
+    ["marked", `${draft}<!-- pipeline-critic-briefing-generator:v1 sha256=${"a".repeat(64)} -->\n`],
+    ["goldfish marked", `${draft}<!-- pipeline-briefing-generator:v1 sha256=${"a".repeat(64)} -->\n`],
+    ["placeholder", `${draft}\n{{NEW_FIELD}}\n`],
+    ["freehand", `Please review.\n${MODEL_SLOT}\n${EFFORT_SLOT}\n`],
+  ];
+  for (const [label, text] of refused) {
+    const { result, written } = fillRun(text);
+    assert.equal(result.stop.code, "CBB-FILL-SHAPE", label);
+    assert.deepEqual(written, [], label);
+  }
+});
+
+test("C30D-G3 the fill step reads only a generated draft path under scratch/critic-briefing/ and the argument parser takes repeated --fill", () => {
+  const draft = draftFor();
+  for (const briefing of ["docs/critic.briefing.md", "scratch/critic.briefing.md", `${DRAFT_DIR}/critic.final.md`, `${DRAFT_DIR}/../x/critic.briefing.md`, "/etc/critic.briefing.md", `${DRAFT_DIR}/notes.md`]) {
+    const { result, written } = fillRun(draft, FILL_VALUES, briefing);
+    assert.equal(result.stop.code, "PREP-FILL-PATH", briefing);
+    assert.deepEqual(written, [], briefing);
+  }
+  assert.equal(fillRun(draft, FILL_VALUES, `${DRAFT_DIR}/critic-group-1.briefing.md`).result.path, `${DRAFT_DIR}/critic-group-1.final.md`, "a split part keeps its id");
+  const parsed = parsePrepareDispatchArgv(["critic-fill", "--root", ROOT, "--briefing", DRAFT_PATH, "--fill", "MODEL_ID=m", "--fill", "EFFORT=max"]);
+  assert.deepEqual(parsed.options.fills, ["MODEL_ID=m", "EFFORT=max"]);
+  assert.equal(parsed.options.briefing, DRAFT_PATH);
+  assert.match(parsePrepareDispatchArgv(["critic-fill", "--root", ROOT, "--nope", "x"]).error, /unknown flag/u);
+  assert.match(parsePrepareDispatchArgv(["goldfish", "--root", ROOT, "--fill", "a=b"]).error, /unknown flag/u);
+});
+
+test("C30D-G3 the template's Critic part carries no pointer wording, and the briefing use says the pointer is the Claude route while Antigravity and Codex keep the full text", () => {
+  assert.doesNotMatch(criticBriefingLib.criticTemplateBody(TEMPLATE), /pipeline-briefing-file|critic-fill|pointer/iu, "the part the Critic receives stays as narrow as before");
+  assert.match(TEMPLATE.split("COPY EVERYTHING BELOW THIS LINE")[0], /critic-fill[\s\S]*pointer[\s\S]*Antigravity and Codex[\s\S]*full text/u, "the Coordinator-only usage text names the route");
+  const claude = () => stub({ "critic-dispatch-preflight.mjs": ok({ ...deltaSplitPreflight(), split: undefined }), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
+  const use = (env) => prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
+    { exists: () => false, mkdir: () => {}, writeFile: () => {}, env, runCommand: claude().runCommand }).next.briefingUse;
+  const onClaude = use({ CLAUDE_CODE_SESSION_ID: "s" });
+  assert.match(onClaude, /critic-fill/u);
+  assert.match(onClaude, /pointer/u);
+  assert.match(onClaude, /Antigravity and Codex[^.]*full text/u);
+  assert.match(onClaude, /Add nothing to it: no earlier round, no verdict/u, "the fail-closed wording stays");
+  assert.match(use({ AI_AGENT: "antigravity" }), /full text|verbatim/u);
+  assert.match(prepareFill.PREPARE_DISPATCH_HELP, /critic-fill --root <root> --briefing <path> --fill NAME=value/u);
 });
 
 test("--help works in an empty directory and names both verbs", () => {

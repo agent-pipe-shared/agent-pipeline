@@ -15,6 +15,7 @@
  */
 import { posix } from "node:path";
 import { criticToolBudget } from "./critic-split.mjs";
+import { stampCriticBriefing, verifyCriticBriefing } from "./briefing-file-reference.mjs";
 
 export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
 const COPY_MARKER = "COPY EVERYTHING BELOW THIS LINE\n-->\n";
@@ -154,6 +155,42 @@ function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promp
   if (rationale !== null) text = text.replace(/^(- Batch scope \(MP-07\): .*)$/mu, `$1\n- ${rationale}`);
   if (/\{\{/u.test(text)) refuse("CBB-TEMPLATE-PLACEHOLDER", "an unfilled placeholder is left in the briefing");
   return { entryId: entry?.id ?? null, text, placeholders };
+}
+
+// C30D-G3: the fill step. A generated Claude Critic briefing holds `<FILL NAME: hint>` slots; this turns it into the FINAL file a pointer prompt names.
+// Only a closed table of slots takes a value, and every value is a fixed-vocabulary token (never prose); the bytes outside the slots are copied unchanged.
+// A slot of another carrier (Codex T1_ASSURANCE, the Antigravity MODEL row) is refused: those carriers hand over the full text.
+const FILL_SLOT = /<FILL ([A-Z0-9_]+): [^>\n]*>/gu;
+const FILL_EFFORTS = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
+export const CRITIC_FILL_VOCABULARY = Object.freeze({
+  MODEL_ID: (value) => /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/u.test(value) && !/^inherit$/iu.test(value),
+  EFFORT: (value) => FILL_EFFORTS.includes(value),
+});
+// The same template markers guard-dispatch's shape check reads (promptTemplateShapeWarning): a text without them is not a generated Critic briefing.
+const FILL_BODY_MARKERS = Object.freeze(["Fail-closed reference boundary", "## Phase A", "## Phase B"]);
+
+/**
+ * `values` is a Map of slot name to value. Returns `{ text, body, slots }` (`text` = the body plus the Critic marker line) or throws a
+ * CriticBriefingError: CBB-FILL-SHAPE, CBB-FILL-UNSUPPORTED-SLOT, CBB-FILL-UNKNOWN-SLOT, CBB-FILL-OPEN-SLOT, CBB-FILL-VALUE.
+ */
+export function fillCriticBriefing({ text, values }) {
+  if (typeof text !== "string" || /pipeline-(?:critic-)?briefing-generator:/u.test(text) || /\{\{/u.test(text)) {
+    refuse("CBB-FILL-SHAPE", "the draft is not an unfilled generated Critic briefing (it is empty, already carries a generator marker, or holds a template placeholder)");
+  }
+  const slots = [...new Set([...text.matchAll(FILL_SLOT)].map((match) => match[1]))];
+  const unsupported = slots.filter((name) => !Object.hasOwn(CRITIC_FILL_VOCABULARY, name));
+  if (unsupported.length > 0) refuse("CBB-FILL-UNSUPPORTED-SLOT", `the draft has slot(s) ${unsupported.join(", ")} that the pointer route does not fill: the Antigravity and Codex carriers still carry the full briefing text`);
+  if (/<FILL\b/u.test(text.replace(FILL_SLOT, ""))) refuse("CBB-FILL-SHAPE", "the draft holds a <FILL ...> slot of an unknown shape");
+  const missingMarkers = FILL_BODY_MARKERS.filter((marker) => !text.includes(marker));
+  if (missingMarkers.length > 0) refuse("CBB-FILL-SHAPE", `the draft is not template-shaped (missing: ${missingMarkers.join("; ")}); it must be the file prepare-dispatch.mjs critic wrote`);
+  for (const name of values.keys()) if (!slots.includes(name)) refuse("CBB-FILL-UNKNOWN-SLOT", `${name} is not a slot of this draft (its slots: ${slots.join(", ") || "none"}); a value that belongs to no slot is never placed anywhere`);
+  for (const name of slots) {
+    if (!values.has(name)) refuse("CBB-FILL-OPEN-SLOT", `slot ${name} has no value; pass --fill ${name}=<value> for every slot (${slots.join(", ")})`);
+    if (!CRITIC_FILL_VOCABULARY[name](values.get(name))) refuse("CBB-FILL-VALUE", `the value for ${name} is outside its fixed vocabulary (${name === "EFFORT" ? FILL_EFFORTS.join(", ") : "one token of letters, digits, dot, underscore and hyphen, never the word inherit"})`);
+  }
+  const body = text.replace(FILL_SLOT, (whole, name) => values.get(name));
+  const final = stampCriticBriefing(body);
+  return { text: final, body: verifyCriticBriefing(final).body, slots };
 }
 
 function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry }) {
