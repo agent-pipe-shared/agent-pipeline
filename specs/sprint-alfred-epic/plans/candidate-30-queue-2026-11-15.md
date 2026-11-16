@@ -331,11 +331,17 @@ wall time and 30 times the uncached tokens for a small app, of which about 59 % 
 3. **P1, the Critic briefing for Antigravity has open placeholders and the model check contradicts the call check.** Confirmed in
    `lib/critic-briefing-build.mjs` (`renderEnvelope` leaves `MODEL` open) and `lib/dispatch-policy.mjs` (`NAMES_MODEL` rejects
    `inherit`, while the outer call refuses a set model). Resolve with the model route source before changing which check gives.
-4. **P2 raised to the push path, a pure evidence commit needs a second push signature.** Root cause confirmed in the greenfield repo:
-   the audit-proof follow-up commit changes only `audit-bundles/<feature>/<commit>/proofs/*` at the repository root, and the carry-forward
-   decision (`lib/evidence-carry-forward.mjs`, `lib/record-only-paths.mjs`) lists only `specs/<id>/audit-bundles/`, a location nothing
-   writes; four other modules already use the root path. The push guard answers `PRODUCT-PATH-CHANGED`. Fix: the bundle directory shape of
-   `lib/audit-proof-collection.mjs` joins the closed evidence set; reproduce the whole push decision first.
+4. **P2 raised to the push path, a pure evidence commit needs another push signature.** The report's own explanation (a wrong path list in
+   the carry-forward set) was NOT the cause: it is a real mismatch (`lib/evidence-carry-forward.mjs` and `lib/record-only-paths.mjs` list
+   `specs/<id>/audit-bundles/`, a location nothing writes), but the shipped follow-up admission (`authorizeAuditProofFollowUp`) takes the root path
+   and never reaches that check. Asked read-only about the refused commit of the greenfield repo it answers
+   `AUDIT-FOLLOWUP-CONTENT: proofs/003-push.json is not the signed proof recorded for the push approval`. Cause: the PO signed the push twice for
+   one commit (the first branch name was taken on the remote), the writer carries every push proof the store holds (two files), and the admission
+   accepts only the proof of the approval for the branch being pushed; it then falls through to the full gate, which refuses the bundle paths.
+   Fix in 30d: a push proof is admitted when it is the proof of a recorded, consumed push approval of this commit to this remote, whatever the
+   branch; a foreign key or another commit is still refused. Not changed, queued: the stale `specs/<id>/audit-bundles/` entries in the two lists
+   (decide with the owner of the carry-forward ADR which location is canonical), and the late remote-branch check of the push start, which is what
+   made the second signature necessary (item 5).
 5. **Queued, lower priority:** guard false positives for the Pipeline's own scripts in the design phase (`GUARD-DEVPLAN-SHELL`, twice);
    `GS-16` and `GUARD-GATE-STRENGTH-SHELL` named neither the right route (`architecture-boundary-check.mjs --write-policy`) nor exempted the
    read-only `--guardrail` flag; the push-init remote-branch check comes only after the signature; the bootstrap barrier ignores a native
