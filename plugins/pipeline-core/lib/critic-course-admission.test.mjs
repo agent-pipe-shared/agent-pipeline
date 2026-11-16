@@ -1000,7 +1000,9 @@ const pf94WriteInput = (fx, value) => {
   }
   writeFileSync(join(fx.root, "delta-input.json"), typeof value === "string" ? value : JSON.stringify(value)); return "delta-input.json";
 };
-const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath });
+// C30d: an input whose trustBoundaryChanged or impactAmbiguous is true (the effective full round) is registered only with the Coordinator's explicit confirmation; these cases mean the full round, so they confirm it.
+const pf94WantsFullRound = (fx, inputPath) => { try { const input = JSON.parse(readFileSync(join(fx.root, inputPath), "utf8")); return input?.trustBoundaryChanged === true || input?.impactAmbiguous === true; } catch { return false; } };
+const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath, confirmFullRound: pf94WantsFullRound(fx, inputPath) });
 /** Failing round, lineage registered and committed, a correction commit; with diagnostic=true the correction diagnostic is produced and registered the way PF94 LINEAGE (g) does. */
 function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true, verdict = null } = {}) {
   const fx = consumedCourseRoundFixture({ failing, verdict });

@@ -549,7 +549,15 @@ test("PF-94 feature-package registration: --add-review-lineage --packet <32 lowe
 test("PF-94 feature-package registration: --add-delta-request <repository-relative path> is admitted, malformed shapes are not", () => {
   withFixture("feature", f => {
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json"), f, "add delta request");
-    for (const [label, argv] of [["delta without path", ["--root", f.root, "--add-delta-request"]],
+    // C30d: the Coordinator's explicit yes to a full next round is the one trailing option this verb takes, and no other verb takes it.
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--confirm-full-round"), f, "add delta request, full round confirmed");
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--confirm-full-round", "--stage"), f, "add delta request, full round confirmed, staged");
+    for (const [label, argv] of [["confirm on the diagnostic verb", ["--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--confirm-full-round"]],
+      ["confirm without the delta verb", ["--root", f.root, "--add-review-unit", "--confirm-full-round"]],
+      ["confirm with a dash path", ["--root", f.root, "--add-delta-request", "--force", "--confirm-full-round"]],
+      ["confirm with an absolute path", ["--root", f.root, "--add-delta-request", join(f.root, "d.json"), "--confirm-full-round"]],
+      ["confirm before the path", ["--root", f.root, "--add-delta-request", "--confirm-full-round", "d.json"]],
+      ["delta without path", ["--root", f.root, "--add-delta-request"]],
       ["delta dash path", ["--root", f.root, "--add-delta-request", "--force"]],
       ["delta absolute path", ["--root", f.root, "--add-delta-request", join(f.root, "d.json")]],
       ["delta parent path", ["--root", f.root, "--add-delta-request", "specs/feature/../../x.json"]],

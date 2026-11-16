@@ -168,7 +168,7 @@ function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
   // The Coordinator's judgment: the four fields and the invariant lists.
   put(root, inputPath, JSON.stringify({ changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags,
     pathInvariantMap: Object.fromEntries(Object.keys(skeleton.pathInvariantMap).map((path) => [path, ["inv-one"]])) }));
-  const added = addCriticDeltaRequest({ root, inputPath });
+  const added = addCriticDeltaRequest({ root, inputPath, confirmFullRound: flags?.trustBoundaryChanged === true || flags?.impactAmbiguous === true });
   assert.equal(added.status, "delta-request-added", JSON.stringify(added));
   (observed.skeletons ??= {})[inputPath] = Object.keys(skeleton.pathInvariantMap).sort();
   return { added, registration: commitPaths(root, added.commitPaths, "register the delta request"), skeleton: inputPath };
@@ -176,11 +176,12 @@ function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
 
 function deltaRequest(root, claims, flags) {
   const base = { changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
+  const confirmFullRound = base.trustBoundaryChanged === true || base.impactAmbiguous === true; // C30d: a true value is registered only with the explicit confirmation
   put(root, "scratch/delta-input.json", JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
-  const first = addCriticDeltaRequest({ root, inputPath: "scratch/delta-input.json" });
+  const first = addCriticDeltaRequest({ root, inputPath: "scratch/delta-input.json", confirmFullRound });
   assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
   put(root, "scratch/delta-input.json", JSON.stringify({ ...base, pathInvariantMap: Object.fromEntries(first.changedPaths.map((path) => [path, ["inv-one"]])) }));
-  const added = addCriticDeltaRequest({ root, inputPath: "scratch/delta-input.json" });
+  const added = addCriticDeltaRequest({ root, inputPath: "scratch/delta-input.json", confirmFullRound });
   assert.equal(added.status, "delta-request-added", JSON.stringify(added));
   return { added, registration: commitPaths(root, added.commitPaths, "register the delta request") };
 }
@@ -1061,6 +1062,44 @@ test("W9 SLICE 3 NEGATIVE (4): an existing delta input of the wrong shape is ref
     const refused = addCriticDeltaRequest({ root: fx.root, inputPath: "scratch/delta-wrong.json" });
     assert.equal(refused.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(refused));
     assert.equal(readFileSync(join(fx.root, "scratch/delta-wrong.json"), "utf8"), wrong, "the file is not overwritten");
+  } finally { cleanup(fx); }
+});
+
+// C30d (PO report on Claude Code, 2026-11-16): a cautious `true` in trustBoundaryChanged / impactAmbiguous silently turned the next round into a FULL round over the whole feature
+// (66 and 72 files, three reviewers instead of about 30 files), the consequence showed only in the registration result, and a registered value cannot be taken back.
+test("C30d: a true trustBoundaryChanged or impactAmbiguous is refused with the consequence and the guidance, writes nothing, and registers only with the explicit confirmation", () => {
+  const fx = walkCourse({ label: "c30d-confirm", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
+  try {
+    put(fx.root, "src/fix2.mjs", "export const fix2 = 2;\n");
+    const candidate = commitPaths(fx.root, ["src/fix2.mjs"], "fix: a correction");
+    registerDiagnostic(fx.root, candidate, "r2");
+    const input = (flags) => JSON.stringify({ changedBehaviorClaims: ["fix-two"], coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags, pathInvariantMap: { "src/fix2.mjs": ["inv-one"] } });
+    for (const flag of ["trustBoundaryChanged", "impactAmbiguous"]) {
+      put(fx.root, "scratch/delta-cost.json", input({ [flag]: true }));
+      const before = git(fx.root, ["status", "--porcelain"]); // with the input file in place; the verb must add nothing to it
+      const refused = addCriticDeltaRequest({ root: fx.root, inputPath: "scratch/delta-cost.json" });
+      assert.equal(refused.status, "refused", JSON.stringify(refused));
+      assert.equal(refused.code, "FPR-DELTA-FULL-ROUND-UNCONFIRMED", JSON.stringify(refused));
+      assert.equal(refused.field, flag);
+      for (const needle of ["FULL round", "RE-DELTA-FALLBACK-FULL", "cannot be taken back", "Nothing was written", "--confirm-full-round", "authentication, authorization"]) assert.ok(refused.reason.includes(needle), `the refusal says "${needle}": ${refused.reason}`);
+      assert.equal(git(fx.root, ["status", "--porcelain"]), before, "no manifest or request file was written");
+    }
+    // The helper confirms exactly when a flag is true: the confirmed registration then reports the full round.
+    const confirmed = deltaRequest(fx.root, ["fix-two"], { trustBoundaryChanged: true }).added;
+    assert.equal(confirmed.nextRoundMode, "full");
+    assert.equal(confirmed.nextRoundReason, "trust-boundary-change");
+  } finally { cleanup(fx); }
+});
+
+test("C30d: false judgments register without any confirmation and the next round stays a diff round", () => {
+  const fx = walkCourse({ label: "c30d-diff", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
+  try {
+    put(fx.root, "src/fix2.mjs", "export const fix2 = 2;\n");
+    const candidate = commitPaths(fx.root, ["src/fix2.mjs"], "fix: a correction");
+    registerDiagnostic(fx.root, candidate, "r2");
+    const added = deltaRequest(fx.root, ["fix-two"], {}).added; // no confirmation passed
+    assert.equal(added.nextRoundMode, "delta");
+    assert.equal(added.nextRoundReason, null);
   } finally { cleanup(fx); }
 });
 

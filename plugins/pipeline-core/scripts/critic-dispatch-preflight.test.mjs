@@ -1648,10 +1648,12 @@ function parentRegisterDiagnostic(root, featureId, candidate, tag) {
 function parentDeltaRequest(root, changedBehaviorClaims = ["fix-one"], flags = {}) {
   const base = { changedBehaviorClaims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
   writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
-  const first = parentAddDelta({ root, inputPath: "delta-input.json" });
+  // C30d: a true trustBoundaryChanged or impactAmbiguous (the effective full round) is registered only with the Coordinator's explicit confirmation.
+  const confirmFullRound = base.trustBoundaryChanged === true || base.impactAmbiguous === true;
+  const first = parentAddDelta({ root, inputPath: "delta-input.json", confirmFullRound });
   assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
   writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: Object.fromEntries(first.changedPaths.map((path) => [path, ["inv-one"]])) }));
-  const added = parentAddDelta({ root, inputPath: "delta-input.json" });
+  const added = parentAddDelta({ root, inputPath: "delta-input.json", confirmFullRound });
   assert.equal(added.status, "delta-request-added", JSON.stringify(added));
   return { added, registration: parentCommitPaths(root, added.commitPaths, "register the delta request") };
 }

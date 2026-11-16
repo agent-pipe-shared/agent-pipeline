@@ -949,7 +949,7 @@ function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
     if (realpathSync(dirname(target)) !== join(realpathSync(root), dirname(inputPath))) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath });
     writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
   } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
-  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool - then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
+  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Mind the cost: trustBoundaryChanged or impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
 }
 /** The manifest core of a commit: the manifest minus its candidate-evidence artifacts (the transport check's own definition), as a canonical digest; null when unreadable. */
 function manifestCoreSha256(root, commit, manifestPath) {
@@ -965,7 +965,9 @@ function manifestCoreUnchanged(root, parent, commit, manifestPath) {
   const before = manifestCoreSha256(root, parent, manifestPath), after = manifestCoreSha256(root, commit, manifestPath);
   return before !== null && after !== null && before === after;
 }
-export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract } = {}) {
+/** When `true` is factually right, and when it is not (shown with the refusal, the skeleton and the help text). */
+const FULL_ROUND_GUIDANCE = "trustBoundaryChanged is true only when the correction itself changes who or what is trusted or what an actor may do (authentication, authorization, a permission check, an input or origin check, a secret or key handling), not for every correction in a security-relevant feature; impactAmbiguous is true only when the changed paths' effect cannot be told even after reading them. A large or risky-looking diff is neither: the diff round exists for it.";
+export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract, confirmFullRound = false } = {}) {
   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
   let root;
   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
@@ -989,6 +991,13 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
     if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
     for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
+    // C30d (PO report on Claude Code, 2026-11-16): `true` in either field turns the next round into a FULL round over the whole feature range (RE-DELTA-FALLBACK-FULL),
+    // several times the size and cost of the diff round, and a registered value cannot be taken back. The consequence is therefore stated BEFORE anything is written, and the
+    // verb registers it only on the Coordinator's explicit flag. No tool changes the judgment itself (D223).
+    if ((input.trustBoundaryChanged === true || input.impactAmbiguous === true) && confirmFullRound !== true) {
+      const field = input.trustBoundaryChanged === true ? "trustBoundaryChanged" : "impactAmbiguous";
+      return refused("FPR-DELTA-FULL-ROUND-UNCONFIRMED", `${field} is true: registering it makes the next Critic round an effective FULL round (RE-DELTA-FALLBACK-FULL) over the whole feature range from the course genesis base, not the diff of this correction, and the registered value cannot be taken back. Nothing was written. ${FULL_ROUND_GUIDANCE} If the full round is meant, rerun the same command with --confirm-full-round; otherwise set ${field} to false in ${inputPath} and rerun.`, { inputPath, field, consequence: "full-round" });
+    }
   }
   // The single registered feature course.
   let features = [];

@@ -75,7 +75,7 @@ export function pushThreatModelReadback(root) {
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> | --add-spec-addendum <approval record>] [--stage]",
+  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>] [--stage]",
   "",
   "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
   "  your commit stays one `git commit -F <message file>` of what is staged.",
@@ -109,9 +109,14 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "     coordinatorImpactConfirmed  true when the Coordinator confirmed the impact",
   "     trustBoundaryChanged    true when the correction moves a trust boundary",
   "     impactAmbiguous         true when the impact cannot be told",
+  "     COST: true in trustBoundaryChanged or impactAmbiguous makes the next round a FULL round over the whole feature range (several times the files and reviewers of a diff round)",
+  "     and the registered value cannot be taken back. trustBoundaryChanged is true only when the correction itself changes who or what is trusted or what an actor may do",
+  "     (authentication, authorization, a permission or origin check, secret or key handling), not for every correction in a security-relevant feature; impactAmbiguous only when",
+  "     the effect cannot be told after reading the paths. A cautious true is the expensive choice. The verb refuses a true value (FPR-DELTA-FULL-ROUND-UNCONFIRMED, nothing written)",
+  "     until you rerun it with --confirm-full-round.",
   "     pathInvariantMap must have exactly the changed paths as keys; a wrong map is refused (FPR-DELTA-MAP) with the changed paths printed.",
   "     If <input.json> does not exist yet, step 5 writes a PATH SKELETON there (the changed paths, an empty list each; never the four judgment fields) and refuses (FPR-DELTA-INPUT-PATH); complete it and rerun.",
-  "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
+  "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json> [--confirm-full-round, only when a true value is meant]",
   "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
   "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
@@ -161,11 +166,12 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   // PF-94: `--add-review-lineage --packet <packetId>` registers the lineage record of a consumed course round.
   const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
   // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
-  const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+  // C30d: the optional `--confirm-full-round` is the Coordinator's explicit yes to a delta request whose trustBoundaryChanged or impactAmbiguous is true (the next round is then a FULL round).
+  const addDelta = (argv.length === 4 || (argv.length === 5 && argv[4] === "--confirm-full-round")) && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
   // ADR-0095: `--add-spec-addendum <approval record>` registers a PO-approved Spec addendum and its approval record.
   const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
   if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> | --add-spec-addendum <approval record>]" })}\n`);
+    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>]" })}\n`);
     return 2;
   }
   let root;
@@ -181,7 +187,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
     return 2;
   }
   if (addDelta) {
-    const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract });
+    const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract, confirmFullRound: argv[4] === "--confirm-full-round" });
     out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
