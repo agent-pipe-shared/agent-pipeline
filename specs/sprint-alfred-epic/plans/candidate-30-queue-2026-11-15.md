@@ -39,7 +39,9 @@ active profile, a module cycle, an export the own import would refuse), so the r
 - No blocking/question split in the report, no machine check of the recurring mandatory questions, no scale switch for a
   one-developer project (decomposition drove 7 to 12 modules).
 
-**Wanted (PO 2026-11-16: like the Critic, QG-13 — one full round and two diff rounds).** Round 1 is the one full review.
+**Wanted (PO 2026-11-16: one full round and two diff rounds, the shape of the Critic batch; note QG-13 itself is uncapped
+since D190, so these numbers are the PO's explicit choice for the design review, not a copy of QG-13; the Critic is not
+changed unasked).** Round 1 is the one full review.
 Rounds 2 and 3 are delta rounds (a fresh reviewer; only the open blocking findings of the round before and what the
 correction changed). After round 3 nothing triggers a round 4: remaining blocking findings
 stop the presentation as today; remaining questions are written into the signing request as accepted questions the PO
@@ -51,7 +53,34 @@ A full rerun after round 1 is refused with a typed repair that names the delta r
 **Open PO decision (tile before building).** The cap re-opens what D246 closed: signing with questions still open. Option
 A: questions only (never blocking findings) may be accepted after round 3, listed in the signature. Option B: after
 round 3 any open finding needs an explicit PO decision per finding. Recommendation: A (built as A unless the PO says
-otherwise; the PO asked to build everything open for the next test).
+otherwise; the PO asked to build everything open for the next test). Keep it behind one switch point and put it at the
+top of the build report: it changes what the PO signs.
+
+**Design requirements found before building (advisor review, 2026-11-16).** The briefing must satisfy all of them.
+
+1. **Where the cap fires.** The stopped run never called `create` or `present-plan`; every round was a plain
+   `readiness-reviewer` dispatch. A cap in the receipt chain or the presentation gate fires on none of those. The
+   enforcement point is the dispatch itself (guard side, per feature, a counter that a new initial receipt cannot
+   reset), with the refusal naming the delta route; the receipt structural bound follows the same number. Check the
+   counter on Codex and Antigravity (no observation route there).
+2. **A delta contract in the reviewer text.** `readiness-reviewer.md` forbids a prior review as input and orders four
+   mandatory questions unconditionally, so a delta dispatched with that text re-raises them. Specify how a delta
+   briefing passes the open finding ids and the changed paths without tripping the contamination rule, and give the
+   reviewer a correction-only scope (open blocking findings of the round before, the correction diff and its direct
+   regressions; no unchanged-area hunt).
+3. **Exit for a blocker still open after the last round.** "Presentation stays refused, no round 4" has no exit; the
+   never-fully-blocking rule needs a repair someone can run. Define the explicit PO decision route (a per-finding
+   acceptance recorded in the signing request), the QG-13 shape "PASS or an explicit PO decision".
+4. **Who classifies blocking versus question.** The split comes from the bound report text; what `create` cross-checks
+   against the report today decides whether the Elephant could pass it as a flag, which must not be possible (the
+   reviewed party must not decide what blocks).
+5. **Must not change.** Bindings over one or two receipts stay byte-identical; an approval already signed keeps
+   verifying; stored-approval and rebind readers stay as they are.
+6. **Proof.** One fixture replays the real sequence (review, source edit, no receipt, second full dispatch) and must be
+   refused with the delta route named; one fixture with a report of questions only yields ready; reviewer wording is
+   not unit-testable, the PO's greenfield run is the open human check.
+7. **Not yet verified:** that missing delta rounds explain most of the non-convergence, and that "first receipt, then
+   deltas" unblocks the stopped run (the delta reviewer text may re-raise the mandatory questions).
 
 **Where it lives.** `plugins/pipeline-core/agents/readiness-reviewer.md`, `lib/design-review-receipt.mjs`,
 `scripts/design-review-receipt.mjs`, `lib/implementation-entry-gate.mjs` and the `present-plan` path in
@@ -60,6 +89,32 @@ counterpart to QG-13). Protected plugin source: held patch and the PO's apply.
 
 **Immediate unblock for the stopped run (no Pipeline change).** Create the first receipt for the current state with the
 round-12 findings as `--open-finding`, fix only the one real gap, then run delta rounds with `--previous` (at most two).
+
+## C30-4: findings and toil of the PO's greenfield tests (filled as they arrive)
+
+**From the design-review handover of 2026-11-16 (Claude greenfield run, project and actor names left out).** C30-6
+covers the termination; these further items are recorded here so they survive the other drive's uncommitted file.
+
+- The reviewer has no shell and reports every hash and marker (`technical-spec-sha256`, ADR digests, manifest hashes) as
+  "not checked" in every round: the coordinator should run those digest and marker checks as an automatic pre-check.
+- Manual upkeep after each spec change took about eight tool calls (`sha256sum`, PRD marker, `create-adr --refresh`,
+  `bind-adr-proposals`, stage, commit message file, `export-report`): a single `design-resync` command is wanted.
+- An ADR title lives only in its sidecar and `create-adr --refresh` does not update it: a `--retitle` option is wanted.
+- The briefing needs `Ruleset SHA: <sha>` and no documented source exists for the value; the run derived it from the
+  plugin version suffix and the dispatch guard accepted it: document the source (or print it in the start line).
+- `create --open-finding` on a source that changed after the review was reported as not usable; verify and, if true,
+  give a documented route for an honest fresh start.
+- The Claude model-role bootstrap is blocked in design drafting by `GUARD-DEVPLAN-SHELL` (opaque script execution) with
+  no override route, so the bootstrap confirmation line is never printed there.
+- Hook-context text reference for the material intake is not available, forcing the `--text-file` fallback.
+- Shell guard friction: composed commands, `git config --get-regexp` with a backslash, `rg --glob` and Glob/Grep inside
+  plugin directories, evidence paths refusing absolute host paths (two retries while writing the handover).
+- The session rule asking for a `Co-Authored-By` trailer collides with the Pipeline trailer rule (GIT-03); the Pipeline
+  rule was followed. A short note in the start output would remove the doubt.
+- The actor label offered by the user was not carried by `onboarding-init` (no `--pipeline-actor` placeholder in the
+  second run), so `heldIdentityChoice.pipelineActor` stayed null.
+- The twelve modules came from repeated decomposition questions on a one-family tablet app: a "small project" setting
+  (no parallel build, no decomposition finding) is part of C30-6.
 
 ## C30-5: tests and Verify leave their temporary folders in the home folder, nothing cleans them (PO, 2026-11-15)
 
