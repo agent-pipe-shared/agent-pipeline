@@ -305,6 +305,10 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/governance-hgo-consumption-source.mjs`. Already-kernel dispatch-budget
   and HGO enforcement modules import these delegates, so a maintenance window
   cannot rewrite the delegated decision or its durable evidence.
+- The 2026-11-16 candidate 30 closure adds `lib/design-review-observation.mjs`.
+  The already-kernel `hooks/guard-dispatch.mjs` imports it to count readiness-review
+  rounds that never reached a receipt (the dispatch-side round cap), so a maintenance
+  window cannot rewrite that count and hide an unreceipted round.
 - The 2026-09-18 Nova B candidate promotion and evidence closure adds
   `scripts/capture-evidence.mjs` and `lib/release-promotion-envelope.mjs`.
   `guard-lifecycle-ready.mjs` imports `capture-evidence.mjs` and

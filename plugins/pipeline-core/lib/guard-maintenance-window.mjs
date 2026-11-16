@@ -500,6 +500,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/dispatch-policy.mjs",
   "plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs",
   "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
+  // C30-6 (2026-11-16): guard-dispatch.mjs imports design-review-observation.mjs to count the readiness-review rounds that
+  // never reached a receipt; a window that could rewrite it could hide an unreceipted round from the dispatch cap.
+  "plugins/pipeline-core/lib/design-review-observation.mjs",
   // Nova B candidate promotion and evidence capture transitive closure (GMWKC01):
   // guard-lifecycle-ready.mjs imports capture-evidence.mjs;
   // push-prepare.mjs imports release-promotion-envelope.mjs.
