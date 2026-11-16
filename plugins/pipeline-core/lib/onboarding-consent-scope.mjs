@@ -68,6 +68,20 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
     en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy where the project has infrastructure or container files; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
     de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
     routes: Object.freeze([{ script: "toolchain-defer.mjs", verbs: null }]),
+    // C30-1: the question shows this step as a lead line with one bullet per tool and a closing bullet; every item is a literal
+    // substring of `en`/`de`, so the two renderings cannot drift on the tool list (pinned in onboarding-consent-mark.test.mjs).
+    bullets: Object.freeze({
+      en: Object.freeze({
+        lead: "check the tools the Pipeline needs on this machine:",
+        items: Object.freeze(["Node.js", "Git", "gitleaks", "osv-scanner", "semgrep", "Trivy where the project has infrastructure or container files", "OpenSSL where you sign"]),
+        tail: "for a missing tool, I show you its install route to run together, or record that you install it later",
+      }),
+      de: Object.freeze({
+        lead: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht:",
+        items: Object.freeze(["Node.js", "Git", "gitleaks", "osv-scanner", "semgrep", "Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat", "OpenSSL dort, wo Sie signieren"]),
+        tail: "bei einem fehlenden Werkzeug zeige ich Ihnen den Installationsweg, den wir gemeinsam gehen, oder halte fest, dass Sie es später installieren",
+      }),
+    }),
   }),
   Object.freeze({
     id: "onboarding-commits",
@@ -133,10 +147,21 @@ export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
   Object.freeze({ id: "guard-override", en: "any human-guard override", de: "jede menschliche Guard-Freigabe (Override)" }),
 ]);
 
+// C30-1: the question is relayed as plain text (dash bullets and blank lines only, no tables or markup a terminal does not
+// render): a short opening, the covered steps as bullets (the tool check with one sub-bullet per tool), the Advisor export as
+// its own paragraph, and the exclusions as a closing bullet list. The scope itself is unchanged (ADR-0092, ADR-0103).
+const bulletList = (entries) => entries.map((entry) => `- ${entry}`).join("\n");
 const QUESTION_FRAME = Object.freeze({
-  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes also lets me ${advisor}. Your yes does not cover ${excluded}; those stay your own decisions.`,
-  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja erlaubt außerdem, ${advisor}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
+  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it?\n\nIf you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval:\n${covered}\n\nYour yes also lets me ${advisor}.\n\nYour yes does not cover these; they stay your own decisions:\n${excluded}`,
+  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen?\n\nWenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird:\n${covered}\n\nIhr Ja erlaubt außerdem, ${advisor}.\n\nIhr Ja deckt nicht ab (das bleiben Ihre eigenen Entscheidungen):\n${excluded}`,
 });
+
+/** One covered step as a bullet; a step with `bullets` gets a lead line, one sub-bullet per item and a closing sub-bullet. */
+function stepBullet(step, lang) {
+  const parts = step.bullets?.[lang];
+  if (parts === undefined) return `- ${step[lang]}`;
+  return [`- ${parts.lead}`, ...parts.items.map((item) => `  - ${item}`), `  - ${parts.tail}`].join("\n");
+}
 
 /**
  * The consent question, in the operator language (`en`/`de`; anything else is English). `text` is relayed verbatim by the
@@ -144,9 +169,9 @@ const QUESTION_FRAME = Object.freeze({
  */
 export function onboardingConsentQuestion({ language = "en" } = {}) {
   const textFor = (lang) => QUESTION_FRAME[lang](
-    ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== ADVISOR_EXPORT_STEP_ID).map((step) => step[lang]).join("; "),
+    ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== ADVISOR_EXPORT_STEP_ID).map((step) => stepBullet(step, lang)).join("\n"),
     ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === ADVISOR_EXPORT_STEP_ID)[lang],
-    ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang]).join("; "),
+    bulletList(ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang])),
   );
   const chosen = language === "de" ? "de" : "en";
   return {

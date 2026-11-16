@@ -105,7 +105,13 @@ test("G20-45: the rendered consent question names every covered step and every e
     const question = onboardingConsentQuestion({ language });
     assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
     assert.equal(question.language, language);
-    for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
+    for (const step of ONBOARDING_CONSENT_COVERED_STEPS) {
+      const parts = step.bullets?.[language];
+      if (parts === undefined) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
+      // C30-1: a step shown as a lead line plus sub-bullets names every part, and every item is a literal part of the full step text.
+      else for (const part of [parts.lead, parts.tail, ...parts.items]) assert.ok(question.text.includes(part), `${language}: ${step.id}: ${part}`);
+      if (parts !== undefined) for (const item of parts.items) assert.ok(step[language].includes(item), `${language}: ${step.id}: ${item} is part of the full step text`);
+    }
     for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
     assert.deepEqual(question.scope, ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id));
     assert.deepEqual(question.notCovered, ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id));
@@ -117,6 +123,29 @@ test("G20-45: the rendered consent question names every covered step and every e
   for (const id of ["design-approval", "push", "release", "guard-override"]) assert.ok(excluded.includes(id), id);
   assert.equal(onboardingConsentQuestion({ language: "fr" }).language, "en");
   assert.equal(onboardingConsentQuestion().textByLanguage.de, onboardingConsentQuestion({ language: "de" }).text);
+});
+
+// C30-1 (PO 2026-11-15): the consent question is scannable. A short opening, one dash bullet per covered step (the tool check with
+// sub-bullets), the Advisor export as its own paragraph, a closing bullet list of what the yes does not cover, no line wider than
+// the start skill relays without wrapping trouble, and plain text only (no table or markup a terminal does not render).
+test("C30-1: the consent question is a short opening, bulleted steps, an Advisor paragraph and a closing exclusions list", () => {
+  for (const language of ["en", "de"]) {
+    const { text } = onboardingConsentQuestion({ language });
+    const lines = text.split("\n");
+    const covered = ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== "advisor-export");
+    // One top-level bullet per covered step except the Advisor export (which is a paragraph); sub-bullets are indented.
+    assert.equal(lines.filter((line) => /^- /u.test(line)).length, covered.length + ONBOARDING_CONSENT_NOT_COVERED.length, `${language}: top-level bullets`);
+    const advisor = ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === "advisor-export")[language];
+    assert.ok(lines.some((line) => line.includes(advisor) && !/^\s*-/u.test(line)), `${language}: the Advisor export is its own paragraph, not a bullet`);
+    const toolchain = ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === "toolchain");
+    assert.equal(lines.filter((line) => /^ {2}- /u.test(line)).length, toolchain.bullets[language].items.length + 1, `${language}: one sub-bullet per tool plus the closing one`);
+    const firstBullet = lines.findIndex((line) => /^- /u.test(line));
+    const lastExclusion = lines.length - 1;
+    assert.ok(firstBullet > 0 && firstBullet <= 4, `${language}: a short opening comes first`);
+    for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(lines.slice(lastExclusion - ONBOARDING_CONSENT_NOT_COVERED.length + 1).includes(`- ${step[language]}`), `${language}: ${step.id} closes the question as a bullet`);
+    assert.ok(lines.every((line) => line.length <= 300), `${language}: no line is wider than 300 characters`);
+    assert.doesNotMatch(text, /[|#*`>]/u, `${language}: plain text only`);
+  }
 });
 
 // C28-ONBOARDING-QUESTIONS (AC-108), friction 1 (PO decision 2026-11-10): the Advisor export consent is part of the FIRST consent question. Agreeing

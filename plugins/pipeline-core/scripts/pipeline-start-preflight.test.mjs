@@ -2599,7 +2599,8 @@ test("G20-45: the pipeline-governance-inactive result carries the consent questi
   const question = result.consentQuestion;
   assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
   assert.equal(question.language, "en");
-  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step.en), step.id);
+  // C30-1: a step shown as a lead line with sub-bullets (the tool check) names its parts instead of one sentence.
+  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) for (const part of step.bullets === undefined ? [step.en] : [step.bullets.en.lead, step.bullets.en.tail, ...step.bullets.en.items]) assert.ok(question.text.includes(part), `${step.id}: ${part}`);
   for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step.en), step.id);
   assert.ok(question.textByLanguage.de.includes(ONBOARDING_CONSENT_COVERED_STEPS[0].de));
   const record = result.consentRecordAction;
