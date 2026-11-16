@@ -1,0 +1,688 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 04e1b9386..ef1ea5e1b 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -851,6 +851,8 @@ if (isDirectInvocation(import.meta.url)) {
+ 
+   // D183: a Claude Agent/Task prompt may be the generator marker line plus one pipeline-briefing-file pointer.
+   // Expand it here, before every later consumer, so they judge the real briefing; the child receives the verified file bytes.
++  // C30D-G3: a pipeline-core:critic dispatch may carry the Critic generator marker; the child then receives the filled body (no marker line),
++  // the exact text an inline paste carries, so the contamination, policy, shape and binding checks below judge it unchanged.
+   let expandedInput = null;
+   {
+     const pointerRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+@@ -862,7 +864,7 @@ if (isDirectInvocation(import.meta.url)) {
+         process.stderr.write("BLOCKED (guard-dispatch): DBG-REF-CARRIER: a pipeline-briefing-file pointer is admitted only in the prompt of a direct Claude Task/Agent call; Workflow, Codex and Antigravity dispatches must carry the full generated briefing text.\n");
+         process.exit(2);
+       }
+-      const loaded = loadReferencedBriefing({ root: pointerRoot, prompt: dispatch.prompt });
++      const loaded = loadReferencedBriefing({ root: pointerRoot, prompt: dispatch.prompt, subagentType: dispatch.subagentType });
+       if (loaded === null) continue;
+       if (!loaded.ok) {
+         process.stderr.write(`BLOCKED (guard-dispatch): ${loaded.code}: ${loaded.message}\n`);
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index e112be9ff..24f865ad7 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -37,6 +37,7 @@ import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs"
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+ import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
++import * as criticRef from "../lib/briefing-file-reference.mjs";
+ 
+ // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
+ // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
+@@ -1365,9 +1366,89 @@ manualCheck("GD20c allow  G20-48: an item-governed generated ANTIGRAVITY Goldfis
+   assert.ok(!result.stderr.includes("BLOCKED"), result.stderr.slice(0, 600));
+ });
+ 
++// C30D-G3 (AC-108): a Critic briefing is handed over as a verified pointer. The Critic's own file (fill step output) carries the Critic
++// generator marker; the guard expands it BEFORE every consumer, so each later check judges exactly the text an inline paste would carry.
++const CRITIC_FINAL_DIR = "scratch/critic-briefing/aaaaaaaaaaaa-bbbbbbbbbbbb";
++function criticBodyText(extra = "") {
++  const filled = filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" });
++  return `${filled.endsWith("\n") ? filled : `${filled}\n`}${extra}`;
++}
++function criticPointerFixture(body, { dir = CRITIC_FINAL_DIR, name = "critic.final.md", path } = {}) {
++  const text = criticRef.stampCriticBriefing(body);
++  mkdirSync(join(bindingRepo, dir), { recursive: true });
++  writeFileSync(join(bindingRepo, dir, name), text);
++  return { text, prompt: criticRef.renderPointerPrompt({ text, path: path ?? `${dir}/${name}` }) };
++}
++const criticCall = (id, prompt, subagentType = "pipeline-core:critic") => ({ tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: subagentType, model: "opus", prompt } });
++
++manualCheck("GD81 allow  C30D-G3: a Critic pointer prompt is admitted and the PreToolUse answer carries updatedInput.prompt equal to the filled body (no marker line), every other field kept", () => {
++  const body = criticBodyText();
++  const { prompt } = criticPointerFixture(body);
++  const { code, stderr, stdout } = runAtOut(criticCall("gd81", prompt), bindingRepo);
++  assert.equal(code, ALLOW, `exit ${code} -- ${stderr.trim().slice(0, 300)}`);
++  const answer = JSON.parse(stdout);
++  assert.equal(answer.hookSpecificOutput.permissionDecision, "allow");
++  assert.equal(answer.hookSpecificOutput.updatedInput.prompt, body, "the Critic receives the filled briefing exactly, the way an inline paste would carry it");
++  assert.equal(answer.hookSpecificOutput.updatedInput.subagent_type, "pipeline-core:critic");
++  assert.equal(answer.hookSpecificOutput.updatedInput.model, "opus");
++});
++
++manualCheck("GD82 differential  C30D-G3: the same Critic text by pointer and inline gives the same exit, the same findings text and the same advisor-prohibition binding digest; a claims list is refused by pointer with the inline code", () => {
++  const body = criticBodyText(`- ${ADVISOR_PROHIBITION_LINE} (MP-26)\n`);
++  const inline = runAtOut(criticCall("gd82-inline", body), bindingRepo);
++  const pointed = runAtOut(criticCall("gd82-pointer", criticPointerFixture(body).prompt), bindingRepo);
++  assert.equal(inline.code, ALLOW, inline.stderr.slice(0, 300));
++  assert.equal(pointed.code, inline.code, pointed.stderr.slice(0, 300));
++  assert.equal(pointed.stderr, inline.stderr, "no check sees a different text");
++  const digestOf = (id) => JSON.parse(readFileSync(join(bindingRepo, ".git", "agent-pipeline", "advisor-prohibition", "pending", `${createHash("sha256").update(id).digest("hex")}.json`), "utf8")).bindings[0].promptSha256;
++  assert.equal(digestOf("gd82-pointer"), digestOf("gd82-inline"), "the binding digest is taken over the expanded text");
++  const contaminated = criticBodyText("\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x\n");
++  const inlineBlocked = runAtOut(criticCall("gd82c-inline", contaminated), bindingRepo);
++  const pointerBlocked = runAtOut(criticCall("gd82c-pointer", criticPointerFixture(contaminated).prompt), bindingRepo);
++  assert.equal(inlineBlocked.code, BLOCK, inlineBlocked.stderr.slice(0, 300));
++  assert.equal(pointerBlocked.code, BLOCK, pointerBlocked.stderr.slice(0, 300));
++  assert.ok(pointerBlocked.stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST") && inlineBlocked.stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST"), pointerBlocked.stderr.slice(0, 300));
++});
++
++manualCheck("GD83 block  C30D-G3: an edited Critic file, an open <FILL> slot, a file outside scratch/critic-briefing/ and a .. segment keep DBG-REF-DIGEST / DBG-REF-PATH", () => {
++  const body = criticBodyText();
++  const edited = criticPointerFixture(body, { name: "critic-edited.final.md" });
++  writeFileSync(join(bindingRepo, CRITIC_FINAL_DIR, "critic-edited.final.md"), `${edited.text}An extra line added after the fill step.\n`);
++  const open = criticPointerFixture(`${body}- model: <FILL MODEL_ID: the concrete model id the dispatch call passes as model>\n`, { name: "critic-open.final.md" });
++  const outside = criticPointerFixture(body, { dir: "scratch", name: "critic-outside.final.md" });
++  const dotdot = criticPointerFixture(body, { name: "critic-dotdot.final.md", path: `${CRITIC_FINAL_DIR}/../critic-briefing/aaaaaaaaaaaa-bbbbbbbbbbbb/critic-dotdot.final.md` });
++  for (const [label, prompt, expected] of [["edited", edited.prompt, "DBG-REF-DIGEST"], ["open slot", open.prompt, "DBG-REF-DIGEST"], ["outside", outside.prompt, "DBG-REF-PATH"], ["dotdot", dotdot.prompt, "DBG-REF-PATH"]]) {
++    const { code, stderr } = runAtOut(criticCall(`gd83-${label}`, prompt), bindingRepo);
++    assert.equal(code, BLOCK, `${label}: ${stderr.slice(0, 300)}`);
++    assert.ok(stderr.includes(expected), `${label}: ${stderr.slice(0, 300)}`);
++  }
++});
++
++manualCheck("GD84 block  C30D-G3: a Critic marker on a Goldfish role and a Critic pointer plus inline text are refused DBG-REF-AMBIGUOUS", () => {
++  const { prompt } = criticPointerFixture(criticBodyText(), { name: "critic-role.final.md" });
++  const wrongRole = runAtOut(criticCall("gd84-role", prompt, "pipeline-core:goldfish-implementor"), bindingRepo);
++  assert.equal(wrongRole.code, BLOCK, wrongRole.stderr.slice(0, 300));
++  assert.ok(wrongRole.stderr.includes("DBG-REF-AMBIGUOUS"), wrongRole.stderr.slice(0, 300));
++  const mixed = runAtOut(criticCall("gd84-mixed", `${prompt}${criticBodyText()}`), bindingRepo);
++  assert.equal(mixed.code, BLOCK, mixed.stderr.slice(0, 300));
++  assert.ok(mixed.stderr.includes("DBG-REF-AMBIGUOUS"), mixed.stderr.slice(0, 300));
++});
++
++manualCheck("GD85 block  C30D-G3: a Critic pointer carried by a Workflow script, a Codex spawn_agent message or an Antigravity Subagents prompt is refused DBG-REF-CARRIER", () => {
++  const { prompt } = criticPointerFixture(criticBodyText(), { name: "critic-carrier.final.md" });
++  const workflow = runAtOut({ cwd: bindingRepo, session_id: "gd85", tool_name: "Workflow", tool_input: { script: `agent({ agentType: "pipeline-core:critic", prompt: ${JSON.stringify(prompt)} })` } }, bindingRepo);
++  const codex = runAtOut({ cwd: bindingRepo, session_id: "gd85", tool_name: "spawn_agent", tool_input: { agent_type: "pipeline-core:critic", message: prompt } }, bindingRepo);
++  const anti = runAtOut({ cwd: bindingRepo, session_id: "gd85", tool_name: "Agent", tool_input: { Subagents: [{ TypeName: "pipeline-core:critic", Prompt: prompt }] } }, bindingRepo);
++  for (const [name, result] of [["workflow", workflow], ["codex", codex], ["antigravity", anti]]) {
++    assert.equal(result.code, BLOCK, `${name}: ${result.stderr.slice(0, 300)}`);
++    assert.ok(result.stderr.includes("DBG-REF-CARRIER"), `${name}: ${result.stderr.slice(0, 300)}`);
++  }
++});
++
+ // QG-04 restatement (candidate 20b, G20-47/G20-48): the corpus grew by the Antigravity bare-name and generated-briefing cases.
+ // C23 (QG-04, restated in place): 85 -> 88, the three GD2-C23 cases for a call that carries an effort.
+-assert.equal(cases.length, 88, "the complete dispatch guard corpus must register before execution");
++// C30D-G3 (QG-04, restated in place): 88 -> 93, the five GD81-GD85 cases for a Critic briefing handed over as a pointer.
++assert.equal(cases.length, 93,"the complete dispatch guard corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/briefing-file-reference.mjs b/plugins/pipeline-core/lib/briefing-file-reference.mjs
+index 4a5a82515..6b7a5a387 100644
+--- a/plugins/pipeline-core/lib/briefing-file-reference.mjs
++++ b/plugins/pipeline-core/lib/briefing-file-reference.mjs
+@@ -9,37 +9,78 @@ import { readFileSync, lstatSync } from "node:fs";
+ import { resolve, isAbsolute, sep } from "node:path";
+ import { verifyGeneratedBriefing, GENERATOR_MARKER_PREFIX } from "./dispatch-briefing-build.mjs";
+ 
++// C30D-G3: a Critic briefing travels the same two-line pointer. Its own generator marker says which generator wrote the file: the prefix
++// deliberately does NOT contain `<!-- pipeline-briefing-generator:`, the substring every Goldfish rule (splitMarker, generatedBriefingAdmission) keys on.
++// The digest covers every other byte of the file; the guard hands the Critic the body WITHOUT the marker line, so every later check judges
++// exactly the text an inline paste of the filled briefing would carry.
++export const CRITIC_GENERATOR_MARKER_PREFIX = "<!-- pipeline-critic-briefing-generator:v1 sha256=";
++export const CRITIC_BRIEFING_ROLE = "pipeline-core:critic";
++export const CRITIC_BRIEFING_DIRECTORY = "scratch/critic-briefing";
++const CRITIC_MARKER_LINE = /^<!-- pipeline-critic-briefing-generator:v1 sha256=([a-f0-9]{64}) -->$/u;
++const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
++
++/** The final Critic file text: the body (a final newline is added when missing) followed by its Critic marker line. */
++export function stampCriticBriefing(body) {
++  const text = body.endsWith("\n") ? body : `${body}\n`;
++  return `${text}${CRITIC_GENERATOR_MARKER_PREFIX}${sha256(text)} -->\n`;
++}
++
++/** `{ ok:true, body }` when the text is a body plus exactly one Critic marker line as its last line whose digest covers that body; else `{ ok:false, code }`. */
++export function verifyCriticBriefing(text) {
++  if (typeof text !== "string" || text.includes("<!-- pipeline-briefing-generator:") || (text.match(/<!-- pipeline-critic-briefing-generator:/gu) ?? []).length !== 1) return { ok: false, code: "DBG-CRITIC-MARKER-MISSING" };
++  const lines = text.split("\n");
++  const index = lines.length - 2;
++  if (index < 0 || lines[lines.length - 1] !== "" || !CRITIC_MARKER_LINE.test(lines[index])) return { ok: false, code: "DBG-CRITIC-MARKER-MISSING" };
++  const digest = CRITIC_MARKER_LINE.exec(lines[index])[1];
++  const body = lines.slice(0, index).join("\n") + (index === 0 ? "" : "\n");
++  if (sha256(body) !== digest) return { ok: false, code: "DBG-CRITIC-DIGEST-MISMATCH" };
++  return { ok: true, body };
++}
++
+ export const BRIEFING_FILE_POINTER_PREFIX = "pipeline-briefing-file:";
+ export const BRIEFING_FILE_MAX_BYTES = 262144;
+ const POINTER_LINE = /^pipeline-briefing-file: (\S+) sha256=([a-f0-9]{64})$/u;
+ const MARKER_LINE = /^<!-- pipeline-briefing-generator:v1 sha256=([a-f0-9]{64}) -->$/u;
++const anyMarkerLine = (line) => MARKER_LINE.test(line) || CRITIC_MARKER_LINE.test(line);
+ 
+ /** True when the text carries a pointer line prefix anywhere at a line start. */
+ export const carriesBriefingFilePointer = (prompt) => typeof prompt === "string" && /^pipeline-briefing-file:/mu.test(prompt);
+ 
+-/** `null` when the prompt has no pointer; else `{ ok, path, sha256, markerDigest }` or `{ ok:false, code }`. */
++/** `null` when the prompt has no pointer; else `{ ok, path, sha256, markerDigest, kind }` (kind `goldfish` or `critic`) or `{ ok:false, code }`. */
+ export function parseBriefingFileReference(prompt) {
+   if (!carriesBriefingFilePointer(prompt)) return null;
+   const lines = prompt.split("\n").map((line) => line.replace(/\r$/u, "")).filter((line) => line.trim() !== "");
+   const pointers = lines.filter((line) => line.startsWith(BRIEFING_FILE_POINTER_PREFIX));
+-  const markers = lines.filter((line) => line.includes("<!-- pipeline-briefing-generator:"));
+-  if (lines.length !== 2 || pointers.length !== 1 || markers.length !== 1 || !MARKER_LINE.test(markers[0])) {
++  const markers = lines.filter((line) => line.includes("<!-- pipeline-briefing-generator:") || line.includes("<!-- pipeline-critic-briefing-generator:"));
++  if (lines.length !== 2 || pointers.length !== 1 || markers.length !== 1 || !anyMarkerLine(markers[0])) {
+     return { ok: false, code: "DBG-REF-AMBIGUOUS", message: "a pointer prompt must be exactly the generator marker line and one pipeline-briefing-file line, never mixed with inline briefing text" };
+   }
+   const match = POINTER_LINE.exec(pointers[0]);
+   if (match === null) return { ok: false, code: "DBG-REF-PATH", message: "the pipeline-briefing-file line must read `pipeline-briefing-file: <repository-relative path> sha256=<64 hex>`" };
+-  return { ok: true, path: match[1], sha256: match[2], markerDigest: MARKER_LINE.exec(markers[0])[1] };
++  const critic = CRITIC_MARKER_LINE.test(markers[0]);
++  return { ok: true, path: match[1], sha256: match[2], markerDigest: (critic ? CRITIC_MARKER_LINE : MARKER_LINE).exec(markers[0])[1], kind: critic ? "critic" : "goldfish" };
+ }
+ 
+-/** Reads and verifies the referenced file: `{ ok:true, text, path }` or `{ ok:false, code, message }`; `null` for a non-pointer prompt. */
+-export function loadReferencedBriefing({ root, prompt, readFile = (file) => readFileSync(file) } = {}) {
++/**
++ * Reads and verifies the referenced file: `{ ok:true, text, path }` or `{ ok:false, code, message }`; `null` for a non-pointer prompt.
++ * A Critic marker is accepted only for a `pipeline-core:critic` dispatch (`subagentType`), only for a file under scratch/critic-briefing/,
++ * and hands back the body without its marker line; a file that still holds an open `<FILL` slot is refused.
++ */
++export function loadReferencedBriefing({ root, prompt, subagentType, readFile = (file) => readFileSync(file) } = {}) {
+   const ref = parseBriefingFileReference(prompt);
+   if (ref === null) return null;
+   if (!ref.ok) return ref;
++  const critic = ref.kind === "critic";
++  if (critic && subagentType !== CRITIC_BRIEFING_ROLE) {
++    return { ok: false, code: "DBG-REF-AMBIGUOUS", message: `a Critic briefing marker is admitted only for a ${CRITIC_BRIEFING_ROLE} dispatch (got ${JSON.stringify(subagentType ?? null)}); a Goldfish dispatch carries a Goldfish briefing` };
++  }
+   const parts = ref.path.split(/[\\/]/u);
+   if (isAbsolute(ref.path) || /^[A-Za-z]:/u.test(ref.path) || parts.includes("..") || parts[0] !== "scratch" || parts.length < 2 || parts.includes("")) {
+     return { ok: false, code: "DBG-REF-PATH", message: `the briefing file must be a repository-relative path under scratch/ without a .. segment (got ${JSON.stringify(ref.path)})` };
+   }
++  if (critic && (parts[1] !== "critic-briefing" || parts.length < 4)) {
++    return { ok: false, code: "DBG-REF-PATH", message: `a Critic briefing file must lie in a folder under ${CRITIC_BRIEFING_DIRECTORY}/ (got ${JSON.stringify(ref.path)})` };
++  }
+   const file = resolve(root, ...parts);
+   if (!file.startsWith(resolve(root) + sep)) return { ok: false, code: "DBG-REF-PATH", message: "the briefing file resolves outside the repository" };
+   let bytes;
+@@ -52,6 +93,14 @@ export function loadReferencedBriefing({ root, prompt, readFile = (file) => read
+     return { ok: false, code: "DBG-REF-PATH", message: `the briefing file cannot be read (${error?.code ?? "error"})` };
+   }
+   const text = Buffer.isBuffer(bytes) ? bytes.toString("utf8") : String(bytes);
++  if (critic) {
++    const checked = verifyCriticBriefing(text);
++    if (!checked.ok) return { ok: false, code: "DBG-REF-DIGEST", message: `the briefing file does not verify against its Critic generator marker (${checked.code}); it was changed after the fill step` };
++    if (sha256(text) !== ref.sha256) return { ok: false, code: "DBG-REF-DIGEST", message: "the sha256 of the briefing file differs from the pointer digest" };
++    if (!text.split("\n").includes(`${CRITIC_GENERATOR_MARKER_PREFIX}${ref.markerDigest} -->`)) return { ok: false, code: "DBG-REF-DIGEST", message: "the marker line of the prompt does not belong to the briefing file" };
++    if (/<FILL\b/u.test(checked.body)) return { ok: false, code: "DBG-REF-DIGEST", message: "the briefing file still holds an open <FILL ...> slot; run the fill step with a value for every slot" };
++    return { ok: true, text: checked.body, path: ref.path };
++  }
+   const verified = verifyGeneratedBriefing(text);
+   if (!verified.ok) return { ok: false, code: "DBG-REF-DIGEST", message: `the briefing file does not verify against its generator marker (${verified.code}); it was changed after generation` };
+   if (createHash("sha256").update(text, "utf8").digest("hex") !== ref.sha256) return { ok: false, code: "DBG-REF-DIGEST", message: "the sha256 of the briefing file differs from the pointer digest" };
+@@ -61,6 +110,6 @@ export function loadReferencedBriefing({ root, prompt, readFile = (file) => read
+ 
+ /** The exact pointer prompt for a generated briefing file (marker line + pointer line). */
+ export function renderPointerPrompt({ text, path }) {
+-  const marker = text.split("\n").find((line) => MARKER_LINE.test(line));
++  const marker = text.split("\n").find(anyMarkerLine);
+   return `${marker}\n${BRIEFING_FILE_POINTER_PREFIX} ${path} sha256=${createHash("sha256").update(text, "utf8").digest("hex")}\n`;
+ }
+diff --git a/plugins/pipeline-core/lib/critic-briefing-build.mjs b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+index 227861dfa..ecac45270 100644
+--- a/plugins/pipeline-core/lib/critic-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+@@ -15,6 +15,7 @@
+  */
+ import { posix } from "node:path";
+ import { criticToolBudget } from "./critic-split.mjs";
++import { stampCriticBriefing, verifyCriticBriefing } from "./briefing-file-reference.mjs";
+ 
+ export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
+ const COPY_MARKER = "COPY EVERYTHING BELOW THIS LINE\n-->\n";
+@@ -156,6 +157,42 @@ function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promp
+   return { entryId: entry?.id ?? null, text, placeholders };
+ }
+ 
++// C30D-G3: the fill step. A generated Claude Critic briefing holds `<FILL NAME: hint>` slots; this turns it into the FINAL file a pointer prompt names.
++// Only a closed table of slots takes a value, and every value is a fixed-vocabulary token (never prose); the bytes outside the slots are copied unchanged.
++// A slot of another carrier (Codex T1_ASSURANCE, the Antigravity MODEL row) is refused: those carriers hand over the full text.
++const FILL_SLOT = /<FILL ([A-Z0-9_]+): [^>\n]*>/gu;
++const FILL_EFFORTS = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
++export const CRITIC_FILL_VOCABULARY = Object.freeze({
++  MODEL_ID: (value) => /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/u.test(value) && !/^inherit$/iu.test(value),
++  EFFORT: (value) => FILL_EFFORTS.includes(value),
++});
++// The same template markers guard-dispatch's shape check reads (promptTemplateShapeWarning): a text without them is not a generated Critic briefing.
++const FILL_BODY_MARKERS = Object.freeze(["Fail-closed reference boundary", "## Phase A", "## Phase B"]);
++
++/**
++ * `values` is a Map of slot name to value. Returns `{ text, body, slots }` (`text` = the body plus the Critic marker line) or throws a
++ * CriticBriefingError: CBB-FILL-SHAPE, CBB-FILL-UNSUPPORTED-SLOT, CBB-FILL-UNKNOWN-SLOT, CBB-FILL-OPEN-SLOT, CBB-FILL-VALUE.
++ */
++export function fillCriticBriefing({ text, values }) {
++  if (typeof text !== "string" || /pipeline-(?:critic-)?briefing-generator:/u.test(text) || /\{\{/u.test(text)) {
++    refuse("CBB-FILL-SHAPE", "the draft is not an unfilled generated Critic briefing (it is empty, already carries a generator marker, or holds a template placeholder)");
++  }
++  const slots = [...new Set([...text.matchAll(FILL_SLOT)].map((match) => match[1]))];
++  const unsupported = slots.filter((name) => !Object.hasOwn(CRITIC_FILL_VOCABULARY, name));
++  if (unsupported.length > 0) refuse("CBB-FILL-UNSUPPORTED-SLOT", `the draft has slot(s) ${unsupported.join(", ")} that the pointer route does not fill: the Antigravity and Codex carriers still carry the full briefing text`);
++  if (/<FILL\b/u.test(text.replace(FILL_SLOT, ""))) refuse("CBB-FILL-SHAPE", "the draft holds a <FILL ...> slot of an unknown shape");
++  const missingMarkers = FILL_BODY_MARKERS.filter((marker) => !text.includes(marker));
++  if (missingMarkers.length > 0) refuse("CBB-FILL-SHAPE", `the draft is not template-shaped (missing: ${missingMarkers.join("; ")}); it must be the file prepare-dispatch.mjs critic wrote`);
++  for (const name of values.keys()) if (!slots.includes(name)) refuse("CBB-FILL-UNKNOWN-SLOT", `${name} is not a slot of this draft (its slots: ${slots.join(", ") || "none"}); a value that belongs to no slot is never placed anywhere`);
++  for (const name of slots) {
++    if (!values.has(name)) refuse("CBB-FILL-OPEN-SLOT", `slot ${name} has no value; pass --fill ${name}=<value> for every slot (${slots.join(", ")})`);
++    if (!CRITIC_FILL_VOCABULARY[name](values.get(name))) refuse("CBB-FILL-VALUE", `the value for ${name} is outside its fixed vocabulary (${name === "EFFORT" ? FILL_EFFORTS.join(", ") : "one token of letters, digits, dot, underscore and hyphen, never the word inherit"})`);
++  }
++  const body = text.replace(FILL_SLOT, (whole, name) => values.get(name));
++  const final = stampCriticBriefing(body);
++  return { text: final, body: verifyCriticBriefing(final).body, slots };
++}
++
+ function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry }) {
+   if (typeof root !== "string" || !posix.isAbsolute(root.replace(/\\/gu, "/")) && !/^[A-Za-z]:[\\/]/u.test(root)) refuse("CBB-ROOT", "an Antigravity envelope needs the absolute repository root");
+   const abs = (path) => `${root.replace(/[\\/]+$/u, "")}/${path}`;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 525c6f849..872aaa3b6 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2821,3 +2821,79 @@ test("ADR-0097 --maintenance never takes a criterion, a document check, a non-te
+   const twice = runDispatchBriefing(maintenanceArgv(fx, {}, ["--maintenance"]), deps);
+   assert.equal(twice.code, "DBG-FLAG-REPEATED", twice.message);
+ });
++
++// --- C30D-G3 (AC-108): a Critic briefing is handed over as a verified pointer. One parser and one loader serve both generators; the marker says which wrote the file. ---
++const pointerLib = () => import("../lib/briefing-file-reference.mjs");
++const CRITIC_POINTER_DIR = "scratch/critic-briefing/aaaaaaaaaaaa-bbbbbbbbbbbb";
++const CRITIC_POINTER_BODY = "You are the **Critic** of the Agent-Pipeline.\n- Requested route: claude-opus-5 at max\n- Spec (the contract): specs/f/spec.md\n";
++async function criticPointerFixture(body = CRITIC_POINTER_BODY, { name = "critic.final.md" } = {}) {
++  const ref = await pointerLib();
++  const root = mkdtempSync(join(tmpdir(), "critic-pointer-"));
++  roots.push(root);
++  mkdirSync(join(root, CRITIC_POINTER_DIR), { recursive: true });
++  const text = ref.stampCriticBriefing(body);
++  const path = `${CRITIC_POINTER_DIR}/${name}`;
++  writeFileSync(join(root, path), text);
++  return { ref, root, text, body, path, prompt: ref.renderPointerPrompt({ text, path }) };
++}
++const CRITIC_ROLE = "pipeline-core:critic";
++
++test("C30D-G3 the Critic marker is its own generator marker: the Goldfish verifier does not accept it and the Critic verifier does not accept a Goldfish text", async () => {
++  const fx = await criticPointerFixture();
++  const { verifyGeneratedBriefing, GENERATOR_MARKER_PREFIX } = await buildLib();
++  assert.equal(fx.ref.CRITIC_GENERATOR_MARKER_PREFIX.includes("<!-- pipeline-briefing-generator:"), false, "the Goldfish guard rules key on that substring");
++  assert.ok(fx.text.endsWith(`${fx.ref.CRITIC_GENERATOR_MARKER_PREFIX}${sha(fx.body)} -->\n`), "the digest covers every other byte of the file");
++  assert.equal(fx.ref.verifyCriticBriefing(fx.text).ok, true);
++  assert.equal(fx.ref.verifyCriticBriefing(fx.text).body, fx.body);
++  assert.equal(verifyGeneratedBriefing(fx.text).ok, false);
++  const goldfish = `${fx.body}${GENERATOR_MARKER_PREFIX}${sha(fx.body)} -->\n`;
++  assert.equal(verifyGeneratedBriefing(goldfish).ok, true);
++  assert.equal(fx.ref.verifyCriticBriefing(goldfish).ok, false);
++  assert.equal(fx.ref.parseBriefingFileReference(fx.prompt).kind, "critic");
++  assert.equal(fx.ref.parseBriefingFileReference(`${GENERATOR_MARKER_PREFIX}${"a".repeat(64)} -->\npipeline-briefing-file: scratch/x.md sha256=${"b".repeat(64)}\n`).kind, "goldfish");
++});
++
++test("C30D-G3 a Critic pointer loads the body exactly (no marker line) for a pipeline-core:critic dispatch, and for no other role", async () => {
++  const fx = await criticPointerFixture();
++  const loaded = fx.ref.loadReferencedBriefing({ root: fx.root, prompt: fx.prompt, subagentType: CRITIC_ROLE });
++  assert.equal(loaded.ok, true, JSON.stringify(loaded));
++  assert.equal(loaded.text, fx.body, "the child receives what an inline paste of the filled briefing carries");
++  assert.equal(loaded.path, fx.path);
++  for (const role of ["pipeline-core:goldfish-implementor", "critic", undefined]) {
++    const refused = fx.ref.loadReferencedBriefing({ root: fx.root, prompt: fx.prompt, subagentType: role });
++    assert.equal(refused.ok, false, String(role));
++    assert.equal(refused.code, "DBG-REF-AMBIGUOUS", String(role));
++  }
++});
++
++test("C30D-G3 a Critic pointer is refused with the existing codes: path, digest, open slot, extra marker, inline text", async () => {
++  const fx = await criticPointerFixture();
++  const load = (prompt, root = fx.root) => fx.ref.loadReferencedBriefing({ root, prompt, subagentType: CRITIC_ROLE });
++  const pointerTo = (path, digest) => `${fx.prompt.split("\n")[0]}\npipeline-briefing-file: ${path} sha256=${digest}\n`;
++  const digest = sha(fx.text);
++  for (const path of ["scratch/other.md", "scratch/critic-briefing/x/../../other.md", `${CRITIC_POINTER_DIR}/missing.final.md`, "/etc/hosts", "docs/critic.final.md", "scratch/critic-briefing/critic.final.md"]) {
++    assert.equal(load(pointerTo(path, digest)).code, "DBG-REF-PATH", path);
++  }
++  assert.equal(load(pointerTo(fx.path, "0".repeat(64))).code, "DBG-REF-DIGEST", "a wrong pointer digest");
++  writeFileSync(join(fx.root, fx.path), `${fx.text}An extra line.\n`);
++  assert.equal(load(fx.prompt).code, "DBG-REF-DIGEST", "an edited file");
++  const open = await criticPointerFixture(`${CRITIC_POINTER_BODY}- model: <FILL MODEL_ID: the concrete model id the dispatch call passes as model>\n`, { name: "critic-open.final.md" });
++  assert.equal(load(open.prompt, open.root).code, "DBG-REF-DIGEST", "a file with an open slot, even with a recomputed marker");
++  assert.equal(load(`${fx.prompt}${fx.body}`).code, "DBG-REF-AMBIGUOUS", "a pointer plus inline text");
++  assert.equal(load(`${fx.prompt.split("\n")[0]}\n${fx.prompt}`).code, "DBG-REF-AMBIGUOUS", "two marker lines");
++});
++
++test("C30D-G3 the Goldfish pointer and its marker are unchanged: kind goldfish, the whole file including its marker, with or without a role", async () => {
++  const ref = await pointerLib();
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const built = runDispatchBriefing([...argv, "--out", "scratch/briefing-ALF-T1.md"], depsOf(fx));
++  assert.equal(built.ok, true, JSON.stringify(built));
++  const written = readFileSync(join(fx.root, "scratch/briefing-ALF-T1.md"), "utf8");
++  for (const subagentType of [undefined, "pipeline-core:goldfish-implementor"]) {
++    const loaded = ref.loadReferencedBriefing({ root: fx.root, prompt: built.dispatchCall.promptPointer, subagentType });
++    assert.equal(loaded.ok, true, JSON.stringify(loaded));
++    assert.equal(loaded.text, written);
++  }
++  assert.equal(ref.renderPointerPrompt({ text: written, path: "scratch/briefing-ALF-T1.md" }), built.dispatchCall.promptPointer);
++});
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index b105b183c..06aa896c1 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -12,7 +12,9 @@ import { basename, dirname, join, posix, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+-import { renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
++import { createHash } from "node:crypto";
++import { fillCriticBriefing, renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
++import { CRITIC_BRIEFING_ROLE, renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
+ import { criticRunnerFromEnv } from "../lib/critic-route-assurance.mjs";
+ 
+ export const DISPATCH_PREPARATION_SCHEMA = "pipeline.dispatch-preparation.v1";
+@@ -27,6 +29,7 @@ export const PREPARE_DISPATCH_HELP = `Usage:
+   node <plugin-root>/scripts/prepare-dispatch.mjs goldfish --root <root> --package <package.json> [--out scratch/<briefing>.md] [--no-goldfish-running]
+   node <plugin-root>/scripts/prepare-dispatch.mjs critic --root <root> --spec <path> --base <ref> --candidate <full commit id> [--guardrail <path>]... [--evidence <path>]...
+        [--task-id <id>] [--prior-critic <path>] [--delta-request <path>] [--correction-input-bindings <file>] [--registration-commit <full commit id>] [--label <name> -- <check command> <args>]
++  node <plugin-root>/scripts/prepare-dispatch.mjs critic-fill --root <root> --briefing <path> --fill NAME=value [--fill NAME=value]...
+   node <plugin-root>/scripts/prepare-dispatch.mjs --help | -h
+ 
+ Prints one JSON object of schema ${DISPATCH_PREPARATION_SCHEMA}: status "ready" (exit 0), "commit-required" or "stopped" (exit 2).
+@@ -41,6 +44,12 @@ critic: with --label, runs the check command as Critic diagnostic evidence under
+   It then runs the preflight and writes ${ADMIT_REQUEST_FILE}; "next.placeholders" names the values only you can fill before "next.admitCommand".
+   A request you had already filled is kept and named in "previousRequest": if that Critic still runs, finalize it with that file. A --label that recorded another candidate is refused.
+   --candidate must be the full commit id, because the evidence commit moves HEAD. The preflight derives the registration commit itself; pass --registration-commit only when it reports several candidates.
++critic-fill: the Claude route to hand a Critic its briefing as a verified pointer instead of retyping the ~12k-token file. --briefing is a draft the critic verb wrote
++  (scratch/critic-briefing/<folder>/critic[-<part>].briefing.md); every <FILL ...> slot needs one --fill NAME=value: MODEL_ID takes the concrete model id (one token, never
++  inherit) and EFFORT one of low, medium, high, xhigh, max. A value for no slot, an open slot, a value outside that vocabulary and a draft with a Codex or Antigravity slot are
++  refused; nothing else in the file can change. It writes critic[-<part>].final.md beside the draft (never over it) with a Critic generator marker and prints "promptPointer": the two-line prompt
++  to pass, unchanged and alone, to a direct Claude Agent call of pipeline-core:critic. The dispatch guard verifies the file and the Critic receives the filled briefing exactly.
++  Antigravity and Codex carriers still carry the full text; a Workflow carrier refuses a pointer.
+ `;
+ 
+ const lastJson = (text) => {
+@@ -187,13 +196,50 @@ export function prepareCriticDispatch(input, deps = {}) {
+       briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
+       ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
+       briefingUse: briefing.runner === "antigravity"
+-        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. The `model:` row takes the concrete model id this session runs on (the Critic inherits it), never the word inherit; the call itself still passes no Model. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md)."
+-        : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
++        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. The `model:` row takes the concrete model id this session runs on (the Critic inherits it), never the word inherit; the call itself still passes no Model. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md). This carrier carries the full text; the pointer route (critic-fill) is for a direct Claude call only."
++        : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary). "
++          + "On Claude hand the briefing over as a pointer instead of retyping it: run `prepare-dispatch.mjs critic-fill --root <root> --briefing <file> --fill MODEL_ID=<concrete model id> --fill EFFORT=<effort>` and pass the printed promptPointer (two lines) as the whole prompt of the Agent call; the dispatch guard verifies the file against its marker and every later check judges the expanded text. The Antigravity and Codex carriers still carry the full text.",
+       nextStep: value.nextStep,
+       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
+   });
+ }
+ 
++// C30D-G3: the fill step of the Critic pointer route. It reads ONE generated draft (scratch/critic-briefing/<folder>/critic[-<part>].briefing.md), takes explicit
++// NAME=value pairs for its <FILL ...> slots (a closed vocabulary, lib/critic-briefing-build.mjs), writes the FINAL file beside it (never over the draft)
++// and prints the two-line pointer prompt for a direct Claude Agent call. The dispatch guard verifies the file against its Critic marker.
++const CRITIC_DRAFT_PATH = /^scratch\/critic-briefing\/([A-Za-z0-9][A-Za-z0-9._-]*)\/(critic(?:-[A-Za-z0-9][A-Za-z0-9._-]*)?)\.briefing\.md$/u;
++
++export function prepareCriticFill({ root, briefing, fills = [] }, deps = {}) {
++  const verb = "critic-fill";
++  const refuse = (code, reason, repair = PREPARE_DISPATCH_HELP) => stopped(verb, code.startsWith("PREP-") ? "arguments" : "fill", { code, reason, repair }, code);
++  const match = typeof briefing === "string" ? CRITIC_DRAFT_PATH.exec(briefing.replace(/\\/gu, "/")) : null;
++  if (match === null) return refuse("PREP-FILL-PATH", "--briefing must be a generated draft: scratch/critic-briefing/<folder>/critic[-<part>].briefing.md, the file `prepare-dispatch.mjs critic` wrote", "pass the path printed in next.briefings of the critic verb");
++  const values = new Map();
++  for (const entry of fills) {
++    const at = String(entry).indexOf("=");
++    const name = at < 1 ? "" : String(entry).slice(0, at);
++    if (!/^[A-Z0-9_]+$/u.test(name)) return refuse("PREP-ARGUMENT", `--fill takes NAME=value with an upper-case slot name (got ${JSON.stringify(String(entry).slice(0, 40))})`);
++    if (values.has(name)) return refuse("PREP-ARGUMENT", `--fill ${name} was given twice`);
++    values.set(name, String(entry).slice(at + 1));
++  }
++  const draftPath = briefing.replace(/\\/gu, "/");
++  let text;
++  try { text = (deps.readFile ?? readFileSync)(resolve(root, ...draftPath.split("/")), "utf8"); } catch (error) {
++    return refuse("PREP-FILL-PATH", `the draft cannot be read (${error?.code ?? "error"})`, "run `prepare-dispatch.mjs critic` again; it writes the draft");
++  }
++  let filled;
++  try { filled = fillCriticBriefing({ text: String(text), values }); } catch (error) {
++    return refuse(error?.code ?? "PREP-FILL-FAILED", String(error?.message ?? error), "fix the named value or slot and run the identical command again; never edit the draft by hand");
++  }
++  const path = `scratch/critic-briefing/${match[1]}/${match[2]}.final.md`;
++  (deps.mkdir ?? mkdirSync)(dirname(resolve(root, path)), { recursive: true });
++  (deps.writeFile ?? writeFileSync)(resolve(root, path), filled.text, "utf8");
++  const promptPointer = renderPointerPrompt({ text: filled.text, path });
++  return outcome(verb, "ready", { path, sha256: createHash("sha256").update(filled.text, "utf8").digest("hex"), slots: filled.slots, promptPointer,
++    next: { tool: "Agent", subagent_type: CRITIC_BRIEFING_ROLE, prompt: promptPointer,
++      use: "Pass promptPointer unchanged as the WHOLE prompt of one direct Claude Agent call to pipeline-core:critic: it is a pointer prompt (the generator marker line plus one pipeline-briefing-file line), nothing before, between or after. The dispatch guard checks the file against its marker and hands the Critic exactly the filled briefing; every later check judges that expanded text. A Workflow, Codex or Antigravity carrier takes the full briefing text instead and refuses a pointer." } });
++}
++
+ const TEMPLATE_PATH = join(HERE, "..", "templates", "prompts", "critic-review.md");
+ 
+ /** Correction input bindings file (derived once, never overwritten), the enumerated commits and the filled briefing text(s). */
+@@ -240,14 +286,15 @@ function criticArgv(input) {
+ }
+ 
+ const SINGLE_FLAGS = { goldfish: { "--root": "root", "--package": "packagePath", "--out": "out" },
++  "critic-fill": { "--root": "root", "--briefing": "briefing" },
+   critic: { "--root": "root", "--spec": "spec", "--base": "base", "--candidate": "candidate", "--task-id": "taskId", "--prior-critic": "priorCritic", "--delta-request": "deltaRequest", "--correction-input-bindings": "correctionInputBindings", "--registration-commit": "registrationCommit", "--label": "label" } };
+ 
+ export function parsePrepareDispatchArgv(argv) {
+   const verb = argv[0];
+-  if (verb !== "goldfish" && verb !== "critic") return { error: `the verbs are goldfish and critic; got ${JSON.stringify(verb ?? null)}` };
++  if (verb !== "goldfish" && verb !== "critic" && verb !== "critic-fill") return { error: `the verbs are goldfish, critic and critic-fill; got ${JSON.stringify(verb ?? null)}` };
+   const split = argv.indexOf("--");
+   const flags = split < 0 ? argv.slice(1) : argv.slice(1, split);
+-  const options = { verb, guardrails: [], evidence: [], command: split < 0 ? [] : argv.slice(split + 1) };
++  const options = { verb, guardrails: [], evidence: [], fills: [], command: split < 0 ? [] : argv.slice(split + 1) };
+   for (let index = 0; index < flags.length; index += 1) {
+     const flag = flags[index];
+     if (verb === "goldfish" && flag === "--no-goldfish-running") { options.noGoldfishRunning = true; continue; }
+@@ -256,6 +303,7 @@ export function parsePrepareDispatchArgv(argv) {
+     index += 1;
+     if (verb === "critic" && flag === "--guardrail") options.guardrails.push(value);
+     else if (verb === "critic" && flag === "--evidence") options.evidence.push(value);
++    else if (verb === "critic-fill" && flag === "--fill") options.fills.push(value);
+     else {
+       const key = SINGLE_FLAGS[verb][flag];
+       if (key === undefined) return { error: `unknown flag ${flag}` };
+@@ -269,7 +317,8 @@ export function parsePrepareDispatchArgv(argv) {
+ 
+ export function runPrepareDispatch(argv, deps = {}) {
+   const parsed = parsePrepareDispatchArgv(argv);
+-  if (parsed.error !== undefined) return stopped(argv[0] === "critic" ? "critic" : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: "run prepare-dispatch.mjs --help for every verb and flag" }, "PREP-ARGUMENT");
++  if (parsed.error !== undefined) return stopped(["critic", "critic-fill"].includes(argv[0]) ? argv[0] : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: "run prepare-dispatch.mjs --help for every verb and flag" }, "PREP-ARGUMENT");
++  if (parsed.options.verb === "critic-fill") return prepareCriticFill(parsed.options, deps);
+   return parsed.options.verb === "goldfish" ? prepareGoldfishDispatch(parsed.options, deps) : prepareCriticDispatch(parsed.options, deps);
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index d706c49f7..7b9d1fc54 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -2,11 +2,13 @@
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
++import * as prepareFill from "./prepare-dispatch.mjs";
+ import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
+ import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+ import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
+@@ -410,6 +412,120 @@ test("C28 prepare-dispatch hands the preflight's review paths to the briefing, a
+   assert.ok(briefing.includes(`-- src/a.mjs src/b.mjs`));
+ });
+ 
++// --- C30D-G3 (AC-108): the fill step turns a generated Critic briefing plus explicit fixed-vocabulary values into the final file a pointer prompt names. ---
++
++const referenceLib = () => import("../lib/briefing-file-reference.mjs");
++const DRAFT_DIR = `scratch/critic-briefing/${PREV.slice(0, 12)}-${HEAD.slice(0, 12)}`;
++const DRAFT_PATH = `${DRAFT_DIR}/critic.briefing.md`;
++const FILL_VALUES = ["MODEL_ID=claude-opus-4-1", "EFFORT=max"];
++const MODEL_SLOT = "<FILL MODEL_ID: the concrete model id the dispatch call passes as model>", EFFORT_SLOT = "<FILL EFFORT: the effort the dispatch call requests>";
++const draftFor = (runner = "claude", over = {}) => criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined, ...over }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner, root: "/repo/root", projectName: "p" }).briefings[0].text;
++const withNewline = (text) => (text.endsWith("\n") ? text : `${text}\n`);
++function fillRun(draft, fills = FILL_VALUES, briefing = DRAFT_PATH) {
++  const written = [];
++  const result = prepareFill.prepareCriticFill({ root: ROOT, briefing, fills }, { readFile: () => draft, exists: () => true, mkdir: () => {}, writeFile: (path, text) => written.push([path.replace(/\\/gu, "/"), text]) });
++  return { result, written };
++}
++
++test("C30D-G3 the fill step writes the final briefing beside the draft with a Critic marker over every other byte, prints the two-line pointer prompt, and the loader hands back exactly the filled draft", async () => {
++  const ref = await referenceLib();
++  const root = mkdtempSync(join(tmpdir(), "prepare-fill-"));
++  try {
++    const draft = draftFor();
++    mkdirSync(join(root, DRAFT_DIR), { recursive: true });
++    writeFileSync(join(root, DRAFT_PATH), draft);
++    const result = prepareFill.prepareCriticFill({ root, briefing: DRAFT_PATH, fills: FILL_VALUES });
++    assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
++    assert.equal(result.path, `${DRAFT_DIR}/critic.final.md`);
++    assert.equal(readFileSync(join(root, DRAFT_PATH), "utf8"), draft, "the draft is never overwritten");
++    const final = readFileSync(join(root, result.path), "utf8");
++    const expected = withNewline(draft.replace(MODEL_SLOT, "claude-opus-4-1").replace(EFFORT_SLOT, "max"));
++    assert.equal(ref.verifyCriticBriefing(final).body, expected, "only the two slots changed");
++    assert.doesNotMatch(final, /<FILL/u);
++    assert.equal(result.promptPointer, ref.renderPointerPrompt({ text: final, path: result.path }));
++    assert.equal(result.promptPointer.trimEnd().split("\n").length, 2, "marker line plus one pointer line");
++    assert.equal(result.sha256, createHash("sha256").update(final, "utf8").digest("hex"));
++    const loaded = ref.loadReferencedBriefing({ root, prompt: result.promptPointer, subagentType: "pipeline-core:critic" });
++    assert.equal(loaded.ok, true, JSON.stringify(loaded));
++    assert.equal(loaded.text, expected);
++    assert.match(result.next.use, /pointer prompt/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("C30D-G3 the fill step refuses a value that belongs to no slot, a slot left open and every value outside the fixed vocabulary, and writes nothing", () => {
++  const cases = [
++    [[...FILL_VALUES, "NOPE=x"], "CBB-FILL-UNKNOWN-SLOT"],
++    [["MODEL_ID=claude-opus-4-1"], "CBB-FILL-OPEN-SLOT"],
++    [["EFFORT=max"], "CBB-FILL-OPEN-SLOT"],
++    [["MODEL_ID=claude opus", "EFFORT=max"], "CBB-FILL-VALUE"],
++    [["MODEL_ID=inherit", "EFFORT=max"], "CBB-FILL-VALUE"],
++    [["MODEL_ID=a>b", "EFFORT=max"], "CBB-FILL-VALUE"],
++    [["MODEL_ID=claude-opus-4-1\n## Phase C: extra prose", "EFFORT=max"], "CBB-FILL-VALUE"],
++    [["MODEL_ID=<FILL MODEL_ID: x>", "EFFORT=max"], "CBB-FILL-VALUE"],
++    [["MODEL_ID=claude-opus-4-1", "EFFORT=ultra"], "CBB-FILL-VALUE"],
++    [["MODEL_ID=claude-opus-4-1", "EFFORT="], "CBB-FILL-VALUE"],
++    [["MODEL_ID=claude-opus-4-1", "EFFORT=max", "EFFORT=low"], "PREP-ARGUMENT"],
++    [["MODEL_ID", "EFFORT=max"], "PREP-ARGUMENT"],
++    [[], "CBB-FILL-OPEN-SLOT"],
++  ];
++  const draft = draftFor();
++  for (const [fills, code] of cases) {
++    const { result, written } = fillRun(draft, fills);
++    assert.equal(result.status, "stopped", JSON.stringify(fills));
++    assert.equal(result.stop.code, code, JSON.stringify(fills));
++    assert.deepEqual(written, [], JSON.stringify(fills));
++  }
++});
++
++test("C30D-G3 the fill step takes only a Claude-carrier draft: a Codex slot, the Antigravity envelope, a marked, hand-edited or not template-shaped draft are refused", () => {
++  const codex = fillRun(draftFor("codex"), [...FILL_VALUES, "T1_ASSURANCE=runner-native"]);
++  assert.equal(codex.result.stop.code, "CBB-FILL-UNSUPPORTED-SLOT", "Codex carries the full text");
++  const antigravity = fillRun(draftFor("antigravity"), ["MODEL=claude-opus-4-1"]);
++  assert.equal(antigravity.result.stop.code, "CBB-FILL-UNSUPPORTED-SLOT", "Antigravity carries the full text");
++  const draft = draftFor();
++  const refused = [
++    ["marked", `${draft}<!-- pipeline-critic-briefing-generator:v1 sha256=${"a".repeat(64)} -->\n`],
++    ["goldfish marked", `${draft}<!-- pipeline-briefing-generator:v1 sha256=${"a".repeat(64)} -->\n`],
++    ["placeholder", `${draft}\n{{NEW_FIELD}}\n`],
++    ["freehand", `Please review.\n${MODEL_SLOT}\n${EFFORT_SLOT}\n`],
++  ];
++  for (const [label, text] of refused) {
++    const { result, written } = fillRun(text);
++    assert.equal(result.stop.code, "CBB-FILL-SHAPE", label);
++    assert.deepEqual(written, [], label);
++  }
++});
++
++test("C30D-G3 the fill step reads only a generated draft path under scratch/critic-briefing/ and the argument parser takes repeated --fill", () => {
++  const draft = draftFor();
++  for (const briefing of ["docs/critic.briefing.md", "scratch/critic.briefing.md", `${DRAFT_DIR}/critic.final.md`, `${DRAFT_DIR}/../x/critic.briefing.md`, "/etc/critic.briefing.md", `${DRAFT_DIR}/notes.md`]) {
++    const { result, written } = fillRun(draft, FILL_VALUES, briefing);
++    assert.equal(result.stop.code, "PREP-FILL-PATH", briefing);
++    assert.deepEqual(written, [], briefing);
++  }
++  assert.equal(fillRun(draft, FILL_VALUES, `${DRAFT_DIR}/critic-group-1.briefing.md`).result.path, `${DRAFT_DIR}/critic-group-1.final.md`, "a split part keeps its id");
++  const parsed = parsePrepareDispatchArgv(["critic-fill", "--root", ROOT, "--briefing", DRAFT_PATH, "--fill", "MODEL_ID=m", "--fill", "EFFORT=max"]);
++  assert.deepEqual(parsed.options.fills, ["MODEL_ID=m", "EFFORT=max"]);
++  assert.equal(parsed.options.briefing, DRAFT_PATH);
++  assert.match(parsePrepareDispatchArgv(["critic-fill", "--root", ROOT, "--nope", "x"]).error, /unknown flag/u);
++  assert.match(parsePrepareDispatchArgv(["goldfish", "--root", ROOT, "--fill", "a=b"]).error, /unknown flag/u);
++});
++
++test("C30D-G3 the template's Critic part carries no pointer wording, and the briefing use says the pointer is the Claude route while Antigravity and Codex keep the full text", () => {
++  assert.doesNotMatch(criticBriefingLib.criticTemplateBody(TEMPLATE), /pipeline-briefing-file|critic-fill|pointer/iu, "the part the Critic receives stays as narrow as before");
++  assert.match(TEMPLATE.split("COPY EVERYTHING BELOW THIS LINE")[0], /critic-fill[\s\S]*pointer[\s\S]*Antigravity and Codex[\s\S]*full text/u, "the Coordinator-only usage text names the route");
++  const claude = () => stub({ "critic-dispatch-preflight.mjs": ok({ ...deltaSplitPreflight(), split: undefined }), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
++  const use = (env) => prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
++    { exists: () => false, mkdir: () => {}, writeFile: () => {}, env, runCommand: claude().runCommand }).next.briefingUse;
++  const onClaude = use({ CLAUDE_CODE_SESSION_ID: "s" });
++  assert.match(onClaude, /critic-fill/u);
++  assert.match(onClaude, /pointer/u);
++  assert.match(onClaude, /Antigravity and Codex[^.]*full text/u);
++  assert.match(onClaude, /Add nothing to it: no earlier round, no verdict/u, "the fail-closed wording stays");
++  assert.match(use({ AI_AGENT: "antigravity" }), /full text|verbatim/u);
++  assert.match(prepareFill.PREPARE_DISPATCH_HELP, /critic-fill --root <root> --briefing <path> --fill NAME=value/u);
++});
++
+ test("--help works in an empty directory and names both verbs", () => {
+   const empty = mkdtempSync(join(tmpdir(), "prepare-dispatch-help-"));
+   try {
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index ed0cb2500..0ceeb6d4f 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -57,6 +57,15 @@ only after an identical second consume readback. A caller must not invent
+ Git blob references for ignored local evidence: the complete preflight digest
+ binds that evidence to the session packet instead.
+ 
++**Handing the briefing over (Elephant):** `scripts/prepare-dispatch.mjs critic` writes the filled briefing file under
++`scratch/critic-briefing/`. On Claude, hand it to the Critic as a verified pointer, not as retyped text: run
++`prepare-dispatch.mjs critic-fill --root <root> --briefing <that file> --fill MODEL_ID=<concrete model id> --fill EFFORT=<effort>`,
++which accepts only those fixed-vocabulary values for the file's `<FILL ...>` slots, writes the final file with a Critic generator marker
++and prints the two-line pointer prompt; pass it, alone and unchanged, as the prompt of a direct Claude Agent call of `pipeline-core:critic`.
++The dispatch guard verifies the file against its marker and expands it, so the Critic receives the filled briefing exactly and every
++dispatch check judges that text. A pointer carries no prose; a pointer plus inline text, an edited file or a Workflow carrier is refused.
++The Antigravity and Codex carriers still carry the full briefing text.
++
+ The canonical before/after commands are:
+ 
+ ```bash
+diff --git a/plugins/pipeline-core/templates/prompts/critic-review.md b/plugins/pipeline-core/templates/prompts/critic-review.md
+index dd7c896f0..7e67f6ba3 100644
+--- a/plugins/pipeline-core/templates/prompts/critic-review.md
++++ b/plugins/pipeline-core/templates/prompts/critic-review.md
+@@ -201,6 +201,22 @@ USAGE (Elephant)
+    - **Tool budget (hard cap, first-class field):** ≤30 tool uses.
+    ```
+    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
++9. **Handing a Claude Critic its filled briefing as a pointer (Coordinator only;
++   this item sits above the copy marker and is never part of the Critic's text).**
++   `node <plugin-root>/scripts/prepare-dispatch.mjs critic` writes the briefing
++   file; do not paste its ~12k tokens into the Agent call. Run
++   `prepare-dispatch.mjs critic-fill --root <root> --briefing <that file> --fill
++   MODEL_ID=<concrete model id> --fill EFFORT=<effort>` instead: it accepts only
++   those fixed-vocabulary values for the file's `<FILL ...>` slots, writes the
++   final file beside the draft with a Critic generator marker, and prints the
++   two-line pointer prompt. Pass that prompt, alone and unchanged, as the prompt
++   of a direct Claude Agent call of `pipeline-core:critic`; the dispatch guard
++   verifies the file against its marker and the Critic receives exactly the
++   filled briefing, so every contamination, policy and binding check judges the
++   same text as before. The pointer adds no way to carry prose: a pointer plus
++   inline text, an edited file, a file outside `scratch/critic-briefing/` or a
++   Workflow carrier is refused. The Antigravity and Codex carriers still carry
++   the full text (item 8 for Antigravity).
+ ═══════════════════════════════════════════════════════════════════════════
+ COPY EVERYTHING BELOW THIS LINE
+ -->
