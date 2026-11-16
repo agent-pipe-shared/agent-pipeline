@@ -281,3 +281,26 @@ wording (QG-04); a new case pins that every covered step id still appears as one
 present, and that no line is longer than the limit the start skill relays without wrapping trouble. The first real
 onboarding of a greenfield project on each runner is the human check: the PO reads the question once and says whether it
 is scannable.
+
+## C30-7: a missing scanner is found only at the close (PO, 2026-11-16, "ja gerne"; for 30d, not built yet)
+
+**Finding.** A missing required scanner (gitleaks, osv-scanner, semgrep, Trivy where the project has infrastructure or
+container files) is reported at the bootstrap as a non-gating environment finding and at onboarding as a deferrable
+question. It is refused only at plan approval and at the close, and only in a project calibrated `critical`; every other
+project gets a notice at the close, after the work is built (`docs/toolchain.md`: a deferral lifts no check). The start
+itself is not blocked on purpose: a design session needs no scanner, and the Trivy scan reads not applicable without such
+files ("never fully blocking": every refusal needs a repair that can run).
+
+**Wanted (PO decision pending on the exact scope).** Move the refusal from the close to the plan-approval gate for every
+project that has not opted the security gate out, not only for `critical`, so the gap is known before the build and not
+after it. The start stays unblocked. A refusal names the exact repair (the install route of `docs/toolchain.md`, or the
+recorded deferral where the calibration allows one) and leaves no state behind.
+
+**Open for the design.** Whether a recorded deferral still passes the plan gate in a standard project; what a project
+without a calibrated security gate (unset stakes) counts as; the Trivy condition (tracked infrastructure files only).
+
+**Not part of this item.** Updating the scanners (the PO's own routine does it: `go install` for osv-scanner and gitleaks,
+`pipx upgrade semgrep`, the Trivy install script) and a newer-version hint in the preflight (the PO keeps the Pipeline out
+of updates). Trivy is installed by the PO; the Trivy suites (`security-adapters/trivy`, `trivy-baseline`, `security-scan*`)
+run once against a clone after that, because two real-binary cases skip without it; the Full Verify `fv30c` ran without
+Trivy.
