@@ -371,3 +371,36 @@ request fields `trustBoundaryChanged` / `impactAmbiguous` set by default or by t
 agent builds a full request by hand; the course breaks between rounds (takeover, registration commit, export commit) so the lineage resets;
 a split (batched) review counts each part as a full round. Do not guess the cause before the transcript: read which `requestedMode` and
 which admission result each round had.
+
+**Details from the PO report (2026-11-16, Claude Code, Windows, one greenfield project; the first hypothesis is confirmed).**
+1. (main cause) The delta request (`register-feature-package.mjs --add-delta-request`) asks the coordinator for four judgment fields, among
+   them `trustBoundaryChanged`. Set to `true`, the next round silently becomes a full round over the whole feature span
+   (`RE-DELTA-FALLBACK-FULL`): 66 and 72 files and three reviewers instead of about 30 files. The consequence is visible only in the
+   registration result (`nextRoundMode: full`), not while filling the field, so a cautious coordinator picks `true` and triggers the costly
+   variant. A wrong value cannot be corrected after registration (the Claude Code guard rightly refuses it as undermining oversight) and no
+   documented route takes the mistake back. Fix to build: state the consequence where the field is filled (the `--help` text, the input
+   template and the briefing), document when `true` is factually right (a correction in authentication or authorization logic), and give the
+   registration a protocol step to withdraw and re-register a delta request before a round has started on it.
+2. Order trap: `critic-diagnostic-evidence.mjs` needs candidate == HEAD (`CDI-DIRTY-CANDIDATE`); an evidence-only commit after the correction
+   commit (the export of the previous round) makes that impossible, and the delta command then picks the last non-evidence commit and finds no
+   diagnostic (`FPR-DELTA-NO-DIAGNOSTIC`); docs-only commits are skipped (AC-108), so no document commit bridges the gap. Fix: accept a
+   diagnostic bound to the right candidate or to its tree, or state "diagnostic first, everything else after" in the instructions and the refusal.
+3. The Critic briefing (about 12k tokens) must be handed over by the coordinator in full; the Goldfish briefing has the `promptPointer`
+   (`pipeline-briefing-file`) form, a Critic briefing has none (an attempt gave `DBG-REF-AMBIGUOUS`). Fix: the pointer mechanism for Critic briefings.
+4. Smaller: `onboarding-init --root` with backslashes fails with a misleading `SCF-INTERNAL ... lstat`; `--registration-commit` must be the full
+   40-character hash, a short one gives `CCA-MANIFEST-READ` and a misleading hint; `DBG-SETTLED-PENDING-HEAL` reappears after every slice so
+   `heal --no-goldfish-running` was needed before each dispatch; the security preflight kept reporting the scanners as missing after their
+   installation while a Goldfish ran in the background. Positive: the Critic found real, fixable defects in security-relevant flows in both rounds.
+
+## C30-10: a successor of a DISCARDED feature cannot materialize the architecture (Codex greenfield, 2026-11-16, blocker)
+
+Recovery of a damaged Critic course is the PO's discard and a successor feature with its own plan. The architecture receipt the discarded feature
+left (`architecture/design-materialization.json`) names its feature id and plan path; the refresh route needs the same id and path, the
+inheritance route needs the predecessor in `closedFeatures`, and the discard writes `discardedFeatures`. The signed successor design (it also
+moves one file's ownership into the shell module) then stops at `ARCHITECTURE-DESIGN-RECEIPT-STALE`, and a second signature cannot change that
+classification. Built in 30d: `lib/architecture-design.mjs` treats an entry of `discardedFeatures` as a lineage (plan still the one its receipt
+names, every recorded target still holding its recorded bytes, otherwise `ARCHITECTURE-DESIGN-ARTIFACT-DRIFT`), inherits an equal design, and
+replaces the targets over their recorded preimages for a changed design, including a changed ownership; a closed predecessor keeps the additive
+rule. Tests: whole sequence in `lib/architecture-design.test.mjs`. Still to do: the refusal text should name an executable recovery; the
+second finding of that report, `cancel-submitted-plan` refused with `SDC-AUTHORITY-UNAVAILABLE` (`continuity State entry not admitted`) after a
+guard block of a read-only architecture preview as opaque-script-execution, is separate and not analysed yet.
