@@ -273,11 +273,14 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
 const STATE_PATH = ".claude/pipeline-state.json";
 const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
 const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+// C30D-G1: the shape `reconcileSigningRoute` prints (boundedCopySafeCommand's `{ executable, argv, command, copyCommand }` plus the kind, subject and boundary): the PO's line is its `command`.
+const SIGNATURE_COMMAND = { executable: "node", argv: ["po-human-approval.mjs", "authorize-critical", "--kind", "feature-package-reconcile"], command: "node po-human-approval.mjs authorize-critical --kind feature-package-reconcile", copyCommand: { maxColumns: 100, posix: null, powershell: null, cmd: null }, kind: "feature-package-reconcile", requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false };
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false } = {}) {
-  const independenceChecks = []; const gateChangeChecks = []; let retired = false;
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false } = {}) {
+  // C30D-G1: `bootstrap` names what the Result bootstrap stand-ins answer (a refused plan by default, so the cases written before the close ran the bootstrap itself keep their stop); `ownerRoute` gives the repository a session-authority catalogue.
+  const independenceChecks = []; const gateChangeChecks = []; const ownerRouteCalls = []; let retired = false; let bootstrapped = false;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
@@ -285,7 +288,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
   const resultSha = sha256Of("# Result\n");
   const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" }, ...(residualOnRecord ? { residualAcceptance: { lastAccepted: { findings: [] } } } : {}),
-    ...(continuity ? { continuity: { revision: retired ? 4 : 3, ...(language === null ? {} : { runtime: { humanFacingLanguage: language } }), queueHead: { nextAction }, authority: { result: resultBound && !retired ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+    ...(continuity ? { continuity: { revision: retired || bootstrapped ? 4 : 3, ...(language === null ? {} : { runtime: { humanFacingLanguage: language } }), queueHead: { nextAction }, authority: { result: (resultBound || bootstrapped) && !retired ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
   if (handover) { mkdirSync(join(root, "project")); mkdirSync(join(root, "docs")); writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`); writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n"); }
@@ -293,11 +296,14 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   git("add", "-A"); git("commit", "-q", "-m", "baseline");
   const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
   if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
+  if (ownerRoute) { mkdirSync(join(root, ".git/agent-pipeline/session-authority"), { recursive: true }); writeFileSync(join(root, ".git/agent-pipeline/session-authority/catalogue.json"), "{}\n"); mkdirSync(join(root, ".git/agent-pipeline/publication-close/lc-1"), { recursive: true }); }
   const calls = []; let phase = startPhase ?? "none"; let addendaPending = addendaWritten;
   const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
   const flag = (argv, name) => argv[argv.indexOf(name) + 1];
   const runner = (executable, argv) => {
     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
+    // The owner route forwards the State argv after `--` to the same State writer stand-ins.
+    if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs") { const inner = argv.slice(argv.indexOf("--") + 1); ownerRouteCalls.push(inner); return runner(executable, [STATE_WRITER, ...inner]); }
     const script = argv[0].split("/").at(-1); const sub = argv[1];
     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
@@ -307,7 +313,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
       ? { schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: ["GS-1 pipeline.user.yaml changed in 0123456789ab: no proof"], repair: "the PO acknowledges the unproven gate-definition changes once for this range: run node pipeline-state.mjs approve-gate-change-acknowledgement --by <the label the PO gives for this command>, which prints the PO's signing command" }
       : { schema: "pipeline.close-gate-changes.v1", status: "proven", changes: 0, record: { schema: "pipeline.gate-definition-changes.v1", status: "proven", base: null, head: git("rev-parse", "HEAD").trim(), changes: [], unproven: [] } }); }
     if (script === "security-scan.mjs" && argv.includes("--close-postimages")) { calls.push("security-scan.mjs --close-postimages"); return postimageBlocking ? POSTIMAGE_BLOCK : POSTIMAGE_PASS; }
-    calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
+    calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" || script === "commit-pipeline-owned.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
     if (script === "verify-evidence-producer.mjs") {
       if (verifyRed) return { status: 2, stdout: "", stderr: "verify-evidence-producer: VEP-FAILED: suite red\n" };
       const head = git("rev-parse", "HEAD").trim(); const tree = git("rev-parse", "HEAD^{tree}").trim();
@@ -318,7 +324,29 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     if (script === "security-scan.mjs") { mkdirSync(join(root, "evidence"), { recursive: true }); writeFileSync(join(root, "evidence/security-latest.v2.verdict.json"), "{\"verdict\":{\"blocking\":false}}\n"); return { status: securityBlocking ? 1 : 0, stdout: "scan", stderr: "" }; }
     if (script === "register-feature-package.mjs") return json({ status: "registered" });
+    // C30D-G1: stand-ins for the Result bootstrap the close now runs itself, and for the commit that owns its outputs (it moves HEAD, as the real one does).
+    if (script === "commit-pipeline-owned.mjs") {
+      if (bootstrap === "commit-refused") return { status: 2, stdout: JSON.stringify({ schema: "pipeline.commit-pipeline-owned.v1", status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted; this command commits only the Pipeline's own state files", others: ["notes.txt"], owned: [STATE_PATH] }), stderr: "" };
+      git("add", "--", STATE_PATH); git("commit", "-q", "-m", "chore(state): bind the Implementation Result", "--", STATE_PATH);
+      return json({ schema: "pipeline.commit-pipeline-owned.v1", status: "committed", owned: [STATE_PATH], commit: git("rev-parse", "HEAD").trim() });
+    }
     if (script === "pipeline-state.mjs") {
+      if (sub === "continuity-result-bootstrap-plan") {
+        if (bootstrap === "refused") return { status: 2, stdout: "", stderr: "Error: Result bootstrap plan refused (PS-RESULT-BOOTSTRAP-DRIFT); zero mutation.\n" };
+        return json({ schema: "pipeline.continuity-result-bootstrap-plan.v1", featureId: "feature-abc", planSha256: "6".repeat(64),
+          applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-bootstrap-apply", "--feature-id", "feature-abc", "--plan-sha256", "6".repeat(64), "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl" },
+          ...(bootstrap === "plan-signature" ? { signatureCommand: SIGNATURE_COMMAND } : {}) });
+      }
+      if (sub === "continuity-result-bootstrap-apply") {
+        if (bootstrap === "apply-refused") return { status: 2, stdout: "", stderr: "Error: Result bootstrap apply refused (PS-RESULT-BOOTSTRAP-LOCK); zero mutation.\n" };
+        // "stuck": the writer reports success but the State still binds no Result (the loop guard's case); the write still dirties the tree, so a commit follows.
+        if (bootstrap === "stuck") writeState({ ...stateValue("review"), touched: true }); else { bootstrapped = true; writeState(stateValue("review")); }
+        const completion = bootstrap === "completion-signature" ? { state: "reconciliation-pending", signatureCommand: SIGNATURE_COMMAND, reconcileCommand: { executable: process.execPath, argv: [STATE_WRITER, "feature-package-reconcile", "--by", "<po-name>"], requiredInputs: ["by", "proof-request", "proof-authority", "proof"] } }
+          : bootstrap === "reconcile" || bootstrap === "reconcile-refused" ? { state: "reconciliation-pending", reconcileCommand: { executable: process.execPath, argv: [STATE_WRITER, "feature-package-reconcile", "--root", root, "--manifest", "specs/feature-abc/lifecycle.json", "--plan-sha256", "5".repeat(64)], requiredInputs: [] } }
+            : { scope: "feature-closure", state: "review", workflowTerminal: false };
+        return json({ schema: "pipeline.continuity-result-bootstrap-apply.v1", status: "applied", featureId: "feature-abc", mutated: true, completion });
+      }
+      if (sub === "feature-package-reconcile") return bootstrap === "reconcile-refused" ? { status: 2, stdout: "", stderr: "Error: feature-package-reconcile refused (PS-RECONCILE-DRIFT); zero mutation.\n" } : json({ status: "reconciled" });
       if (sub === "feature-package-plan") return json({ planSha256: "9".repeat(64) });
       if (sub === "feature-package-apply") return json({ status: "applied" });
       // C22 (CGF-12): the existing handover writer; this stand-in rewrites the generated Current state sentence the way the writer does for a closed feature.
@@ -344,7 +372,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     throw new Error(`unexpected ${script} ${sub}`);
   };
-  return { root, git, calls, independenceChecks, gateChangeChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
+  return { root, git, calls, ownerRouteCalls, independenceChecks, gateChangeChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
@@ -399,14 +427,211 @@ test("P3: a feature with Continuity gets its Result close block and close reques
 });
 
 test("C21B: a Continuity feature with no bound Result stops before Verify with the exact bootstrap chain and writes no close evidence", () => {
+  // C30D-G1 (QG-04, restated in place): the close now takes the bootstrap plan itself, so the one State call it makes is the plan; this fixture's plan is refused, so the stop, the manual chain and the
+  // guarantee that nothing past the plan ran (no Verify, no package stage, no apply, no commit) stay exactly as they were.
   const f = oneShotFixture({ continuity: true, resultBound: false });
   try {
     const stopped = oneShotClose(f.input, { runCommand: f.runner });
     assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
     assert.equal(stopped.stop.code, "ONESHOT-RESULT-NOT-BOUND");
-    assert.deepEqual(f.calls, [], "Verify and the package stages must not run");
+    assert.deepEqual(f.calls, ["pipeline-state continuity-result-bootstrap-plan"], "Verify and the package stages must not run");
+    assert.match(stopped.stop.reason, /PS-RESULT-BOOTSTRAP-DRIFT[\s\S]*nothing was written/u);
     for (const needle of ["continuity-result-bootstrap-plan", "applyAction", "reconcileCommand", "commit-pipeline-owned.mjs", `--critic-packet-id ${f.packetId}`]) assert.ok(stopped.stop.repair.includes(needle), needle);
     for (const name of ["audit-request.json", "verify-candidate.json", "close-request.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ---- C30D-G1 (AC-108): the one-shot close runs the Result bootstrap itself when it needs agent authority only -------------------------------------
+const BOOTSTRAP_PLAN = "pipeline-state continuity-result-bootstrap-plan";
+const BOOTSTRAP_APPLY = "pipeline-state continuity-result-bootstrap-apply";
+const countOf = (calls, name) => calls.filter((call) => call === name).length;
+
+test("C30D-G1: a close that only lacks the Result bootstrap needs no detour: the first call plans, applies, commits and asks the question at the new HEAD, the second reaches the commit step on that HEAD", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent", acceptance: false });
+  try {
+    const before = f.git("rev-parse", "HEAD").trim();
+    const asked = oneShotClose(f.input, { runCommand: f.runner });
+    const head = f.git("rev-parse", "HEAD").trim();
+    assert.notEqual(head, before, "the bootstrap's own commit moved HEAD");
+    assert.equal(asked.status, "stopped", JSON.stringify(asked).slice(0, 500)); assert.equal(asked.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    assert.ok(asked.stop.reason.includes(`candidate ${head}`), "the question names the post-bootstrap HEAD, never the one before it");
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs"], "the bootstrap is settled and nothing else ran before the question");
+    assert.equal(asked.resultBootstrap.commit, head);
+    // the human's answer comes with the second call, for the candidate the question named
+    const result = oneShotClose({ ...f.input, humanAcceptance: "yes, I accept" }, { runCommand: f.runner });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 500));
+    assert.equal(f.git("rev-parse", "HEAD").trim(), head, "the second call moved nothing");
+    assert.equal(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/verify-candidate.json"), "utf8")).candidate.commit, head, "the candidate Verify ran on the post-bootstrap HEAD");
+    assert.equal(readAcceptanceRecord(f.root, "feature-abc").candidate, head, "the acceptance names the post-bootstrap HEAD");
+    const request = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/close-request.json"), "utf8"));
+    assert.equal(request.expectedRevision, 4, "the close request is built from the State read after the bootstrap");
+    assert.deepEqual(request.result, { path: "specs/feature-abc/result.md", sha256: f.resultSha });
+    assert.equal(countOf(f.calls, BOOTSTRAP_PLAN), 1, "never planned a second time");
+    assert.deepEqual(forbidden(f.calls), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: an answer given before the candidate existed is not carried over the bootstrap commit, and a decline does not bind a Result only to retire it", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent" });
+  try {
+    const asked = oneShotClose(f.input, { runCommand: f.runner }); // f.input carries --human-acceptance
+    assert.equal(asked.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(asked).slice(0, 500));
+    assert.match(asked.stop.repair, /answer given with --human-acceptance[\s\S]*not carried/u);
+    assert.equal(readAcceptanceRecord(f.root, "feature-abc"), null, "no acceptance was recorded for a HEAD the human never saw");
+    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const g = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent" });
+  try {
+    const { humanAcceptance, ...noAnswer } = g.input;
+    const declined = oneShotClose({ ...noAnswer, humanDecline: "it crashes on start" }, { runCommand: g.runner });
+    assert.equal(declined.status, "stopped", JSON.stringify(declined).slice(0, 500)); assert.equal(declined.stop.code, "ONESHOT-RESULT-NOT-BOUND");
+    assert.match(declined.stop.reason, /decline[\s\S]*nothing was written/u);
+    assert.deepEqual(g.calls, [], "no plan, no apply, no commit");
+  } finally { rmSync(g.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a reconcile the agent may run (no proof inputs) is run before the commit; a refused one stops with what is written and not committed", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "reconcile", acceptance: false });
+  try {
+    const result = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(result.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(result).slice(0, 500));
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "pipeline-state feature-package-reconcile", "commit-pipeline-owned.mjs"]);
+    assert.equal(result.resultBootstrap.reconciled, true);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const g = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "reconcile-refused" });
+  try {
+    const stopped = oneShotClose(g.input, { runCommand: g.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500)); assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-RECONCILE");
+    assert.match(stopped.stop.reason, /not committed[\s\S]*PS-RECONCILE-DRIFT/u);
+    assert.match(stopped.stop.repair, /feature-package-reconcile[\s\S]*commit-pipeline-owned\.mjs --root [^ ]+ --agent/u);
+    assert.deepEqual(g.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "pipeline-state feature-package-reconcile"], "no commit after a refused reconcile");
+  } finally { rmSync(g.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a stop below the block keeps its code and order after the bootstrap, and says what the bootstrap committed", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent", acknowledgementMissing: true });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    const head = f.git("rev-parse", "HEAD").trim();
+    assert.equal(stopped.stage, "critic-acknowledgement"); assert.equal(stopped.stop.code, "CLOSE-CRITIC-CALLER-AUTHORED");
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs"], "the acknowledgement is read after the bootstrap, before Verify");
+    assert.equal(f.independenceChecks.length, 1, "the Critic independence check ran once, after the commit");
+    assert.match(stopped.stop.repair, new RegExp(`first ran the Result bootstrap and committed it as ${head}[\\s\\S]*counts from that commit on[\\s\\S]*nothing was written;`, "u"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: on the owner route the same helper runs the entries through the route, and a later stop says what the bootstrap committed", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent", ownerRoute: true, startPhase: "checkpointed", acceptance: false });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    const head = f.git("rev-parse", "HEAD").trim();
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500));
+    assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    assert.deepEqual(f.ownerRouteCalls.map((argv) => argv[0]), ["continuity-result-bootstrap-plan", "continuity-result-bootstrap-apply"], "plan and apply both ran on the owner route");
+    assert.ok(stopped.stop.reason.includes(`candidate ${head}`), "the acceptance question names the post-bootstrap HEAD");
+    assert.equal(stopped.resultBootstrap.commit, head);
+    assert.match(stopped.stop.repair, /first ran the Result bootstrap and committed it[\s\S]*nothing was written[\s\S]*counts from that commit on/u, "the later stop does not claim an untouched tree");
+    assert.match(stopped.stop.repair, /--resume-lifecycle-id lc-1/u);
+    assert.equal(countOf(f.calls, BOOTSTRAP_PLAN), 1);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: on the owner route a refused plan keeps the old wording: the lifecycle may be open, nothing in the work tree was written", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, ownerRoute: true, startPhase: "checkpointed" });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(stopped).slice(0, 500));
+    assert.match(stopped.stop.reason, /owner route; the Close lifecycle lc-1 it needs is open\. [\s\S]*PS-RESULT-BOOTSTRAP-DRIFT[\s\S]*nothing in the work tree was written/u);
+    assert.match(stopped.stop.repair, /continuity-owner-route\.mjs run --root \S+ --lifecycle lc-1 --/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a plan that prints a signatureCommand still stops, names it for the PO and says nothing was written", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "plan-signature" });
+  try {
+    const before = f.git("rev-parse", "HEAD").trim();
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500));
+    assert.equal(stopped.stage, "result-bootstrap"); assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-NEEDS-PO");
+    assert.match(stopped.stop.reason, /nothing was written/u);
+    assert.match(stopped.stop.repair, /authorize-critical --kind feature-package-reconcile/u);
+    assert.equal(stopped.signatureCommand.command, SIGNATURE_COMMAND.command, "the printed line travels unchanged in the result too");
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN], "nothing was applied, committed or verified");
+    assert.equal(f.git("rev-parse", "HEAD").trim(), before); assert.equal(f.git("status", "--porcelain").trim(), "");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a completion that needs the PO's signature stops after the apply, says the writes are not committed and names the signatureCommand", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "completion-signature" });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500));
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-NEEDS-PO");
+    assert.match(stopped.stop.reason, /applied[\s\S]*not committed/u);
+    assert.match(stopped.stop.repair, /authorize-critical --kind feature-package-reconcile[\s\S]*commit-pipeline-owned\.mjs --root [^ ]+ --agent[\s\S]*--critic-packet-id /u);
+    assert.match(stopped.stop.repair, /Do not commit or change the tree between the signature and the reconcile/u);
+    assert.equal(stopped.signatureCommand.command, SIGNATURE_COMMAND.command);
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY], "no reconcile, no commit, no Verify");
+    assert.notEqual(f.git("status", "--porcelain").trim(), "", "the applied State write is left uncommitted, as the stop says");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a refused applyAction is a typed stop that commits and verifies nothing", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "apply-refused" });
+  try {
+    const before = f.git("rev-parse", "HEAD").trim();
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500));
+    assert.equal(stopped.stage, "result-bootstrap"); assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-APPLY");
+    assert.match(stopped.stop.reason, /PS-RESULT-BOOTSTRAP-LOCK/u);
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY]);
+    assert.equal(f.git("rev-parse", "HEAD").trim(), before);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a refused commit stops with the typed refusal and says the applied State is not committed", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "commit-refused" });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500));
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-COMMIT");
+    assert.match(stopped.stop.reason, /CPO-FOREIGN-CHANGES[\s\S]*not committed/u);
+    assert.match(stopped.stop.repair, /commit-pipeline-owned\.mjs --root [^ ]+ --agent/u);
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: the loop guard: when the State still binds no Result after the one re-entry the close stops and never plans a second time", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "stuck" });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 500));
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-LOOP");
+    assert.match(stopped.stop.repair, /first ran the Result bootstrap and committed it/u);
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs"], "one plan, one apply, one commit, no Verify");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30D-G1: a signed SBOM override is bound to the HEAD it was signed at, so the bootstrap commit asks for a new signature instead of reusing it; a blocked SBOM stops before the bootstrap writes anything", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent" });
+  try {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const pem = publicKey.export({ type: "spki", format: "pem" });
+    mkdirSync(join(f.root, "project"), { recursive: true });
+    writeFileSync(join(f.root, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "po-key", publicKeySha256: createHash("sha256").update(pem).digest("hex") }] }));
+    writeFileSync(join(f.root, "Podfile.lock"), "PODS:\n"); f.git("add", "Podfile.lock", "project/critical-human-proof.json"); f.git("commit", "-q", "-m", "pods");
+    const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
+    assert.equal(stopped.stage, "sbom"); assert.deepEqual(f.calls, [], "the SBOM stop comes before the bootstrap: nothing was planned, applied or committed");
+    const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)[1];
+    const proofPath = requestPath.replace("request", "proof");
+    const request = JSON.parse(readFileSync(join(f.root, requestPath), "utf8"));
+    writeFileSync(join(f.root, proofPath), JSON.stringify({ schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "po-key", publicKey: pem, signatureBase64: nodeSign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), privateKey).toString("base64") }));
+    const after = oneShotClose({ ...f.input, sbomOverrideProof: proofPath }, { runCommand: f.runner });
+    assert.equal(after.status, "stopped", JSON.stringify(after).slice(0, 400)); assert.equal(after.stage, "sbom"); assert.equal(after.stop.code, "SBOM-ADAPTER-UNSUPPORTED");
+    assert.match(after.stop.repair, /first ran the Result bootstrap and committed it/u);
+    const newRequest = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(after.stop.repair)[1];
+    assert.notEqual(newRequest, requestPath, "the new request names the new HEAD"); assert.equal(existsSync(join(f.root, newRequest)), true, "the request the stop names exists");
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs"], "one bootstrap, no Verify bound to a stale HEAD");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

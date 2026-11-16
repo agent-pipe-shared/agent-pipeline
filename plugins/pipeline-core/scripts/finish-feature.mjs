@@ -424,15 +424,69 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       }
       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
       if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
-        if (ownerRouteRequired) {
-          let lifecycle;
+        // C30D-G1 (AC-108, first Antigravity greenfield run): every step of the bootstrap is agent authority, so the close runs them itself instead of printing them: plan, apply, the agent-run package reconcile,
+        // the Pipeline-owned commit. Only a plan or completion that needs the PO's signature stops. The commit moves HEAD, so the close is entered ONCE more: State and every value derived from HEAD (the
+        // addenda, the acceptance, the Verify evidence, the Critic binding) are then read after the commit, never before. `deps.resultBootstrapped` is that one re-entry; a second bootstrap is a typed stop.
+        const commitOwned = join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs");
+        let lifecycle = null;
+        if (deps.resultBootstrapped === undefined && ownerRouteRequired) {
           try { lifecycle = ensureOwnerLifecycle(); } catch (error) { return stopResult("result-bootstrap", error.refusalCode ?? error.code, error.message, repairFor(error, again)); }
-          const route = `node ${OWNER_ROUTE} run --root ${root} --lifecycle ${lifecycle} --`;
-          return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", `Continuity authority.result is null, so this feature has no bound Implementation Result. This project has a session-authority catalogue, so the State entries run on the owner route; the Close lifecycle ${lifecycle} it needs is open and nothing in the work tree was written.`,
-            `in the project root ${root}: (1) ${route} continuity-result-bootstrap-plan; (2) run the applyAction it returns on the same route, that is ${route} followed by its argv from the second element on; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(lifecycle)}`);
         }
-        return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", "Continuity authority.result is null, so this feature has no bound Implementation Result; nothing was written.",
-          `in the project root ${root} (the first command takes no flags and reads the working directory): (1) node ${STATE_WRITER} continuity-result-bootstrap-plan; (2) run the applyAction it returns; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(null)}`);
+        const route = lifecycle === null ? null : [OWNER_ROUTE, "run", "--root", root, "--lifecycle", lifecycle, "--"];
+        const routeText = route === null ? "" : `node ${OWNER_ROUTE} run --root ${root} --lifecycle ${lifecycle} --`;
+        const commitCommand = `node ${commitOwned} --root ${root} --agent`;
+        const manualChain = route === null
+          ? `in the project root ${root} (the first command takes no flags and reads the working directory): (1) node ${STATE_WRITER} continuity-result-bootstrap-plan; (2) run the applyAction it returns; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) ${commitCommand}; (5) ${rerun(null)}`
+          : `in the project root ${root}: (1) ${routeText} continuity-result-bootstrap-plan; (2) run the applyAction it returns on the same route, that is ${routeText} followed by its argv from the second element on; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) ${commitCommand}; (5) ${rerun(lifecycle)}`;
+        const notBound = (cause) => stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", `Continuity authority.result is null, so this feature has no bound Implementation Result.${route === null ? "" : ` This project has a session-authority catalogue, so the State entries run on the owner route; the Close lifecycle ${lifecycle} it needs is open.`} ${cause}; nothing ${route === null ? "was" : "in the work tree was"} written.`, manualChain);
+        if (deps.resultBootstrapped !== undefined) {
+          return stopResult("result-bootstrap", "ONESHOT-RESULT-BOOTSTRAP-LOOP", "The Result bootstrap ran and was committed, but Continuity authority.result is still null, so the close stops instead of running the bootstrap a second time.", `look at the State after that commit (git log, git status) and repair what keeps the Result unbound; then rerun the identical command: ${rerun(again)}`);
+        }
+        // A decline belongs to a candidate the human was asked about, which needs a bound Result; binding and committing one only to retire it again is not what the human declined.
+        if (humanDecline !== null) return notBound("A decline was given, and the close does not bind a Result only to retire it again (bind the Result first, then ask the question)");
+        const commandText = (value) => (typeof value?.command === "string" ? value.command : [value?.executable, ...(Array.isArray(value?.argv) ? value.argv : [])].filter((part) => typeof part === "string").join(" "));
+        const needsPo = (value) => Boolean(value?.signatureCommand) || Boolean(value?.signatureUnavailable) || [value?.applyAction, value?.reconcileCommand].some((action) => Array.isArray(action?.requiredInputs) && action.requiredInputs.length > 0);
+        const signatureLine = (value) => (value?.signatureCommand ? commandText(value.signatureCommand) : `(no signing command could be rendered: ${String(value?.signatureUnavailable ?? "the printed action needs proof inputs").slice(0, 200)})`);
+        const refusalText = (error) => String(error.refusalMessage ? `${error.refusalCode}: ${error.refusalMessage}` : error.message).slice(0, 300);
+        let plan = null;
+        try { plan = command(runner, process.execPath, route === null ? [STATE_WRITER, "continuity-result-bootstrap-plan"] : [...route, "continuity-result-bootstrap-plan"], "ONESHOT-RESULT-BOOTSTRAP-PLAN"); }
+        catch (error) { return notBound(`The Result bootstrap plan was refused (${refusalText(error)})`); }
+        // The plan of a null Result prints only its applyAction (the signature need appears in the apply's completion, below); a plan that does name one is never applied.
+        if (needsPo(plan)) {
+          return stopResult("result-bootstrap", "ONESHOT-RESULT-BOOTSTRAP-NEEDS-PO", "The Result bootstrap plan needs the PO's signature, which the close never takes; nothing was written (no apply, no commit).",
+            `hand the PO exactly this one line for their own terminal: ${signatureLine(plan)}; after the PO reports back, ${manualChain}`, plan?.signatureCommand ? { signatureCommand: plan.signatureCommand } : {});
+        }
+        if (plan?.schema !== "pipeline.continuity-result-bootstrap-plan.v1" || typeof plan.applyAction?.executable !== "string" || !Array.isArray(plan.applyAction.argv)) return notBound("The Result bootstrap plan returned no apply action the close can run");
+        stages.push("result-bootstrap");
+        let applied = null;
+        try { applied = command(runner, route === null ? plan.applyAction.executable : process.execPath, route === null ? plan.applyAction.argv : [...route, ...plan.applyAction.argv.slice(1)], "ONESHOT-RESULT-BOOTSTRAP-APPLY"); }
+        catch (error) { return stopResult("result-bootstrap", error.refusalCode ?? error.code, `The Result bootstrap apply was refused (${refusalText(error)}); nothing was committed. A refused apply reports zero mutation; git status shows what it left.`, repairFor(error, lifecycle ?? again)); }
+        const completion = applied?.completion ?? null;
+        if (needsPo(completion)) {
+          return stopResult("result-bootstrap", "ONESHOT-RESULT-BOOTSTRAP-NEEDS-PO", "The Result bootstrap was applied (the State and the Result are written, not committed), but its package reconcile needs the PO's signature, which the close never takes.",
+            `hand the PO exactly this one line for their own terminal: ${signatureLine(completion)}; after the PO reports back run the reconcileCommand the apply printed${completion?.reconcileCommand ? ` (${commandText(completion.reconcileCommand)})` : ""}, then ${commitCommand}, then ${rerun(lifecycle ?? again)}. Do not commit or change the tree between the signature and the reconcile: the signature names the current commit.`, completion?.signatureCommand ? { signatureCommand: completion.signatureCommand } : {});
+        }
+        const reconcile = completion?.reconcileCommand ?? null;
+        if (reconcile !== null) {
+          stages.push("result-reconcile");
+          try { command(runner, reconcile.executable, reconcile.argv, "ONESHOT-RESULT-BOOTSTRAP-RECONCILE"); }
+          catch (error) { return stopResult("result-bootstrap", error.refusalCode ?? error.code, `The Result bootstrap was applied (the State and the Result are written, not committed), but its package reconcile was refused (${refusalText(error)}).`, `repair the refusal, run ${commandText(reconcile)} again, then ${commitCommand}, then ${rerun(lifecycle ?? again)}`); }
+        }
+        stages.push("result-commit");
+        const committed = runner(process.execPath, [commitOwned, "--root", root, "--agent"]);
+        let receipt = null;
+        try { receipt = JSON.parse(String(committed?.stdout ?? "")); } catch { receipt = null; }
+        if (committed?.status !== 0 || (receipt?.status !== "committed" && receipt?.status !== "nothing-to-commit")) {
+          return stopResult("result-bootstrap", "ONESHOT-RESULT-BOOTSTRAP-COMMIT", `commit-pipeline-owned refused (${receipt?.code ? `${receipt.code}: ${String(receipt.reason ?? "").slice(0, 300)}` : failedText(committed)}), so the applied Result bootstrap is written but not committed.`,
+            `repair what the refusal names, then run ${commitCommand}, then ${rerun(lifecycle ?? again)}`);
+        }
+        const info = Object.freeze({ commit: typeof receipt.commit === "string" ? receipt.commit : null, paths: Object.freeze(Array.isArray(receipt.owned) ? receipt.owned.filter((path) => typeof path === "string") : []), reconciled: reconcile !== null });
+        const note = `This call first ran the Result bootstrap and committed it${info.commit === null ? " (nothing was left to commit)" : ` as ${info.commit}`}${info.paths.length === 0 ? "" : ` (${info.paths.join(", ")})`}; every "nothing was written" below counts from that commit on, and the rerun command below does not run the bootstrap again.${humanAcceptance === null ? "" : " The answer given with --human-acceptance was not carried over: it was given before this candidate existed, so the question is asked again for the candidate it names."}`;
+        // The one re-entry: everything the close derived from the old State and HEAD is read again from the committed result.
+        // A signed SBOM override names the HEAD it was signed at (its request is derived from the candidate), so the commit above made it stale: it is not carried into the re-entry, which then asks for a new signature.
+        const entered = oneShotClose({ rootDir: root, by: actor, architectureImpact, criticPacketId: packet, resumeLifecycleId, humanAcceptance: null, humanDecline: null, openChecks, sbomOverrideProof: null }, { ...deps, resultBootstrapped: info });
+        if (entered.status === "stopped") return Object.freeze({ ...entered, stop: Object.freeze({ ...entered.stop, repair: `${note} ${entered.stop.repair}` }), resultBootstrap: info });
+        return Object.freeze({ ...entered, ...(Array.isArray(entered.stages) ? { stages: ["result-bootstrap", ...entered.stages] } : {}), resultBootstrap: info });
       }
       // C21C: the missing PO acknowledgement of a caller-authored Critic used to surface only inside the close, after Verify and the package move. Its signature needs
       // a clean tree, so the close's evidence had to be committed and the bound candidate went stale. Named here, it stops before anything was written.
