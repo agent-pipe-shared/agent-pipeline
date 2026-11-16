@@ -453,7 +453,8 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         assert.equal(bound.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(bound.result).slice(0, 600));
         assert.ok(bound.result.resultBootstrap?.commit, `the close reports the bootstrap it ran: ${JSON.stringify(bound.result).slice(0, 600)}`);
         assert.notEqual(git(log, fx.root, ["rev-parse", "HEAD"]), headBefore, "the bootstrap commit moved HEAD before the question was asked");
-        assert.equal(porcelain(), treeBefore, `${identity.runner}: the bootstrap is committed and the question wrote nothing more`);
+        // the owned commit (commit-pipeline-owned --agent, the same step 4 of the old repair chain) takes every pipeline-owned path that was waiting, so the tree is clean, not just unchanged
+        assert.equal(porcelain(), "", `${identity.runner}: the bootstrap is committed and the question wrote nothing more (before: ${JSON.stringify(treeBefore)})`);
         assert.notEqual(JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result, null, "the Result is bound");
       }
       const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
