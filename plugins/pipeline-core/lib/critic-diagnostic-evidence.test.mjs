@@ -72,6 +72,26 @@ test("CLI emits honest evidence and refuses missing execution, stale/dirty input
     assert.throws(() => produceCriticDiagnostic(options(f)), /CDI-DIRTY-CANDIDATE/);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+// C30d (PO report on Claude Code, 2026-11-16): the refusal named only its code. An evidence-only commit after the correction commit leaves HEAD behind the candidate the delta route
+// selects; the refusal now says that, and the order that avoids it, instead of leaving a coordinator to guess at a dirty tree.
+test("C30d: a candidate behind HEAD is refused CDI-DIRTY-CANDIDATE with the order trap named, a dirty tree with its own text, and nothing is written", () => {
+  const f = fixture();
+  try {
+    writeFileSync(join(f.root, "later.md"), "an evidence-only commit made after the candidate\n");
+    git(f.root, ["add", "later.md"]);
+    git(f.root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "evidence after the candidate"]);
+    let behind = null;
+    try { produceCriticDiagnostic({ ...options(f), candidate: f.candidate.commit }); } catch (error) { behind = error; }
+    assert.equal(behind?.code, "CDI-DIRTY-CANDIDATE");
+    for (const needle of ["is not the candidate", "1 commit(s) follow the candidate", "BEFORE any evidence, export or lineage commit", "clean checkout of exactly the candidate", "Nothing was written"]) assert.ok(behind.message.includes(needle), `the refusal says "${needle}": ${behind.message}`);
+    assert.equal(existsSync(join(f.root, "evidence/targeted.log")), false, "no capture log was written");
+    writeFileSync(join(f.root, "spec.md"), "dirty");
+    let dirty = null;
+    try { produceCriticDiagnostic(options(f)); } catch (error) { dirty = error; }
+    assert.equal(dirty?.code, "CDI-DIRTY-CANDIDATE");
+    assert.ok(dirty.message.includes("the working tree differs from the candidate") && !dirty.message.includes("follow the candidate"), dirty.message);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
 // D167-PF78: the producer and the registrar share one location rule.
 import * as shared from "./critic-diagnostic-evidence.mjs";
 import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
