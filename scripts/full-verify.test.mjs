@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { countResumed, leakedFixtureNames, newestRunId, summarize } from "./full-verify.mjs";
 import { isLeftoverName, planLeftovers, sweepLeftovers } from "./clean-test-leftovers.mjs";
+import { activeRunsIn, applyPlan, isInsideScratch, planScratch } from "./clean-repo-scratch.mjs";
 import { keepTestHomes, removeTestTree, sweepOldChildren } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
 
 test("newestRunId picks the most recently modified safe run directory name", () => {
@@ -98,6 +99,90 @@ test("C30-5: a new fixture-shaped folder the cleaner does not know is a leak; kn
 test("C30-5: the keep switch is PIPELINE_KEEP_TEST_HOMES=1 and nothing else", () => {
   assert.equal(keepTestHomes({ PIPELINE_KEEP_TEST_HOMES: "1" }), true);
   for (const value of [undefined, "", "0", "true", "yes"]) assert.equal(keepTestHomes({ PIPELINE_KEEP_TEST_HOMES: value }), false, String(value));
+});
+
+// ---- C30-5 extension: the repository scratch cleaner (scripts/clean-repo-scratch.mjs), on a throwaway root ----
+
+const DAY = 86400000;
+function fakeRoot(t) {
+  const root = mkdtempSync(join(tmpdir(), "c30-scratch-"));
+  t.after(() => removeTestTree(root));
+  return root;
+}
+function scratchDir(root, relative, ageDays = 5) {
+  const path = join(root, "scratch", relative);
+  mkdirSync(path, { recursive: true });
+  writeFileSync(join(path, "data.bin"), "x".repeat(100));
+  const when = new Date(Date.now() - ageDays * DAY);
+  utimesSync(path, when, when);
+  return path;
+}
+
+test("C30-5 scratch: old clones and work folders are planned, young ones and the kept names stay", (t) => {
+  const root = fakeRoot(t);
+  for (const name of ["k1", "k2", "pw-old-0"]) scratchDir(root, `clones/${name}`, 20);
+  scratchDir(root, "clones/pw-new-0", 0.2);
+  scratchDir(root, "clones/fixtures", 90);
+  scratchDir(root, "clones/scratch", 90);
+  scratchDir(root, "agent-out/c18", 30);
+  scratchDir(root, "agent-out/c29", 30);
+  scratchDir(root, "agent-out/c30", 0.1);
+  scratchDir(root, "agent-out/w24reh", 0.1);
+  scratchDir(root, "agent-out/w24reh/reh29e", 4);
+  scratchDir(root, "agent-out/w24reh/reh30", 0.1);
+  const { planned, kept } = planScratch({ root, keepDays: 1 });
+  assert.deepEqual(planned.map((item) => item.name).sort(), ["agent-out/c18", "agent-out/w24reh/reh29e", "clones/k1", "clones/k2", "clones/pw-old-0"]);
+  const keptNames = kept.map((item) => item.name);
+  for (const name of ["clones/pw-new-0", "clones/fixtures", "clones/scratch", "agent-out/c29", "agent-out/c30", "agent-out/w24reh", "agent-out/w24reh/reh30"]) assert.ok(keptNames.includes(name), name);
+  assert.ok(planned.every((item) => item.bytes === 100 && item.files === 1));
+});
+
+test("C30-5 scratch: files and every other top-level entry of scratch are never considered", (t) => {
+  const root = fakeRoot(t);
+  scratchDir(root, "clones/k1", 20);
+  mkdirSync(join(root, "scratch", "agent-out"), { recursive: true });
+  writeFileSync(join(root, "scratch", "agent-out", "mkclone.mjs"), "x");
+  writeFileSync(join(root, "scratch", "note.txt"), "x");
+  scratchDir(root, "test-tmp-verify2", 20);
+  scratchDir(root, "8249e5be-session-folder", 20);
+  assert.deepEqual(planScratch({ root, keepDays: 1 }).planned.map((item) => item.name), ["clones/k1"]);
+});
+
+test("C30-5 scratch: a symbolic link is skipped, never followed, and the link target stays", (t) => {
+  const root = fakeRoot(t);
+  const outside = fakeRoot(t);
+  writeFileSync(join(outside, "keep.txt"), "keep");
+  mkdirSync(join(root, "scratch", "clones"), { recursive: true });
+  symlinkSync(outside, join(root, "scratch", "clones", "linked"));
+  const { planned, kept } = planScratch({ root, keepDays: 0 });
+  assert.deepEqual(planned, []);
+  assert.deepEqual(kept.map((item) => [item.name, item.reason]), [["clones/linked", "symbolic link"]]);
+  assert.equal(isInsideScratch(root, join(root, "scratch", "clones", "linked")), false);
+  assert.equal(existsSync(join(outside, "keep.txt")), true);
+});
+
+test("C30-5 scratch: apply removes exactly the plan, makes unreadable trees removable, and a second plan is empty", (t) => {
+  const root = fakeRoot(t);
+  const old = scratchDir(root, "clones/k9", 20);
+  const keep = scratchDir(root, "clones/pw-new-0", 0.1);
+  mkdirSync(join(old, "locked"));
+  writeFileSync(join(old, "locked", "f"), "x");
+  chmodSync(join(old, "locked"), 0o000);
+  const aged = new Date(Date.now() - 20 * DAY);
+  utimesSync(old, aged, aged); // writing inside the folder refreshed its own time
+  const { planned } = planScratch({ root, keepDays: 1 });
+  assert.equal(applyPlan(planned), 1);
+  assert.equal(existsSync(old), false);
+  assert.equal(existsSync(keep), true);
+  assert.deepEqual(planScratch({ root, keepDays: 1 }).planned, []);
+});
+
+test("C30-5 scratch: a missing scratch folder plans nothing, and an active run is recognised from the command lines", (t) => {
+  assert.deepEqual(planScratch({ root: fakeRoot(t) }), { planned: [], kept: [] });
+  assert.deepEqual(activeRunsIn(["node scripts/full-verify.mjs /x fv30", "bash"]), ["full-verify.mjs"]);
+  assert.deepEqual(activeRunsIn(["node /x/scripts/run-parallel.mjs 4 label"]), ["run-parallel.mjs"]);
+  assert.deepEqual(activeRunsIn(["node harness/scripts/verify.mjs --no-reuse"]), ["harness/scripts/verify.mjs"]);
+  assert.deepEqual(activeRunsIn(["node scripts/clean-repo-scratch.mjs apply", "claude"]), []);
 });
 
 test("summarize states the resumed count only when resuming, and keeps the old lines otherwise", () => {
