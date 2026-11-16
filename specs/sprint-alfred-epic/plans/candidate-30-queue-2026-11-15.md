@@ -304,3 +304,45 @@ without a calibrated security gate (unset stakes) counts as; the Trivy condition
 of updates). Trivy is installed by the PO; the Trivy suites (`security-adapters/trivy`, `trivy-baseline`, `security-scan*`)
 run once against a clone after that, because two real-binary cases skip without it; the Full Verify `fv30c` ran without
 Trivy.
+
+## C30-8: the Antigravity greenfield report (2026-11-16, first run on that runner; project, remote and key names left out)
+
+**Verdict of the report.** The run is a success the PO can work with: from the product idea to a signed close and a remote push, the
+Elephant wrote no product code, four Goldfish slices ran in isolated worktrees (two of them in parallel), 99 tests green, the Critic
+passed with no finding, the audit bundle was complete. Against an unguided run of the same runner and model the governed result was
+better on every compared point (data safety, parental PIN, integer money arithmetic, tests). The measured cost: about 22 times the
+wall time and 30 times the uncached tokens for a small app, of which about 59 % of the uncached input tokens were ceremony.
+
+**Findings, with what the code shows (read 2026-11-16 against the stamped 30c).**
+
+1. **P1, a second parallel slice cannot fast-forward (six calls by hand).** Confirmed: `agy-native-integrate.mjs` `fastForwardFacts`
+   returns "not eligible" when `base !== head` and `plan.next` then names only the plain `apply`, which leaves the change in the working
+   tree. The one-call route `apply --commit-dispatch-id` already exists but is not advertised, and it cannot write the dispatch record
+   (`goldfish-host-commit-recover.mjs` writes it only with `--briefing --handback`, which the integrate script does not forward). Fix
+   (keeps ADR-0099, no replay, no new authority): advertise the one-call route in `plan.next`, forward `--briefing`/`--handback`, so
+   take-over, commit and the attested record are one call. An authorship-preserving replay (new commits, no commit-msg hook) is a
+   separate decision and not part of 30d.
+2. **P1, the one-shot close needs a manual Result bootstrap (five calls), then a second acceptance turn.**
+   (a) Buildable: when the bootstrap plan needs agent authority only, the one-shot runs plan, apply and reconcile itself and returns
+   `commit-required`; a plan that needs the PO still stops with the signature command; HEAD must settle before the acceptance binds.
+   (b) NOT built, PO decision needed: the report asks the close to accept a natural sentence ("good! ... and then please push") as
+   the acceptance. That reverses the PO decision of C28 / AC-108 (2026-11-10: one fixed yes form, no keyword is searched in an answer).
+   Not changed without the PO; the cost seen was one extra turn.
+3. **P1, the Critic briefing for Antigravity has open placeholders and the model check contradicts the call check.** Confirmed in
+   `lib/critic-briefing-build.mjs` (`renderEnvelope` leaves `MODEL` open) and `lib/dispatch-policy.mjs` (`NAMES_MODEL` rejects
+   `inherit`, while the outer call refuses a set model). Resolve with the model route source before changing which check gives.
+4. **P2 raised to the push path, a pure evidence commit needs a second push signature.** Root cause confirmed in the greenfield repo:
+   the audit-proof follow-up commit changes only `audit-bundles/<feature>/<commit>/proofs/*` at the repository root, and the carry-forward
+   decision (`lib/evidence-carry-forward.mjs`, `lib/record-only-paths.mjs`) lists only `specs/<id>/audit-bundles/`, a location nothing
+   writes; four other modules already use the root path. The push guard answers `PRODUCT-PATH-CHANGED`. Fix: the bundle directory shape of
+   `lib/audit-proof-collection.mjs` joins the closed evidence set; reproduce the whole push decision first.
+5. **Queued, lower priority:** guard false positives for the Pipeline's own scripts in the design phase (`GUARD-DEVPLAN-SHELL`, twice);
+   `GS-16` and `GUARD-GATE-STRENGTH-SHELL` named neither the right route (`architecture-boundary-check.mjs --write-policy`) nor exempted the
+   read-only `--guardrail` flag; the push-init remote-branch check comes only after the signature; the bootstrap barrier ignores a native
+   `read_file` of the start skill; the resume hint refuses a hyphenated compound word; `usage-ledger.mjs --latest --row` reads only the Claude
+   directory format, so the audit bundle has no cost record on Antigravity; Goldfish children read the start skill twice (bad byte offset).
+6. **Tuning, measured:** ceremony is 59 % of the uncached input tokens but 31.5 % of the output; the long Elephant session is re-read in
+   full after each cache expiry (two waits of about 45 minutes cost about 225,000 uncached tokens each). No change planned; noted for the
+   consent and bootstrap work of C30-1.
+
+**Order.** 1, 4, 3, 2a in 30d; 2b to the PO; 5 as capacity allows. Failing-first test per fix in an already registered suite.
