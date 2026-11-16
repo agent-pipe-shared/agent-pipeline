@@ -1,7 +1,15 @@
 # Candidate 30 queue (opened 2026-11-15)
 
-Items the PO names for candidate 30 (C30-1 was named first, C30-2 second). Nothing here is built; each item says where the change lives, what must
+Items the PO names for candidate 30 (C30-1 was named first, C30-2 second). Each item says where the change lives, what must
 not change, and how it is proven. Candidate 29e is applied, stamped and installed; candidate 30 starts from it.
+
+**Build status (2026-11-16): implementation complete for C30-1, C30-5 and C30-6; Critic, Full Verify, native Windows proof and PO acceptance pending.**
+Four patches against `5df67f885` (consent text, design review cap, test and Verify cleanup, kernel path entry for
+`lib/design-review-observation.mjs`) are held under `evidence/held-patches/candidate30/` with `apply-candidate30.mjs`; rehearsed clean in a fresh
+clone (registration and case-completion checks green, derived files refreshed in one chore commit). The 183-suite affected run is green except the
+kernel-closure suite, which exposed the missing kernel path entry; fixed in patch 04 and re-run green. Not built: C30-2 (the PO said later), C30-3
+(no Full Verify of 30 has run), C30-4 (only the toil of the one handover is recorded). Known: `native-goldfish-host-stop-pair` is an intermittent
+pre-existing race; `revised-native-design-cannot-reach-a-new-advisor-course` case (iii) was red in the build environment only, green in the clean clone run.
 
 ## Scope decided by the PO (2026-11-15)
 
