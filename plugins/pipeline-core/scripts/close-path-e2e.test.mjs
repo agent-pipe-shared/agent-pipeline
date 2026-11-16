@@ -443,14 +443,18 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       }
       let ownerLifecycle = null;
       if (oneShot) {
-        // C22 (CGF-04), first stop of the real CLI: a Continuity feature with no bound Result stops BEFORE any evidence is written, with the bootstrap chain as its repair.
+        // C30d (QG-04, restated in place; was C22 CGF-04 "first stop of the real CLI ONESHOT-RESULT-NOT-BOUND"): a Continuity feature with no bound Result no longer stops the close with a repair chain, because
+        // every step of that chain is agent authority. The first call of the real CLI runs the bootstrap plan, its apply action (owner route when the project has a catalogue), the agent-run reconcile and the
+        // owned commit itself, and ends at the acceptance question for the HEAD that commit produced; the Result is then bound. The manual chain stays walked by the plain (not one-shot) run of this walk.
         const treeBefore = porcelain();
-        const unbound = oneShotCli();
-        assert.equal(unbound.status, 2, JSON.stringify(unbound.result).slice(0, 600));
-        assert.equal(unbound.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(unbound.result).slice(0, 600));
-        assert.match(unbound.result.stop.repair, /continuity-result-bootstrap-plan/u);
-        assert.equal(porcelain(), treeBefore, `${identity.runner}: a stop that wrote nothing leaves the tree as it was`);
-        if (catalogue) ownerLifecycle = /continuity-owner-route\.mjs run --root \S+ --lifecycle (\S+) --/u.exec(unbound.result.stop.repair)?.[1] ?? assert.fail(`the stop names the owner route: ${unbound.result.stop.repair}`);
+        const headBefore = git(log, fx.root, ["rev-parse", "HEAD"]);
+        const bound = oneShotCli();
+        assert.equal(bound.status, 2, JSON.stringify(bound.result).slice(0, 600));
+        assert.equal(bound.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(bound.result).slice(0, 600));
+        assert.ok(bound.result.resultBootstrap?.commit, `the close reports the bootstrap it ran: ${JSON.stringify(bound.result).slice(0, 600)}`);
+        assert.notEqual(git(log, fx.root, ["rev-parse", "HEAD"]), headBefore, "the bootstrap commit moved HEAD before the question was asked");
+        assert.equal(porcelain(), treeBefore, `${identity.runner}: the bootstrap is committed and the question wrote nothing more`);
+        assert.notEqual(JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result, null, "the Result is bound");
       }
       const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
       // C28 (QG-04, restated in place): the Result binding is one function because a declined acceptance retires the bound Result and the second close binds it again through the very same verbs.
@@ -488,7 +492,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
       };
-      bindResult(true);
+      if (!oneShot) bindResult(true); // C30d: the one-shot close bound the Result itself above
       if (oneShot) {
         if (decline) {
           // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): the whole chain of a declined acceptance on the real fixture, real Git and the real State writer. The Critic round is the fixture's own
@@ -544,9 +548,10 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
           writeFileSync(join(fx.root, correction), "# Correction of the declined acceptance\n");
           commitPaths("fix: correct the declined acceptance", [correction]);
           // the second close runs the Result bootstrap again for the new candidate
+          // C30d (QG-04, restated in place): it binds the Result itself (the retired one is not carried) and ends at the question for the new HEAD
           const again = oneShotCli();
-          assert.equal(again.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(again.result).slice(0, 800));
-          bindResult(false);
+          assert.equal(again.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(again.result).slice(0, 800));
+          assert.ok(again.result.resultBootstrap?.commit, JSON.stringify(again.result).slice(0, 800));
           assert.notEqual(stateJson().continuity.authority.result.sha256, undefined, "a freshly bound Result");
         }
         // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once and writes nothing; the answer is recorded for exactly the HEAD it was
