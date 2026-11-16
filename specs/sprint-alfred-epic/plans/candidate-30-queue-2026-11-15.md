@@ -303,7 +303,27 @@ without a calibrated security gate (unset stakes) counts as; the Trivy condition
 `pipx upgrade semgrep`, the Trivy install script) and a newer-version hint in the preflight (the PO keeps the Pipeline out
 of updates). Trivy is installed by the PO; the Trivy suites (`security-adapters/trivy`, `trivy-baseline`, `security-scan*`)
 run once against a clone after that, because two real-binary cases skip without it; the Full Verify `fv30c` ran without
-Trivy.
+Trivy. **Update 2026-11-16:** Trivy is installed; `security-adapters/trivy` (13/13, none skipped), `toolchain-preflight` and `security-scan` are green against the `fv30c` clone. The PO decision on the exact scope is still pending; not built in 30d.
+
+## C30-10b: `cancel-submitted-plan` refused "continuity State entry not admitted" (Codex report 2026-11-16, second finding; analysed, not built)
+
+Read cause (code, not reproduced): `pipeline-state.mjs` (about line 14664) maps `cancel-submitted-plan` to the State entry `state.cancel-submitted-plan`, which
+`lib/session-authority-registry.mjs` knows (`stateWriteEntries`), but `lib/onboarding-continuity.mjs` (`continuityObserveSharedStateWrite`) admits only
+`state.reopen-design`, `state.seal-plan-approval`, `state.set-gate-estimate`, `state.revoke-plan` and `state.set-phase-no-calibration` (`continuitySharedStateEntries`) and refuses every
+other entry whose write affects the `onboarding-continuity` producer, with an untyped `SDC-AUTHORITY-UNAVAILABLE`. `state.set-feature`, `state.cancel-mixed-plan-state` and
+`state.set-phase-with-calibration` are not admitted either. Open design question: is `cancel-submitted-plan` meant to be a continuity-affecting write (then admit it with its CAS checks and a test),
+or must it not touch the continuity producer (then the `affectedProducerIds` computation is the defect)? The refusal should in either case name an executable recovery.
+
+## Not built in 30d, from the Critic-cost report (C30-9) and the Full Verify of 30c
+
+- Order trap, structural fix: the delta route should accept a diagnostic produced at a HEAD that is the candidate plus only evidence-only commits with the non-evidence tree unchanged
+  (classifier in `lib/critic-course-admission.mjs`: `criticExportOnlyCommit`, `evidenceOnlyCommit`, `classifyRegisteredEvidenceOnlyCommits`). 30d changed only the refusal text.
+- Not reproduced: a short `--registration-commit` is refused by the preflight with a clear message (`critic-dispatch-preflight.mjs` about line 949), so the reported `CCA-MANIFEST-READ` came from
+  another path; `onboarding-init --root` with backslashes (`SCF-INTERNAL ... lstat`); `DBG-SETTLED-PENDING-HEAL` after every slice (stale armed members keep the heal deferred until
+  `heal --no-goldfish-running`); the security preflight reporting scanners as missing while a Goldfish runs in the background.
+- Full Verify of 30c: `security-scan` red on a gitleaks `sourcegraph-access-token` false positive on the blob ids of line 2 of `held-patches/candidate30b/02-0107034d7.patch` (same shape as the
+  fingerprints for `c20b-chain/13` and `c20e-fix-chain/2`); repair by the reviewed value gate (`gitleaks-repair-ignore.mjs`) or by removing the superseded 30b directory. `native-goldfish-host-stop-pair-tests`
+  red in the run and again alone (known intermittent race, also on 29d).
 
 ## C30-8: the Antigravity greenfield report (2026-11-16, first run on that runner; project, remote and key names left out)
 
