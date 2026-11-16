@@ -502,17 +502,32 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
         // Only a parseable receipt of the same schema qualifies; the receipt on disk is never rewritten.
         let predecessor = null;
         try { predecessor = JSON.parse(stored); } catch { /* unparseable: stale below */ }
-        const closedPredecessor = predecessor !== null && typeof predecessor === "object" && predecessor.schema === receipt.schema
+        const predecessorEnded = (list) => predecessor !== null && typeof predecessor === "object" && predecessor.schema === receipt.schema
           && typeof predecessor.featureId === "string" && predecessor.featureId !== state.activeFeature.id
-          && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === predecessor.featureId);
-        const equalDesign = closedPredecessor && predecessor.designSha256 === receipt.designSha256 && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets);
+          && Array.isArray(state[list]) && state[list].some(entry => entry?.id === predecessor.featureId);
+        const closedPredecessor = predecessorEnded("closedFeatures");
+        // C30d (Codex greenfield, 2026-11-16): the prescribed recovery of a damaged Critic course is the PO's discard of the feature and a successor with its own plan. The discard
+        // writes the predecessor to discardedFeatures, never to closedFeatures, so the receipt it left behind could neither be refreshed (a new feature id and plan path) nor inherited.
+        const discardedPredecessor = !closedPredecessor && predecessorEnded("discardedFeatures");
+        const endedPredecessor = closedPredecessor || discardedPredecessor;
+        const equalDesign = endedPredecessor && predecessor.designSha256 === receipt.designSha256 && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets);
         if (!equalDesign) {
           // K-13: a different design is accepted only as an addition to the closed predecessor's; everything else stays stale.
           const extended = closedPredecessor && Array.isArray(predecessor.targets) && typeof predecessor.planPath === "string" && additiveExtensionOf(root, predecessor, input)
             ? replaceOverRecorded(root, predecessor, targets) : null;
-          requireValue(extended !== null, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
-          return { ok: true, status: "materialization-required", input, targets: extended, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
-            extendsClosedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
+          if (extended !== null) {
+            return { ok: true, status: "materialization-required", input, targets: extended, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
+              extendsClosedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
+          }
+          // C30d: a successor of a DISCARDED feature carries the design its own signed plan approved, including a changed ownership. Its authority is that signature; this route only
+          // proves the lineage (the predecessor is in discardedFeatures, its plan is still the one its receipt names) and that every recorded target still holds its recorded bytes, so
+          // independent drift, a hand-edited target and a dropped file that still exists are refused exactly as on every other route (replaceOverRecorded).
+          const lineageIntact = discardedPredecessor && Array.isArray(predecessor.targets) && typeof predecessor.planPath === "string" && (() => {
+            try { return hash(bytes(root, predecessor.planPath)) === predecessor.planSha256; } catch { return false; }
+          })();
+          requireValue(lineageIntact === true, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+          return { ok: true, status: "materialization-required", input, targets: replaceOverRecorded(root, predecessor, targets), receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
+            supersedesDiscardedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
         }
         inheritedFrom = { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 };
       }
