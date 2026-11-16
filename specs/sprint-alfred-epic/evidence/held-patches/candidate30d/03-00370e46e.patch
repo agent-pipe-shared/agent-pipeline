@@ -1,0 +1,65 @@
+diff --git a/plugins/pipeline-core/lib/critic-briefing-build.mjs b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+index 68d463e25aa146692d50541c4d253fcb15a700cd..227861dfa1399253f4d861dcadaeb9ee1ce7f0bc 100644
+--- a/plugins/pipeline-core/lib/critic-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+@@ -171,7 +171,7 @@ function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, r
+     else if (name === "EVIDENCE_PATH") for (const path of [...facts.evidence, ...(bindingsPath === null ? [] : [bindingsPath])]) lines.push(line.replace(`{{${name}}}`, abs(path)));
+     else if (name === "TRIGGER_ROW") lines.push(line.replace(`{{${name}}}`, trigger));
+     else if (name === "RULESET_SHA") lines.push(line.replace(`{{${name}}}`, facts.rulesetSha));
+-    else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the Antigravity route model of the Critic duty"))); }
++    else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the concrete model id this session runs on (the Critic inherits it); never the word inherit, and the call itself passes no Model"))); }
+     // C29e T5: one part of a split review names its scope marker; the template tells the Critic to begin trajectory_evidence with it. A whole-range review has no row.
+     else if (name === "SCOPE_MARKER") { if (entry) lines.push(line.replace(`{{${name}}}`, entry.scopeMarker)); }
+     else refuse("CBB-TEMPLATE-PLACEHOLDER", `the Antigravity envelope holds a placeholder this builder does not know: ${name}`);
+diff --git a/plugins/pipeline-core/lib/dispatch-policy.mjs b/plugins/pipeline-core/lib/dispatch-policy.mjs
+index 2113311b504cd299e20e5dc10d9d8d9ff04cdf85..6d49f4e698db9a6f965e7f007314b0476087c96d 100644
+--- a/plugins/pipeline-core/lib/dispatch-policy.mjs
++++ b/plugins/pipeline-core/lib/dispatch-policy.mjs
+@@ -307,7 +307,8 @@ export function dispatchFindings({ subagentType, prompt, transport = "direct" }
+       });
+     }
+     if (!NAMES_MODEL.test(text)) {
+-      findings.push({ code: "DISPATCH-NO-MODEL", why: "every dispatch names its model explicitly (MP-05); subagents otherwise inherit the session's silently" });
++      // C30d (Antigravity greenfield): the Critic there inherits the session's model and its call passes no Model, but the briefing still names the concrete id; the word `inherit` is not an id and sent the dispatcher round in circles.
++      findings.push({ code: "DISPATCH-NO-MODEL", why: "every dispatch names its model explicitly (MP-05); subagents otherwise inherit the session's silently. Name the concrete model id (for a Critic that inherits the session's model on Antigravity, the id this session runs on, in the briefing's `model:` row); the word `inherit` names none, and the call itself still passes no Model there" });
+     }
+     if (selectsOpus(text)) {
+       const lines = text.split(/\r?\n/);
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index 9d279fabdb66a9d50d06e5db412c692d78373b8c..b105b183cdc0a705be12edc444bc29c87b1dbd8b 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -187,7 +187,7 @@ export function prepareCriticDispatch(input, deps = {}) {
+       briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
+       ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
+       briefingUse: briefing.runner === "antigravity"
+-        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md)."
++        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. The `model:` row takes the concrete model id this session runs on (the Critic inherits it), never the word inherit; the call itself still passes no Model. It holds paths and refs only: add nothing. A Critic is a read-only role, so prepare each call before issuing it: write one request file with `packets` (one pipeline.role-dispatch-request.v1 packet) and that call's own TypeName, Role and Prompt, run `antigravity-native-dispatch-prepare.mjs prepare --root <root> --request <file>`, and pass the returned invocation's fields unchanged; an unprepared call is refused AGY-NATIVE-ARTIFACT-MISSING (skills/pipeline-start/references/antigravity-native-dispatch.md)."
+         : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
+       nextStep: value.nextStep,
+       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index 67eafcbb8e69970c7adc8189fda6a22009128503..d706c49f7ce4ff358f3b14a362ca88b51f340f16 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -321,6 +321,20 @@ test("R14 (Antigravity run 3): on Antigravity the briefing use names the prepare
+   assert.match(result.next.briefingUse, /antigravity-native-dispatch-prepare\.mjs prepare --root <root> --request <file>/u);
+   assert.match(result.next.briefingUse, /AGY-NATIVE-ARTIFACT-MISSING/u);
+   assert.match(result.next.briefingUse, /TypeName critic, no Model/u);
++  // C30d (Antigravity greenfield): the `model:` row takes the concrete id of the session; the word inherit sent the dispatcher round in circles (DISPATCH-NO-MODEL).
++  assert.match(result.next.briefingUse, /`model:` row takes the concrete model id this session runs on.*never the word inherit/u);
++});
++
++test("C30d: the Antigravity envelope's model row asks for the session's concrete id, and the policy finding says what to write for it", () => {
++  const { briefings: [{ text }] } = criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" });
++  const row = text.split("\n").find((line) => line.startsWith("model: "));
++  assert.match(row, /^model: <FILL MODEL: the concrete model id this session runs on \(the Critic inherits it\); never the word inherit, and the call itself passes no Model>$/u);
++  const findingsFor = (value) => dispatchFindings({ subagentType: "critic", prompt: text.replace(row, `model: ${value}`), transport: "antigravity" }).findings.filter(({ code }) => code === "DISPATCH-NO-MODEL");
++  const refused = findingsFor("inherit");
++  assert.equal(refused.length, 1, "the word inherit names no model");
++  assert.match(refused[0].why, /concrete model id/u);
++  assert.match(refused[0].why, /the word `inherit` names none/u);
++  assert.deepEqual(findingsFor("gemini-4-argon-medium"), [], "a concrete id passes");
+ });
+ 
+ test("a template that lost its copy marker or holds an unknown placeholder refuses instead of handing on an unfilled briefing", () => {

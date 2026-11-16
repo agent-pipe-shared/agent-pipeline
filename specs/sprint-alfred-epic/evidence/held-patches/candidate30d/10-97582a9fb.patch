@@ -1,0 +1,62 @@
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index 75c5efc8e76b7c2d3fba94d7157d818d1edaa862..0364844bb8415de87db5eb66a26f43e80b5969ba 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -32,7 +32,7 @@
+     },
+     {
+       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+-      "rawSha256": "c374451867cd394b0cc847ca39dd7f823c19763610389043947d064ff114d997"
++      "rawSha256": "5c5a18576bdc972b0c1592101625fa2a1693882da0806915cf9161fc3165ceaa"
+     },
+     {
+       "path": "roles/critic.md",
+@@ -40,7 +40,7 @@
+     },
+     {
+       "path": "templates/prompts/critic-review.md",
+-      "rawSha256": "93c6b34e47a6ae657d899905bec7bee477dba05aa9dac83216fcc80263140a7a"
++      "rawSha256": "2bbad87b775d0a5e94370d14126bfdac07e76c5dd0918ca6a839f08a8cbfea2e"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 0ceeb6d4f110cc95de69e80a128b3bf828386674..7b2811327ff25060ac99bea5f2152e0f821b6ee9 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -347,7 +347,7 @@ tool or mutating command, do not delegate, and report the exposure as a
+ residual host limitation. No staleness check (the dispatch fixed the SHA); no
+ handover, no history — ever.
+ 
+-**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record, finding-disposition record or retained prior result exclusion, never readable; a finding-disposition record is only a file the project calibration lists in `criticFindingRecordPaths`, so a project whose backlog or feedback files quote earlier Critic findings lists them there and commits the calibration before the range is derived) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic). For an effective FULL round (a delta request that moves a trust boundary or is impact-ambiguous, RE-DELTA-FALLBACK-FULL) the range is the course genesis base to the candidate, not the correction range: derive with `--base <genesis base>`; the preflight refusal names that base. Passing the file is optional: when the flag is omitted the preflight derives the same bindings in memory and echoes them as `derived: true` (admit and finalize then bind that echo), and `--registration-commit` may be omitted too when exactly one commit after the candidate qualifies (several refuse, never the latest). The built-in project-state convention covers `docs/HISTORY.md` and everything under `docs/state-archive/`; any other history-named markdown or text file in the range is refused before a packet is reserved with `CDP-HISTORY-IN-RANGE` (list it in `criticFindingRecordPaths` in BOTH calibration mirrors, or leave it out of the range). A missing delta input file is written as a path skeleton by `--add-delta-request` (the four judgment fields stay for the Coordinator).
++**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record, finding-disposition record or retained prior result exclusion, never readable; a finding-disposition record is only a file the project calibration lists in `criticFindingRecordPaths`, so a project whose backlog or feedback files quote earlier Critic findings lists them there and commits the calibration before the range is derived) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic). For an effective FULL round (a delta request that moves a trust boundary or is impact-ambiguous, RE-DELTA-FALLBACK-FULL) the range is the course genesis base to the candidate, not the correction range: derive with `--base <genesis base>`; the preflight refusal names that base. Passing the file is optional: when the flag is omitted the preflight derives the same bindings in memory and echoes them as `derived: true` (admit and finalize then bind that echo), and `--registration-commit` may be omitted too when exactly one commit after the candidate qualifies (several refuse, never the latest). The built-in project-state convention covers `docs/HISTORY.md` and everything under `docs/state-archive/`; any other history-named markdown or text file in the range is refused before a packet is reserved with `CDP-HISTORY-IN-RANGE` (list it in `criticFindingRecordPaths` in BOTH calibration mirrors, or leave it out of the range). A missing delta input file is written as a path skeleton by `--add-delta-request` (the four judgment fields stay for the Coordinator). Mind the cost of two of them: `trustBoundaryChanged` or `impactAmbiguous` set to true makes the next round an effective full round over the whole feature range, several times the files and reviewers of a diff round, and a registered value cannot be taken back; the verb therefore refuses a true value (FPR-DELTA-FULL-ROUND-UNCONFIRMED, nothing written) until it is rerun with `--confirm-full-round`. `trustBoundaryChanged` is true only when the correction itself changes who or what is trusted or what an actor may do (authentication, authorization, a permission or origin check, secret or key handling), not for every correction in a security-relevant feature.
+ 
+ **Lifecycle-Guard inspection form (hard):** When the functional-equivalent
+ lane runs under a Lifecycle Guard, perform each repository inspection as one
+diff --git a/templates/prompts/critic-review.md b/templates/prompts/critic-review.md
+index dd7c896f03777128e0563560d25b01912c4653c3..7e67f6ba305806a1a5d46f8e5d3523fe626cbf9c 100644
+--- a/templates/prompts/critic-review.md
++++ b/templates/prompts/critic-review.md
+@@ -201,6 +201,22 @@ USAGE (Elephant)
+    - **Tool budget (hard cap, first-class field):** ≤30 tool uses.
+    ```
+    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
++9. **Handing a Claude Critic its filled briefing as a pointer (Coordinator only;
++   this item sits above the copy marker and is never part of the Critic's text).**
++   `node <plugin-root>/scripts/prepare-dispatch.mjs critic` writes the briefing
++   file; do not paste its ~12k tokens into the Agent call. Run
++   `prepare-dispatch.mjs critic-fill --root <root> --briefing <that file> --fill
++   MODEL_ID=<concrete model id> --fill EFFORT=<effort>` instead: it accepts only
++   those fixed-vocabulary values for the file's `<FILL ...>` slots, writes the
++   final file beside the draft with a Critic generator marker, and prints the
++   two-line pointer prompt. Pass that prompt, alone and unchanged, as the prompt
++   of a direct Claude Agent call of `pipeline-core:critic`; the dispatch guard
++   verifies the file against its marker and the Critic receives exactly the
++   filled briefing, so every contamination, policy and binding check judges the
++   same text as before. The pointer adds no way to carry prose: a pointer plus
++   inline text, an edited file, a file outside `scratch/critic-briefing/` or a
++   Workflow carrier is refused. The Antigravity and Codex carriers still carry
++   the full text (item 8 for Antigravity).
+ ═══════════════════════════════════════════════════════════════════════════
+ COPY EVERYTHING BELOW THIS LINE
+ -->

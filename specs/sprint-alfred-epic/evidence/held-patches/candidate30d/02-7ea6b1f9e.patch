@@ -1,0 +1,220 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 16192d331e78eaf0637df10758004b2457a05e17..eee5ade2f718a70156dd8d7e99d79827e1fb9291 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -634,16 +634,20 @@ function sanctionedAgyNativeIntegrateArgs(args, root) {
+   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
+   const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-") && !value.startsWith("/")
+     && !/[\u0000-\u001f\u007f\\]/u.test(value) && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+-  let branch = false, expect = false, commit = false, allowedCount = 0;
++  // C30d: the two files of the one-call route (take-over, commit and typed attested record). They are the recovery route's own inputs: repository-relative, under scratch/, evidence/ or specs/.
++  const inputFile = (value) => pathValue(value) && /^(?:scratch|evidence|specs)\/[A-Za-z0-9._/-]+$/u.test(value);
++  let branch = false, expect = false, commit = false, commitFlag = null, briefing = false, handback = false, allowedCount = 0;
+   for (let index = 3; index < args.length; index += 2) {
+     const flag = args[index], value = args[index + 1];
+     if (flag === "--branch" && !branch && /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u.test(value ?? "")) branch = true;
+     else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
+-    else if ((flag === "--commit-dispatch-id" || flag === "--keep-authorship") && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
++    else if ((flag === "--commit-dispatch-id" || flag === "--keep-authorship") && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) { commit = true; commitFlag = flag; }
++    else if (flag === "--briefing" && !briefing && args[0] === "apply" && inputFile(value)) briefing = true;
++    else if (flag === "--handback" && !handback && args[0] === "apply" && inputFile(value)) handback = true;
+     else if (flag === "--allowed-path" && pathValue(value) && allowedCount < 50) allowedCount += 1;
+     else return false;
+   }
+-  return branch && allowedCount > 0 && (args[0] === "apply" ? expect : !expect);
++  return branch && allowedCount > 0 && (args[0] === "apply" ? expect : !expect) && briefing === handback && (!briefing || commitFlag === "--commit-dispatch-id");
+ }
+ 
+ // G20-20: only the read-only verbs, each with exactly its own flags: `inspect --root <root>`, `inspect-aside --root <root>
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 43913d2d8d28ad84978b5ca28dd455d1717317a7..aa89680bc6b2852bb6de4cf962ebe644f99cbf99 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -568,7 +568,9 @@ test("C28C: apply with a dispatch id lands the dispatch-trailer commit of exactl
+     assert.equal(git(fx.workspace, "rev-list", "--count", `${head}..HEAD`), "1");
+     assert.match(git(fx.workspace, "log", "-1", "--format=%B"), /Dispatch: C28C-AGY-COMMIT \(goldfish\)/u);
+     assert.equal(git(fx.workspace, "show", "--name-only", "--format=", "HEAD"), "src/a.mjs", "only the applied path is committed");
+-    assert.match(applied.next, /nothing left to do/u);
++    // C30d: without --briefing and --handback no dispatch record is written, and the text says so instead of claiming nothing is left to do.
++    assert.match(applied.next, /no dispatch record is written/u);
++    assert.match(applied.next, /--briefing and --handback/u);
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
+@@ -686,6 +688,39 @@ test("C29 R5: no harvest with authorship for a commit without the trailer or a m
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
++// C30d (Antigravity greenfield, first parallel run): the second of two parallel slices cannot fast-forward (a sibling moved HEAD) and cost six hand-made calls. The plan now names the
++// one-call route for every branch, and apply forwards the briefing and hand-back files to the recovery route, which writes the typed attested record in the same command.
++test("C30d: the plan names the one-call route; --briefing and --handback travel to the recovery route; parse rules", async () => {
++  const fx = brainFixture();
++  try {
++    const integrate = await import("../../scripts/agy-native-integrate.mjs");
++    const wt = worktreeFixture(fx);
++    childCommit(wt, { "src/a.mjs": "export const a = 1;\n" }, "AI-Assisted: true\nDispatch: C30D-ONE (goldfish)");
++    git(fx.workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "a sibling slice landed first");
++    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
++    const planned = integrate.plan(options);
++    assert.equal(planned.status, "ready", JSON.stringify(planned));
++    assert.equal(planned.fastForward.eligible, false, "a moved HEAD cannot fast-forward");
++    assert.match(planned.next, / --commit-dispatch-id <the briefed dispatch id> --briefing <the generated briefing file> --handback <the file holding the child's hand-back text>$/u);
++    assert.doesNotMatch(planned.applyOnly, /--commit-dispatch-id|--briefing/u, "the plain take-over stays available");
++    // The files reach the recovery route: an unreadable briefing refuses the commit step there (without the flags the same call commits), and the take-over stays applied.
++    const head = git(fx.workspace, "rev-parse", "HEAD");
++    const refused = integrate.apply({ ...options, expect: planned.planSha256, commitDispatchId: "C30D-ONE", briefing: "scratch/no-such-briefing.md", handback: "scratch/no-such-handback.txt" });
++    assert.equal(refused.status, "applied", JSON.stringify(refused));
++    assert.equal(refused.commit.status, "refused", JSON.stringify(refused.commit));
++    assert.equal(refused.commit.code, "GHCR-INPUT-UNREADABLE", JSON.stringify(refused.commit));
++    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "nothing committed");
++    const parsed = (...args) => integrate.parseArgs(args);
++    const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a", "--expect-sha256", "a".repeat(64)];
++    const ok = parsed("apply", ...common, "--commit-dispatch-id", "C30D-ONE", "--briefing", "scratch/b.md", "--handback", "scratch/h.txt");
++    assert.equal(ok.briefing, "scratch/b.md"); assert.equal(ok.handback, "scratch/h.txt");
++    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "C30D-ONE", "--briefing", "scratch/b.md").error, /come together/u);
++    assert.match(parsed("apply", ...common, "--briefing", "scratch/b.md", "--handback", "scratch/h.txt").error, /belong to --commit-dispatch-id/u);
++    assert.match(parsed("apply", ...common, "--keep-authorship", "C30D-ONE", "--briefing", "scratch/b.md", "--handback", "scratch/h.txt").error, /belong to --commit-dispatch-id/u);
++    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "C30D-ONE", "--briefing", "a", "--briefing", "b", "--handback", "c").error, /unexpected or repeated/u);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
+ test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
+   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+   const root = realpathSync(resolve(libDir, "..", "..", ".."));
+@@ -699,6 +734,17 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
+   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-AGY-COMMIT`), true);
+   // C29 R5: or one --keep-authorship id instead, never both, never on plan.
+   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5`), true);
++  // C30d: the one-call route: the commit flag plus the briefing and hand-back files together, repository-relative under scratch/, evidence/ or specs/, never with --keep-authorship or on plan.
++  const oneCall = `apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C30D-ONE`;
++  assert.equal(admitted(`${oneCall} --briefing scratch/c.briefing.md --handback scratch/handback-C30D-ONE.txt`), true);
++  for (const args of [
++    `${oneCall} --briefing scratch/c.briefing.md`, `${oneCall} --handback scratch/h.txt`, `${oneCall} --briefing scratch/b.md --handback ../h.txt`,
++    `${oneCall} --briefing /etc/passwd --handback scratch/h.txt`, `${oneCall} --briefing src/app.mjs --handback scratch/h.txt`,
++    `${oneCall} --briefing scratch/b.md --briefing scratch/c.md --handback scratch/h.txt`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5 --briefing scratch/b.md --handback scratch/h.txt`,
++    `plan --root '${root}' --branch ${branch} --allowed-path a --briefing scratch/b.md --handback scratch/h.txt`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --briefing scratch/b.md --handback scratch/h.txt`,
++  ]) assert.equal(admitted(args), false, args);
+   for (const args of [
+     `plan --root '${root}' --branch ${branch} --allowed-path a --keep-authorship C29-R5`,
+     `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5 --commit-dispatch-id C29-R5`,
+diff --git a/plugins/pipeline-core/scripts/agy-native-integrate.mjs b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+index 87d4cba1279bdba48767effdcc5d551962c9bd91..63c9472cced509242b18055ee2d9a6115a215bea 100644
+--- a/plugins/pipeline-core/scripts/agy-native-integrate.mjs
++++ b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+@@ -12,6 +12,9 @@
+  *   apply ... --commit-dispatch-id <id>   (C28C) the same, then the recovery route's own plan and apply commit exactly those paths with the dispatch trailer
+  *   apply ... --keep-authorship <id>      (C29 R5, ADR-0099) instead lands the child's own commits unchanged by fast-forward; only when plan's
+  *                                         `fastForward.eligible` (branch cut from the current HEAD, every commit `Dispatch: <id> (goldfish)`)
++ *   apply ... --commit-dispatch-id <id> --briefing <file> --handback <file>   (C30d) the one-call route for every branch that cannot fast-forward (a second
++ *                                         parallel slice, whose HEAD a sibling already moved): take-over, dispatch-trailer commit and the typed
++ *                                         orchestrator-attested dispatch record in one command. The two files are forwarded to the recovery route unchanged.
+  *
+  * A refusal of the commit step never undoes the applied change: the result carries `commit: {status: "refused", ...}` and `next` names the manual route.
+  *
+@@ -32,7 +35,7 @@ const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "ru
+ const SELF = fileURLToPath(import.meta.url);
+ const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
+ const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
+-const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id> | --keep-authorship <briefed dispatch id>, apply only]";
++const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id> [--briefing <briefing file> --handback <hand-back file>] | --keep-authorship <briefed dispatch id>, apply only]";
+ const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // the same token the recovery route accepts
+ const MAX_COMMITS = 200;
+ 
+@@ -47,7 +50,7 @@ const shellWord = (value) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value :
+ export function parseArgs(argv) {
+   const [verb, ...rest] = argv;
+   if (verb !== "plan" && verb !== "apply") return { error: `unknown verb; usage: ${SYNTAX}` };
+-  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null, keepAuthorship: null };
++  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null, keepAuthorship: null, briefing: null, handback: null };
+   for (let i = 0; i < rest.length; i += 2) {
+     const flag = rest[i], value = rest[i + 1];
+     if (typeof value !== "string" || value === "" || /[\u0000-\u001f\u007f]/u.test(value)) return { error: `flag ${flag} needs one value; usage: ${SYNTAX}` };
+@@ -59,11 +62,16 @@ export function parseArgs(argv) {
+     else if (flag === "--commit-dispatch-id" && out.commitDispatchId === null && DISPATCH_ID.test(value)) out.commitDispatchId = value;
+     // C29 R5 (ADR-0099): apply may instead land the child's own commits unchanged by fast-forward, keeping their authorship.
+     else if (flag === "--keep-authorship" && out.keepAuthorship === null && DISPATCH_ID.test(value)) out.keepAuthorship = value;
++    // C30d: the two files the recovery route binds into the typed attested record, so the take-over, the commit and the record are one call.
++    else if (flag === "--briefing" && out.briefing === null) out.briefing = value;
++    else if (flag === "--handback" && out.handback === null) out.handback = value;
+     else return { error: `unexpected or repeated flag ${flag}; usage: ${SYNTAX}` };
+   }
+   if (out.commitDispatchId !== null && verb !== "apply") return { error: `--commit-dispatch-id belongs to apply; usage: ${SYNTAX}` };
+   if (out.keepAuthorship !== null && verb !== "apply") return { error: `--keep-authorship belongs to apply; usage: ${SYNTAX}` };
+   if (out.keepAuthorship !== null && out.commitDispatchId !== null) return { error: `--keep-authorship and --commit-dispatch-id exclude each other; usage: ${SYNTAX}` };
++  if ((out.briefing === null) !== (out.handback === null)) return { error: `--briefing and --handback come together; usage: ${SYNTAX}` };
++  if (out.briefing !== null && out.commitDispatchId === null) return { error: `--briefing and --handback belong to --commit-dispatch-id; usage: ${SYNTAX}` };
+   return out;
+ }
+ 
+@@ -137,7 +145,10 @@ export function plan(options) {
+   if (fastForward.eligible) fastForward.next = [...applyArgv, "--keep-authorship", fastForward.dispatchId].map(shellWord).join(" ");
+   return { schema: PLAN_SCHEMA, status: "ready", code: "AGYI-READY", root, branch: options.branch, head: head.out.trim(), tip: tip.out.trim(),
+     base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [], fastForward,
+-    next: applyArgv.map(shellWord).join(" ") };
++    // C30d: the one-call route for a branch that cannot fast-forward (a second parallel slice): take-over, dispatch-trailer commit and the typed attested record. `applyOnly` is the
++    // plain take-over that leaves the change uncommitted in the working tree.
++    next: `${applyArgv.map(shellWord).join(" ")} --commit-dispatch-id <the briefed dispatch id> --briefing <the generated briefing file> --handback <the file holding the child's hand-back text>`,
++    applyOnly: applyArgv.map(shellWord).join(" ") };
+ }
+ 
+ /**
+@@ -233,9 +244,11 @@ export function apply(options) {
+   }
+   const next = `the child's change is now in the working tree, uncommitted: commit it with the existing recovery route: node ${shellWord(RECOVER)} plan --root ${shellWord(planned.root)} --dispatch-id <the briefed dispatch id> ${planned.paths.map((p) => `--allowed-path ${shellWord(p)}`).join(" ")}, then the same command as apply with the --expect-sha256 digest it printed`;
+   if (options.commitDispatchId == null) return { ...planned, status: "applied", code: "AGYI-APPLIED", next };
+-  const commit = commitThroughRecovery(planned, options.commitDispatchId);
++  const commit = commitThroughRecovery(planned, options.commitDispatchId, { briefing: options.briefing, handback: options.handback });
+   return { ...planned, status: "applied", code: "AGYI-APPLIED", commit,
+-    next: commit.status === "committed" ? "nothing left to do for this child: its change is committed with the dispatch trailer" : next };
++    next: commit.status !== "committed" ? next
++      : commit.record ? "nothing left to do for this child: its change is committed with the dispatch trailer and the typed orchestrator-attested dispatch record is written (not host-observed evidence)"
++        : "its change is committed with the dispatch trailer; no dispatch record is written (the briefing and hand-back files were not passed): write it with dispatch-record-write.mjs --attested-request, or pass --briefing and --handback next time" };
+ }
+ 
+ /**
+@@ -266,21 +279,22 @@ function landWithAuthorship(planned, dispatchId) {
+  * paths are the integrate plan's own, so there is nothing new to review between the two pairs; every refusal of the recovery route is returned as it is and the
+  * working tree keeps the applied change (the manual route in `next` still works).
+  */
+-function commitThroughRecovery(planned, dispatchId) {
++function commitThroughRecovery(planned, dispatchId, files = {}) {
+   const run = (args) => {
+     const res = spawnSync(process.execPath, [RECOVER, ...args], { encoding: "utf8", shell: false, timeout: 120_000, maxBuffer: 1 << 26 });
+     let json = null;
+     try { json = JSON.parse(String(res.stdout ?? "")); } catch { /* typed below */ }
+     return { json };
+   };
+-  const planArgs = ["plan", "--root", planned.root, "--dispatch-id", dispatchId, ...planned.paths.flatMap((p) => ["--allowed-path", p])];
++  const planArgs = ["plan", "--root", planned.root, "--dispatch-id", dispatchId, ...planned.paths.flatMap((p) => ["--allowed-path", p]),
++    ...(files.briefing == null || files.handback == null ? [] : ["--briefing", files.briefing, "--handback", files.handback])];
+   const recoveryPlan = run(planArgs).json;
+   if (recoveryPlan?.status !== "ready" || !Array.isArray(recoveryPlan.next) || recoveryPlan.next[2] !== "apply" || !recoveryPlan.next.every((word) => typeof word === "string")) {
+     return { status: "refused", code: recoveryPlan?.code ?? "AGYI-COMMIT-PLAN-UNREADABLE", refusals: recoveryPlan?.refusals ?? [] };
+   }
+   const committed = run(recoveryPlan.next.slice(2)).json;
+   if (committed?.status !== "committed") return { status: "refused", code: committed?.code ?? "AGYI-COMMIT-APPLY-UNREADABLE", refusals: committed?.refusals ?? [] };
+-  return { status: "committed", commit: committed.commit, dispatchId };
++  return { status: "committed", commit: committed.commit, dispatchId, ...(committed.record ? { record: committed.record } : {}) };
+ }
+ 
+ if (process.argv[1] && resolve(process.argv[1]) === SELF) {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index 2f8eb18b971f92ceecd79ee402c36d3b62693c94..431fe099fd42b0c636a021dacc9051675416aa8b 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -72,8 +72,11 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
+   commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). When `plan` reports
+   `fastForward.eligible` (the branch was cut from the current HEAD and every commit carries the briefed `Dispatch: <id> (goldfish)`
+   trailer), run its `fastForward.next` instead: `apply ... --keep-authorship <id>` lands the child's own commits unchanged (ADR-0099), and
+-  its `next` names the attested record over exactly those commits. The host owns the worktree and the
+-  branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
++  its `next` names the attested record over exactly those commits. Every other branch, typically the second of two parallel slices whose HEAD a
++  sibling already moved, takes the one-call route that `plan`'s `next` prints: `apply ... --commit-dispatch-id <briefed id> --briefing
++  <generated briefing file> --handback <file holding the child's hand-back text>` takes the change over, commits it with the dispatch trailer
++  and writes the typed orchestrator-attested record in one call (`applyOnly` in the plan is the plain take-over without a commit). The host
++  owns the worktree and the branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
+   <the child's branch>` read the shared object database, so no `git -C <worktree>` is needed. The tool budget is field 6 of the generated
+   briefing and `guard-dispatch` reads it from there; nothing else is passed on the call. Neither step needs a look into the guard sources.
+ - **Briefing text, not a file pointer.** The generated `promptPointer` (`pipeline-briefing-file:` line) is admitted only in a direct

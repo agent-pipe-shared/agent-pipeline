@@ -1,0 +1,117 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 3610f8f96240f4a85286cfb4fd55f80eff74b929..1791acb0b8ed7b788e6e45cea2e801fe586ccc87 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -502,17 +502,32 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+         // Only a parseable receipt of the same schema qualifies; the receipt on disk is never rewritten.
+         let predecessor = null;
+         try { predecessor = JSON.parse(stored); } catch { /* unparseable: stale below */ }
+-        const closedPredecessor = predecessor !== null && typeof predecessor === "object" && predecessor.schema === receipt.schema
++        const predecessorEnded = (list) => predecessor !== null && typeof predecessor === "object" && predecessor.schema === receipt.schema
+           && typeof predecessor.featureId === "string" && predecessor.featureId !== state.activeFeature.id
+-          && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === predecessor.featureId);
+-        const equalDesign = closedPredecessor && predecessor.designSha256 === receipt.designSha256 && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets);
++          && Array.isArray(state[list]) && state[list].some(entry => entry?.id === predecessor.featureId);
++        const closedPredecessor = predecessorEnded("closedFeatures");
++        // C30d (Codex greenfield, 2026-11-16): the prescribed recovery of a damaged Critic course is the PO's discard of the feature and a successor with its own plan. The discard
++        // writes the predecessor to discardedFeatures, never to closedFeatures, so the receipt it left behind could neither be refreshed (a new feature id and plan path) nor inherited.
++        const discardedPredecessor = !closedPredecessor && predecessorEnded("discardedFeatures");
++        const endedPredecessor = closedPredecessor || discardedPredecessor;
++        const equalDesign = endedPredecessor && predecessor.designSha256 === receipt.designSha256 && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets);
+         if (!equalDesign) {
+           // K-13: a different design is accepted only as an addition to the closed predecessor's; everything else stays stale.
+           const extended = closedPredecessor && Array.isArray(predecessor.targets) && typeof predecessor.planPath === "string" && additiveExtensionOf(root, predecessor, input)
+             ? replaceOverRecorded(root, predecessor, targets) : null;
+-          requireValue(extended !== null, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+-          return { ok: true, status: "materialization-required", input, targets: extended, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
+-            extendsClosedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
++          if (extended !== null) {
++            return { ok: true, status: "materialization-required", input, targets: extended, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
++              extendsClosedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
++          }
++          // C30d: a successor of a DISCARDED feature carries the design its own signed plan approved, including a changed ownership. Its authority is that signature; this route only
++          // proves the lineage (the predecessor is in discardedFeatures, its plan is still the one its receipt names) and that every recorded target still holds its recorded bytes, so
++          // independent drift, a hand-edited target and a dropped file that still exists are refused exactly as on every other route (replaceOverRecorded).
++          const lineageIntact = discardedPredecessor && Array.isArray(predecessor.targets) && typeof predecessor.planPath === "string" && (() => {
++            try { return hash(bytes(root, predecessor.planPath)) === predecessor.planSha256; } catch { return false; }
++          })();
++          requireValue(lineageIntact === true, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
++          return { ok: true, status: "materialization-required", input, targets: replaceOverRecorded(root, predecessor, targets), receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
++            supersedesDiscardedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
+         }
+         inheritedFrom = { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 };
+       }
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index d926922d39bd28be12258602a6ffd4ec6fce5f9d..614d1d71c474c121323c5e1ec420e5a3af01b3f2 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -569,7 +569,7 @@ function k13Design(modules) {
+   const base = hf9Design(); const { modules: _omitted, ...fitnessModel } = base.fitnessModel;
+   return { ...base, modules, implementationSurface: modules.map((module) => module.ownedPaths[0]), fitnessModel };
+ }
+-function k13Fixture(stage, { closed = true, current = [k13Module("engine"), k13Module("shell")], earlier = [k13Module("engine")], editPlan = false, driftTarget = false } = {}) {
++function k13Fixture(stage, { closed = true, discarded = false, current = [k13Module("engine"), k13Module("shell")], earlier = [k13Module("engine")], editPlan = false, driftTarget = false } = {}) {
+   const fixture = hf9Fixture(stage, { block: true, scaffold: "none", receipt: true, designInput: k13Design(current) });
+   const oldPrd = `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(k13Design(earlier))}\n\`\`\`\n`;
+   hf9Put(fixture.root, "specs/old/prd.md", editPlan ? `${oldPrd}\nedited after the close\n` : oldPrd);
+@@ -581,6 +581,8 @@ function k13Fixture(stage, { closed = true, current = [k13Module("engine"), k13M
+   const statePath = join(fixture.root, "project/pipeline-state.json");
+   const state = JSON.parse(readFileSync(statePath, "utf8"));
+   state.closedFeatures = closed ? [{ id: "feat-0", planPath: "specs/old/prd.md", closedAt: "2026-01-01T00:00:00.000Z", forCommit: null }] : [];
++  // discard-feature writes the feature to discardedFeatures (never to closedFeatures) with these fields.
++  if (discarded) state.discardedFeatures = [{ id: "feat-0", planPath: "specs/old/prd.md", phaseAtDiscard: "implementation", discardedAt: "2026-01-01T00:00:00.000Z", discardedBy: "the PO", reason: "damaged Critic course", forCommit: null }];
+   writeFileSync(statePath, JSON.stringify(state, null, 2));
+   return { ...fixture, receipt };
+ }
+@@ -615,6 +617,51 @@ test("K-13: removing or changing a predecessor module, an open predecessor, an e
+   refused({ driftTarget: true }, "a recorded target no longer holds its recorded bytes", "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+ });
+ 
++// C30d (Codex greenfield, 2026-11-16): the recovery of a damaged Critic course is the PO's discard and a successor feature with its own signed plan. The receipt the discarded feature left
++// is bound to its id and plan path, and the discard writes discardedFeatures, so neither the refresh of the same feature nor the inheritance of a closed one applied: the successor was
++// stuck on ARCHITECTURE-DESIGN-RECEIPT-STALE although its design was signed and verified. The whole sequence: materialized design, discard, successor, signed plan, materialization, entry.
++test("C30d: the successor of a DISCARDED feature materializes its signed design over the recorded bytes, including a changed ownership, and the receipt then names the successor", async () => {
++  const { stage, mod } = await hf9Load();
++  const widened = [k13Module("engine", { ownedPaths: ["src/engine.mjs", "src/more.mjs"] }), k13Module("shell")];
++  const fixture = k13Fixture(stage, { closed: false, discarded: true, current: widened });
++  const result = mod.inspectArchitectureDesign(fixture.root, null, {});
++  assert.equal(result.status, "materialization-required", result.code);
++  assert.deepEqual(result.supersedesDiscardedFeature, { featureId: "feat-0", planPath: "specs/old/prd.md", designSha256: fixture.receipt.designSha256 });
++  assert.equal(Object.hasOwn(result, "extendsClosedFeature"), false, "a discard is not a close");
++  const recorded = new Set(fixture.receipt.targets.map((target) => target.path));
++  assert.ok(result.targets.filter((target) => recorded.has(target.path)).every((target) => /^[0-9a-f]{64}$/u.test(target.preimageSha256)), "every recorded target is replaced only over its recorded bytes");
++  assert.equal(result.receiptPreimageSha256, hf9Sha(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")));
++  const lockPath = join(fixture.root, "project", "pipeline-state.json.lock");
++  writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: "token-1", ownerNonce: "nonce-1" }));
++  const published = mod.materializeArchitectureDesign(fixture.root, { lock: { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" } });
++  assert.equal(published.status, "materialized", published.code);
++  assert.equal(JSON.parse(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")).featureId, HF9_FEATURE, "the receipt now names the successor");
++  const settled = mod.inspectArchitectureDesign(fixture.root, null, {});
++  assert.equal(settled.status, "materialized", "the recovery is settled, not repeated");
++  assert.equal(Object.hasOwn(settled, "supersedesDiscardedFeature"), false);
++});
++
++test("C30d: a discarded predecessor with the equal design is inherited like a closed one", async () => {
++  const { stage, mod } = await hf9Load();
++  const result = mod.inspectArchitectureDesign(k13Fixture(stage, { closed: false, discarded: true, current: [k13Module("engine")] }).root, null, {});
++  assert.equal(result.status, "materialized", result.code);
++  assert.equal(result.inheritedFrom.featureId, "feat-0");
++});
++
++test("C30d: independent drift, an edited predecessor plan, and a predecessor that is neither closed nor discarded stay refused", async () => {
++  const { stage, mod } = await hf9Load();
++  const widened = [k13Module("engine", { ownedPaths: ["src/engine.mjs", "src/more.mjs"] }), k13Module("shell")];
++  const refused = (options, label, code = "ARCHITECTURE-DESIGN-RECEIPT-STALE") => assert.equal(mod.inspectArchitectureDesign(k13Fixture(stage, { closed: false, current: widened, ...options }).root, null, {}).code, code, label);
++  refused({ discarded: true, driftTarget: true }, "a recorded target no longer holds its recorded bytes", "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
++  refused({ discarded: true, editPlan: true }, "the discarded predecessor's plan is not the one its receipt names");
++  refused({ discarded: false }, "an open predecessor (in neither list) is no lineage");
++  // the receipt of a discarded feature on the closed route still needs the additive rule: a closed predecessor does not gain the ownership change
++  refused({ closed: true }, "a CLOSED predecessor may still only be extended additively");
++  // a dropped module whose file still exists is named, not silently kept
++  const dropped = mod.inspectArchitectureDesign(k13Fixture(stage, { closed: false, discarded: true, current: [k13Module("shell")] }).root, null, {});
++  assert.equal(dropped.code, "ARCHITECTURE-DESIGN-TARGET-REMOVED");
++});
++
+ // Consumer finding on the first build (2026-11-11): a module that owns the pages must gain a dependency on every new module, so a predecessor module may GROW in exactly three lists.
+ test("K-13: a predecessor module may grow its dependencies, contracts and test entry points, nothing else, and growth never closes a loop", async () => {
+   const { stage, mod } = await hf9Load();

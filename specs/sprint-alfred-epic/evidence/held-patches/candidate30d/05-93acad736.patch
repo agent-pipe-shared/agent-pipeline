@@ -1,0 +1,77 @@
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+index d1df0d630f13ef3751cb9cf81650affbcc3f1789..1aea7077bb70605fe760203a88da949e9392962a 100644
+--- a/plugins/pipeline-core/lib/close-acceptance-record.mjs
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -54,13 +54,21 @@ const formLanguage = (form) => Object.keys(ACCEPTANCE_YES_FORMS).find((key) => A
+ const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").replace(/,/gu, " ").replace(/\s+/gu, " ").trim().toLowerCase();
+ /**
+  * An acceptance only for an answer on the closed list of the form's language (normalised for case, commas, inner and surrounding
+- * space and a closing `.` or `!`). A form outside ACCEPTANCE_YES_FORMS keeps the old one-form rule. No keyword search in free text.
++ * space and a closing `.` or `!`), or for an answer whose FIRST SENTENCE is such a form (C30d, PO decision 2026-11-16, Antigravity
++ * greenfield: "yes! now please push" is an acceptance followed by the next request). The first sentence ends at a `.`, `!` or a line
++ * break; a `?` never ends an accepting sentence, and a comma continues the sentence, so "yes, but ..." stays a decline. What follows the
++ * first sentence is recorded with the answer and never read: no keyword is searched anywhere. A form outside ACCEPTANCE_YES_FORMS
++ * keeps the old one-form rule.
+  */
+ export function isAcceptanceYes(answer, form) {
+   if (typeof answer !== "string") return false;
+   const language = formLanguage(form);
+   const allowed = language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language];
+-  return allowed.some((entry) => yesKey(answer) === yesKey(entry));
++  const accepts = (value) => allowed.some((entry) => yesKey(value) === yesKey(entry));
++  if (accepts(answer)) return true;
++  const boundary = /([.!?]+)(?=\s)|\r?\n/u.exec(answer.trim());
++  if (boundary === null || (boundary[1] !== undefined && boundary[1].includes("?"))) return false;
++  return accepts(answer.trim().slice(0, boundary.index));
+ }
+ /** The clear yes answers of the form's language, quoted for a sentence. */
+ export function acceptanceYesAnswersText(form) {
+@@ -71,9 +79,9 @@ export function acceptanceYesAnswersText(form) {
+ /** The one sentence the agent asks the human in the chat, in the project's language (the form's language); it names the clear yes answers. */
+ export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
+   if (formLanguage(form) === "de") {
+-    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; jede andere Antwort ist keine Abnahme.`;
++    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; steht eine dieser Formen als erster Satz, darf danach Ihr nächster Auftrag folgen (er wird festgehalten, nicht als Teil der Abnahme gelesen); jede andere Antwort ist keine Abnahme.`;
+   }
+-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; any other answer is not an acceptance.`;
++  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; when one of them is the first sentence, your next request may follow it (it is recorded, not read as part of the acceptance); any other answer is not an acceptance.`;
+ }
+ 
+ export const DECLINE_BEGIN = "<!-- close-decline:begin -->";
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 37f93033f7a7d1d11d415ef1e483d64181310af1..2be8e262b3b87d0fa54bd81f5b253587b996cebc 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -860,6 +860,32 @@ test("C28: the fixed yes form is read normalised for case, surrounding space and
+   }
+ });
+ 
++// C30d (PO decision 2026-11-16, first Antigravity greenfield): a human who accepts and in the same breath names the next job ("yes! now push it") was asked a second time. An answer whose FIRST sentence is
++// a form of the closed list is the acceptance; what follows is recorded with it and never read. A comma continues the sentence ("yes, but ..." stays a decline), a question mark never accepts, no keyword is searched.
++test("C30d: a first sentence on the closed yes list accepts, the rest of the answer is recorded and never read; a comma, a question or any other first sentence still declines", () => {
++  for (const answer of ["Yes, I accept! Now please push the branch.", "yes. then push it to the new branch", "Accepted!\nPlease close the feature and push.", "I accept. What is left?"]) {
++    const f = oneShotFixture({ acceptance: false });
++    try {
++      assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer);
++      assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the whole literal answer is recorded");
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++  for (const answer of ["yes, but level 2 is stuck. Then push", "Yes? Then push", "No. Yes, I accept.", "good! Then please push", "Now push it. Yes, I accept."]) {
++    const f = oneShotFixture({ acceptance: false });
++    try {
++      assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
++      assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++  const asked = oneShotClose(oneShotFixture({ acceptance: false }).input, { runCommand: oneShotFixture({ acceptance: false }).runner });
++  assert.match(asked.stop.reason, /when one of them is the first sentence, your next request may follow it/u, "the question says so");
++  const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
++  try {
++    assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere! Bitte jetzt pushen." }, { runCommand: de.runner }).status, "commit-required");
++    assert.match(oneShotClose({ ...oneShotFixture({ acceptance: false, continuity: true, language: "de" }).input }, { runCommand: de.runner }).stop.reason ?? "", /darf danach Ihr nächster Auftrag folgen/u);
++  } finally { rmSync(de.root, { recursive: true, force: true }); }
++});
++
+ test("C28: the fixed form follows the project's human-facing language so a German-speaking human answers in German, and falls back to English for any other language", () => {
+   const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+   try {
