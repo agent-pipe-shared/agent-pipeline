@@ -54,13 +54,21 @@ const formLanguage = (form) => Object.keys(ACCEPTANCE_YES_FORMS).find((key) => A
 const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").replace(/,/gu, " ").replace(/\s+/gu, " ").trim().toLowerCase();
 /**
  * An acceptance only for an answer on the closed list of the form's language (normalised for case, commas, inner and surrounding
- * space and a closing `.` or `!`). A form outside ACCEPTANCE_YES_FORMS keeps the old one-form rule. No keyword search in free text.
+ * space and a closing `.` or `!`), or for an answer whose FIRST SENTENCE is such a form (C30d, PO decision 2026-11-16, Antigravity
+ * greenfield: "yes! now please push" is an acceptance followed by the next request). The first sentence ends at a `.`, `!` or a line
+ * break; a `?` never ends an accepting sentence, and a comma continues the sentence, so "yes, but ..." stays a decline. What follows the
+ * first sentence is recorded with the answer and never read: no keyword is searched anywhere. A form outside ACCEPTANCE_YES_FORMS
+ * keeps the old one-form rule.
  */
 export function isAcceptanceYes(answer, form) {
   if (typeof answer !== "string") return false;
   const language = formLanguage(form);
   const allowed = language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language];
-  return allowed.some((entry) => yesKey(answer) === yesKey(entry));
+  const accepts = (value) => allowed.some((entry) => yesKey(value) === yesKey(entry));
+  if (accepts(answer)) return true;
+  const boundary = /([.!?]+)(?=\s)|\r?\n/u.exec(answer.trim());
+  if (boundary === null || (boundary[1] !== undefined && boundary[1].includes("?"))) return false;
+  return accepts(answer.trim().slice(0, boundary.index));
 }
 /** The clear yes answers of the form's language, quoted for a sentence. */
 export function acceptanceYesAnswersText(form) {
@@ -71,9 +79,9 @@ export function acceptanceYesAnswersText(form) {
 /** The one sentence the agent asks the human in the chat, in the project's language (the form's language); it names the clear yes answers. */
 export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
   if (formLanguage(form) === "de") {
-    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; jede andere Antwort ist keine Abnahme.`;
+    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; steht eine dieser Formen als erster Satz, darf danach Ihr nächster Auftrag folgen (er wird festgehalten, nicht als Teil der Abnahme gelesen); jede andere Antwort ist keine Abnahme.`;
   }
-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; any other answer is not an acceptance.`;
+  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; when one of them is the first sentence, your next request may follow it (it is recorded, not read as part of the acceptance); any other answer is not an acceptance.`;
 }
 
 export const DECLINE_BEGIN = "<!-- close-decline:begin -->";

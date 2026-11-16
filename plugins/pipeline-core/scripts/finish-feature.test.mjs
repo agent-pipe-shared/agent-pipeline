@@ -860,6 +860,32 @@ test("C28: the fixed yes form is read normalised for case, surrounding space and
   }
 });
 
+// C30d (PO decision 2026-11-16, first Antigravity greenfield): a human who accepts and in the same breath names the next job ("yes! now push it") was asked a second time. An answer whose FIRST sentence is
+// a form of the closed list is the acceptance; what follows is recorded with it and never read. A comma continues the sentence ("yes, but ..." stays a decline), a question mark never accepts, no keyword is searched.
+test("C30d: a first sentence on the closed yes list accepts, the rest of the answer is recorded and never read; a comma, a question or any other first sentence still declines", () => {
+  for (const answer of ["Yes, I accept! Now please push the branch.", "yes. then push it to the new branch", "Accepted!\nPlease close the feature and push.", "I accept. What is left?"]) {
+    const f = oneShotFixture({ acceptance: false });
+    try {
+      assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer);
+      assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the whole literal answer is recorded");
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+  for (const answer of ["yes, but level 2 is stuck. Then push", "Yes? Then push", "No. Yes, I accept.", "good! Then please push", "Now push it. Yes, I accept."]) {
+    const f = oneShotFixture({ acceptance: false });
+    try {
+      assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
+      assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+  const asked = oneShotClose(oneShotFixture({ acceptance: false }).input, { runCommand: oneShotFixture({ acceptance: false }).runner });
+  assert.match(asked.stop.reason, /when one of them is the first sentence, your next request may follow it/u, "the question says so");
+  const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+  try {
+    assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere! Bitte jetzt pushen." }, { runCommand: de.runner }).status, "commit-required");
+    assert.match(oneShotClose({ ...oneShotFixture({ acceptance: false, continuity: true, language: "de" }).input }, { runCommand: de.runner }).stop.reason ?? "", /darf danach Ihr nächster Auftrag folgen/u);
+  } finally { rmSync(de.root, { recursive: true, force: true }); }
+});
+
 test("C28: the fixed form follows the project's human-facing language so a German-speaking human answers in German, and falls back to English for any other language", () => {
   const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
   try {
