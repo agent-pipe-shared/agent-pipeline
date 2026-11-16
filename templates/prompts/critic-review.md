@@ -201,6 +201,22 @@ USAGE (Elephant)
    - **Tool budget (hard cap, first-class field):** ≤30 tool uses.
    ```
    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
+9. **Handing a Claude Critic its filled briefing as a pointer (Coordinator only;
+   this item sits above the copy marker and is never part of the Critic's text).**
+   `node <plugin-root>/scripts/prepare-dispatch.mjs critic` writes the briefing
+   file; do not paste its ~12k tokens into the Agent call. Run
+   `prepare-dispatch.mjs critic-fill --root <root> --briefing <that file> --fill
+   MODEL_ID=<concrete model id> --fill EFFORT=<effort>` instead: it accepts only
+   those fixed-vocabulary values for the file's `<FILL ...>` slots, writes the
+   final file beside the draft with a Critic generator marker, and prints the
+   two-line pointer prompt. Pass that prompt, alone and unchanged, as the prompt
+   of a direct Claude Agent call of `pipeline-core:critic`; the dispatch guard
+   verifies the file against its marker and the Critic receives exactly the
+   filled briefing, so every contamination, policy and binding check judges the
+   same text as before. The pointer adds no way to carry prose: a pointer plus
+   inline text, an edited file, a file outside `scratch/critic-briefing/` or a
+   Workflow carrier is refused. The Antigravity and Codex carriers still carry
+   the full text (item 8 for Antigravity).
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
