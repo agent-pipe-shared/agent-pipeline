@@ -1,0 +1,872 @@
+diff --git a/docs/adr/0085-one-review-one-signature-design-approval.md b/docs/adr/0085-one-review-one-signature-design-approval.md
+index 4ea58c664e8ee4c193294afa28a53587899b478e..4d6fe6ff437b8279edffc060e665a4b3db788634 100644
+--- a/docs/adr/0085-one-review-one-signature-design-approval.md
++++ b/docs/adr/0085-one-review-one-signature-design-approval.md
+@@ -167,3 +167,33 @@ the review dispatch, labelled per runner:
+    (the receipt binds them at `create`, as before), or which model a provider served
+    beyond what the host reports. The store is device-local, so `create` runs on the
+    machine that dispatched the review; the committed receipt carries the result.
++
++## Amendment 2026-11-16: one full round and two delta rounds, blocking findings apart from questions (C30-6)
++
++Accepted by PO chat decision 2026-11-16 (a Claude greenfield run needed twelve fresh full readiness rounds, about 774 000
++reviewer tokens, and never reached ready; the spec grew from about 25 KB to 61 KB). It narrows the 2026-11-13 amendment
++(D246, "delta rounds until pass, no round cap"); everything not named here stands.
++
++1. **Rounds.** The review is one full round and at most two delta rounds (the shape of the Critic's batch review; the Critic
++   itself is uncapped since D190 and is not changed). The structural bound of 64 stays only as the parse bound, so a longer
++   chain made earlier still parses and an approval already signed keeps verifying. `create` refuses a fourth round
++   (`DRR-ROUND-CAP`); the next-round hint after a source drift stops at round 3.
++2. **The cap fires at the dispatch too.** The stopped run never called `create` or `present-plan`; every round was a plain
++   `readiness-reviewer` dispatch. A `readiness-reviewer` dispatch is refused (`DISPATCH-DESIGN-REVIEW-NO-RECEIPT`) while an
++   observed round has no receipt, and its repair is the order the course states: report, receipt over the unchanged sources,
++   commit, then correct and dispatch the delta. Claude's host observation is the only counter (device-local, a round older
++   than 48 hours counts as abandoned); on Codex and Antigravity the cap is the receipt (`DRR-ROUND-CAP`) and the course.
++3. **Blocking findings and questions.** The reviewer returns the two apart (`agents/readiness-reviewer.md`). Only a blocking
++   finding is an open finding of the receipt, and the split is read from the bound report text: a report with a
++   `Blocking findings:` section must list exactly the ids passed as `--open-finding` (`DRC-FINDINGS-SPLIT`), so the reviewed
++   party cannot decide what blocks. A report with only questions is ready. A report without that section is a legacy report
++   and is not checked.
++4. **Delta contract.** A delta round reviews only the open blocking findings of the round before and the correction with its
++   direct regressions; it does not repeat the full round, re-ask a question or hunt in unchanged areas.
++5. **The exit after round 3.** Nothing more can be reviewed, so `present-plan` no longer refuses an open review after the last
++   round (this reverses the refusal of D246 for that case only): the binding already carries `verdict` and `openFindingIds`,
++   the signing text states them (`open review findings: ...`), and the PO accepts them knowingly by signing or sends the design
++   back. Before the last round `PLAN-DESIGN-REVIEW-OPEN` still refuses. A chat selection grants nothing here; the one signature
++   is the explicit PO decision.
++6. **Not changed.** Bindings over one or two receipts stay byte-identical, no field is added to the binding or the receipt,
++   and the stored-approval and rebind readers are untouched.
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 4ef644e4a2e7e6be879c83d0231985476d06871f..4314f5611e20fefed7086baf390c9e64d61e4b07 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -6,9 +6,10 @@ tools: [Read, Grep, Glob]
+ 
+ You are a fresh, hard-read-only readiness reviewer. Inspect only the fixed
+ candidate and the supplied sorted refs. Do not receive chat history, handover,
+-implementor rationale, a prior review, or user prose as authority. Use Read,
+-Grep and Glob only; do not write, invoke a shell, delegate, alter a route, or
+-select a model.
++implementor rationale, or user prose as authority. Use Read, Grep and Glob only;
++do not write, invoke a shell, delegate, alter a route, or select a model. A
++prior review reaches you only in a delta round, as the open blocking findings
++the briefing restates (see Rounds).
+ 
+ The explicit readiness call site is runner-specific. Codex uses the committed
+ model-family selector and `codex-design-readiness-host.mjs`; Claude and
+@@ -18,6 +19,61 @@ source references. A typed unavailable result ends the duty without a child
+ or a usability claim. Never describe the Codex transport as evidence that a
+ Claude or Antigravity route ran.
+ 
++## Rounds: one full round, then at most two delta rounds
++
++The design review is one full round and at most two delta rounds. The briefing
++says which one this is.
++
++- **Full round (round 1):** read the whole design and run every check below once.
++- **Delta round (rounds 2 and 3):** the briefing carries the open blocking
++  findings of the round before (id and one line each) and the paths the
++  correction changed. Review only (1) whether each of those findings is
++  resolved, and (2) the correction itself and its direct regressions. Do not
++  hunt in unchanged areas, do not repeat the full round, do not re-ask a
++  question of an earlier round, and raise a mandatory question below only when
++  the correction changed the thing it concerns (a module, the implementation
++  surface, an ADR-relevant choice). A finding you cannot tie to the correction
++  or to a finding of the round before is not raised.
++- There is no round 4. What is still open after round 3 goes to the human, who
++  decides; say so plainly instead of widening the review.
++
++## Blocking findings versus questions
++
++Everything you raise is one of two things, and the report keeps them apart.
++
++- **Blocking finding:** the design cannot be built or proven as it stands. A
++  contradiction between documents or inside one, data loss or an input the own
++  import or export would refuse, a dependency cycle between modules, a
++  security fault, an acceptance criterion with no testable path, a missing
++  mandatory criterion clause (`PLR-HANDOFF-NO-JOURNEY`), or a decision the
++  design makes with no recorded home where the Spec itself says one is
++  required. Give each an id of upper-case letters and digits such as
++  `DESIGN-REVIEW-3`.
++- **Question:** anything else: a detail that belongs to the implementation, a
++  choice the design could state more clearly, a coverage or decomposition
++  question, a missing ADR, a recoverability question. A question never makes
++  the design not ready and is never counted as an open finding. Give each an id
++  such as `DESIGN-QUESTION-2`.
++
++Say **ready** exactly when no blocking finding is open, whatever questions
++remain. Do not turn a question into a finding to keep the design held.
++
++Report shape, exactly, because the host reads it and the receipt's open
++findings must equal the blocking list:
++
++```
++Verdict: READY | NOT READY
++Blocking findings:
++- DESIGN-REVIEW-1 <one line, then the reference>
++Questions:
++- DESIGN-QUESTION-1 <one line>
++```
++
++Write `- none` under a heading with no item. Keep every id on the line that
++starts its item.
++
++## What to check
++
+ Never state a proposed architecture scope or disposition as a fact: you cannot
+ see the implementation surface. Phrase it as a question to the Elephant and
+ name the coverage materialization checks: the plan path,
+@@ -26,7 +82,9 @@ name the coverage materialization checks: the plan path,
+ scope must each be covered by `disposition.scope`. On a greenfield baseline the
+ Pipeline writes those `architecture/` files after approval: a scope covering
+ `architecture/` is enough, and their absence from `implementationSurface` is no
+-question.
++question. Ask this once, in the full round; the hashes and markers
++(`technical-spec-sha256`, ADR digests) are checked by the coordinator, so never
++report them as unchecked.
+ 
+ Decomposition: read the declared modules against the responsibilities the Spec
+ names. When one module carries more than one separable responsibility (two parts
+@@ -34,38 +92,38 @@ that could be built without talking to each other), or the design declares a
+ single module for a Spec with several independent outcomes, raise it as a
+ question to the Elephant: name the responsibilities that could be cut and say
+ that a single module leaves no slice that can run in parallel. This is a
+-question in the review, never a block, and a justified single module (one
+-responsibility, small scope) is not a finding.
++question, never a block. A justified single module (one responsibility, small
++scope) is not a finding, and a small project (one developer, no parallel build,
++a handful of outcomes) is not asked to split: more modules than its
++responsibilities need is itself a cost, so never ask for a cut only to make
++slices parallel.
+ 
+ First path: read the order of work the design or plan declares. When it builds
+ layer by layer and names no complete path that runs first, raise it as a question
+ to the Elephant: which one path from a real input to a real result is built and
+ run first, and which slices can then run in parallel on disjoint write scopes.
+ Every kind of deliverable has such a path (a command, a library call, a screen).
+-This is a question in the review, never a block, and a feature that is one path
+-is not a finding.
++This is a question, never a block, and a feature that is one path is not a finding.
+ 
+ Journeys: read each user-facing acceptance criterion of the Spec for the journeys
+ and state transitions that prove it (every entry path, a reload in the middle of a
+ transition, a second action after an error, a concurrent import, every dynamic text
+ context) and for the actual effect asserted, not only that text changed. A
+-criterion that names none is not ready: raise it as a finding naming the criterion
+-and the typed code `PLR-HANDOFF-NO-JOURNEY`, with the repair (add a `Journeys:` and
+-an `Asserts:` clause, or tag a criterion no user sees `[not user-facing: <reason>]`).
++criterion that names none is a blocking finding naming the criterion and the
++typed code `PLR-HANDOFF-NO-JOURNEY`, with the repair (add a `Journeys:` and an
++`Asserts:` clause, or tag a criterion no user sees `[not user-facing: <reason>]`).
+ For a criterion that deletes, replaces, imports or migrates stored data, also ask
+ whether its journeys name recoverability and unintended valid input (an empty,
+-partial or older input that passes validation); a missing one is a question in the
+-review, not a block.
++partial or older input that passes validation); a missing one is a question, not a block.
+ 
+ Decisions to record: read the design for choices that need an ADR (module
+ boundaries, data keeping, offline and error strategy, a security trade-off). When
+ the design makes such a choice and no module names an ADR path for it in
+ `adrReferences` (title, trigger and path), raise it as a question to the Elephant
+-and point to the `architecture-decision` skill. This is a question, never a block;
+-the close only reports which named ADR paths exist.
+-
+-Return one concise readiness review with references. Give every open finding an
+-id of upper-case letters and digits such as `DESIGN-REVIEW-3`, and say ready only
+-when none is open. The host, not this agent,
+-creates the sanitized, dispatch-bound duty and execution receipts; never return
+-or persist raw prompts, answers, paths, credentials, or private coordinates.
++and point to the `architecture-decision` skill. This is a question, never a
++block; the close only reports which named ADR paths exist.
++
++Return one concise readiness review with references in the report shape above.
++The host, not this agent, creates the sanitized, dispatch-bound duty and
++execution receipts; never return or persist raw prompts, answers, paths,
++credentials, or private coordinates.
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 11675a0a90ed2dbd3728beb7886c6c520e211a93..04e1b938637eae40662ff967af993ef26489574d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -78,7 +78,8 @@ import {
+   prepareAdvisorProhibitionBindings,
+ } from "../lib/advisor-prohibition-binding.mjs";
+ import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
+-import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, isShippedPipelineAgentType, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
++import { designReviewRoundFinding, dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, isShippedPipelineAgentType, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
++import { listUnreceiptedDesignReviewRounds } from "../lib/design-review-observation.mjs";
+ // Circular by design: the producer imports this module's route exports, and this module calls the producer only at hook
+ // run time (recordAdmittedBriefingRoutes), never while either module is evaluating. Function declarations are hoisted.
+ import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
+@@ -894,6 +895,16 @@ if (isDirectInvocation(import.meta.url)) {
+     policy: dispatchFindings(dispatch),
+     budget: dispatchBudgetBinding(dispatch),
+   }));
++  // C30-6: a readiness-reviewer dispatch is refused while an earlier observed review round has no receipt (a delta needs one to chain to).
++  // Claude's observation store only; another runner has no records, so nothing is invented. A store that cannot be read admits.
++  for (const entry of evaluated) {
++    if (!/readiness-reviewer/u.test(String(entry.dispatch.subagentType ?? ""))) continue;
++    const reviewRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
++    const reviewCommonDir = resolveGitCommonDir(reviewRoot);
++    if (typeof reviewCommonDir !== "string" || reviewCommonDir === "") continue;
++    const finding = designReviewRoundFinding({ subagentType: entry.dispatch.subagentType, unreceiptedRounds: listUnreceiptedDesignReviewRounds({ commonDir: reviewCommonDir }) });
++    if (finding !== null) entry.policy.findings.push(finding);
++  }
+   // W7 A: a pipeline-core Goldfish or Critic dispatch whose prompt is not template-shaped is announced, never refused for it.
+   for (const { dispatch } of evaluated) {
+     const shape = promptTemplateShapeWarning(dispatch);
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.mjs b/plugins/pipeline-core/lib/design-approval-binding.mjs
+index 87f0dd4e761bb3f6953c03cfa7a23d9189f1fdfc..acff39403a022f2b0eeb6f105128b60081f48eb3 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.mjs
+@@ -311,6 +311,19 @@ export function describeUnreviewedCorrections(binding) {
+   return [`unreviewed corrections: ${delta.length} source ${many ? "files were" : "file was"} changed after the last readiness review (round ${round}) and ${many ? "were" : "was"} not re-reviewed: ${shown}${more}`];
+ }
+ 
++/**
++ * C30-6: the design review is one full round and two delta rounds; after the last one `present-plan` no longer refuses an open review,
++ * and the human decides. This is what the human sees before signing: the findings still open at the end of the last allowed round, read
++ * from the signed binding itself (`verdict`, `openFindingIds`, the last receipt's round), so the statement cannot drift from what is signed.
++ * Pure; `[]` for a passing review or one that still has a delta round left.
++ */
++export function describeOpenReviewFindings(binding, policyRounds = 3) {
++  if (binding?.verdict !== "open-findings" || !Array.isArray(binding.openFindingIds) || binding.openFindingIds.length === 0) return [];
++  const round = binding.reviewReceipts?.[binding.reviewReceipts.length - 1]?.round;
++  const ids = binding.openFindingIds;
++  return [`open review findings: the last allowed readiness round (round ${round} of ${policyRounds}) left ${ids.length} blocking finding${ids.length === 1 ? "" : "s"} open (${ids.join(", ")}); signing accepts ${ids.length === 1 ? "it" : "them"} knowingly, declining sends the design back`];
++}
++
+ // ----------------------------------------------------------------------------- request
+ 
+ /** The approval intent over a binding; null when createPoApprovalIntent rejects the candidate or a field. */
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.test.mjs b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+index 42f015713385eff42ff86e49bc05122d5f26151f..ecdc66544f89366edf287ef52860d88ef18455f0 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.test.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+@@ -1139,6 +1139,20 @@ test("CGR-03c: nothing is stated when the binding records no unreviewed change (
+   assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(null), []);
+ });
+ 
++// C30-6 (PO 2026-11-16): after the last allowed readiness round an open review is presented and the PO decides; the statement is read from
++// the signed binding itself, so it cannot drift from what is signed, and a passing review states nothing.
++test("C30-6: the findings still open after the last allowed round are stated from the binding, and nothing is stated for a pass", () => {
++  const open = { verdict: "open-findings", openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-REVIEW-4"], reviewReceipts: [{ round: 1 }, { round: 2 }, { round: 3 }] };
++  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings(open), ["open review findings: the last allowed readiness round (round 3 of 3) left 2 blocking findings open (DESIGN-REVIEW-1, DESIGN-REVIEW-4); signing accepts them knowingly, declining sends the design back"]);
++  assert.match(bindingModule.describeOpenReviewFindings({ ...open, openFindingIds: ["DESIGN-REVIEW-1"] })[0], /1 blocking finding open \(DESIGN-REVIEW-1\); signing accepts it knowingly/u);
++  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings(mustCreate(passScenario()).binding), []);
++  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings({ verdict: "pass", openFindingIds: [] }), []);
++  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings(null), []);
++  const source = readFileSync(new URL("../scripts/po-human-approval.mjs", import.meta.url), "utf8");
++  const statement = source.indexOf("...describeOpenReviewFindings(");
++  assert.ok(statement > 0 && statement < source.indexOf("complete bounded design binding follows"), "the signing description states it before the complete binding");
++});
++
+ test("CGR-03d: the design signing description puts that statement before the complete binding", () => {
+   const source = readFileSync(new URL("../scripts/po-human-approval.mjs", import.meta.url), "utf8");
+   const statement = source.indexOf("...describeUnreviewedCorrections(");
+diff --git a/plugins/pipeline-core/lib/design-review-observation.mjs b/plugins/pipeline-core/lib/design-review-observation.mjs
+index 553c9573751b3c57ad7ee5ba78091c4e608b2bda..1bfb32d5fd4d440739df79c13fb38c4a98de4ea5 100644
+--- a/plugins/pipeline-core/lib/design-review-observation.mjs
++++ b/plugins/pipeline-core/lib/design-review-observation.mjs
+@@ -209,6 +209,30 @@ export function listUnexportedDesignReviewObservations({ commonDir }) {
+   return out.sort((left, right) => right.observedAtMs - left.observedAtMs || (left.resultSha256 < right.resultSha256 ? -1 : 1));
+ }
+ 
++/** C30-6: an observed round older than this is treated as abandoned, so a stale record can never hold a later design review. */
++export const UNRECEIPTED_ROUND_MAX_AGE_MS = 48 * 60 * 60 * 1000;
++
++/**
++ * C30-6 (PO 2026-11-16): the review rounds this device observed that no receipt has stamped yet (no `<digest>.consumed`), newest first,
++ * within `maxAgeMs`. A greenfield run dispatched twelve full reviews and never made a receipt, so no round could be a delta; the dispatch
++ * guard refuses the next `readiness-reviewer` dispatch while one such round is open and names the way on. Never throws; an unreadable
++ * store is an empty list (the guard then admits, it never invents a refusal).
++ */
++export function listUnreceiptedDesignReviewRounds({ commonDir, nowMs = Date.now(), maxAgeMs = UNRECEIPTED_ROUND_MAX_AGE_MS } = {}) {
++  try {
++    const dir = designReviewObservationDir(commonDir);
++    const names = readdirSync(dir);
++    const out = [];
++    for (const name of names) {
++      const match = /^([a-f0-9]{64})\.json$/u.exec(name);
++      if (match === null || names.includes(`${match[1]}.consumed`)) continue;
++      const record = readDesignReviewObservation({ commonDir, resultSha256: match[1] });
++      if (record !== null && nowMs - record.observedAtMs <= maxAgeMs) out.push({ resultSha256: record.resultSha256, observedAtMs: record.observedAtMs });
++    }
++    return out.sort((left, right) => right.observedAtMs - left.observedAtMs);
++  } catch { return []; }
++}
++
+ /**
+  * One observed review stamps the receipts of ONE review: the first `create` that stamps an observation binds it to the PRD and
+  * Spec digests it was made for (`<digest>.consumed`, exclusive create). A later stamp over the same digests (a receipt made
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 1a64f011af190b1b4e6077d0ac84ec542b68e611..7532c1e935f18db80649ca6d461a029ef1bb3846 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -25,6 +25,13 @@ import { canonical } from "./po-approval-proof.mjs";
+ 
+ export const DESIGN_REVIEW_RECEIPT_SCHEMA = "pipeline.design-review-receipt.v1";
+ export const DESIGN_REVIEW_MAX_ROUNDS = 64;
++/**
++ * C30-6 (PO 2026-11-16): the review POLICY, one full round plus two delta rounds. `createDesignReviewReceipt` refuses a fourth round
++ * (`DRR-ROUND-CAP`) and `present-plan` stops refusing an open review after this round (the PO signs the open findings knowingly,
++ * the binding already carries them). It is a creation and presentation rule only: `DESIGN_REVIEW_MAX_ROUNDS` stays the parse bound,
++ * so a longer chain made before this rule still parses and an approval already signed keeps verifying.
++ */
++export const DESIGN_REVIEW_POLICY_ROUNDS = 3;
+ export const DESIGN_REVIEW_RECEIPT_MAX_BYTES = 65536;
+ 
+ const MAX_COMPANIONS = 64;
+@@ -416,6 +423,7 @@ export function createDesignReviewReceipt(input) {
+     if (!parsed.ok) return refuse("DRR-DELTA-CHAIN");
+     const earlier = parsed.receipt;
+     if (earlier.round >= DESIGN_REVIEW_MAX_ROUNDS) return refuse("DRR-ROUND-EXCEEDED");
++    if (earlier.round >= DESIGN_REVIEW_POLICY_ROUNDS) return refuse("DRR-ROUND-CAP");
+     if (earlier.featureId !== featureId || earlier.sources.prd.path !== normalized.prd.path || earlier.sources.spec.path !== normalized.spec.path) return refuse("DRR-DELTA-CHAIN");
+     if (sameSources(earlier.sources, normalized)) {
+       const withdrawn = earlier.openFindingIds.filter((id) => !ids.includes(id));
+@@ -514,5 +522,5 @@ export function checkDesignReviewReceiptSources(input) {
+   const currentSources = isObject(input) ? input.currentSources : undefined;
+   if (isObject(summary) && sameSources(summary.sources, currentSources)) return { ok: true };
+   const round = isObject(summary) && Number.isSafeInteger(summary.round) && summary.round >= 1 ? summary.round : null;
+-  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: round !== null && round < DESIGN_REVIEW_MAX_ROUNDS ? round + 1 : null };
++  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: round !== null && round < DESIGN_REVIEW_POLICY_ROUNDS ? round + 1 : null };
+ }
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.test.mjs b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+index e156e36dbf45a8bb17b8d7af0cd87f7dc5f232a2..f685697685c77703497e9776c5b94b146b216dfb 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+@@ -19,6 +19,12 @@ import {
+   parseDesignReviewReceipt,
+   summarizeDesignReviewReceipt,
+ } from "./design-review-receipt.mjs";
++import { checkOpenFindingsAgainstReport, designReviewReportSections } from "./design-review-report-sections.mjs";
++import { designReviewRoundFinding } from "./dispatch-policy.mjs";
++import { consumeDesignReviewObservation, listUnreceiptedDesignReviewRounds, recordDesignReviewObservation } from "./design-review-observation.mjs";
++import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
+ // AC-155: the decision-continuity exports are reached through the namespace so a missing export fails the
+ // affected case (typeof check) instead of failing the whole file at link time.
+ import * as receiptLib from "./design-review-receipt.mjs";
+@@ -642,6 +648,95 @@ test("L3: only a receipt at the structural bound refuses a further round (DRR-RO
+   assert.deepStrictEqual(create({ previous: atBound, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"));
+ });
+ 
++// ------------------------------------------------------------------ C30-6
++
++// PO 2026-11-16: one full round and two delta rounds. The policy bound is a creation rule: a longer chain made earlier still parses.
++test("C30-6: the review policy is one full round plus two delta rounds; a fourth receipt is DRR-ROUND-CAP, round 3 still parses", () => {
++  assert.equal(receiptLib.DESIGN_REVIEW_POLICY_ROUNDS, 3);
++  assert.ok(DESIGN_REVIEW_MAX_ROUNDS > receiptLib.DESIGN_REVIEW_POLICY_ROUNDS, "the parse bound stays above the policy bound");
++  const report = { path: "specs/feat-x/review/design-review-4.md", sha256: sha("report-4") };
++  const roundThree = previousOf(deltaObject({ round: 3 }), RECEIPT2_PATH);
++  const sources = sourcesWith((s) => { s.companions[0].sha256 = sha("design-4"); }, SOURCES_2);
++  assert.deepStrictEqual(create({ previous: roundThree, sources, report }), refuse("DRR-ROUND-CAP"));
++  assert.equal(parse(deltaObject({ round: 3 })).ok, true, "a round-3 receipt parses");
++  assert.equal(parse(deltaObject({ round: 4 })).ok, true, "a chain made before the policy (round 4 and later) still parses");
++  const chainLong = previousOf(deltaObject({ round: 4 }), RECEIPT2_PATH);
++  assert.deepStrictEqual(create({ previous: chainLong, sources, report }), refuse("DRR-ROUND-CAP"), "no new receipt is made on a legacy chain either");
++});
++
++test("C30-6: the next round after a source drift is named only while a delta round is left", () => {
++  const drifted = (round) => checkDesignReviewReceiptSources({ summary: summaryOf(deltaObject({ round }), RECEIPT2_PATH), currentSources: sourcesWith((s) => { s.companions[0].sha256 = sha("drift"); }, SOURCES_2) });
++  assert.equal(drifted(2).nextRound, 3);
++  assert.equal(drifted(3).nextRound, null, "after round 3 there is no next round to name");
++});
++
++const SPLIT_REPORT = [
++  "Verdict: NOT READY",
++  "",
++  "Blocking findings:",
++  "- DESIGN-REVIEW-1 the export of the first path would be refused by its own import (spec.md section 4)",
++  "2. AC-155 a criterion names no journey",
++  "",
++  "Questions:",
++  "- DESIGN-QUESTION-1 which slice runs first?",
++  "- DESIGN-QUESTION-2 is an ADR needed for the storage choice?",
++].join("\n");
++
++test("C30-6: the report separates blocking findings from questions, and only the blocking ids are the open findings", () => {
++  assert.deepStrictEqual(designReviewReportSections(SPLIT_REPORT), { structured: true, blocking: ["AC-155", "DESIGN-REVIEW-1"], questions: ["DESIGN-QUESTION-1", "DESIGN-QUESTION-2"] });
++  assert.deepStrictEqual(checkOpenFindingsAgainstReport(SPLIT_REPORT, ["DESIGN-REVIEW-1", "AC-155"]), { ok: true });
++  // The Elephant cannot hold the design with a question, and cannot drop a blocking finding.
++  assert.deepStrictEqual(checkOpenFindingsAgainstReport(SPLIT_REPORT, ["DESIGN-REVIEW-1", "AC-155", "DESIGN-QUESTION-1"]),
++    { ok: false, missing: [], extra: ["DESIGN-QUESTION-1"], questionsAsFindings: ["DESIGN-QUESTION-1"] });
++  assert.deepStrictEqual(checkOpenFindingsAgainstReport(SPLIT_REPORT, ["AC-155"]), { ok: false, missing: ["DESIGN-REVIEW-1"], extra: [], questionsAsFindings: [] });
++});
++
++test("C30-6: a report whose questions are all that is left reads as ready (no open finding), headings in markdown or bold count", () => {
++  const onlyQuestions = ["**Verdict: READY**", "", "## Blocking findings", "- none", "", "## Questions", "- DESIGN-QUESTION-1 the colour scheme has no criterion"].join("\n");
++  assert.deepStrictEqual(designReviewReportSections(onlyQuestions), { structured: true, blocking: [], questions: ["DESIGN-QUESTION-1"] });
++  assert.deepStrictEqual(checkOpenFindingsAgainstReport(onlyQuestions, []), { ok: true });
++  assert.deepStrictEqual(designReviewReportSections("**Blocking findings:**\n- DESIGN-REVIEW-4 a cycle\n**Questions:**\n- DESIGN-QUESTION-1 x").blocking, ["DESIGN-REVIEW-4"]);
++});
++
++test("C30-6: a legacy report without a Blocking findings section is not split and is not checked", () => {
++  const legacy = "NOT READY\nDESIGN-REVIEW-1 something\nDESIGN-REVIEW-2 something else";
++  assert.deepStrictEqual(designReviewReportSections(legacy), { structured: false });
++  assert.deepStrictEqual(checkOpenFindingsAgainstReport(legacy, ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"]), { ok: true });
++  assert.deepStrictEqual(designReviewReportSections(undefined), { structured: false });
++});
++
++// The replay of the stopped run, at the dispatch: a full review whose receipt was never made, then a second full dispatch.
++test("C30-6: a second readiness dispatch is refused while an observed round has no receipt, names the delta route, and is admitted once the round is receipted", (t) => {
++  const common = mkdtempSync(join(tmpdir(), "c30-6-"));
++  t.after(() => rmSync(common, { recursive: true, force: true }));
++  mkdirSync(join(common, "agent-pipeline"), { recursive: true });
++  const nowMs = Date.parse("2026-11-16T10:00:00.000Z");
++  const input = (text) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:readiness-reviewer" },
++    tool_response: { status: "completed", resolvedModel: "claude-sonnet-5-5", modelsUsed: ["claude-sonnet-5-5"], content: [{ type: "text", text }] } });
++  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs }), [], "nothing observed yet: the first dispatch is admitted");
++  assert.equal(designReviewRoundFinding({ subagentType: "pipeline-core:readiness-reviewer", unreceiptedRounds: [] }), null);
++  const recorded = recordDesignReviewObservation({ commonDir: common, runner: "claude", input: input("Verdict: NOT READY\nBlocking findings:\n- DESIGN-REVIEW-1 x"), nowMs });
++  assert.equal(recorded.status, "recorded");
++  const open = listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs: nowMs + 60_000 });
++  assert.equal(open.length, 1, "the observed round has no receipt");
++  const finding = designReviewRoundFinding({ subagentType: "pipeline-core:readiness-reviewer", unreceiptedRounds: open });
++  assert.equal(finding.code, "DISPATCH-DESIGN-REVIEW-NO-RECEIPT");
++  assert.match(finding.why, /one full round and at most two delta rounds/u);
++  assert.match(finding.why, /export-report/u);
++  assert.match(finding.why, /--previous/u, "the delta route is named");
++  // Only the reviewer is held; any other role is untouched.
++  assert.equal(designReviewRoundFinding({ subagentType: "pipeline-core:critic", unreceiptedRounds: open }), null);
++  assert.equal(designReviewRoundFinding({ subagentType: "readiness-reviewer", unreceiptedRounds: open }).code, "DISPATCH-DESIGN-REVIEW-NO-RECEIPT", "the bare spelling counts too");
++  // A round older than 48 hours is abandoned, never a permanent hold.
++  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs: nowMs + 49 * 3_600_000 }), []);
++  // The receipt stamps the observation: the next dispatch is admitted.
++  const sha = (value) => createHash("sha256").update(value).digest("hex");
++  assert.deepStrictEqual(consumeDesignReviewObservation({ commonDir: common, resultSha256: recorded.resultSha256, prdSha256: sha("prd"), specSha256: sha("spec") }), { ok: true });
++  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs: nowMs + 60_000 }), [], "a receipted round holds nothing");
++  // A store that cannot be read admits (the guard never invents a refusal).
++  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: join(common, "does-not-exist") }), []);
++});
++
+ // ------------------------------------------------------------------ U2-14
+ 
+ test("U2-14: a previous receipt of another feature, another PRD path or another Spec path is DRR-DELTA-CHAIN", () => {
+diff --git a/plugins/pipeline-core/lib/design-review-report-sections.mjs b/plugins/pipeline-core/lib/design-review-report-sections.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..25801e0a74115e21c7a876fe81008c5d14236620
+--- /dev/null
++++ b/plugins/pipeline-core/lib/design-review-report-sections.mjs
+@@ -0,0 +1,56 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C30-6 (PO 2026-11-16): the readiness review report separates BLOCKING findings from QUESTIONS, and the split is read from the
++ * bound report text, never from a flag the reviewed party passes. A greenfield run of twelve readiness rounds never reached
++ * ready because every question the reviewer asked became an open finding that held the design.
++ *
++ * Report contract (`agents/readiness-reviewer.md`): a line `Blocking findings:` and a line `Questions:` (a markdown heading
++ * or bold of the same words also counts), each followed by items that start with their id (`DESIGN-REVIEW-3`, `AC-155`).
++ * Only a blocking finding is an open finding of the receipt; a question never is.
++ *
++ * A report without a `Blocking findings:` line is a legacy report: nothing is inferred from it and the caller keeps the old
++ * rule (every id the Elephant passes is an open finding). Pure: no filesystem, no git, no clock.
++ */
++
++const BLOCKING_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*blocking(?:\s+findings?)?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(?:\(.*\))?\s*$/iu;
++const QUESTIONS_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(?:open\s+)?questions?(?:\s+to\s+the\s+elephant)?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(?:\(.*\))?\s*$/iu;
++const OTHER_HEADING = /^\s*#{1,6}\s+\S/u;
++const ITEM_ID = /^\s*(?:[-*+]|\d+[.)])?\s*(?:\*\*|__)?\[?([A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7})\]?(?:\*\*|__)?(?=[\s:.)\-—–]|$)/u;
++
++/**
++ * @param {string} text the report text
++ * @returns {{ structured: false } | { structured: true, blocking: string[], questions: string[] }}
++ */
++export function designReviewReportSections(text) {
++  if (typeof text !== "string") return { structured: false };
++  const lines = text.split(/\r?\n/u);
++  if (!lines.some((line) => BLOCKING_HEADING.test(line))) return { structured: false };
++  const blocking = [];
++  const questions = [];
++  let section = null;
++  for (const line of lines) {
++    if (BLOCKING_HEADING.test(line)) { section = "blocking"; continue; }
++    if (QUESTIONS_HEADING.test(line)) { section = "questions"; continue; }
++    if (OTHER_HEADING.test(line)) { section = null; continue; }
++    if (section === null) continue;
++    const match = ITEM_ID.exec(line);
++    if (match === null) continue;
++    const bucket = section === "blocking" ? blocking : questions;
++    if (!bucket.includes(match[1])) bucket.push(match[1]);
++  }
++  return { structured: true, blocking: blocking.sort(), questions: questions.sort() };
++}
++
++/**
++ * Does the open-finding set the caller passes equal the report's blocking set? Legacy reports always agree.
++ * @returns {{ ok: true } | { ok: false, missing: string[], extra: string[], questionsAsFindings: string[] }}
++ */
++export function checkOpenFindingsAgainstReport(text, openFindingIds) {
++  const sections = designReviewReportSections(text);
++  if (!sections.structured) return { ok: true };
++  const passed = [...new Set(openFindingIds)].sort();
++  const missing = sections.blocking.filter((id) => !passed.includes(id));
++  const extra = passed.filter((id) => !sections.blocking.includes(id));
++  const questionsAsFindings = extra.filter((id) => sections.questions.includes(id));
++  return missing.length === 0 && extra.length === 0 ? { ok: true } : { ok: false, missing, extra, questionsAsFindings };
++}
+diff --git a/plugins/pipeline-core/lib/dispatch-policy.mjs b/plugins/pipeline-core/lib/dispatch-policy.mjs
+index 9264b29d11dd905596c2b7c9f0140f2d6f9e138e..2113311b504cd299e20e5dc10d9d8d9ff04cdf85 100644
+--- a/plugins/pipeline-core/lib/dispatch-policy.mjs
++++ b/plugins/pipeline-core/lib/dispatch-policy.mjs
+@@ -241,6 +241,26 @@ function recriticFindings(text) {
+   return out;
+ }
+ 
++/**
++ * C30-6 (PO 2026-11-16): the design review is one full round and at most two delta rounds, and each round gets its receipt BEFORE the
++ * correction (a receipt binds the bytes the review read; a delta chains to it). A greenfield run dispatched twelve full reviews and
++ * never made a receipt, so the cap in the receipt and the presentation gate never fired. This is the dispatch-side rule: a
++ * `readiness-reviewer` dispatch is refused while an earlier observed round has no receipt. Pure: the guard supplies the unreceipted rounds
++ * (`listUnreceiptedDesignReviewRounds`, Claude's observation store; other runners have none, so they are never refused here).
++ * @returns {{code: string, why: string} | null}
++ */
++export function designReviewRoundFinding({ subagentType, unreceiptedRounds } = {}) {
++  const type = typeof subagentType === "string" ? subagentType : "";
++  const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
++  if (bareType !== "readiness-reviewer" || !Array.isArray(unreceiptedRounds) || unreceiptedRounds.length === 0) return null;
++  const count = unreceiptedRounds.length;
++  return {
++    code: "DISPATCH-DESIGN-REVIEW-NO-RECEIPT",
++    why: `${count === 1 ? "an earlier readiness review round has" : `${count} earlier readiness review rounds have`} no receipt yet; the design review is one full round and at most two delta rounds (C30-6), so a next round is a delta of a receipted one. `
++      + "Repair, before correcting anything: write the report with `node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <report path>`, create the receipt over the unchanged sources with `design-review-receipt.mjs create` (one `--open-finding` per id under the report's \"Blocking findings:\"; a question is no finding), commit it, then correct the sources and dispatch the delta round (`create --previous <that receipt>`). A round older than 48 hours is treated as abandoned.",
++  };
++}
++
+ /**
+  * @param {{subagentType: string, prompt: string, transport?: "direct"|"workflow"|"antigravity"|"codex"}} dispatch
+  * @returns {{role: "critic"|"goldfish"|"other", findings: {code: string, why: string}[]}}
+diff --git a/plugins/pipeline-core/lib/implementation-entry-gate.mjs b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+index 36d4223fea9784964da4c7de9649bc728d088086..902581460fad2f7bbc6a9824717b4ab85fcc0783 100644
+--- a/plugins/pipeline-core/lib/implementation-entry-gate.mjs
++++ b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+@@ -59,7 +59,7 @@ const REPAIRS = new Map([
+   ["DCC-REVIEW-RECEIPT-BINDING", REPEAT_REVIEW],
+   ["DCC-REVIEW-DELTA-CHAIN", "Create each later receipt with --previous <the receipt of the round before>, then pass the whole chain in order, initial first."],
+   // L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round, as often as needed.
+-  ["PLAN-DESIGN-REVIEW-OPEN", "Correct the PRD or Spec for the open findings named here (commit; after submit-plan the PRD/Spec drift repairs apply: run submit-plan again), then run a delta readiness review: a fresh pipeline-core:readiness-reviewer that reads only these findings and what changed. Create its receipt with design-review-receipt.mjs create --previous <the last receipt> (a delta over unchanged documents may only withdraw findings), commit it, and run present-plan again with every receipt of the chain, initial first."],
++  ["PLAN-DESIGN-REVIEW-OPEN", "Correct the PRD or Spec for the open findings named here (commit; after submit-plan the PRD/Spec drift repairs apply: run submit-plan again), then run a delta readiness review: a fresh pipeline-core:readiness-reviewer that reads only these findings and what changed. Create its receipt with design-review-receipt.mjs create --previous <the last receipt> (a delta over unchanged documents may only withdraw findings), commit it, and run present-plan again with every receipt of the chain, initial first. The review is one full round and at most two delta rounds (C30-6): after round 3 present-plan no longer refuses an open review, it presents the findings still open and the PO decides."],
+   ["PLAN-DESIGN-REVIEW-UNOBSERVED", "On Claude the reviewer model of every review round is read from the host's record of the dispatch (D247). Dispatch pipeline-core:readiness-reviewer again for the current sources in a session whose plugin hooks are loaded (after a plugin install or hook refresh: restart the session first). Write its returned text as the report with design-review-receipt.mjs export-report --repo <root> --out <new report path> (a sanitized publication goes in --report, the exported text in --original-report, kept local under evidence/, which onboarding git-ignores), create a new initial receipt with design-review-receipt.mjs create (no --previous: an earlier round made without an observation cannot be continued), commit both, and run present-plan with that chain. A typed fallback receipt (--fallback-reason-code) is passed as it is."],
+   ["DCC-REVIEW-ROUND-EXCEEDED", "The review chain is above the structural bound of 64 rounds: start a new initial review of the current sources and pass that chain."],
+   ["DCC-PATH-UNSAFE", "The bound path must be a regular repository file; restore it or remove it from the receipt's companions."],
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 82929c5b94664c693122454a0c64bf6f46c64dcc..667bc11216184f5e761ef1e0e874898e7f9b6913 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -451,7 +451,7 @@ function continuityRequest(authority) {
+ 
+ /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
+ const MOVED_DIR = "specs/e2e-moved";
+-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false, reviewerRunner = "claude" } = {}) {
++async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false, reviewerRunner = "claude", chainRounds = 1 } = {}) {
+   stateModule ??= await import(pathToFileURL(CLI).href);
+   const governance = await loadLib("governance-scope.mjs");
+   const poGate = await loadLib("po-gate-authority.mjs");
+@@ -555,23 +555,47 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+     if (createdCli !== 0) throw new Error(`fixture create refused: ${out.join("")}`);
+     fx.cliOutput = out.join("");
+   }
++  // C30-6: `chainRounds` > 1 builds the earlier rounds of a review chain (each over earlier source bytes, each with its own report), so the
++  // last receipt is round N and a delta of the round before. `receiptPaths` is the whole chain, initial first, as present-plan takes it.
++  fx.receiptPaths = [];
++  let previousRound = null;
++  const reportOf = (round) => (round === 1 ? REPORT_PATH : `specs/e2e/review/design-review-${round}.md`);
++  const receiptOf = (round) => (round === 1 ? RECEIPT_PATH : `specs/e2e/review/design-review-receipt-${round}.json`);
++  for (let round = 1; round < chainRounds; round += 1) {
++    writeFileIn(dir, reportOf(round), `# Design review ${round}\nVerdict: not ready.\n`);
++    const earlier = receiptLib.createDesignReviewReceipt({
++      featureId: FEATURE_ID, previous: previousRound,
++      sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map((path, index) => (index === 0 ? { path, sha256: sha256(`earlier-round-${round}`) } : sourceFor(path))) },
++      reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(reportOf(round)), openFindingIds: ["DESIGN-REVIEW-1"],
++      reviewedAt: "2026-10-09T09:00:00.000Z",
++      reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reportOf(round)).sha256 },
++    });
++    if (!earlier.ok) throw new Error(`fixture earlier review receipt refused: ${earlier.code}`);
++    writeFileIn(dir, receiptOf(round), Buffer.from(earlier.bytes).toString("utf8"));
++    fx.receiptPaths.push(receiptOf(round));
++    previousRound = { path: receiptOf(round), bytes: earlier.bytes };
++  }
++  if (chainRounds > 1) writeFileIn(dir, reportOf(chainRounds), "# Design review last\nVerdict: not ready.\n");
++  const finalReportPath = reportOf(chainRounds);
++  const finalReceiptPath = receiptOf(chainRounds);
+   const created = hostRoute ? { ok: true, bytes: readFileSync(join(dir, ...RECEIPT_PATH.split("/"))) } : receiptLib.createDesignReviewReceipt({
+     featureId: FEATURE_ID,
+-    previous: null,
++    previous: previousRound,
+     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
+     reviewer: { runner: reviewerRunner, model: reviewerRunner === "claude" ? "claude-opus-4" : "unknown" },
+-    report: sourceFor(REPORT_PATH),
++    report: sourceFor(finalReportPath),
+     openFindingIds,
+     reviewedAt: "2026-10-09T09:00:00.000Z",
+     ...(fallback === undefined ? {} : { fallback }),
+     // D247: a native Claude review round carries the host's observation of its reviewer (export-report + create); `observed: false` is a round without one.
+     // A runner without an observation route (`reviewerRunner: "codex"`) carries the visible `unobserved` label, as create writes it.
+     ...(fallback === undefined && reviewerRunner !== "claude" ? { reviewerObservation: { assurance: "unobserved", modelsUsed: [], resultSha256: null } } : {}),
+-    ...(fallback === undefined && reviewerRunner === "claude" && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
++    ...(fallback === undefined && reviewerRunner === "claude" && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(finalReportPath).sha256 } } : {}),
+   });
+   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
+-  if (!hostRoute) writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
+-  fx.receiptPath = RECEIPT_PATH;
++  if (!hostRoute) writeFileIn(dir, finalReceiptPath, Buffer.from(created.bytes).toString("utf8"));
++  fx.receiptPath = finalReceiptPath;
++  fx.receiptPaths.push(finalReceiptPath);
+ 
+   // Trust anchor for approve-plan (A10): project/critical-human-proof.json, schema v3, committed.
+   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+@@ -583,7 +607,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+   }, null, 2)}\n`);
+ 
+   // C28e (Codex test run): `proofUncommitted` leaves the trust policy in the working tree only, the state that cost a second signature.
+-  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, ...(proofUncommitted ? [] : ["project/critical-human-proof.json"]), "specs/e2e/acceptance.md", "specs/e2e/result.md");
++  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, ...new Set([REPORT_PATH, RECEIPT_PATH, ...fx.receiptPaths, ...Array.from({ length: chainRounds }, (_, index) => reportOf(index + 1))]), ...(proofUncommitted ? [] : ["project/critical-human-proof.json"]), "specs/e2e/acceptance.md", "specs/e2e/result.md");
+   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
+   // Folder rebind (Phoenix Wanted 4, slice 3): the reviewed sources move to another registrar-valid feature folder; the review
+   // receipt and report stay where they are (default pending PO). `changeByte` appends one byte to the PRD after the move.
+@@ -805,6 +829,22 @@ test("L3 (Claude run 3): present-plan refuses a review chain whose last round le
+   const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
+   assert.deepEqual(requests, [], "no approval request is written");
+   assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
++  // C30-6 (PO 2026-11-16, restating this case): one full round and two delta rounds. Round 2 with findings open is still refused; after
++  // round 3 nothing more can be reviewed, so present-plan hands the PO the signing step and the signing text names the open findings.
++  const second = await buildSubmittedFeature("route-open-round-2", { openFindingIds: ["DESIGN-REVIEW-1"], chainRounds: 2 });
++  await bindRouteOwner(second);
++  const stillRefused = await ownedCli(second, ["present-plan", "--by", "coordinator", ...second.receiptPaths.flatMap((path) => ["--review-receipt", path])]);
++  assert.equal(stillRefused.status, 2, `round 2 with open findings is refused; stdout: ${stillRefused.stdout}; stderr: ${stillRefused.stderr}`);
++  assert.match(stillRefused.stderr, /PLAN-DESIGN-REVIEW-OPEN/u);
++  const third = await buildSubmittedFeature("route-open-round-3", { openFindingIds: ["DESIGN-REVIEW-1"], chainRounds: 3 });
++  await bindRouteOwner(third);
++  const presented = await ownedCli(third, ["present-plan", "--by", "coordinator", ...third.receiptPaths.flatMap((path) => ["--review-receipt", path])]);
++  assert.equal(presented.status, 0, `after round 3 an open review is presented, not refused; stdout: ${presented.stdout}; stderr: ${presented.stderr}`);
++  assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
++  const request = JSON.parse(readFileSync(requestPathOf(posixSigningCommands(presented.stdout)[0]), "utf8"));
++  assert.equal(request.binding.verdict, "open-findings", "the signed binding carries the open verdict");
++  assert.deepEqual(request.binding.openFindingIds, ["DESIGN-REVIEW-1"], "and the open ids");
++  assert.equal(request.binding.reviewReceipts.length, 3, "three rounds, initial first");
+ });
+ 
+ // D247 (PO tiles 2026-11-13): on Claude the reviewer model is host-observed; a round without the observation (made by hand, in a
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 5e8adbf48f2ee1000b9f991714dcabed5010f90a..c9b6606b5385c725332d8262f6d776335411db56 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -36,6 +36,7 @@ import { dirname, join, sep } from "node:path";
+ 
+ import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
+ import { consumeDesignReviewObservation, listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
++import { checkOpenFindingsAgainstReport } from "../lib/design-review-report-sections.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ 
+@@ -246,10 +247,26 @@ export function createReceiptFromDisk(input, deps = {}) {
+   if (!reportRead.ok) return reportRead;
+   // D64: a sanitized report. The unpublished original is read only to derive its digest; the receipt binds both digests.
+   let originalSha256 = null;
++  let splitBytes = reportRead.bytes;
+   if (originalReportPath !== null) {
+     const originalRead = readBound(repoReal, originalReportPath, "original report");
+     if (!originalRead.ok) return originalRead;
+     originalSha256 = sha256Of(originalRead.bytes);
++    splitBytes = originalRead.bytes;
++  }
++  // C30-6: the blocking/question split comes from the bound report text (the reviewer's own words, the unpublished original when
++  // there is one), never from what the Elephant passes. A report with a `Blocking findings:` section must list exactly the ids
++  // passed as --open-finding; a question never holds the design. A report without that section is a legacy report and is not checked.
++  let splitText = null;
++  try { splitText = new TextDecoder("utf-8", { fatal: true }).decode(splitBytes); } catch { splitText = null; }
++  const split = splitText === null ? { ok: true } : checkOpenFindingsAgainstReport(splitText, openFindingIds);
++  if (!split.ok) {
++    const parts = [];
++    if (split.missing.length > 0) parts.push(`the report lists blocking finding(s) not passed as --open-finding: ${split.missing.join(", ")}`);
++    if (split.questionsAsFindings.length > 0) parts.push(`a question is not an open finding and is never passed as one: ${split.questionsAsFindings.join(", ")}`);
++    const other = split.extra.filter((id) => !split.questionsAsFindings.includes(id));
++    if (other.length > 0) parts.push(`--open-finding id(s) the report does not list under "Blocking findings": ${other.join(", ")}`);
++    return refuse("DRC-FINDINGS-SPLIT", `design review receipt refused: DRC-FINDINGS-SPLIT: ${parts.join("; ")}. The open findings of a receipt are exactly the report's blocking findings (C30-6); pass one --open-finding per id under "Blocking findings:" and none for a question.`);
+   }
+   let previous = null;
+   if (previousPath !== null) {
+@@ -320,6 +337,10 @@ export function createReceiptFromDisk(input, deps = {}) {
+       const why = describeDesignReviewFindingIdRefusal(openFindingIds);
+       if (why !== null) return refuse(created.code, `design review receipt refused: DRR-FINDING-IDS: ${why}`);
+     }
++    // C30-6: one full round and two delta rounds. A fourth is never created; the open findings of round 3 go to the PO, who signs them knowingly.
++    if (created.code === "DRR-ROUND-CAP") {
++      return refuse(created.code, "design review receipt refused: DRR-ROUND-CAP: the design review is one full round and at most two delta rounds (C30-6), and the previous receipt is already round 3. No round 4 is made. Correct what you can, commit, and run present-plan with every receipt of the chain: the findings still open after round 3 are carried in the design binding and shown to the PO before the one signature, who accepts them knowingly or sends the design back.");
++    }
+     if (created.code === "DRR-DELTA-UNCHANGED") {
+       return refuse(created.code, "design review receipt refused: DRR-DELTA-UNCHANGED: the documents did not change, so a second receipt may only withdraw findings of the first (fewer open ids, no new id, the reviewer's report says so). Otherwise change a document and review again.");
+     }
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index c7a15c87a5797f297b596f7cc64e629c3db566ec..1a2a235fc7261a946791e1339a1aec69e3fcfdac 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -4,7 +4,7 @@
+ // Critic agent definition; no flag can supply any of those values.
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { spawnSync } from "node:child_process";
+@@ -129,6 +129,51 @@ test("a delta round chains to the previous receipt by path and digest", withRepo
+   assert.equal(parsed.receipt.sources.spec.sha256, sha(readFileSync(join(repo, SPEC))));
+ }));
+ 
++// C30-6 (PO 2026-11-16): the open findings of a receipt are the report's blocking findings, read from the bound report text.
++const SPLIT = (blocking, questions) => ["Verdict: NOT READY", "", "Blocking findings:", ...blocking.map((id) => `- ${id} text`), "", "Questions:", ...questions.map((id) => `- ${id} text`), ""].join("\n");
++
++test("C30-6: the receipt's open findings must equal the report's blocking findings; a question never holds the design", withRepo((repo) => {
++  writeFileSync(join(repo, REPORT1), SPLIT(["DESIGN-REVIEW-1"], ["DESIGN-QUESTION-1", "DESIGN-QUESTION-2"]));
++  const asQuestion = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-QUESTION-1"] }), { env: CLAUDE, now });
++  assert.equal(asQuestion.ok, false);
++  assert.equal(asQuestion.code, "DRC-FINDINGS-SPLIT");
++  assert.match(asQuestion.message, /a question is not an open finding.*DESIGN-QUESTION-1/u);
++  const dropped = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });
++  assert.equal(dropped.code, "DRC-FINDINGS-SPLIT");
++  assert.match(dropped.message, /not passed as --open-finding: DESIGN-REVIEW-1/u);
++  assert.equal(readdirSync(join(repo, "specs/feat-x/review")).some((name) => name.endsWith(".receipt.json")), false, "nothing is written on a refusal");
++  const exact = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
++  assert.equal(exact.ok, true, JSON.stringify(exact));
++  assert.deepEqual(exact.receipt.openFindingIds, ["DESIGN-REVIEW-1"]);
++}));
++
++test("C30-6: a report with only questions makes a passing receipt", withRepo((repo) => {
++  writeFileSync(join(repo, REPORT1), SPLIT([], ["DESIGN-QUESTION-1"]).replace("Verdict: NOT READY", "Verdict: READY").replace("Blocking findings:\n", "Blocking findings:\n- none\n"));
++  const result = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.equal(result.receipt.verdict, "pass");
++}));
++
++test("C30-6: one full round and two delta rounds; the replay of the stopped run (review, correction, no receipt, a second full review) is answered by the delta route, and round 4 is refused", withRepo((repo) => {
++  // Round 1, then two delta rounds, each over a corrected spec.
++  assert.equal(createReceiptFromDisk(request(repo, { openFindingIds: ["F-ONE"] }), { env: CLAUDE, now }).ok, true);
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
++  writeFileSync(join(repo, "specs/feat-x/review/design-review-3.md"), "# Round 3\n\nVerdict: NOT READY\n");
++  writeFileSync(join(repo, "specs/feat-x/review/design-review-4.md"), "# Round 4\n\nVerdict: NOT READY\n");
++  const second = createReceiptFromDisk(request(repo, { reportPath: REPORT2, previousPath: RECEIPT1, outPath: RECEIPT2, openFindingIds: ["F-ONE"] }), { env: CLAUDE, now });
++  assert.equal(second.ok, true, JSON.stringify(second));
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v3\n");
++  const third = createReceiptFromDisk(request(repo, { reportPath: "specs/feat-x/review/design-review-3.md", previousPath: RECEIPT2, outPath: "specs/feat-x/review/design-review-3.receipt.json", openFindingIds: ["F-ONE"] }), { env: CLAUDE, now });
++  assert.equal(third.ok, true, JSON.stringify(third));
++  assert.equal(third.receipt.round, 3);
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v4\n");
++  const fourth = createReceiptFromDisk(request(repo, { reportPath: "specs/feat-x/review/design-review-4.md", previousPath: "specs/feat-x/review/design-review-3.receipt.json", outPath: "specs/feat-x/review/design-review-4.receipt.json", openFindingIds: ["F-ONE"] }), { env: CLAUDE, now });
++  assert.equal(fourth.ok, false);
++  assert.equal(fourth.code, "DRR-ROUND-CAP");
++  assert.match(fourth.message, /one full round and at most two delta rounds/u);
++  assert.match(fourth.message, /present-plan/u, "the refusal names the way on");
++}));
++
+ test("the runner comes from the runtime signal, with the claude, antigravity and codex signals and nothing else", () => {
+   assert.equal(detectRunner({ CLAUDECODE: "1" }), "claude");
+   assert.equal(detectRunner({ ANTIGRAVITY_AGENT: "1" }), "antigravity");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2ba961a1c0c463e58eb119ce774ad78ac0d15b0e..e9c61c21e598922b817fed3a0f855fea198cc040 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -393,7 +393,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, reso
+ import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+-import { DESIGN_REVIEW_MAX_ROUNDS, DESIGN_REVIEW_OBSERVATION_RUNNERS, isHostObservedDesignReview, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { DESIGN_REVIEW_MAX_ROUNDS, DESIGN_REVIEW_POLICY_ROUNDS, DESIGN_REVIEW_OBSERVATION_RUNNERS, isHostObservedDesignReview, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+@@ -10698,6 +10698,9 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
+       if (!inputs?.ok || !Array.isArray(inputs.receipts) || inputs.receipts.length === 0) return null;
+       const latest = summarizeDesignReviewReceipt(inputs.receipts.at(-1));
+       if (!latest.ok || latest.summary.verdict !== "open-findings") return null;
++      // C30-6 (PO 2026-11-16): one full round and two delta rounds. After the last allowed round nothing more can be reviewed, so the
++      // open findings are not a refusal but a knowing decision: the binding carries verdict and ids, and the signing text names them.
++      if (latest.summary.round >= DESIGN_REVIEW_POLICY_ROUNDS) return null;
+       return { code: "PLAN-DESIGN-REVIEW-OPEN", path: latest.summary.path,
+         message: `round ${latest.summary.round} of the readiness review leaves ${latest.summary.openFindingIds.length} finding(s) open: ${latest.summary.openFindingIds.join(", ")}`,
+         repair: entryGateRepair("PLAN-DESIGN-REVIEW-OPEN") };
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index ef32eb6d52744ec3cd7692d4758b51a307d1706d..47e2e959bb9cfe98edcfe1494fe31f504de79360 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -45,7 +45,7 @@ import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatur
+ import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
+ import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
+ import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+-import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeUnreviewedCorrections, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
++import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeOpenReviewFindings, describeUnreviewedCorrections, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+@@ -447,6 +447,8 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+       `public trust posture: ${policy.trustAnchors === null ? "legacy singular anchor" : "v3 anchor set"}`,
+       // CGR-03: stated before the binding, from the signed binding itself; informs the signer, adds no gate and no review round.
+       ...describeUnreviewedCorrections(physicalRequest.binding),
++      // C30-6: findings still open after the last allowed readiness round, stated from the signed binding.
++      ...describeOpenReviewFindings(physicalRequest.binding),
+       "complete bounded design binding follows (current sources and actual receipt/report bytes validated):",
+       JSON.stringify(physicalRequest.binding, null, 2),
+       "this signs only the exact design decision digest; approve-plan must independently consume it. It is not push, release, publication or a guard override.",
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index 53108824064be394329c0c25213e989aac269f8f..461b7d99db3db020bbdf8defcb76b7aeff50b1f9 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -93,15 +93,36 @@ was needed; capability evidence is not an Advisor answer.
+    `--open-finding <id>`: a report that says ready while it still lists findings
+    is `open-findings`, not `pass`, and the PO sees that when signing.
+    After a delta round that still reports open findings: correct the sources
+-   and run the next delta round (`--previous` the last receipt); there is no
+-   round cap (only a structural bound of 64). Before `submit-plan` a correction
++   and run the next delta round (`--previous` the last receipt), while one is left.
++   **The review is one full round and at most two delta rounds (C30-6, PO
++   2026-11-16).** Round 1 is the one full review. Rounds 2 and 3 are delta rounds
++   (`--previous` the last receipt; a fresh reviewer that reads only the open
++   blocking findings and what the correction changed). There is no round 4:
++   `create` refuses it (`DRR-ROUND-CAP`). **Order matters:** after every review
++   round, BEFORE you correct anything, write the report (`export-report`), create
++   the receipt over the unchanged sources (a receipt binds the bytes the review
++   read) and commit it; only then correct the sources and dispatch the next
++   delta. A fresh full review after round 1 is never the route: the dispatch of
++   the next `readiness-reviewer` is refused while an observed round has no receipt
++   (`DISPATCH-DESIGN-REVIEW-NO-RECEIPT`, Claude's host observation; a round
++   older than 48 hours counts as abandoned). The reviewer separates
++   **blocking findings** from **questions** (`agents/readiness-reviewer.md`); the
++   receipt's `--open-finding` ids are exactly the report's `Blocking findings:`
++   ids, checked against the bound report text (`DRC-FINDINGS-SPLIT`), and a
++   question never holds the design. A report with only questions is ready.
++   Before `submit-plan` a correction
+    is an ordinary edit and commit; `reopen-design` exists only for a package
+-   that was already submitted. A delta over unchanged documents may only
+-   withdraw findings of the round before. `present-plan` refuses while the last
+-   receipt is `open-findings` (`PLAN-DESIGN-REVIEW-OPEN`) and names the next
+-   delta round. Pass every receipt of the chain, initial first. A source change
+-   after a passing delta round is carried as `unreviewedSourceDelta`, which the
+-   PO signs knowingly.
++   that was already submitted. A delta over unchanged documents may only withdraw findings of the round before.
++   `present-plan` refuses while the last receipt is `open-findings` and a delta
++   round is left (`PLAN-DESIGN-REVIEW-OPEN`, it names the next delta round); after
++   round 3 it no longer refuses: the findings still open are carried in the
++   design binding, stated in the signing text, and the PO signs them knowingly or
++   sends the design back. Pass every receipt of the chain, initial first. A source
++   change after a passing delta round is carried as `unreviewedSourceDelta`, which
++   the PO signs knowingly. The `Ruleset SHA:` value of the briefing is the
++   `rulesetSha` that `node <plugin-root>/scripts/dispatch-briefing.mjs binding ...`
++   prints (the preflight's loaded content identity, else the installed identity,
++   else a hash of the plugin root); the dispatch guard only checks its format.
+ 3. Use the sanctioned source-binding and document-integration routes. Update
+    digests once, after the last edit: `create-adr.mjs --root <root> --refresh`
+    without `--slug` recomputes every ADR draft, and the PRD's
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 1e14fd056034e049afffd6d42244d1ac5ff512b0..433232e7a37223b80243315b9c96d31c947e6486 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -46,7 +46,7 @@ The acceptance question of the one-shot close is asked in the project's human-fa
+    the design input). It writes `scratch/seal-plan.json` (the digest-bound seal plan) and never State; it also replaces a damaged plan file. `inspect` -> `sealSituation`
+    names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
+ 4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
+-   present the plan to the PO; its digest is part of what the one signature covers. Pass every receipt of the review chain, initial first; while the last one is `open-findings` it refuses (`PLAN-DESIGN-REVIEW-OPEN`) until a delta round passes. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
++   present the plan to the PO; its digest is part of what the one signature covers. Pass every receipt of the review chain, initial first; while the last one is `open-findings` and a delta round is left it refuses (`PLAN-DESIGN-REVIEW-OPEN`) until a delta round passes; the review is one full round and at most two delta rounds, and after round 3 the open findings go to the PO's signature (C30-6). This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
+    Before asking for a signature on a design that changes the architecture rules of code that already exists, preview what the check will say: `architecture-boundary-check.mjs --root <root> --preview-prd <repo-relative PRD path>` (read-only, no signature, writes nothing). It checks the tracked tree against the modules of the PRD's PROPOSED design block, with the same rules as the real check (ownership, forbidden dependency, line bound); the map that the real check reads exists only after the signature. Fix the PRD, not the code, when it names a finding the design should have allowed. A pass is a preview, not an approval.
+ 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
+    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow

@@ -1,0 +1,29 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index a028b60da0c366799aed84e87516bc387b13746c..faece1739f344b4573b320b0fc1173da33512016 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -305,6 +305,10 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/governance-hgo-consumption-source.mjs`. Already-kernel dispatch-budget
+   and HGO enforcement modules import these delegates, so a maintenance window
+   cannot rewrite the delegated decision or its durable evidence.
++- The 2026-11-16 candidate 30 closure adds `lib/design-review-observation.mjs`.
++  The already-kernel `hooks/guard-dispatch.mjs` imports it to count readiness-review
++  rounds that never reached a receipt (the dispatch-side round cap), so a maintenance
++  window cannot rewrite that count and hide an unreceipted round.
+ - The 2026-09-18 Nova B candidate promotion and evidence closure adds
+   `scripts/capture-evidence.mjs` and `lib/release-promotion-envelope.mjs`.
+   `guard-lifecycle-ready.mjs` imports `capture-evidence.mjs` and
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 486df0693232d90e0ee74f2a3a4b30616621db57..2871b371a2d705269fbb8247431f3677f2d920de 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -500,6 +500,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/dispatch-policy.mjs",
+   "plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs",
+   "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
++  // C30-6 (2026-11-16): guard-dispatch.mjs imports design-review-observation.mjs to count the readiness-review rounds that
++  // never reached a receipt; a window that could rewrite it could hide an unreceipted round from the dispatch cap.
++  "plugins/pipeline-core/lib/design-review-observation.mjs",
+   // Nova B candidate promotion and evidence capture transitive closure (GMWKC01):
+   // guard-lifecycle-ready.mjs imports capture-evidence.mjs;
+   // push-prepare.mjs imports release-promotion-envelope.mjs.

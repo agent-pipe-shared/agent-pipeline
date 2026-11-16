@@ -1,0 +1,124 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+index e1a65f6d46ab97b580541b435a99ad6f57fce022..9b23742f1c9fcc4be8f19cf9e7dbb39ffd93ebb1 100644
+--- a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -68,6 +68,20 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
+     en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy where the project has infrastructure or container files; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
+     de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
+     routes: Object.freeze([{ script: "toolchain-defer.mjs", verbs: null }]),
++    // C30-1: the question shows this step as a lead line with one bullet per tool and a closing bullet; every item is a literal
++    // substring of `en`/`de`, so the two renderings cannot drift on the tool list (pinned in onboarding-consent-mark.test.mjs).
++    bullets: Object.freeze({
++      en: Object.freeze({
++        lead: "check the tools the Pipeline needs on this machine:",
++        items: Object.freeze(["Node.js", "Git", "gitleaks", "osv-scanner", "semgrep", "Trivy where the project has infrastructure or container files", "OpenSSL where you sign"]),
++        tail: "for a missing tool, I show you its install route to run together, or record that you install it later",
++      }),
++      de: Object.freeze({
++        lead: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht:",
++        items: Object.freeze(["Node.js", "Git", "gitleaks", "osv-scanner", "semgrep", "Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat", "OpenSSL dort, wo Sie signieren"]),
++        tail: "bei einem fehlenden Werkzeug zeige ich Ihnen den Installationsweg, den wir gemeinsam gehen, oder halte fest, dass Sie es später installieren",
++      }),
++    }),
+   }),
+   Object.freeze({
+     id: "onboarding-commits",
+@@ -133,20 +147,31 @@ export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
+   Object.freeze({ id: "guard-override", en: "any human-guard override", de: "jede menschliche Guard-Freigabe (Override)" }),
+ ]);
+ 
++// C30-1: the question is relayed as plain text (dash bullets and blank lines only, no tables or markup a terminal does not
++// render): a short opening, the covered steps as bullets (the tool check with one sub-bullet per tool), the Advisor export as
++// its own paragraph, and the exclusions as a closing bullet list. The scope itself is unchanged (ADR-0092, ADR-0103).
++const bulletList = (entries) => entries.map((entry) => `- ${entry}`).join("\n");
+ const QUESTION_FRAME = Object.freeze({
+-  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes also lets me ${advisor}. Your yes does not cover ${excluded}; those stay your own decisions.`,
+-  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja erlaubt außerdem, ${advisor}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
++  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it?\n\nIf you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval:\n${covered}\n\nYour yes also lets me ${advisor}.\n\nYour yes does not cover these; they stay your own decisions:\n${excluded}`,
++  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen?\n\nWenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird:\n${covered}\n\nIhr Ja erlaubt außerdem, ${advisor}.\n\nIhr Ja deckt nicht ab (das bleiben Ihre eigenen Entscheidungen):\n${excluded}`,
+ });
+ 
++/** One covered step as a bullet; a step with `bullets` gets a lead line, one sub-bullet per item and a closing sub-bullet. */
++function stepBullet(step, lang) {
++  const parts = step.bullets?.[lang];
++  if (parts === undefined) return `- ${step[lang]}`;
++  return [`- ${parts.lead}`, ...parts.items.map((item) => `  - ${item}`), `  - ${parts.tail}`].join("\n");
++}
++
+ /**
+  * The consent question, in the operator language (`en`/`de`; anything else is English). `text` is relayed verbatim by the
+  * agent, never paraphrased; `scope`/`notCovered` are the step ids the record of a yes will carry.
+  */
+ export function onboardingConsentQuestion({ language = "en" } = {}) {
+   const textFor = (lang) => QUESTION_FRAME[lang](
+-    ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== ADVISOR_EXPORT_STEP_ID).map((step) => step[lang]).join("; "),
++    ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== ADVISOR_EXPORT_STEP_ID).map((step) => stepBullet(step, lang)).join("\n"),
+     ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === ADVISOR_EXPORT_STEP_ID)[lang],
+-    ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang]).join("; "),
++    bulletList(ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang])),
+   );
+   const chosen = language === "de" ? "de" : "en";
+   return {
+diff --git a/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs b/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
+index e15d97a4886f1563e835719ef255332a153d21f6..e9ab0991a10d3b2116f5a1766283c7f6ed933157 100644
+--- a/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
+@@ -105,7 +105,13 @@ test("G20-45: the rendered consent question names every covered step and every e
+     const question = onboardingConsentQuestion({ language });
+     assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
+     assert.equal(question.language, language);
+-    for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
++    for (const step of ONBOARDING_CONSENT_COVERED_STEPS) {
++      const parts = step.bullets?.[language];
++      if (parts === undefined) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
++      // C30-1: a step shown as a lead line plus sub-bullets names every part, and every item is a literal part of the full step text.
++      else for (const part of [parts.lead, parts.tail, ...parts.items]) assert.ok(question.text.includes(part), `${language}: ${step.id}: ${part}`);
++      if (parts !== undefined) for (const item of parts.items) assert.ok(step[language].includes(item), `${language}: ${step.id}: ${item} is part of the full step text`);
++    }
+     for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
+     assert.deepEqual(question.scope, ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id));
+     assert.deepEqual(question.notCovered, ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id));
+@@ -119,6 +125,29 @@ test("G20-45: the rendered consent question names every covered step and every e
+   assert.equal(onboardingConsentQuestion().textByLanguage.de, onboardingConsentQuestion({ language: "de" }).text);
+ });
+ 
++// C30-1 (PO 2026-11-15): the consent question is scannable. A short opening, one dash bullet per covered step (the tool check with
++// sub-bullets), the Advisor export as its own paragraph, a closing bullet list of what the yes does not cover, no line wider than
++// the start skill relays without wrapping trouble, and plain text only (no table or markup a terminal does not render).
++test("C30-1: the consent question is a short opening, bulleted steps, an Advisor paragraph and a closing exclusions list", () => {
++  for (const language of ["en", "de"]) {
++    const { text } = onboardingConsentQuestion({ language });
++    const lines = text.split("\n");
++    const covered = ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== "advisor-export");
++    // One top-level bullet per covered step except the Advisor export (which is a paragraph); sub-bullets are indented.
++    assert.equal(lines.filter((line) => /^- /u.test(line)).length, covered.length + ONBOARDING_CONSENT_NOT_COVERED.length, `${language}: top-level bullets`);
++    const advisor = ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === "advisor-export")[language];
++    assert.ok(lines.some((line) => line.includes(advisor) && !/^\s*-/u.test(line)), `${language}: the Advisor export is its own paragraph, not a bullet`);
++    const toolchain = ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === "toolchain");
++    assert.equal(lines.filter((line) => /^ {2}- /u.test(line)).length, toolchain.bullets[language].items.length + 1, `${language}: one sub-bullet per tool plus the closing one`);
++    const firstBullet = lines.findIndex((line) => /^- /u.test(line));
++    const lastExclusion = lines.length - 1;
++    assert.ok(firstBullet > 0 && firstBullet <= 4, `${language}: a short opening comes first`);
++    for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(lines.slice(lastExclusion - ONBOARDING_CONSENT_NOT_COVERED.length + 1).includes(`- ${step[language]}`), `${language}: ${step.id} closes the question as a bullet`);
++    assert.ok(lines.every((line) => line.length <= 300), `${language}: no line is wider than 300 characters`);
++    assert.doesNotMatch(text, /[|#*`>]/u, `${language}: plain text only`);
++  }
++});
++
+ // C28-ONBOARDING-QUESTIONS (AC-108), friction 1 (PO decision 2026-11-10): the Advisor export consent is part of the FIRST consent question. Agreeing
+ // activates it, so no separate Advisor question follows; a record that does not name it (v1, an older v2, a no) never reads as approved.
+ test("C28-ONBOARDING-QUESTIONS: the first consent question lists the Advisor export among what agreeing activates, and a yes records it in the same record", () => {
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 8ba9da056e05764f767b18374e62f2888a1bf2de..96c4ee0b42cc99b9cb40a47460e8cf9bf25aa2f9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -2599,7 +2599,8 @@ test("G20-45: the pipeline-governance-inactive result carries the consent questi
+   const question = result.consentQuestion;
+   assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
+   assert.equal(question.language, "en");
+-  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step.en), step.id);
++  // C30-1: a step shown as a lead line with sub-bullets (the tool check) names its parts instead of one sentence.
++  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) for (const part of step.bullets === undefined ? [step.en] : [step.bullets.en.lead, step.bullets.en.tail, ...step.bullets.en.items]) assert.ok(question.text.includes(part), `${step.id}: ${part}`);
+   for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step.en), step.id);
+   assert.ok(question.textByLanguage.de.includes(ONBOARDING_CONSENT_COVERED_STEPS[0].de));
+   const record = result.consentRecordAction;

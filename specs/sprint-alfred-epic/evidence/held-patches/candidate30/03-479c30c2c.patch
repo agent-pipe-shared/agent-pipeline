@@ -1,0 +1,466 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 3b67de42f0f74696c3ad22eb14feed579341ac85..3d15a659b28c4d85ed99d6039797112faa1624ff 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -28,7 +28,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
+ | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
+ | Build, test, package and rehearse a held-patch candidate through scratch clones (the clone-slice route of candidate 18); re-run only the red suites of a Full Verify record | `scripts/clone-slice/*.mjs` (copy to `scratch/agent-out/` to use; see "Clone-slice route" below) | clones and patch files only |
+-| Remove the test and Verify leftovers the suites and Full Verify runs leave in the home folder (signing-method, b1i, existing-public-anchor, k79-scan, local-supervisor and design-route test homes, old Full Verify clones, the shared fixture and tmp folders); the manual form of the cleanup candidate 30 automates | `scripts/clean-test-leftovers.mjs [--apply] [--min-age-hours <n>]` | without `--apply` the plan only; `--apply` removes exactly the planned name-matched entries older than the minimum age (default 12 h); live state is not in its allowlist |
++| Remove the test and Verify leftovers the suites and Full Verify runs leave in the home folder (signing-method, b1i, existing-public-anchor, k79-scan, local-supervisor and design-route test homes, old Full Verify clones, the shared fixture and tmp folders). Candidate 30 (C30-5) runs it automatically: `scripts/full-verify.mjs` sweeps at the end of every run (a green run also removes its own private home, a red run keeps it for the red-suite reruns, and a new unlisted fixture-shaped folder fails the wrapper), `scripts/run-quiet.mjs` removes a green suite's private TMPDIR and sweeps old label folders, and the suites remove what they create; `PIPELINE_KEEP_TEST_HOMES=1` keeps everything for a diagnosis | `scripts/clean-test-leftovers.mjs [--apply] [--min-age-hours <n>] [--verify-homes <days>]` (`node --test scripts/full-verify.test.mjs`; shared removal in `plugins/pipeline-core/lib/test-home-cleanup.mjs`) | without `--apply` the plan only; `--apply` removes exactly the planned name-matched entries older than the minimum age (default 12 h); live state is not in its allowlist; `--verify-homes <days>` adds the children of `.fv` and `fvc` older than that many days |
+ | Collect growing runtime state of a checkout; first collector: old git-hook `runtime-<sha256>` snapshots that no hook names (`plan` prints a digest, `apply --plan-sha256 <digest> --aside <dir outside the repository>` moves them aside, never deletes) | `scripts/housekeeping.mjs plan\|apply` (`node --test scripts/housekeeping.test.mjs`) | `plan` none; `apply` renames snapshots into the aside directory |
+ 
+ ## Candidate stamp
+diff --git a/plugins/pipeline-core/lib/test-home-cleanup.mjs b/plugins/pipeline-core/lib/test-home-cleanup.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..3d650d58df29acc5745c962774821742573f2b92
+--- /dev/null
++++ b/plugins/pipeline-core/lib/test-home-cleanup.mjs
+@@ -0,0 +1,61 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C30-5 (PO 2026-11-15): tests and Verify runs leave folders in the home folder and nothing removed them (62 entries, 40.7 GB in
++ * one measurement). This is the one place that removes a test tree safely, so a suite's own cleanup, `scripts/run-quiet.mjs`,
++ * `scripts/full-verify.mjs` and `scripts/clean-test-leftovers.mjs` all do it the same way:
++ *
++ *  - `removeTestTree(path)`: a fixture may chmod its folders unreadable, so every directory of the tree is made removable first, then
++ *    the tree is removed. A symbolic link is never followed and the link itself is removed. Never throws: it returns false when
++ *    something stayed behind (the next sweep retries).
++ *  - `keepTestHomes()`: the documented switch (PIPELINE_KEEP_TEST_HOMES=1) that keeps a fixture folder for a diagnosis. A failing
++ *    run keeps its folders by itself only where the caller says so; the sweep removes them after the age guard.
++ *
++ * Imports node builtins only (suites import it before anything else runs).
++ */
++import { chmodSync, lstatSync, readdirSync, rmSync } from "node:fs";
++import { join } from "node:path";
++
++/** True when the person asked to keep fixture folders (a diagnosis); the default is to remove them. */
++export function keepTestHomes(env = process.env) {
++  return env.PIPELINE_KEEP_TEST_HOMES === "1";
++}
++
++function makeRemovable(path) {
++  const stack = [path];
++  while (stack.length > 0) {
++    const current = stack.pop();
++    let stat;
++    try { stat = lstatSync(current); } catch { continue; }
++    if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
++    try { chmodSync(current, 0o700); } catch { /* not ours to change */ }
++    try { for (const entry of readdirSync(current)) stack.push(join(current, entry)); } catch { /* unreadable */ }
++  }
++}
++
++/** Remove one test tree. @returns {boolean} true when it is gone. */
++export function removeTestTree(path) {
++  if (typeof path !== "string" || path === "") return false;
++  try {
++    makeRemovable(path);
++    rmSync(path, { recursive: true, force: true });
++  } catch { /* reported by the return value */ }
++  try { lstatSync(path); return false; } catch { return true; }
++}
++
++/**
++ * Remove the children of `dir` whose own modification time is older than `minAgeHours` (a younger one may belong to a run that is
++ * still going). Never follows a symbolic link. @returns {{ removed: string[], kept: string[] }} names only.
++ */
++export function sweepOldChildren(dir, { minAgeHours = 12, now = Date.now() } = {}) {
++  const removed = [], kept = [];
++  let names;
++  try { names = readdirSync(dir); } catch { return { removed, kept }; }
++  for (const name of names) {
++    const path = join(dir, name);
++    let stat;
++    try { stat = lstatSync(path); } catch { continue; }
++    if ((now - stat.mtimeMs) / 3600000 < minAgeHours) { kept.push(name); continue; }
++    (removeTestTree(path) ? removed : kept).push(name);
++  }
++  return { removed, kept };
++}
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 667bc11216184f5e761ef1e0e874898e7f9b6913..d5f8d0af7c192154427f1172f66a0c454b3b2858 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -536,6 +536,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
+     // transcript), export-report writes the returned text as the report, and create (the CLI, on the Claude runner signal) stamps the
+     // observation into the receipt itself. Nothing here supplies a model.
+     const sessionBase = mkdtempSync(join(dirname(dir), "design-route-transcript-"));
++    DIRS.push(sessionBase); // C30-5: the transcript fixture left a home folder behind on every run
+     mkdirSync(join(sessionBase, "session", "subagents"), { recursive: true });
+     writeFileSync(join(sessionBase, "session.jsonl"), "");
+     writeFileSync(join(sessionBase, "session", "subagents", "agent-a1.jsonl"),
+diff --git a/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs b/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs
+index 67a5e66120aeb8117db30d672eaa130f3296e343..2a2a01d4f10421c21df8da9458ac5eeece20a6e5 100644
+--- a/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs
++++ b/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { after } from 'node:test';
+-import { mkdtempSync, chmodSync, lstatSync, realpathSync, rmSync } from 'node:fs';
++import { mkdtempSync, chmodSync, lstatSync, realpathSync } from 'node:fs';
++import { keepTestHomes, removeTestTree } from '../lib/test-home-cleanup.mjs';
+ import { join, dirname, resolve } from 'node:path';
+ import { userInfo } from 'node:os';
+ import { registerTestCaseCompletion } from '../lib/test-case-completion.mjs';
+@@ -45,6 +46,7 @@ after(() => {
+     throw Error('EPA-FIXTURE-CLEANUP-CAS');
+   const beforeRemove = lstatSync(parent);
+   if (!same(identity(current), identity(beforeRemove))) throw Error('EPA-FIXTURE-CLEANUP-CAS');
+-  rmSync(parent, { recursive: true });
++  // C30-5: removed with the shared removal (a case may leave a folder unreadable); PIPELINE_KEEP_TEST_HOMES=1 keeps it.
++  if (!keepTestHomes()) removeTestTree(parent);
+ });
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs
+index d78e953ee2362264653ef4a7340ce29748c11869..e03a372cbb9f3ed7994b3bb36f690d171aa96686 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs
+@@ -7,6 +7,7 @@ import {userInfo} from 'node:os';
+ import {join,resolve,dirname,isAbsolute} from 'node:path';
+ import {fileURLToPath} from 'node:url';
+ import {registerTestCaseCompletion} from '../lib/test-case-completion.mjs';
++import {keepTestHomes,removeTestTree} from '../lib/test-home-cleanup.mjs';
+ const sourceRoot=fileURLToPath(new URL('../../../',import.meta.url));
+ const fixtureRoot=fileURLToPath(new URL('./signing-disclosure-sweep/',import.meta.url));
+ assert.equal(resolve(sourceRoot),resolve(fixtureRoot,'../../../..'));
+@@ -33,8 +34,9 @@ for(let index=0;index<before.length;index++){
+ const operation=directoryFact(operationRoot);assert.equal(operation.uid,BigInt(osUser.uid));assert.equal(operation.mode&0o777n,0o700n);
+ for(const expected of [...parents,operation]){const actual=directoryFact(expected.path);for(const key of fields)assert.equal(actual[key],expected[key]);}
+ process.chdir(operationRoot);assert.equal(process.cwd(),operationRoot);
+-// Retain physical METHOD artifacts; cleanup is not an authority terminal claim.
+-after(()=>process.chdir(originalCwd));
++// C30-5 (PO 2026-11-15): the METHOD folder in the home folder is removed when the suite ends (35 of them, left by earlier runs, were found in
++// one home folder); removing a test fixture is not an authority terminal claim. PIPELINE_KEEP_TEST_HOMES=1 keeps it for a diagnosis.
++after(()=>{process.chdir(originalCwd);if(!keepTestHomes())removeTestTree(operationRoot);});
+ const {presentationCases}=await import('./signing-disclosure-sweep/presentation-cases.mjs');
+ const {typedHgoCases}=await import('./signing-disclosure-sweep/typed-hgo-cases.mjs');
+ const {sweepCases}=await import('./signing-disclosure-sweep/sweep-cases.mjs');
+diff --git a/scripts/clean-test-leftovers.mjs b/scripts/clean-test-leftovers.mjs
+index aa6fff94d94bfca364bfc168c3fe4b4555c0f62c..f5ef0b2012d421be75a7139e1b30d51b93f9550b 100644
+--- a/scripts/clean-test-leftovers.mjs
++++ b/scripts/clean-test-leftovers.mjs
+@@ -1,19 +1,24 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Purpose: remove the test and Verify leftovers the Pipeline's own suites and Full Verify runs leave directly in the home folder
+ //          (signing-method, b1i, existing-public-anchor, k79-scan, local-supervisor and design-route test homes, old Full Verify
+-//          clones, the shared fixture/tmp folders). It is the manual form of the cleanup candidate 30 automates after Verify.
+-// Usage:   node scripts/clean-test-leftovers.mjs [--apply] [--min-age-hours <n>]
++//          clones, the shared fixture/tmp folders). Candidate 30 (C30-5) runs it automatically: `scripts/full-verify.mjs` calls
++//          `sweepLeftovers` at the end of every run, `scripts/run-quiet.mjs` sweeps its own label folders, and the suites remove
++//          what they create. This file is also the manual form.
++// Usage:   node scripts/clean-test-leftovers.mjs [--apply] [--min-age-hours <n>] [--verify-homes <days>]
+ //          Without --apply it only prints the plan (name, size, files, age) and removes nothing. --apply removes exactly the entries
+ //          of the plan. Default minimum age 12 hours by the entry's own modification time: a younger entry may belong to a run that
+-//          is still going and is skipped.
++//          is still going and is skipped. --verify-homes <days> additionally plans the per-run homes of finished Full Verify runs
++//          (`.fv/<label>`) and their clones (`fvc/<name>`) that are older than <days> days; without the flag `.fv` and `fvc` are
++//          never touched (a red run keeps its home for the red-suite reruns).
+ // Safety:  only top-level entries of the home folder whose NAME matches the allowlist below are ever considered; a symbolic link is
+ //          never followed or removed through; live state is not in the allowlist (.fv, fvc, .ptp, .apsp, .agent-pipeline, the
+ //          installed plugin folder, the PO key folder, .ssh and every other dot folder not named here). The home folder is read
+ //          from the operating system, no path is written into this file.
+ // Data:    writes nothing but the removals of --apply; reads sizes by walking each planned entry once.
+-import { chmodSync, lstatSync, readdirSync, rmSync } from "node:fs";
++import { lstatSync, readdirSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { join } from "node:path";
++import { removeTestTree } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
+ 
+ export const LEFTOVER_PATTERNS = Object.freeze([
+   /^\.pipeline-signing-method-[A-Za-z0-9]{6}$/u,
+@@ -43,39 +48,53 @@ function measure(path) {
+   return { bytes, files };
+ }
+ 
+-function makeRemovable(path) {
+-  const stack = [path];
+-  while (stack.length) {
+-    const current = stack.pop();
+-    let stat;
+-    try { stat = lstatSync(current); } catch { continue; }
+-    if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
+-    try { chmodSync(current, 0o700); } catch { /* not ours to change */ }
+-    try { for (const entry of readdirSync(current)) stack.push(join(current, entry)); } catch { /* unreadable */ }
+-  }
+-}
+-
+-export function planLeftovers({ home = homedir(), minAgeHours = 12, now = Date.now() } = {}) {
++export function planLeftovers({ home = homedir(), minAgeHours = 12, now = Date.now(), verifyHomeDays = null } = {}) {
+   const planned = [], skipped = [];
+-  for (const name of readdirSync(home)) {
+-    if (!isLeftoverName(name)) continue;
+-    const path = join(home, name);
++  const consider = (name, path, limitHours) => {
+     let stat;
+-    try { stat = lstatSync(path); } catch { continue; }
+-    if (stat.isSymbolicLink()) { skipped.push({ name, reason: "symbolic link" }); continue; }
++    try { stat = lstatSync(path); } catch { return; }
++    if (stat.isSymbolicLink()) { skipped.push({ name, reason: "symbolic link" }); return; }
+     const ageHours = (now - stat.mtimeMs) / 3600000;
+-    if (ageHours < minAgeHours) { skipped.push({ name, reason: `younger than ${minAgeHours} h` }); continue; }
++    if (ageHours < limitHours) { skipped.push({ name, reason: `younger than ${limitHours} h` }); return; }
+     planned.push({ name, path, ageHours, ...(stat.isDirectory() ? measure(path) : { bytes: stat.size, files: 1 }) });
++  };
++  for (const name of readdirSync(home)) if (isLeftoverName(name)) consider(name, join(home, name), minAgeHours);
++  // C30-5: the per-run homes of finished Full Verify runs and their clones, only when asked and only the children of the two
++  // folders, older than the given number of days. The folders themselves and everything else of the home folder stay.
++  if (verifyHomeDays !== null) {
++    for (const folder of [".fv", "fvc"]) {
++      let children;
++      try { children = readdirSync(join(home, folder)); } catch { continue; }
++      for (const child of children) consider(`${folder}/${child}`, join(home, folder, child), verifyHomeDays * 24);
++    }
+   }
+   return { planned, skipped };
+ }
+ 
++/**
++ * C30-5: plan and (with `apply`) remove the leftovers in one call, the form Verify uses at the end of a run. Returns counts only.
++ * Never throws; an entry that cannot be removed stays and is retried by the next sweep.
++ */
++export function sweepLeftovers({ home = homedir(), minAgeHours = 12, now = Date.now(), apply = true, verifyHomeDays = null } = {}) {
++  try {
++    const { planned } = planLeftovers({ home, minAgeHours, now, verifyHomeDays });
++    const bytes = planned.reduce((sum, item) => sum + item.bytes, 0);
++    if (!apply) return { planned: planned.length, removed: 0, bytes };
++    let removed = 0;
++    for (const item of planned) if (removeTestTree(item.path)) removed += 1;
++    return { planned: planned.length, removed, bytes };
++  } catch { return { planned: 0, removed: 0, bytes: 0 }; }
++}
++
+ function main(argv) {
+   const apply = argv.includes("--apply");
+   const ageIndex = argv.indexOf("--min-age-hours");
+   const minAgeHours = ageIndex === -1 ? 12 : Number(argv[ageIndex + 1]);
+   if (!Number.isFinite(minAgeHours) || minAgeHours < 0) { console.error("clean-test-leftovers: REFUSED: --min-age-hours needs a non-negative number"); return 2; }
+-  const { planned, skipped } = planLeftovers({ minAgeHours });
++  const verifyIndex = argv.indexOf("--verify-homes");
++  const verifyHomeDays = verifyIndex === -1 ? null : Number(argv[verifyIndex + 1]);
++  if (verifyHomeDays !== null && (!Number.isFinite(verifyHomeDays) || verifyHomeDays < 0)) { console.error("clean-test-leftovers: REFUSED: --verify-homes needs a non-negative number of days"); return 2; }
++  const { planned, skipped } = planLeftovers({ minAgeHours, verifyHomeDays });
+   for (const item of planned) console.log(`${(item.bytes / 1048576).toFixed(1).padStart(9)} MB ${String(item.files).padStart(8)} files ${(item.ageHours / 24).toFixed(1).padStart(6)} d  ${item.name}`);
+   for (const item of skipped) console.log(`   skipped  ${item.name} (${item.reason})`);
+   const total = planned.reduce((sum, item) => sum + item.bytes, 0);
+@@ -83,7 +102,7 @@ function main(argv) {
+   if (!apply) { console.log("nothing removed; run again with --apply to remove exactly these entries"); return 0; }
+   let removed = 0;
+   for (const item of planned) {
+-    try { makeRemovable(item.path); rmSync(item.path, { recursive: true, force: true }); removed += 1; } catch (error) { console.error(`failed ${item.name}: ${error.message}`); }
++    if (removeTestTree(item.path)) removed += 1; else console.error(`failed ${item.name}`);
+   }
+   console.log(`removed ${removed} of ${planned.length}`);
+   return removed === planned.length ? 0 : 1;
+diff --git a/scripts/full-verify.mjs b/scripts/full-verify.mjs
+index 08f5672d82a744a1df93aae69e41d7d946a7ff1f..36d94c257f93905829e4ca24bf4143d9e9806067 100644
+--- a/scripts/full-verify.mjs
++++ b/scripts/full-verify.mjs
+@@ -15,15 +15,30 @@
+ //          path and the red step names read from <clone-dir>/evidence/verify-latest.json (the run record). Exit code = verify's.
+ // Data:    HOME and TMPDIR under <home>/.fv/<label>/ (recreated each run, outside every repository). The TMPDIR path must stay
+ //          under 30 characters; a longer one is refused with exit 2 rather than silently breaking socket-path tests.
++//          C30-5: when the run ends, a green run removes that private home; a red run keeps it (the red-suite reruns use it); then the
++//          home-level leftovers of the suites on the cleaner's allowlist older than 12 h are removed (scripts/clean-test-leftovers.mjs).
++//          PIPELINE_KEEP_TEST_HOMES=1 keeps everything.
+ // Read-only toward the source: it writes only the output file, the run record verify itself writes in the clone, and the temp dirs.
+ import { spawn, execFileSync } from "node:child_process";
+ import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { delimiter, dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { keepTestHomes, removeTestTree } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
++import { isLeftoverName, sweepLeftovers } from "./clean-test-leftovers.mjs";
+ 
+ export const MAX_TMPDIR_CHARS = 29;
+ 
++/**
++ * C30-5: names a run added directly to the home folder that look like a leaked fixture folder (a `mkdtemp` shape: a name ending in a
++ * six-character random suffix) and are not already on the cleaner's allowlist, which the sweep removes. Pure. A name that is new but
++ * not of that shape (a shell history, a tool's config folder) is not a leak and is not reported.
++ */
++export function leakedFixtureNames({ before, after, isKnownLeftover }) {
++  const seen = new Set(before);
++  return [...after].filter((name) => !seen.has(name) && !isKnownLeftover(name) && /^\.?[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9]{6}$/u.test(name)).sort();
++}
++
+ /** Pure: a private TMPDIR path is short enough to keep socket paths under the 96-byte limit. */
+ export function tmpDirIsShortEnough(path) {
+   return typeof path === "string" && path.length > 0 && path.length <= MAX_TMPDIR_CHARS;
+@@ -108,6 +123,8 @@ function main(argv) {
+   const outputRel = `scratch/${label}-output${resume ? "-resume" : ""}.txt`;
+   const out = createWriteStream(join(clone, outputRel));
+   const started = Date.now();
++  let homeBefore = [];
++  try { homeBefore = readdirSync(homedir()); } catch { homeBefore = []; }
+   const args = ["harness/scripts/verify.mjs", "--mode", "candidate", ...(reuse ? [] : ["--no-reuse"])];
+   const child = spawn(nodeBinary, args, { cwd: clone, env, stdio: ["ignore", "pipe", "pipe"] });
+   child.stdout.pipe(out, { end: false });
+@@ -120,7 +137,20 @@ function main(argv) {
+     let resumed = null;
+     if (resume) { try { resumed = countResumed(readFileSync(join(clone, outputRel), "utf8")); } catch { resumed = 0; } }
+     for (const line of summarize({ exitCode: code, seconds: Math.round((Date.now() - started) / 1000), outputPath: outputRel, record, resumed })) console.log(line);
+-    process.exit(code ?? 1);
++    // C30-5 (PO 2026-11-15): a Verify run cleans up after itself. A GREEN run removes its own private HOME and TMPDIR; a RED run keeps
++    // them, because the red-suite reruns (`rerun-reds.mjs`) use that exact HOME and TMPDIR, and the next sweep removes them with the
++    // other old homes. Then the shared home-level leftovers of the suites (names on the cleaner's allowlist, older than 12 h) go.
++    // PIPELINE_KEEP_TEST_HOMES=1 skips all of it.
++    let leaked = [];
++    if (!keepTestHomes()) {
++      const homeRemoved = code === 0 ? removeTestTree(base) : false;
++      const swept = sweepLeftovers({ minAgeHours: 12, apply: true });
++      console.log(`cleanup: private home ${code === 0 ? (homeRemoved ? "removed" : "kept (removal failed)") : "kept for the red-suite reruns"}; ${swept.removed} of ${swept.planned} home-level leftovers removed (${(swept.bytes / 1073741824).toFixed(2)} GB)`);
++      // The check: a run that left a new fixture-shaped folder in the home folder that the cleaner does not know fails the wrapper.
++      try { leaked = leakedFixtureNames({ before: homeBefore, after: readdirSync(homedir()), isKnownLeftover: isLeftoverName }); } catch { leaked = []; }
++      if (leaked.length > 0) console.log(`LEAK: this run left ${leaked.length} unlisted fixture folder(s) in the home folder: ${leaked.join(", ")}. A suite must remove what it creates (PIPELINE_KEEP_TEST_HOMES=1 keeps them for a diagnosis), or the name joins the allowlist of scripts/clean-test-leftovers.mjs.`);
++    }
++    process.exit(code === 0 && leaked.length > 0 ? 1 : code ?? 1);
+   });
+   return null;
+ }
+diff --git a/scripts/full-verify.test.mjs b/scripts/full-verify.test.mjs
+index 0c3aa9996a06918d866590e583ba9efdad79cc77..c3602ccd2ed154dde4a0415c2ccfdc7a42d95874 100644
+--- a/scripts/full-verify.test.mjs
++++ b/scripts/full-verify.test.mjs
+@@ -2,7 +2,12 @@
+ // Pure-function cases of the Full Verify wrapper: the --resume run choice, the resumed count and the summary line (AC-140).
+ import assert from "node:assert/strict";
+ import test from "node:test";
+-import { countResumed, newestRunId, summarize } from "./full-verify.mjs";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { countResumed, leakedFixtureNames, newestRunId, summarize } from "./full-verify.mjs";
++import { isLeftoverName, planLeftovers, sweepLeftovers } from "./clean-test-leftovers.mjs";
++import { keepTestHomes, removeTestTree, sweepOldChildren } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
+ 
+ test("newestRunId picks the most recently modified safe run directory name", () => {
+   assert.equal(newestRunId([{ name: "verify-a", mtimeMs: 1 }, { name: "verify-b", mtimeMs: 3 }, { name: "verify-c", mtimeMs: 2 }]), "verify-b");
+@@ -17,6 +22,84 @@ test("countResumed counts only resumed progress lines", () => {
+   assert.equal(countResumed(""), 0);
+ });
+ 
++// ---- C30-5 (PO 2026-11-15): tests and Verify clean up after themselves; the home folder keeps nothing a run created ----
++
++const HOUR = 3600000;
++function fakeHome(t) {
++  const home = mkdtempSync(join(tmpdir(), "c30-5-"));
++  t.after(() => removeTestTree(home));
++  return home;
++}
++const agedBy = (path, hours) => { const when = new Date(Date.now() - hours * HOUR); utimesSync(path, when, when); };
++
++test("C30-5: removeTestTree removes a tree a fixture made unreadable, never follows a link out, and reports a missing path as gone", (t) => {
++  const home = fakeHome(t);
++  const tree = join(home, "tree"), outside = join(home, "outside");
++  mkdirSync(join(tree, "locked", "inner"), { recursive: true });
++  writeFileSync(join(tree, "locked", "inner", "file.txt"), "x");
++  mkdirSync(outside); writeFileSync(join(outside, "keep.txt"), "keep");
++  symlinkSync(outside, join(tree, "link-out"));
++  chmodSync(join(tree, "locked"), 0o000);
++  assert.equal(removeTestTree(tree), true);
++  assert.equal(existsSync(tree), false);
++  assert.equal(existsSync(join(outside, "keep.txt")), true, "the link target is untouched");
++  assert.equal(removeTestTree(join(home, "never-existed")), true);
++  assert.equal(removeTestTree(""), false);
++});
++
++test("C30-5: sweepOldChildren removes only children older than the guard", (t) => {
++  const home = fakeHome(t);
++  for (const name of ["old-one", "old-two", "young"]) mkdirSync(join(home, name));
++  agedBy(join(home, "old-one"), 30); agedBy(join(home, "old-two"), 13);
++  const result = sweepOldChildren(home, { minAgeHours: 12 });
++  assert.deepEqual(result.removed.sort(), ["old-one", "old-two"]);
++  assert.deepEqual(result.kept, ["young"]);
++  assert.equal(existsSync(join(home, "young")), true);
++});
++
++test("C30-5: the cleaner plans and removes only allowlisted names older than the guard, and leaves live state and every other name alone", (t) => {
++  const home = fakeHome(t);
++  const leftovers = [".pipeline-signing-method-AbCd12", ".pipeline-existing-public-anchor-Zz9Yy8", "design-route-route-9SUHKj", "pipeline-test-tmp", "fv19g"];
++  const live = [".fv", "fvc", ".ptp", ".apsp", ".agent-pipeline", ".claude", ".ssh", "src", "agent-pipeline-local-marketplace", "agent-pipeline-po", "notes.txt"];
++  for (const name of [...leftovers, ...live, ".pipeline-signing-method-Young1"]) mkdirSync(join(home, name));
++  for (const name of leftovers) agedBy(join(home, name), 40);
++  for (const name of live) agedBy(join(home, name), 4000);
++  const plan = planLeftovers({ home, minAgeHours: 12 });
++  assert.deepEqual(plan.planned.map((item) => item.name).sort(), [...leftovers].sort());
++  assert.ok(plan.skipped.some((item) => item.name === ".pipeline-signing-method-Young1" && /younger/u.test(item.reason)), "a young entry may belong to a running suite");
++  const dry = sweepLeftovers({ home, apply: false });
++  assert.deepEqual([dry.planned, dry.removed], [leftovers.length, 0]);
++  const done = sweepLeftovers({ home });
++  assert.deepEqual([done.planned, done.removed], [leftovers.length, leftovers.length]);
++  for (const name of leftovers) assert.equal(existsSync(join(home, name)), false, name);
++  for (const name of [...live, ".pipeline-signing-method-Young1"]) assert.equal(existsSync(join(home, name)), true, `${name} stays`);
++  assert.equal(sweepLeftovers({ home }).planned, 0, "a second sweep finds nothing");
++});
++
++test("C30-5: finished Full Verify homes and clones are planned only when asked, only their children, and only past the day count", (t) => {
++  const home = fakeHome(t);
++  for (const path of [".fv/fv29e", ".fv/fv28a", "fvc/c29e", "fvc/c28a"]) mkdirSync(join(home, path), { recursive: true });
++  for (const path of [".fv/fv28a", "fvc/c28a"]) agedBy(join(home, path), 24 * 20);
++  assert.deepEqual(planLeftovers({ home }).planned, [], "without the flag .fv and fvc are never touched");
++  const plan = planLeftovers({ home, verifyHomeDays: 14 });
++  assert.deepEqual(plan.planned.map((item) => item.name).sort(), [".fv/fv28a", "fvc/c28a"]);
++  assert.equal(sweepLeftovers({ home, verifyHomeDays: 14 }).removed, 2);
++  assert.equal(existsSync(join(home, ".fv", "fv29e")), true, "the recent run stays");
++  assert.equal(existsSync(join(home, ".fv")), true, "the folder itself stays");
++});
++
++test("C30-5: a new fixture-shaped folder the cleaner does not know is a leak; known names, ordinary new names and old names are not", () => {
++  const before = ["src", ".claude", "notes.txt"];
++  const after = [...before, ".pipeline-newsuite-Ab12Cd", ".pipeline-signing-method-AbCd12", ".bash_history", "Downloads", ".cache-k79-scan-X37qSd", "plain-name-xyz"];
++  assert.deepEqual(leakedFixtureNames({ before, after, isKnownLeftover: isLeftoverName }), [".pipeline-newsuite-Ab12Cd"]);
++  assert.deepEqual(leakedFixtureNames({ before: after, after, isKnownLeftover: isLeftoverName }), [], "nothing new, nothing leaked");
++});
++
++test("C30-5: the keep switch is PIPELINE_KEEP_TEST_HOMES=1 and nothing else", () => {
++  assert.equal(keepTestHomes({ PIPELINE_KEEP_TEST_HOMES: "1" }), true);
++  for (const value of [undefined, "", "0", "true", "yes"]) assert.equal(keepTestHomes({ PIPELINE_KEEP_TEST_HOMES: value }), false, String(value));
++});
++
+ test("summarize states the resumed count only when resuming, and keeps the old lines otherwise", () => {
+   const record = { steps: [{ name: "a", exitCode: 0 }, { name: "b", exitCode: 1 }] };
+   const plain = summarize({ exitCode: 1, seconds: 5, outputPath: "o.txt", record });
+diff --git a/scripts/run-quiet.mjs b/scripts/run-quiet.mjs
+index 3ea97d20173bff02b257be5b7260dd3b7f57260b..7d641744b840bca052e28202b336b1ba1269b0e0 100644
+--- a/scripts/run-quiet.mjs
++++ b/scripts/run-quiet.mjs
+@@ -6,15 +6,21 @@
+ // Output:  per file "GREEN|RED exit <code> tests/pass/fail/skip/todo <n>" plus failing case names; exit 1 if any file failed.
+ // Data:    private TMPDIRs under the chosen directory; after each suite it moves address slots of vanished fixture
+ //          repositories aside (D71/D72). Not read-only for that home-level repair; tracked files are untouched.
++//          C30-5: a GREEN suite's private TMPDIR is removed when the suite ends (a measured 33.7 GB of label folders came from
++//          never removing them); a RED suite's is kept for the diagnosis and printed, and the next run's start sweep removes label
++//          folders under <home>/pipeline-test-tmp older than 12 h. PIPELINE_KEEP_TEST_HOMES=1 keeps every folder.
+ import { spawnSync } from "node:child_process";
+-import { mkdirSync, chmodSync } from "node:fs";
++import { mkdirSync, chmodSync, rmdirSync } from "node:fs";
+ import { join, isAbsolute } from "node:path";
+ import { homedir, userInfo } from "node:os";
+ import { repairAddressRootQuietly } from "../plugins/pipeline-core/lib/session-power-address-repair.mjs";
++import { keepTestHomes, removeTestTree, sweepOldChildren } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
+ const [tmpArg, ...files] = process.argv.slice(2);
+ if (!tmpArg || files.length === 0) { console.error("usage: run-quiet.mjs <label|absolute tmp dir> <test-file>..."); process.exit(2); }
+ // A bare label resolves to a private directory outside the checkout: <home>/pipeline-test-tmp/<label>.
+ const tmpRoot = isAbsolute(tmpArg) ? tmpArg : join(homedir(), "pipeline-test-tmp", tmpArg);
++// C30-5: the start sweep. Only the label folders of the shared parent (never an absolute folder the caller named), older than 12 h.
++if (!isAbsolute(tmpArg) && !keepTestHomes()) sweepOldChildren(join(homedir(), "pipeline-test-tmp"), { minAgeHours: 12 });
+ let worst = 0;
+ files.forEach((file, i) => {
+   const tmp = join(tmpRoot, String(i));
+@@ -29,8 +35,15 @@ files.forEach((file, i) => {
+   for (const f of failing) console.log(`   ✖ ${f.slice(0, 160)}`);
+   if (num("tests") === "?") console.log(`   (no summary) tail: ${out.trim().split("\n").slice(-3).join(" | ").slice(0, 400)}`);
+   if (r.status !== 0) worst = 1;
++  // C30-5: a green suite leaves nothing behind; a red one keeps its private TMPDIR for the diagnosis (swept after 12 h).
++  if (!keepTestHomes()) {
++    if (r.status === 0) removeTestTree(tmp);
++    else console.log(`   kept ${tmp} for the diagnosis (removed by a later run's start sweep after 12 h)`);
++  }
+   // D71/D72: move address slots of fixture repositories that no longer exist aside after each suite.
+   const repair = repairAddressRootQuietly({ home: userInfo().homedir });
+   if (repair.status !== "nothing-to-do") console.log(`   address-root repair: ${repair.status} ${repair.code} moved ${repair.moved}`);
+ });
++// C30-5: the label folder itself goes when every suite was green and nothing is kept in it (rmdir only removes an empty folder).
++if (!keepTestHomes() && !isAbsolute(tmpArg)) { try { rmdirSync(tmpRoot); } catch { /* not empty (a red suite's folder) or already gone */ } }
+ process.exit(worst);
