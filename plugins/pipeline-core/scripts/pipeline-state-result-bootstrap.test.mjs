@@ -971,6 +971,42 @@ test("a catalogue project: close-feature takes the direct route only with a coor
   assert.match(direct(bound), /SDC-AUTHORITY-HELD: state-operation-in-flight/, "a State operation in flight holds the close");
 });
 
+// C30c (Codex greenfield 2026-11-16): the Critic course admission and the discard writer name `discard-feature` as the PO's own-terminal
+// recovery, but a plain shell has no owning lifecycle context, so a catalogue project refused it with SDC-AUTHORITY-UNAVAILABLE and nothing
+// could run. Like close-feature with a coordinator binding and the design verbs, it takes the direct (PF-54) route when no owning context
+// exists; the writer still proves every one of its own gates and the hook still keeps the agent from running it.
+test("C30c a catalogue project: the PO's plain terminal discard-feature takes the direct route, and never while a State operation is in flight", () => {
+  const direct = (p, argv) => {
+    const errors = [], originalError = console.error;
+    console.error = (...parts) => errors.push(parts.join(" "));
+    let status;
+    try { status = run(argv, { dir: p.root }); } finally { console.error = originalError; }
+    return { status, errors: errors.join("\n") };
+  };
+  const discard = ["discard-feature", "--by", "PO", "--reason", "abandoned; start a new feature"];
+  const held = ownerRouteProject("discard-held");
+  const producerPath = join(held.repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json");
+  const producer = JSON.parse(readFileSync(producerPath));
+  const memberLocal = "agent-pipeline/session-authority/members/onboarding-continuity/fixture-in-flight.json";
+  mkdirSync(join(held.repository.commonDir, "agent-pipeline/session-authority/members/onboarding-continuity"), { recursive: true });
+  writeFileSync(join(held.repository.commonDir, memberLocal), JSON.stringify({ association: { state: "bound" }, phase: "armed" }));
+  writeFileSync(producerPath, JSON.stringify({ ...producer, members: [...producer.members, { memberRef: { path: `.git/${memberLocal}` } }] }));
+  const heldBefore = readFileSync(held.statePath);
+  const refused = direct(held, discard);
+  assert.equal(refused.status, 2);
+  assert.match(refused.errors, /SDC-AUTHORITY-HELD: state-operation-in-flight/u, "a State operation in flight holds the discard");
+  assert.deepEqual(readFileSync(held.statePath), heldBefore, "State bytes unchanged");
+  const p = ownerRouteProject("discard-direct");
+  const result = direct(p, discard);
+  assert.equal(result.status, 0, result.errors);
+  assert.doesNotMatch(result.errors, /State authority route unavailable|companion-owning-lifecycle-context-required/u);
+  const after = JSON.parse(readFileSync(p.statePath, "utf8"));
+  assert.equal(Object.hasOwn(after, "activeFeature"), false, "the active feature is gone");
+  assert.equal(after.discardedFeatures.at(-1).discardedBy, "PO");
+  assert.equal(after.discardedFeatures.at(-1).id, "feature");
+  assertReleased(p, "after the direct discard");
+});
+
 test("D231 owner route: a project without a catalogue takes the direct route unchanged and the CLI names that route", () => {
   const p = ownerRouteProject("cor-nocatalogue", { catalogue: false });
   const direct = invoke(p.root, ["continuity-result-bootstrap-plan"]);

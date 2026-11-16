@@ -15438,8 +15438,14 @@ function runStatePushSource(argv,repository) {
 
 // Private source invocation custody; public observations cannot mint this handle.
 const stateCompanionBrands = new WeakMap();
+// "discard-feature" (C30c, Codex greenfield 2026-11-16): the PO's own-terminal recovery that the Critic course admission and the discard
+// writer both name. A plain shell never has an owning lifecycle context, so without this entry a catalogue project refused the one route
+// it prescribed (SDC-AUTHORITY-UNAVAILABLE: companion-owning-lifecycle-context-required) and a damaged course could not be ended. It
+// takes the same PF-54 route (refused while a State operation is in flight); the writer re-proves --by, --reason, the active feature,
+// the structurally-unsatisfiable-close condition and the cleanup-binding release, and the po-only-discard-boundary hook still keeps
+// the agent from running it.
 const STATE_DIRECT_WITHOUT_OWNING_CONTEXT = new Set([
-  "set-feature", "continuity-init", "submit-plan", "present-plan", "approve-plan", "materialize-architecture",
+  "set-feature", "continuity-init", "submit-plan", "present-plan", "approve-plan", "materialize-architecture", "discard-feature",
 ]);
 const STATE_COMPANION_ENTRIES = new Set([
   "discard-feature", "set-feature", "continuity-init", "submit-plan", "present-plan", "afk-project",
