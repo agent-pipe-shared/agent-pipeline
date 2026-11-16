@@ -424,3 +424,22 @@ replaces the targets over their recorded preimages for a changed design, includi
 rule. Tests: whole sequence in `lib/architecture-design.test.mjs`. Still to do: the refusal text should name an executable recovery; the
 second finding of that report, `cancel-submitted-plan` refused with `SDC-AUTHORITY-UNAVAILABLE` (`continuity State entry not admitted`) after a
 guard block of a read-only architecture preview as opaque-script-execution, is separate and not analysed yet.
+
+## C30-11: candidate 30e, the optimisation chain (PO 2026-11-16: build everything feasible; the Claude and Codex improvements follow after it)
+
+Source: the full Antigravity greenfield report read again 2026-11-16 (the runner prioritises its own findings, so quick wins were re-ranked against the code).
+Built in the clone (`scratch/agent-out/c30e/clone`), one failing-first test each: (1) the two carry-forward lists (`evidence-carry-forward.mjs`,
+`record-only-paths.mjs`) name the bundle's real location `audit-bundles/<feature>/...` (the writer, `close-commit-split.mjs` and the administration paths
+already did; ROP4 restated to three classes); the audit bundle itself is NOT written under `scratch/` (the `scratch/auditor-evidence-index.md` of the report
+was an index the agent wrote itself, the product writes no such file). (2) `resume-hint.mjs`: a hyphen-joined token of words and one- or two-digit numbers is no
+credential shape (`1-2-Spieler-Minispiel` was refused with `RH-SCHEMA`; random mixed-case tokens still are). (3) `antigravity-pretool-guard.mjs`: the native
+`read_file` of the pipeline-start skill consumes the session bootstrap barrier like the shell spellings.
+Checked and NOT changed: `GS-16` already names its route (`--write-policy`) in its reason and the boundary check prints it; `GUARD-GATE-STRENGTH-SHELL`
+exempts only provably write-free scripts and `prepare-dispatch.mjs` writes the briefing, so it cannot join that list.
+Still to check or build in 30e: fitness class 1 `finding` for Pipeline metadata paths outside `src/` and `app/` (report 5.3), the Antigravity cost row of the audit
+bundle (`usage-ledger.mjs --latest --row` reads only the Claude layout), `GUARD-DEVPLAN-SHELL` (needs a reproduction), the Critic model contradiction (item 3 of C30-8).
+**PO observation 2026-11-16, to do once the Claude, Codex and Antigravity reports are all in:** on Antigravity the Critic and the checks are always much faster
+than on the other two runners and seem to find nothing, yet something is found and corrected later. The Antigravity run measured: readiness review 2 min 34 s,
+`READY` in round 1; Critic 40 planner steps, 39 tool calls, 6 min 18 s, about 180,000 tokens, pass with zero findings in its first round, with write tools available
+(receipt: `functional-equivalent-read-only; OS isolation not asserted`). Compare per runner: steps and tool calls, which files each Critic really read, wall time,
+tokens, findings per round, and whether a later round found what the first missed. No conclusion before the three reports are compared.
