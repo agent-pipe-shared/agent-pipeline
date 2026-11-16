@@ -1,0 +1,409 @@
+diff --git a/docs/toolchain.md b/docs/toolchain.md
+index a80c7a000..184f16061 100644
+--- a/docs/toolchain.md
++++ b/docs/toolchain.md
+@@ -8,7 +8,7 @@ Check the state of this machine with `node <plugin root>/scripts/toolchain-prefl
+ 
+ ## Required on every machine
+ 
+-The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.
++The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check at the close. At plan approval it answers the refusal only outside a project calibrated critical: any project that has not opted the security gate out refuses a missing scanner at plan approval and at the close, a project that has opted it out gets a notice, and a deferral recorded on this machine (or a committed named exception) lets a project that is not calibrated critical go on with a notice.
+ 
+ ### node
+ 
+diff --git a/plugins/pipeline-core/docs/toolchain.md b/plugins/pipeline-core/docs/toolchain.md
+index a80c7a000..184f16061 100644
+--- a/plugins/pipeline-core/docs/toolchain.md
++++ b/plugins/pipeline-core/docs/toolchain.md
+@@ -8,7 +8,7 @@ Check the state of this machine with `node <plugin root>/scripts/toolchain-prefl
+ 
+ ## Required on every machine
+ 
+-The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.
++The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check at the close. At plan approval it answers the refusal only outside a project calibrated critical: any project that has not opted the security gate out refuses a missing scanner at plan approval and at the close, a project that has opted it out gets a notice, and a deferral recorded on this machine (or a committed named exception) lets a project that is not calibrated critical go on with a notice.
+ 
+ ### node
+ 
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
+index 457615b99..7f2d28468 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
+@@ -71,8 +71,10 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
+ let counter = 0;
+ // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
+ // mode: "chat" | "signature"; reopen: run reopen-design and approve a second time before implementation.
+-// toolchainReport: the toolchain preflight's answer at the entry gate; criticalEntry: try set-phase once under a critical calibration first.
+-function fixture({ mode = "chat", reopen = false, toolchainReport = null, criticalEntry = null } = {}) {
++// toolchainReport: the toolchain preflight's answer at the entry gate; criticalEntry: try set-phase once under a critical calibration first;
++// standardEntry: try set-phase once under the unset (standard) calibration with no deferral recorded; deferredTools: the tools the machine-local
++// deferral file names for the entry that finally succeeds.
++function fixture({ mode = "chat", reopen = false, toolchainReport = null, criticalEntry = null, standardEntry = null, deferredTools = [] } = {}) {
+   const parent = join(WORK, `fx-${counter += 1}`);
+   mkdirSync(parent, { recursive: true });
+   const root = join(parent, "repo");
+@@ -210,7 +212,9 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
+   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(round.request.approvalIntent.value.candidate), supersedes: null });
+   const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
+   assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
+-  const entryDeps = toolchainReport === null ? undefined : { toolchainPreflight: () => toolchainReport };
++  // The machine-local deferral file is injected too, so no result depends on the machine the suite runs on.
++  const depsFor = (deferred) => (toolchainReport === null ? undefined : { toolchainPreflight: () => toolchainReport, readToolDeferral: (tool) => (deferred.includes(tool) ? { deferredAt: AT, answer: "later" } : null) });
++  const entryDeps = depsFor(deferredTools);
+   let entered = false;
+   if (criticalEntry !== null) {
+     for (const twin of TWINS) writeJson(twin, { ...baseline, stakes: "critical" });
+@@ -219,6 +223,11 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
+     criticalEntry(result, derivePlanLifecycle(readCurrent()).status);
+     for (const twin of TWINS) writeJson(twin, baseline);
+   }
++  if (standardEntry !== null) {
++    // The baseline calibration states no stakes: unset reads as standard.
++    const result = attempt(["set-phase", "--phase", "implementation"], depsFor([]));
++    standardEntry(result, derivePlanLifecycle(readCurrent()).status);
++  }
+   const entryLogs = entered ? [] : lifecycle(["set-phase", "--phase", "implementation"], entryDeps);
+   assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
+   const stateRelative = statePath(root).slice(root.length + 1).replaceAll("\\", "/");
+@@ -227,14 +236,29 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
+   return { root, git, gitOk, env, write, read, observed, statePath: stateRelative, entryLogs };
+ }
+ 
+-test("candidate 22: the real set-phase names a missing scanner: a critical project is stopped with the install route, any other gets a notice and enters", () => {
++// Restated 2026-11-16 (C30F-G3B, QG-04, AC-108): the old case said a non-critical project "gets a notice and enters". The plan gate now refuses
++// a missing required scanner in every project that has not opted the security gate out (a standard or unset-stakes project too, the case's
++// fixture unchanged); a project enters with the notice once a machine-local deferral records it, or once it opted the gate out.
++test("C30F-G3B (was candidate 22): the real set-phase names a missing scanner: critical and standard projects are stopped with the install route, a recorded deferral or an opt-out enters with a notice", () => {
+   const toolchainReport = { results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] };
+   let refused = null;
+-  const ctx = fixture({ toolchainReport, criticalEntry: (result, phase) => { refused = { ...result, phase }; } });
++  let standardRefused = null;
++  const ctx = fixture({ toolchainReport, deferredTools: ["gitleaks"], criticalEntry: (result, phase) => { refused = { ...result, phase }; }, standardEntry: (result, phase) => { standardRefused = { ...result, phase }; } });
+   assert.equal(refused.status, 2, refused.logs.join("\n"));
+-  assert.ok(refused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /security-scanner-exceptions\.json/u.test(line)), refused.logs.join("\n"));
++  assert.ok(refused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /security-scanner-exceptions\.json/u.test(line) && /calibrated critical/u.test(line)), `a deferral does not answer a critical project: ${refused.logs.join("\n")}`);
+   assert.notEqual(refused.phase, "implementing", "nothing was written before the gate cleared");
++  assert.equal(standardRefused.status, 2, standardRefused.logs.join("\n"));
++  const standardText = standardRefused.logs.join("\n");
++  assert.ok(standardRefused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /docs\/toolchain\.md#gitleaks/u.test(line) && /toolchain-defer\.mjs --tool gitleaks --answer/u.test(line)), standardText);
++  assert.ok(!/calibrated critical/u.test(standardText), standardText);
++  assert.notEqual(standardRefused.phase, "implementing", "nothing was written before the gate cleared");
++  assert.ok(ctx.entryLogs.some((line) => /^Notice: gitleaks is not ready \(binary_missing\)/u.test(line)), `a recorded deferral enters and still gets its notice: ${ctx.entryLogs.join("\n")}`);
++});
++
++test("C30F-G3B: a project that opted the security gate out enters the real set-phase with a notice, a missing scanner does not stop it", () => {
++  const ctx = fixture({ toolchainReport: { securityGate: "off", results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] } });
+   assert.ok(ctx.entryLogs.some((line) => /^Notice: gitleaks is not ready \(binary_missing\)/u.test(line)), ctx.entryLogs.join("\n"));
++  assert.ok(!ctx.entryLogs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line)), ctx.entryLogs.join("\n"));
+ });
+ 
+ test("candidate 22: a toolchain check that could not look never stops the real set-phase, even in a critical project", () => {
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+index 8e917c723..3cd1ab14b 100644
+--- a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -597,13 +597,73 @@ test("C21 a missing scanner is named before the signature: critical refuses, oth
+   }
+   const excepted = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: true, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] } });
+   assert.deepEqual(excepted.refusals, []);
++  // Restated 2026-11-16 (C30F-G3B, QG-04, AC-108): a standard project that has not opted the security gate out is refused here too; it
++  // gets only a notice once it has opted out (see the plan-gate cases below).
+   const standard = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: false });
+-  assert.deepEqual(standard.refusals, []);
+-  assert.equal(standard.notices.length, 1);
+-  assert.match(standard.notices[0], /gitleaks.*binary_missing/u);
++  assert.equal(standard.refusals.length, 1);
++  assert.deepEqual(standard.notices, []);
+   assert.deepEqual(scannerEntryReadiness(null, { critical: true }), { refusals: [], notices: [] });
+ });
+ 
++// C30F-G3B (PO 2026-11-16, AC-108): the plan gate refuses a missing required scanner for every project that has not opted the security gate out.
++test("C30F-G3B the plan gate refuses a missing scanner in a standard or unset-stakes project, with its own wording, unless a record or the opt-out answers it", async () => {
++  const { scannerEntryReadiness } = await import("../security-close-status.mjs");
++  const row = (tool, status) => ({ tool, status, guidance: `install ${tool}` });
++  const report = (rows, extra = {}) => ({ results: [{ tool: "node", status: "binary_missing" }, ...rows], ...extra });
++  const missing = report([row("gitleaks", "binary_missing")]);
++  // Standard (critical false covers stakes standard and unset: isCriticalStakes is false for both).
++  const refused = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [], rejected: [] }, deferred: () => false });
++  assert.deepEqual(refused.notices, []);
++  assert.equal(refused.refusals.length, 1);
++  assert.equal(refused.refusals[0].code, "SEC-CLOSE-SCANNER-NOT-EXECUTED");
++  const text = refused.refusals[0].text;
++  assert.match(text, /gitleaks/u);
++  assert.match(text, /install gitleaks/u, "the platform guidance of the report is in the refusal");
++  assert.match(text, /docs\/toolchain\.md#gitleaks/u, "the install route of the toolchain document");
++  assert.ok(text.includes('toolchain-defer.mjs --tool gitleaks --answer "'), `the exact deferral command with the tool filled: ${text}`);
++  assert.match(text, /nothing was written/iu);
++  assert.ok(!/calibrated critical/u.test(text), `a standard project is not told it is calibrated critical: ${text}`);
++  // The critical wording stays what it was.
++  const critical = scannerEntryReadiness(missing, { critical: true, exceptions: { valid: [], rejected: [] }, deferred: () => true });
++  assert.equal(critical.refusals.length, 1, "a machine-local deferral never answers a critical calibration");
++  assert.match(critical.refusals[0].text, /calibrated critical/u);
++  // A record answers it, and the scanner still gets its notice: the machine-local deferral ...
++  const deferred = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [], rejected: [] }, deferred: (tool) => tool === "gitleaks" });
++  assert.deepEqual(deferred.refusals, []);
++  assert.equal(deferred.notices.length, 1);
++  assert.match(deferred.notices[0], /gitleaks.*binary_missing/u);
++  // ... and the committed exception (of another scanner it admits nothing).
++  const excepted = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] }, deferred: () => false });
++  assert.deepEqual(excepted.refusals, []);
++  assert.equal(excepted.notices.length, 1);
++  const otherScanner = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [exception({ scanner: "semgrep" })], rejected: [] }, deferred: () => false });
++  assert.equal(otherScanner.refusals.length, 1);
++  // A rejected exception entry is named, as at the close.
++  const ignored = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [], rejected: [{ ref: "entry 0 (gitleaks)", why: "expired (2020-01-01)" }] }, deferred: () => false });
++  assert.match(ignored.refusals[0].text, /expired \(2020-01-01\)/u);
++  // Opted out (the report's securityGate is off): today's notice, no refusal. Absent, warn and blocking are not opted out.
++  const optedOut = scannerEntryReadiness({ ...missing, securityGate: "off" }, { critical: false, exceptions: { valid: [], rejected: [] }, deferred: () => false });
++  assert.deepEqual(optedOut.refusals, []);
++  assert.equal(optedOut.notices.length, 1);
++  assert.match(optedOut.notices[0], /^Notice: gitleaks is not ready \(binary_missing\)/u);
++  for (const gate of [undefined, "warn", "blocking"]) {
++    assert.equal(scannerEntryReadiness({ ...missing, securityGate: gate }, { critical: false }).refusals.length, 1, `securityGate ${gate} is not opted out`);
++  }
++  // The opt-out does not lift a critical calibration.
++  assert.equal(scannerEntryReadiness({ ...missing, securityGate: "off" }, { critical: true }).refusals.length, 1);
++  // A license-check finding stays a notice; a not-applicable Trivy (not_required) and a ready scanner say nothing; a check that could not look stops nothing.
++  const mixed = scannerEntryReadiness(report([row("license-check", "input_missing"), row("trivy", "not_required"), row("semgrep", "ready")]), { critical: false });
++  assert.deepEqual(mixed.refusals, []);
++  assert.equal(mixed.notices.length, 1);
++  assert.match(mixed.notices[0], /license-check/u);
++  for (const status of ["execution_environment", "probe_timeout", "probe_error"]) {
++    assert.deepEqual(scannerEntryReadiness(report([row("gitleaks", status)]), { critical: false }), { refusals: [], notices: [] }, `${status}: a check that could not look stops nothing`);
++  }
++  // An applicable Trivy that is missing is refused like the others.
++  assert.equal(scannerEntryReadiness(report([row("trivy", "binary_missing")]), { critical: false }).refusals.length, 1);
++  assert.deepEqual(scannerEntryReadiness(null, { critical: false }), { refusals: [], notices: [] });
++});
++
+ test("C19 the close quality readback names an applied exception in its security evidence", async () => {
+   const { closeQualityReadback } = await import("../close-quality-readback.mjs");
+   const files = {
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index ab9aa1ea1..c927f5746 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
+ import { existsSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { toolchainDocPointer } from "./toolchain-registry.mjs";
+ 
+ export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
+ // C29e (ADR-0103): trivy is the fifth element; it reads "not applicable" for a candidate without infrastructure or container files.
+@@ -378,24 +379,44 @@ export function securityGateNotConfiguredRefusal(root, where = "this check") {
+ const SCANNER_PROVISION_STATES = new Set(["binary_missing", "incompatible_version", "incompatible_capability", "input_missing", "untrusted_path"]);
+ 
+ /**
+- * PO 2026-11-09: a scanner the close will need is reported before the signature and before implementation, so it is installed then and not found
+- * missing at the close. `report` is a toolchain preflight result. A critical calibration gets one refusal per scanner, the same one the close
+- * would give; any other calibration gets notices only. A valid named exception answers it here as it does at the close.
++ * PO 2026-11-09 / 2026-11-16: a scanner the close will need is reported before the signature and before implementation, so it is installed then
++ * and not found missing at the close. `report` is a toolchain preflight result. A critical calibration gets one refusal per scanner, the same one
++ * the close would give. Every other calibration (standard, or stakes unset) is refused for a missing scanner too (gitleaks, osv-scanner, semgrep and
++ * an applicable Trivy; a Trivy the preflight reports not_required is not here at all) unless the project opted the security gate out
++ * (`report.securityGate` is exactly "off"; an absent key reads blocking). A valid named exception answers it here as it does at the close; for a
++ * non-critical project so does a deferral the person recorded on this machine (`deferred(tool)`), which a critical calibration never honours.
++ * A scanner a record answers, an opted-out project and a license-check finding get a notice, not a refusal.
+  * @returns {{refusals: {code: string, text: string}[], notices: string[]}}
+  */
+-export function scannerEntryReadiness(report, { critical = false, exceptions = null } = {}) {
++export function scannerEntryReadiness(report, { critical = false, exceptions = null, deferred = () => false } = {}) {
+   const refusals = [];
+   const notices = [];
++  const optedOut = report?.securityGate === "off";
+   for (const entry of Array.isArray(report?.results) ? report.results : []) {
+     if (!SECURITY_ELEMENTS.includes(entry?.tool) || !SCANNER_PROVISION_STATES.has(entry.status)) continue;
+     if (critical && exceptions?.valid?.some((e) => e.scanner === entry.tool)) continue;
+     const guidance = typeof entry.guidance === "string" && entry.guidance !== "" ? ` ${entry.guidance}` : "";
+     if (critical) refusals.push({ code: SCANNER_NOT_EXECUTED_CODE, text: `${scannerNotExecutedRefusal(entry.tool, `toolchain check: ${entry.status}`, { rejected: exceptions?.rejected ?? [] })}${guidance}` });
+-    else notices.push(`Notice: ${entry.tool} is not ready (${entry.status}); install it now if this project's security gate needs it at the close.${guidance}`);
++    else if (!optedOut && entry.tool !== "license-check" && !exceptions?.valid?.some((e) => e.scanner === entry.tool) && !deferred(entry.tool)) {
++      refusals.push({ code: SCANNER_NOT_EXECUTED_CODE, text: `${scannerMissingAtPlanGateRefusal(entry.tool, entry.status, { rejected: exceptions?.rejected ?? [] })}${guidance}` });
++    } else notices.push(`Notice: ${entry.tool} is not ready (${entry.status}); install it now if this project's security gate needs it at the close.${guidance}`);
+   }
+   return { refusals, notices };
+ }
+ 
++/**
++ * The plan-gate refusal of a project that is not calibrated critical and has not opted the security gate out: a required scanner is missing. Same
++ * code as the critical one; names the install route, the one command that records a deferral on this machine and the committed exception route,
++ * and states that nothing was written (the refusal leaves no state behind).
++ */
++export function scannerMissingAtPlanGateRefusal(tool, status, { rejected = [] } = {}) {
++  const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";
++  return `${SCANNER_NOT_EXECUTED_CODE}: ${tool} is not ready (toolchain check: ${status}) and this project has not opted the security gate out, so the plan does not go on without it. Nothing was written. `
++    + `Install ${tool} (${toolchainDocPointer(tool) ?? `${tool} install routes: docs/toolchain.md`}; platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run this step again. `
++    + `If you install it later, record that on this machine, word for word as the person said it, with: node <plugin-root>/scripts/toolchain-defer.mjs --tool ${tool} --answer "<the person's answer>"; `
++    + `or record a named exception in ${SCANNER_EXCEPTIONS_PATH} (schema ${SCANNER_EXCEPTIONS_SCHEMA}) and commit it. The close still needs ${tool}.${ignored}`;
++}
++
+ /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
+ export function scannerNotExecutedRefusal(element, where = "the security evidence", { rejected = [] } = {}) {
+   const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";
+diff --git a/plugins/pipeline-core/lib/toolchain-deferrals.mjs b/plugins/pipeline-core/lib/toolchain-deferrals.mjs
+index f07361fc3..b6d14f9d5 100644
+--- a/plugins/pipeline-core/lib/toolchain-deferrals.mjs
++++ b/plugins/pipeline-core/lib/toolchain-deferrals.mjs
+@@ -2,8 +2,9 @@
+ /**
+  * C28e (PO tile 2026-11-12): when a required tool is missing at onboarding, the person may say "later". That answer is recorded on THIS machine,
+  * so the agent does not ask again in every session, and it stays visible: the readiness finding of the tool still reads `attended` and names the
+- * deferral. A deferral is never a pass: it changes no finding to ok, and the plan and close checks (lib/security-close-status.mjs) never read it,
+- * so a critical calibration still refuses a scanner that did not run.
++ * deferral. A deferral is never a pass: it changes no finding to ok, and the close never reads it. The plan gate (lib/security-close-status.mjs
++ * scannerEntryReadiness, run by pipeline-state.mjs) reads it for a project that is not calibrated critical: a scanner recorded here lets such a
++ * project go on with a notice (C30F-G3B); a critical calibration never honours it and still refuses a scanner that did not run.
+  *
+  * Stored in its own file next to the machine plane (`<home>/.agent-pipeline/toolchain-deferrals.json`), not in machine.json: that file has an
+  * exact key set, and a new key would make it invalid for every plugin copy that does not know the key yet. The directory is derived from
+diff --git a/plugins/pipeline-core/lib/toolchain-doc.mjs b/plugins/pipeline-core/lib/toolchain-doc.mjs
+index ca22a5636..f5a633c15 100644
+--- a/plugins/pipeline-core/lib/toolchain-doc.mjs
++++ b/plugins/pipeline-core/lib/toolchain-doc.mjs
+@@ -14,7 +14,7 @@ const CLASS_TITLES = Object.freeze({
+   "project-setting": "Settings in the project's own build",
+ });
+ const CLASS_INTROS = Object.freeze({
+-  required: "The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.",
++  required: "The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check at the close. At plan approval it answers the refusal only outside a project calibrated critical: any project that has not opted the security gate out refuses a missing scanner at plan approval and at the close, a project that has opted it out gets a notice, and a deferral recorded on this machine (or a committed named exception) lets a project that is not calibrated critical go on with a notice.",
+   "required-with-infrastructure": "The feature close runs this only when the project's tracked files hold a Dockerfile or Containerfile, a Terraform file or a Kubernetes manifest; anywhere else the scan reads not applicable and needs no install. Where such files exist, a missing tool is treated like a missing required one, and it may be deferred the same way.",
+   "required-to-sign": "Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.",
+   optional: "A feature that works without these, or has a fallback. Install one when you use the feature it names.",
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.test.mjs b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+index b2b81d081..afbd8b63b 100644
+--- a/plugins/pipeline-core/lib/toolchain-registry.test.mjs
++++ b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+@@ -79,6 +79,13 @@ test("docs/toolchain.md is the registry's rendering, in the repository and in th
+   }
+ });
+ 
++// C30F-G3B (AC-108): the document states the plan-gate rule as it now is, not only critical.
++test("docs/toolchain.md says the plan gate refuses a missing scanner in every project that has not opted the security gate out", () => {
++  const text = renderToolchainDoc();
++  assert.match(text, /any project that has not opted the security gate out refuses a missing scanner at plan approval and at the close/u);
++  assert.doesNotMatch(text, /any other project gets a notice/u, "the old rule is gone from the document");
++});
++
+ test("the version floors the preflight checks come from the registry", () => {
+   assert.equal(meetsVersionFloor("node", [24, 0, 0]), true);
+   assert.equal(meetsVersionFloor("node", [22, 9, 0]), false);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index a48873842..b7c7ca923 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -399,6 +399,7 @@ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft,
+ import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+ import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerEntryReadiness } from "../lib/security-close-status.mjs";
+ import { runToolchainPreflight } from "./toolchain-preflight.mjs";
++import { readToolDeferral } from "../lib/toolchain-deferrals.mjs";
+ import { tmpdir as hostTmpdir } from "node:os";
+ import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+ import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
+@@ -4132,15 +4133,21 @@ function validProfileChangeBinding(binding) {
+ 
+ /**
+  * One entry-gate check, the same before the signature and at set-phase implementation (PO 2026-11-09): a scanner the close will need is named now,
+- * so it is installed now. Only a critical calibration can be refused, and only for a tool a person can provide. If the check itself cannot run it
+- * stays silent: a sandboxed session that cannot look must not be stopped by not looking.
++ * so it is installed now. Every project that has not opted the security gate out can be refused (PO 2026-11-16; unset stakes read as standard),
++ * only for a tool a person can provide; a committed exception or, outside a critical calibration, a deferral recorded on this machine answers it.
++ * The start itself is never blocked: only the two callers below run this. If the check itself cannot run it stays silent: a sandboxed session
++ * that cannot look must not be stopped by not looking.
+  */
+ function securityScannerEntryCheck(dir, deps) {
+   let readiness;
+   try {
+     const critical = isCriticalStakes(readCalibrationStakes(dir));
+     const report = (deps.toolchainPreflight ?? runToolchainPreflight)({ rootDir: dir, tempDir: hostTmpdir() });
+-    readiness = scannerEntryReadiness(report, { critical, exceptions: critical ? readScannerExceptions(dir) : null });
++    readiness = scannerEntryReadiness(report, {
++      critical,
++      exceptions: readScannerExceptions(dir),
++      deferred: (tool) => (deps.readToolDeferral ?? readToolDeferral)(tool, deps.deferralDependencies ?? {}) !== null,
++    });
+   } catch {
+     return null;
+   }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2751e3c0a..8c5a38e0f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1337,6 +1337,35 @@ function assertPresentRetired(root, deps) {
+   assert.equal(readFileSync(statePath(root), "utf8"), before, "a retired-route refusal must not mutate state");
+ }
+ 
++// C30F-G3B (AC-108, PO 2026-11-16): the plan gate before the signature (present-plan) refuses a missing required scanner in a standard project
++// (no stakes stated) that has not opted the security gate out, names the repair, and writes nothing; a recorded deferral or exception answers it.
++{
++  const featureId = "c30f-g3b-plan-gate";
++  const planPath = `specs/${featureId}/prd_${featureId}.md`;
++  const specPath = `specs/${featureId}/spec.md`;
++  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
++  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
++  const missing = { results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] };
++  const before = readFileSync(statePath(root), "utf8");
++  const present = (extra) => capturedStderr(() => run(["present-plan", "--by", "coordinator"], { ...deps, toolchainPreflight: () => missing, readToolDeferral: () => null, ...extra }));
++  const refused = present({});
++  const refusedText = refused.lines.join("\n");
++  assert.equal(refused.result, 2, refusedText);
++  assert.ok(refusedText.includes("SEC-CLOSE-SCANNER-NOT-EXECUTED") && refusedText.includes("gitleaks") && refusedText.includes("Install gitleaks."), `the plan gate names the missing scanner: ${refusedText}`);
++  assert.ok(refusedText.includes("docs/toolchain.md#gitleaks") && refusedText.includes("toolchain-defer.mjs --tool gitleaks --answer"), `and the install route and the deferral command: ${refusedText}`);
++  assert.ok(!refusedText.includes("calibrated critical"), `a standard project is not told it is calibrated critical: ${refusedText}`);
++  assert.equal(readFileSync(statePath(root), "utf8"), before, "the refusal writes nothing");
++  // A machine-local deferral passes the scanner point and still gets its notice (the other points of the gate may still be open here).
++  const deferred = present({ readToolDeferral: (tool) => (tool === "gitleaks" ? { deferredAt: "2026-11-16T10:00:00.000Z", answer: "later" } : null) });
++  const deferredText = deferred.lines.join("\n");
++  assert.ok(!deferredText.includes("SEC-CLOSE-SCANNER-NOT-EXECUTED"), `a recorded deferral passes the plan gate: ${deferredText}`);
++  assert.ok(deferredText.includes("Notice: gitleaks is not ready (binary_missing)"), `and gets its notice: ${deferredText}`);
++  // An opted-out project is not refused for the scanner either.
++  const optedOut = present({ toolchainPreflight: () => ({ ...missing, securityGate: "off" }) });
++  assert.ok(!optedOut.lines.join("\n").includes("SEC-CLOSE-SCANNER-NOT-EXECUTED"), optedOut.lines.join("\n"));
++  assert.ok(optedOut.lines.join("\n").includes("Notice: gitleaks is not ready (binary_missing)"), optedOut.lines.join("\n"));
++}
++
+ // Claude greenfield 2026-11-08: a second reopen of a NEW submission records its own time, not the first reopen's.
+ {
+   const featureId = "reopen-own-time";
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index 48cffd018..7d71d05e9 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -501,8 +501,9 @@ const scannerProbe = (tool) => (context) => {
+     return { status: "unknown", cause: `${tool} could not be observed at this execution boundary (${status})`, repair: attendedPrerequisite(`${tool}-observable`, `re-run the readiness report in your own terminal, outside any sandbox; do not reinstall ${tool} from this result.`) };
+   }
+   // C28e (PO tiles 2026-11-12): the repair names the tool's class in the one registry and its section of docs/toolchain.md, and a deferral the
+-  // person recorded on this machine (lib/toolchain-deferrals.mjs). A deferral never makes the finding ok and never reaches the plan or close
+-  // check (lib/security-close-status.mjs scannerEntryReadiness reads the preflight result, not this report).
++  // person recorded on this machine (lib/toolchain-deferrals.mjs). A deferral never makes the finding ok and never reaches the close; the plan
++  // gate (lib/security-close-status.mjs scannerEntryReadiness reads the preflight result, not this report) refuses a missing scanner in every
++  // project that has not opted the security gate out, and a deferral answers that refusal only outside a critical calibration.
+   const deferral = (context.deps.readToolDeferral ?? readToolDeferral)(tool, context.deps.deferralDependencies ?? {});
+   return {
+     status: "attended",
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index 174718d6e..25bdf96eb 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -181,6 +181,22 @@ check("execution environment outranks missing, timeout, probe and compatibility
+     assert.match(gitleaks.guidance, /do not reinstall gitleaks/u);
+   } finally { rmSync(repo, { recursive: true, force: true }); }
+ });
++// C30F-G3B (AC-108): the plan gate (lib/security-close-status.mjs scannerEntryReadiness) reads this report. Opted out is exactly securityGate "off";
++// an absent gate key, warn and blocking are not; Trivy without tracked infrastructure or container files stays not_required, so it never refuses.
++check("the report states the security gate the plan gate reads: off only when the manifest says off, an absent key reads blocking, Trivy without infrastructure files is not required", () => {
++  const repo = root();
++  try {
++    const base = { probeNodeFn: nodeReady, probeGitFn: gitReady, resolveExecutableFn: (name) => `/tools/${name}`, scannerProbes: { trivy: () => ({ ok: false, status: "binary_missing" }) }, trivyTriggerFilesFn: () => ({ container: [], terraform: [], kubernetes: [] }) };
++    const run = (manifestResult, extra = {}) => runToolchainPreflight({ rootDir: repo, manifestResult }, { ...base, ...extra });
++    assert.equal(run(manifest({ trivy: { enabled: true } }, "off")).securityGate, "off");
++    assert.equal(run(manifest({ trivy: { enabled: true } }, "warn")).securityGate, "warn");
++    assert.equal(run(manifest({ trivy: { enabled: true } })).securityGate, "blocking");
++    assert.equal(run({ status: "ok", manifest: { security: { scanners: { trivy: { enabled: true } } } } }).securityGate, "blocking", "an absent gates.security key counts as blocking, not as opted out");
++    assert.equal(run(manifest({ trivy: { enabled: true } })).results.find(({ tool }) => tool === "trivy").status, "not_required", "no infrastructure or container files: Trivy is not required");
++    const applicable = run(manifest({ trivy: { enabled: true } }), { trivyTriggerFilesFn: () => ({ container: ["Dockerfile"], terraform: [], kubernetes: [] }) });
++    assert.equal(applicable.results.find(({ tool }) => tool === "trivy").status, "binary_missing", "with a Dockerfile Trivy is required");
++  } finally { rmSync(repo, { recursive: true, force: true }); }
++});
+ check("Git accepts only the documented status-zero EPERM false-positive, while ordinary probes retain EPERM failure", () => {
+   const epermSuccess = () => ({ status: 0, error: Object.assign(new Error("sandbox false-positive"), { code: "EPERM" }), stdout: "git version 2.50.1\n", stderr: "" });
+   assert.equal(runProbe("git", ["--version"], { cwd: "/tmp", tempDir: "/tmp", spawnFn: epermSuccess }).status, "execution_environment");
