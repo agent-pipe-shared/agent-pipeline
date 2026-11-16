@@ -1,0 +1,89 @@
+diff --git a/plugins/pipeline-core/lib/writer-commit-capability.mjs b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+index b396a99296590e1c7be4bed83f788323b36322e6..7bced3fc24428eb25edb31f1d81fdf70d6a8bbb8 100644
+--- a/plugins/pipeline-core/lib/writer-commit-capability.mjs
++++ b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+@@ -146,6 +146,34 @@ export function captureWorktree(rootDir, { spawn = spawnSync } = {}) {
+   } catch { return null; }
+ }
+ 
++const FEATURE_MANIFEST_PATH = /^specs\/[^/]+\/lifecycle\.json$/u;
++
++/**
++ * C30c (Codex greenfield 2026-11-16): the printed commit step is built from what changed during the writer run, so an artifact that an
++ * EARLIER step left uncommitted (the accepted-delivery receipt) and that this run only registered in the feature manifest was left out of
++ * `git commit -F ... -- <list>`; the manifest was committed alone and every later Critic course read refused it for good (CCA-EVIDENCE-MODE).
++ * Every file a manifest the writer wrote lists, that is still uncommitted in the working tree (git status keys, so never a path outside
++ * the repository), joins the same step. A listed file that is committed and clean, or absent, adds nothing.
++ */
++function manifestCompanions(after, files) {
++  const known = new Set(files.map((file) => file.path));
++  const companions = [];
++  for (const file of files) {
++    if (!FEATURE_MANIFEST_PATH.test(file.path)) continue;
++    let manifest;
++    try { manifest = JSON.parse(readFileSync(resolve(after.root, file.path), "utf8")); } catch { continue; }
++    for (const artifact of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
++      const path = typeof artifact?.path === "string" ? artifact.path.replace(/\\/gu, "/") : null;
++      if (path === null || known.has(path)) continue;
++      const digest = after.files.get(path);
++      if (typeof digest !== "string") continue;
++      known.add(path);
++      companions.push({ path, sha256: digest });
++    }
++  }
++  return companions;
++}
++
+ /** Arms what changed in the working tree since `before` (a `captureWorktree` result). Never throws for "nothing written". */
+ export function armWrittenSince({ rootDir, before, writer, rerun, spawn = spawnSync } = {}) {
+   const after = captureWorktree(rootDir, { spawn });
+@@ -153,6 +181,7 @@ export function armWrittenSince({ rootDir, before, writer, rerun, spawn = spawnS
+   const files = [];
+   for (const [path, sha256] of after.files) if (sha256 !== null && before.files.get(path) !== sha256) files.push({ path, sha256 });
+   if (files.length === 0) return { status: "not-needed", reason: "nothing-written", paths: [], protectedPaths: [], excluded: [], steps: [], message: commitSubject(writer), writer, rerun };
++  files.push(...manifestCompanions(after, files));
+   return armWriterCommitCapability({ rootDir, writer, rerun, files, spawn });
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+index 2ec2bf6cfc8d744d125db278a11ee0896b8ac6a4..c167041a610d9d846a8e01aeb1e9c3149a4f803e 100644
+--- a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
++++ b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+@@ -346,6 +346,37 @@ test("G20-66: approve-plan and close-feature are the wired writers; the wrapper
+   failed.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(failed.root, MANIFEST), null, "a failed writer arms nothing");
+ });
+ 
++test("C30c: the printed commit step carries the uncommitted evidence the written manifest lists, and nothing else", async () => {
++  // Codex greenfield 2026-11-16: an earlier step left the accepted-delivery receipt uncommitted, the writer only registered it in the
++  // manifest, and the printed `git commit -F ... -- <list>` took the manifest alone: the commit named a file it did not hold.
++  const { withWriterCommitCapability } = await wcLib();
++  const f = fixture("wc-companions"); closeInState(f);
++  mkdirSync(join(f.root, "specs/feature/evidence"), { recursive: true });
++  const receipt = `specs/feature/evidence/accepted-delivery-contract-${h("a")}.json`;
++  const committed = "specs/feature/evidence/committed-evidence.json";
++  const absent = "specs/feature/evidence/never-written.json";
++  writeFileSync(join(f.root, committed), "{}\n"); f.git("add", committed); f.git("commit", "-q", "-m", "evidence that is already committed", "--", committed);
++  writeFileSync(join(f.root, receipt), "{\"receipt\":1}\n");
++  const entry = (path) => ({ class: "candidate-evidence", path, sha256: h("b") });
++  const manifest = `${JSON.stringify({ artifacts: [entry(receipt), entry(committed), entry(absent)] })}\n`;
++  const printed = []; const original = console.error; console.error = (...v) => printed.push(v.join(" "));
++  let status;
++  try {
++    status = withWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs materialize-architecture", rerun: "node pipeline-state.mjs materialize-architecture" }, () => { writeFileSync(join(f.root, MANIFEST), manifest); return 0; });
++  } finally { console.error = original; }
++  assert.equal(status, 0);
++  const out = printed.join("\n");
++  const add = out.split("\n").find((line) => /git add -- /u.test(line)) ?? "";
++  const commit = out.split("\n").find((line) => /git commit -F /u.test(line)) ?? "";
++  for (const line of [add, commit]) {
++    assert.ok(line.includes(MANIFEST), `the manifest is in: ${line}`);
++    assert.ok(line.includes(receipt), `the uncommitted receipt the manifest lists is in the same step: ${line}`);
++    assert.ok(!line.includes(committed), "a listed file that is already committed adds nothing");
++    assert.ok(!line.includes(absent), "a listed file that does not exist adds nothing");
++  }
++  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST) === null, false, "the protected manifest is still armed");
++});
++
+ test("D3 (3): with no protected path in the reconcile commit nothing is armed and nothing is staged (exit 0)", () => {
+   const f = fixture("not-needed");
+   const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
