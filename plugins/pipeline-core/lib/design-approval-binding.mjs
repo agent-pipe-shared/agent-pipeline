@@ -311,6 +311,19 @@ export function describeUnreviewedCorrections(binding) {
   return [`unreviewed corrections: ${delta.length} source ${many ? "files were" : "file was"} changed after the last readiness review (round ${round}) and ${many ? "were" : "was"} not re-reviewed: ${shown}${more}`];
 }
 
+/**
+ * C30-6: the design review is one full round and two delta rounds; after the last one `present-plan` no longer refuses an open review,
+ * and the human decides. This is what the human sees before signing: the findings still open at the end of the last allowed round, read
+ * from the signed binding itself (`verdict`, `openFindingIds`, the last receipt's round), so the statement cannot drift from what is signed.
+ * Pure; `[]` for a passing review or one that still has a delta round left.
+ */
+export function describeOpenReviewFindings(binding, policyRounds = 3) {
+  if (binding?.verdict !== "open-findings" || !Array.isArray(binding.openFindingIds) || binding.openFindingIds.length === 0) return [];
+  const round = binding.reviewReceipts?.[binding.reviewReceipts.length - 1]?.round;
+  const ids = binding.openFindingIds;
+  return [`open review findings: the last allowed readiness round (round ${round} of ${policyRounds}) left ${ids.length} blocking finding${ids.length === 1 ? "" : "s"} open (${ids.join(", ")}); signing accepts ${ids.length === 1 ? "it" : "them"} knowingly, declining sends the design back`];
+}
+
 // ----------------------------------------------------------------------------- request
 
 /** The approval intent over a binding; null when createPoApprovalIntent rejects the candidate or a field. */

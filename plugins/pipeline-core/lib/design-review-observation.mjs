@@ -209,6 +209,30 @@ export function listUnexportedDesignReviewObservations({ commonDir }) {
   return out.sort((left, right) => right.observedAtMs - left.observedAtMs || (left.resultSha256 < right.resultSha256 ? -1 : 1));
 }
 
+/** C30-6: an observed round older than this is treated as abandoned, so a stale record can never hold a later design review. */
+export const UNRECEIPTED_ROUND_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * C30-6 (PO 2026-11-16): the review rounds this device observed that no receipt has stamped yet (no `<digest>.consumed`), newest first,
+ * within `maxAgeMs`. A greenfield run dispatched twelve full reviews and never made a receipt, so no round could be a delta; the dispatch
+ * guard refuses the next `readiness-reviewer` dispatch while one such round is open and names the way on. Never throws; an unreadable
+ * store is an empty list (the guard then admits, it never invents a refusal).
+ */
+export function listUnreceiptedDesignReviewRounds({ commonDir, nowMs = Date.now(), maxAgeMs = UNRECEIPTED_ROUND_MAX_AGE_MS } = {}) {
+  try {
+    const dir = designReviewObservationDir(commonDir);
+    const names = readdirSync(dir);
+    const out = [];
+    for (const name of names) {
+      const match = /^([a-f0-9]{64})\.json$/u.exec(name);
+      if (match === null || names.includes(`${match[1]}.consumed`)) continue;
+      const record = readDesignReviewObservation({ commonDir, resultSha256: match[1] });
+      if (record !== null && nowMs - record.observedAtMs <= maxAgeMs) out.push({ resultSha256: record.resultSha256, observedAtMs: record.observedAtMs });
+    }
+    return out.sort((left, right) => right.observedAtMs - left.observedAtMs);
+  } catch { return []; }
+}
+
 /**
  * One observed review stamps the receipts of ONE review: the first `create` that stamps an observation binds it to the PRD and
  * Spec digests it was made for (`<digest>.consumed`, exclusive create). A later stamp over the same digests (a receipt made

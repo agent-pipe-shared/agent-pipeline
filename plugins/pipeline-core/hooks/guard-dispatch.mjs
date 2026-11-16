@@ -78,7 +78,8 @@ import {
   prepareAdvisorProhibitionBindings,
 } from "../lib/advisor-prohibition-binding.mjs";
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
-import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, isShippedPipelineAgentType, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
+import { designReviewRoundFinding, dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, isShippedPipelineAgentType, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
+import { listUnreceiptedDesignReviewRounds } from "../lib/design-review-observation.mjs";
 // Circular by design: the producer imports this module's route exports, and this module calls the producer only at hook
 // run time (recordAdmittedBriefingRoutes), never while either module is evaluating. Function declarations are hoisted.
 import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
@@ -894,6 +895,16 @@ if (isDirectInvocation(import.meta.url)) {
     policy: dispatchFindings(dispatch),
     budget: dispatchBudgetBinding(dispatch),
   }));
+  // C30-6: a readiness-reviewer dispatch is refused while an earlier observed review round has no receipt (a delta needs one to chain to).
+  // Claude's observation store only; another runner has no records, so nothing is invented. A store that cannot be read admits.
+  for (const entry of evaluated) {
+    if (!/readiness-reviewer/u.test(String(entry.dispatch.subagentType ?? ""))) continue;
+    const reviewRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+    const reviewCommonDir = resolveGitCommonDir(reviewRoot);
+    if (typeof reviewCommonDir !== "string" || reviewCommonDir === "") continue;
+    const finding = designReviewRoundFinding({ subagentType: entry.dispatch.subagentType, unreceiptedRounds: listUnreceiptedDesignReviewRounds({ commonDir: reviewCommonDir }) });
+    if (finding !== null) entry.policy.findings.push(finding);
+  }
   // W7 A: a pipeline-core Goldfish or Critic dispatch whose prompt is not template-shaped is announced, never refused for it.
   for (const { dispatch } of evaluated) {
     const shape = promptTemplateShapeWarning(dispatch);

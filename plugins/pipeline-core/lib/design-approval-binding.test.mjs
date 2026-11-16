@@ -1139,6 +1139,20 @@ test("CGR-03c: nothing is stated when the binding records no unreviewed change (
   assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(null), []);
 });
 
+// C30-6 (PO 2026-11-16): after the last allowed readiness round an open review is presented and the PO decides; the statement is read from
+// the signed binding itself, so it cannot drift from what is signed, and a passing review states nothing.
+test("C30-6: the findings still open after the last allowed round are stated from the binding, and nothing is stated for a pass", () => {
+  const open = { verdict: "open-findings", openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-REVIEW-4"], reviewReceipts: [{ round: 1 }, { round: 2 }, { round: 3 }] };
+  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings(open), ["open review findings: the last allowed readiness round (round 3 of 3) left 2 blocking findings open (DESIGN-REVIEW-1, DESIGN-REVIEW-4); signing accepts them knowingly, declining sends the design back"]);
+  assert.match(bindingModule.describeOpenReviewFindings({ ...open, openFindingIds: ["DESIGN-REVIEW-1"] })[0], /1 blocking finding open \(DESIGN-REVIEW-1\); signing accepts it knowingly/u);
+  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings(mustCreate(passScenario()).binding), []);
+  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings({ verdict: "pass", openFindingIds: [] }), []);
+  assert.deepStrictEqual(bindingModule.describeOpenReviewFindings(null), []);
+  const source = readFileSync(new URL("../scripts/po-human-approval.mjs", import.meta.url), "utf8");
+  const statement = source.indexOf("...describeOpenReviewFindings(");
+  assert.ok(statement > 0 && statement < source.indexOf("complete bounded design binding follows"), "the signing description states it before the complete binding");
+});
+
 test("CGR-03d: the design signing description puts that statement before the complete binding", () => {
   const source = readFileSync(new URL("../scripts/po-human-approval.mjs", import.meta.url), "utf8");
   const statement = source.indexOf("...describeUnreviewedCorrections(");

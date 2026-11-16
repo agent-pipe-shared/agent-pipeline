@@ -167,3 +167,33 @@ the review dispatch, labelled per runner:
    (the receipt binds them at `create`, as before), or which model a provider served
    beyond what the host reports. The store is device-local, so `create` runs on the
    machine that dispatched the review; the committed receipt carries the result.
+
+## Amendment 2026-11-16: one full round and two delta rounds, blocking findings apart from questions (C30-6)
+
+Accepted by PO chat decision 2026-11-16 (a Claude greenfield run needed twelve fresh full readiness rounds, about 774 000
+reviewer tokens, and never reached ready; the spec grew from about 25 KB to 61 KB). It narrows the 2026-11-13 amendment
+(D246, "delta rounds until pass, no round cap"); everything not named here stands.
+
+1. **Rounds.** The review is one full round and at most two delta rounds (the shape of the Critic's batch review; the Critic
+   itself is uncapped since D190 and is not changed). The structural bound of 64 stays only as the parse bound, so a longer
+   chain made earlier still parses and an approval already signed keeps verifying. `create` refuses a fourth round
+   (`DRR-ROUND-CAP`); the next-round hint after a source drift stops at round 3.
+2. **The cap fires at the dispatch too.** The stopped run never called `create` or `present-plan`; every round was a plain
+   `readiness-reviewer` dispatch. A `readiness-reviewer` dispatch is refused (`DISPATCH-DESIGN-REVIEW-NO-RECEIPT`) while an
+   observed round has no receipt, and its repair is the order the course states: report, receipt over the unchanged sources,
+   commit, then correct and dispatch the delta. Claude's host observation is the only counter (device-local, a round older
+   than 48 hours counts as abandoned); on Codex and Antigravity the cap is the receipt (`DRR-ROUND-CAP`) and the course.
+3. **Blocking findings and questions.** The reviewer returns the two apart (`agents/readiness-reviewer.md`). Only a blocking
+   finding is an open finding of the receipt, and the split is read from the bound report text: a report with a
+   `Blocking findings:` section must list exactly the ids passed as `--open-finding` (`DRC-FINDINGS-SPLIT`), so the reviewed
+   party cannot decide what blocks. A report with only questions is ready. A report without that section is a legacy report
+   and is not checked.
+4. **Delta contract.** A delta round reviews only the open blocking findings of the round before and the correction with its
+   direct regressions; it does not repeat the full round, re-ask a question or hunt in unchanged areas.
+5. **The exit after round 3.** Nothing more can be reviewed, so `present-plan` no longer refuses an open review after the last
+   round (this reverses the refusal of D246 for that case only): the binding already carries `verdict` and `openFindingIds`,
+   the signing text states them (`open review findings: ...`), and the PO accepts them knowingly by signing or sends the design
+   back. Before the last round `PLAN-DESIGN-REVIEW-OPEN` still refuses. A chat selection grants nothing here; the one signature
+   is the explicit PO decision.
+6. **Not changed.** Bindings over one or two receipts stay byte-identical, no field is added to the binding or the receipt,
+   and the stored-approval and rebind readers are untouched.

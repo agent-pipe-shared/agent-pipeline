@@ -451,7 +451,7 @@ function continuityRequest(authority) {
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
 const MOVED_DIR = "specs/e2e-moved";
-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false, reviewerRunner = "claude" } = {}) {
+async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [], observed = true, hostRoute = false, reviewerRunner = "claude", chainRounds = 1 } = {}) {
   stateModule ??= await import(pathToFileURL(CLI).href);
   const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
@@ -555,23 +555,47 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
     if (createdCli !== 0) throw new Error(`fixture create refused: ${out.join("")}`);
     fx.cliOutput = out.join("");
   }
+  // C30-6: `chainRounds` > 1 builds the earlier rounds of a review chain (each over earlier source bytes, each with its own report), so the
+  // last receipt is round N and a delta of the round before. `receiptPaths` is the whole chain, initial first, as present-plan takes it.
+  fx.receiptPaths = [];
+  let previousRound = null;
+  const reportOf = (round) => (round === 1 ? REPORT_PATH : `specs/e2e/review/design-review-${round}.md`);
+  const receiptOf = (round) => (round === 1 ? RECEIPT_PATH : `specs/e2e/review/design-review-receipt-${round}.json`);
+  for (let round = 1; round < chainRounds; round += 1) {
+    writeFileIn(dir, reportOf(round), `# Design review ${round}\nVerdict: not ready.\n`);
+    const earlier = receiptLib.createDesignReviewReceipt({
+      featureId: FEATURE_ID, previous: previousRound,
+      sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map((path, index) => (index === 0 ? { path, sha256: sha256(`earlier-round-${round}`) } : sourceFor(path))) },
+      reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(reportOf(round)), openFindingIds: ["DESIGN-REVIEW-1"],
+      reviewedAt: "2026-10-09T09:00:00.000Z",
+      reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(reportOf(round)).sha256 },
+    });
+    if (!earlier.ok) throw new Error(`fixture earlier review receipt refused: ${earlier.code}`);
+    writeFileIn(dir, receiptOf(round), Buffer.from(earlier.bytes).toString("utf8"));
+    fx.receiptPaths.push(receiptOf(round));
+    previousRound = { path: receiptOf(round), bytes: earlier.bytes };
+  }
+  if (chainRounds > 1) writeFileIn(dir, reportOf(chainRounds), "# Design review last\nVerdict: not ready.\n");
+  const finalReportPath = reportOf(chainRounds);
+  const finalReceiptPath = receiptOf(chainRounds);
   const created = hostRoute ? { ok: true, bytes: readFileSync(join(dir, ...RECEIPT_PATH.split("/"))) } : receiptLib.createDesignReviewReceipt({
     featureId: FEATURE_ID,
-    previous: null,
+    previous: previousRound,
     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
     reviewer: { runner: reviewerRunner, model: reviewerRunner === "claude" ? "claude-opus-4" : "unknown" },
-    report: sourceFor(REPORT_PATH),
+    report: sourceFor(finalReportPath),
     openFindingIds,
     reviewedAt: "2026-10-09T09:00:00.000Z",
     ...(fallback === undefined ? {} : { fallback }),
     // D247: a native Claude review round carries the host's observation of its reviewer (export-report + create); `observed: false` is a round without one.
     // A runner without an observation route (`reviewerRunner: "codex"`) carries the visible `unobserved` label, as create writes it.
     ...(fallback === undefined && reviewerRunner !== "claude" ? { reviewerObservation: { assurance: "unobserved", modelsUsed: [], resultSha256: null } } : {}),
-    ...(fallback === undefined && reviewerRunner === "claude" && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(REPORT_PATH).sha256 } } : {}),
+    ...(fallback === undefined && reviewerRunner === "claude" && observed ? { reviewerObservation: { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sourceFor(finalReportPath).sha256 } } : {}),
   });
   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
-  if (!hostRoute) writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
-  fx.receiptPath = RECEIPT_PATH;
+  if (!hostRoute) writeFileIn(dir, finalReceiptPath, Buffer.from(created.bytes).toString("utf8"));
+  fx.receiptPath = finalReceiptPath;
+  fx.receiptPaths.push(finalReceiptPath);
 
   // Trust anchor for approve-plan (A10): project/critical-human-proof.json, schema v3, committed.
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
@@ -583,7 +607,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
   }, null, 2)}\n`);
 
   // C28e (Codex test run): `proofUncommitted` leaves the trust policy in the working tree only, the state that cost a second signature.
-  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, ...(proofUncommitted ? [] : ["project/critical-human-proof.json"]), "specs/e2e/acceptance.md", "specs/e2e/result.md");
+  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, ...new Set([REPORT_PATH, RECEIPT_PATH, ...fx.receiptPaths, ...Array.from({ length: chainRounds }, (_, index) => reportOf(index + 1))]), ...(proofUncommitted ? [] : ["project/critical-human-proof.json"]), "specs/e2e/acceptance.md", "specs/e2e/result.md");
   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
   // Folder rebind (Phoenix Wanted 4, slice 3): the reviewed sources move to another registrar-valid feature folder; the review
   // receipt and report stay where they are (default pending PO). `changeByte` appends one byte to the PRD after the move.
@@ -805,6 +829,22 @@ test("L3 (Claude run 3): present-plan refuses a review chain whose last round le
   const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
   assert.deepEqual(requests, [], "no approval request is written");
   assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
+  // C30-6 (PO 2026-11-16, restating this case): one full round and two delta rounds. Round 2 with findings open is still refused; after
+  // round 3 nothing more can be reviewed, so present-plan hands the PO the signing step and the signing text names the open findings.
+  const second = await buildSubmittedFeature("route-open-round-2", { openFindingIds: ["DESIGN-REVIEW-1"], chainRounds: 2 });
+  await bindRouteOwner(second);
+  const stillRefused = await ownedCli(second, ["present-plan", "--by", "coordinator", ...second.receiptPaths.flatMap((path) => ["--review-receipt", path])]);
+  assert.equal(stillRefused.status, 2, `round 2 with open findings is refused; stdout: ${stillRefused.stdout}; stderr: ${stillRefused.stderr}`);
+  assert.match(stillRefused.stderr, /PLAN-DESIGN-REVIEW-OPEN/u);
+  const third = await buildSubmittedFeature("route-open-round-3", { openFindingIds: ["DESIGN-REVIEW-1"], chainRounds: 3 });
+  await bindRouteOwner(third);
+  const presented = await ownedCli(third, ["present-plan", "--by", "coordinator", ...third.receiptPaths.flatMap((path) => ["--review-receipt", path])]);
+  assert.equal(presented.status, 0, `after round 3 an open review is presented, not refused; stdout: ${presented.stdout}; stderr: ${presented.stderr}`);
+  assert.equal(posixSigningCommands(presented.stdout).length, 1, "exactly one signing command is handed over");
+  const request = JSON.parse(readFileSync(requestPathOf(posixSigningCommands(presented.stdout)[0]), "utf8"));
+  assert.equal(request.binding.verdict, "open-findings", "the signed binding carries the open verdict");
+  assert.deepEqual(request.binding.openFindingIds, ["DESIGN-REVIEW-1"], "and the open ids");
+  assert.equal(request.binding.reviewReceipts.length, 3, "three rounds, initial first");
 });
 
 // D247 (PO tiles 2026-11-13): on Claude the reviewer model is host-observed; a round without the observation (made by hand, in a

@@ -25,6 +25,13 @@ import { canonical } from "./po-approval-proof.mjs";
 
 export const DESIGN_REVIEW_RECEIPT_SCHEMA = "pipeline.design-review-receipt.v1";
 export const DESIGN_REVIEW_MAX_ROUNDS = 64;
+/**
+ * C30-6 (PO 2026-11-16): the review POLICY, one full round plus two delta rounds. `createDesignReviewReceipt` refuses a fourth round
+ * (`DRR-ROUND-CAP`) and `present-plan` stops refusing an open review after this round (the PO signs the open findings knowingly,
+ * the binding already carries them). It is a creation and presentation rule only: `DESIGN_REVIEW_MAX_ROUNDS` stays the parse bound,
+ * so a longer chain made before this rule still parses and an approval already signed keeps verifying.
+ */
+export const DESIGN_REVIEW_POLICY_ROUNDS = 3;
 export const DESIGN_REVIEW_RECEIPT_MAX_BYTES = 65536;
 
 const MAX_COMPANIONS = 64;
@@ -416,6 +423,7 @@ export function createDesignReviewReceipt(input) {
     if (!parsed.ok) return refuse("DRR-DELTA-CHAIN");
     const earlier = parsed.receipt;
     if (earlier.round >= DESIGN_REVIEW_MAX_ROUNDS) return refuse("DRR-ROUND-EXCEEDED");
+    if (earlier.round >= DESIGN_REVIEW_POLICY_ROUNDS) return refuse("DRR-ROUND-CAP");
     if (earlier.featureId !== featureId || earlier.sources.prd.path !== normalized.prd.path || earlier.sources.spec.path !== normalized.spec.path) return refuse("DRR-DELTA-CHAIN");
     if (sameSources(earlier.sources, normalized)) {
       const withdrawn = earlier.openFindingIds.filter((id) => !ids.includes(id));
@@ -514,5 +522,5 @@ export function checkDesignReviewReceiptSources(input) {
   const currentSources = isObject(input) ? input.currentSources : undefined;
   if (isObject(summary) && sameSources(summary.sources, currentSources)) return { ok: true };
   const round = isObject(summary) && Number.isSafeInteger(summary.round) && summary.round >= 1 ? summary.round : null;
-  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: round !== null && round < DESIGN_REVIEW_MAX_ROUNDS ? round + 1 : null };
+  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: round !== null && round < DESIGN_REVIEW_POLICY_ROUNDS ? round + 1 : null };
 }

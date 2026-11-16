@@ -93,15 +93,36 @@ was needed; capability evidence is not an Advisor answer.
    `--open-finding <id>`: a report that says ready while it still lists findings
    is `open-findings`, not `pass`, and the PO sees that when signing.
    After a delta round that still reports open findings: correct the sources
-   and run the next delta round (`--previous` the last receipt); there is no
-   round cap (only a structural bound of 64). Before `submit-plan` a correction
+   and run the next delta round (`--previous` the last receipt), while one is left.
+   **The review is one full round and at most two delta rounds (C30-6, PO
+   2026-11-16).** Round 1 is the one full review. Rounds 2 and 3 are delta rounds
+   (`--previous` the last receipt; a fresh reviewer that reads only the open
+   blocking findings and what the correction changed). There is no round 4:
+   `create` refuses it (`DRR-ROUND-CAP`). **Order matters:** after every review
+   round, BEFORE you correct anything, write the report (`export-report`), create
+   the receipt over the unchanged sources (a receipt binds the bytes the review
+   read) and commit it; only then correct the sources and dispatch the next
+   delta. A fresh full review after round 1 is never the route: the dispatch of
+   the next `readiness-reviewer` is refused while an observed round has no receipt
+   (`DISPATCH-DESIGN-REVIEW-NO-RECEIPT`, Claude's host observation; a round
+   older than 48 hours counts as abandoned). The reviewer separates
+   **blocking findings** from **questions** (`agents/readiness-reviewer.md`); the
+   receipt's `--open-finding` ids are exactly the report's `Blocking findings:`
+   ids, checked against the bound report text (`DRC-FINDINGS-SPLIT`), and a
+   question never holds the design. A report with only questions is ready.
+   Before `submit-plan` a correction
    is an ordinary edit and commit; `reopen-design` exists only for a package
-   that was already submitted. A delta over unchanged documents may only
-   withdraw findings of the round before. `present-plan` refuses while the last
-   receipt is `open-findings` (`PLAN-DESIGN-REVIEW-OPEN`) and names the next
-   delta round. Pass every receipt of the chain, initial first. A source change
-   after a passing delta round is carried as `unreviewedSourceDelta`, which the
-   PO signs knowingly.
+   that was already submitted. A delta over unchanged documents may only withdraw findings of the round before.
+   `present-plan` refuses while the last receipt is `open-findings` and a delta
+   round is left (`PLAN-DESIGN-REVIEW-OPEN`, it names the next delta round); after
+   round 3 it no longer refuses: the findings still open are carried in the
+   design binding, stated in the signing text, and the PO signs them knowingly or
+   sends the design back. Pass every receipt of the chain, initial first. A source
+   change after a passing delta round is carried as `unreviewedSourceDelta`, which
+   the PO signs knowingly. The `Ruleset SHA:` value of the briefing is the
+   `rulesetSha` that `node <plugin-root>/scripts/dispatch-briefing.mjs binding ...`
+   prints (the preflight's loaded content identity, else the installed identity,
+   else a hash of the plugin root); the dispatch guard only checks its format.
 3. Use the sanctioned source-binding and document-integration routes. Update
    digests once, after the last edit: `create-adr.mjs --root <root> --refresh`
    without `--slug` recomputes every ADR draft, and the PRD's

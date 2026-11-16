@@ -45,7 +45,7 @@ import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatur
 import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
 import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
 import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
-import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeUnreviewedCorrections, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeOpenReviewFindings, describeUnreviewedCorrections, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
 import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -447,6 +447,8 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
       `public trust posture: ${policy.trustAnchors === null ? "legacy singular anchor" : "v3 anchor set"}`,
       // CGR-03: stated before the binding, from the signed binding itself; informs the signer, adds no gate and no review round.
       ...describeUnreviewedCorrections(physicalRequest.binding),
+      // C30-6: findings still open after the last allowed readiness round, stated from the signed binding.
+      ...describeOpenReviewFindings(physicalRequest.binding),
       "complete bounded design binding follows (current sources and actual receipt/report bytes validated):",
       JSON.stringify(physicalRequest.binding, null, 2),
       "this signs only the exact design decision digest; approve-plan must independently consume it. It is not push, release, publication or a guard override.",

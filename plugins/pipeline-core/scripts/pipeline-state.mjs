@@ -393,7 +393,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, reso
 import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 import { spawnSync } from "node:child_process";
 import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
-import { DESIGN_REVIEW_MAX_ROUNDS, DESIGN_REVIEW_OBSERVATION_RUNNERS, isHostObservedDesignReview, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { DESIGN_REVIEW_MAX_ROUNDS, DESIGN_REVIEW_POLICY_ROUNDS, DESIGN_REVIEW_OBSERVATION_RUNNERS, isHostObservedDesignReview, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
 import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
@@ -10698,6 +10698,9 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
       if (!inputs?.ok || !Array.isArray(inputs.receipts) || inputs.receipts.length === 0) return null;
       const latest = summarizeDesignReviewReceipt(inputs.receipts.at(-1));
       if (!latest.ok || latest.summary.verdict !== "open-findings") return null;
+      // C30-6 (PO 2026-11-16): one full round and two delta rounds. After the last allowed round nothing more can be reviewed, so the
+      // open findings are not a refusal but a knowing decision: the binding carries verdict and ids, and the signing text names them.
+      if (latest.summary.round >= DESIGN_REVIEW_POLICY_ROUNDS) return null;
       return { code: "PLAN-DESIGN-REVIEW-OPEN", path: latest.summary.path,
         message: `round ${latest.summary.round} of the readiness review leaves ${latest.summary.openFindingIds.length} finding(s) open: ${latest.summary.openFindingIds.join(", ")}`,
         repair: entryGateRepair("PLAN-DESIGN-REVIEW-OPEN") };

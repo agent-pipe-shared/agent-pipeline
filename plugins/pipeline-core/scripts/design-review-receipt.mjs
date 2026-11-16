@@ -36,6 +36,7 @@ import { dirname, join, sep } from "node:path";
 
 import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
 import { consumeDesignReviewObservation, listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
+import { checkOpenFindingsAgainstReport } from "../lib/design-review-report-sections.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 
@@ -246,10 +247,26 @@ export function createReceiptFromDisk(input, deps = {}) {
   if (!reportRead.ok) return reportRead;
   // D64: a sanitized report. The unpublished original is read only to derive its digest; the receipt binds both digests.
   let originalSha256 = null;
+  let splitBytes = reportRead.bytes;
   if (originalReportPath !== null) {
     const originalRead = readBound(repoReal, originalReportPath, "original report");
     if (!originalRead.ok) return originalRead;
     originalSha256 = sha256Of(originalRead.bytes);
+    splitBytes = originalRead.bytes;
+  }
+  // C30-6: the blocking/question split comes from the bound report text (the reviewer's own words, the unpublished original when
+  // there is one), never from what the Elephant passes. A report with a `Blocking findings:` section must list exactly the ids
+  // passed as --open-finding; a question never holds the design. A report without that section is a legacy report and is not checked.
+  let splitText = null;
+  try { splitText = new TextDecoder("utf-8", { fatal: true }).decode(splitBytes); } catch { splitText = null; }
+  const split = splitText === null ? { ok: true } : checkOpenFindingsAgainstReport(splitText, openFindingIds);
+  if (!split.ok) {
+    const parts = [];
+    if (split.missing.length > 0) parts.push(`the report lists blocking finding(s) not passed as --open-finding: ${split.missing.join(", ")}`);
+    if (split.questionsAsFindings.length > 0) parts.push(`a question is not an open finding and is never passed as one: ${split.questionsAsFindings.join(", ")}`);
+    const other = split.extra.filter((id) => !split.questionsAsFindings.includes(id));
+    if (other.length > 0) parts.push(`--open-finding id(s) the report does not list under "Blocking findings": ${other.join(", ")}`);
+    return refuse("DRC-FINDINGS-SPLIT", `design review receipt refused: DRC-FINDINGS-SPLIT: ${parts.join("; ")}. The open findings of a receipt are exactly the report's blocking findings (C30-6); pass one --open-finding per id under "Blocking findings:" and none for a question.`);
   }
   let previous = null;
   if (previousPath !== null) {
@@ -319,6 +336,10 @@ export function createReceiptFromDisk(input, deps = {}) {
     if (created.code === "DRR-FINDING-IDS") {
       const why = describeDesignReviewFindingIdRefusal(openFindingIds);
       if (why !== null) return refuse(created.code, `design review receipt refused: DRR-FINDING-IDS: ${why}`);
+    }
+    // C30-6: one full round and two delta rounds. A fourth is never created; the open findings of round 3 go to the PO, who signs them knowingly.
+    if (created.code === "DRR-ROUND-CAP") {
+      return refuse(created.code, "design review receipt refused: DRR-ROUND-CAP: the design review is one full round and at most two delta rounds (C30-6), and the previous receipt is already round 3. No round 4 is made. Correct what you can, commit, and run present-plan with every receipt of the chain: the findings still open after round 3 are carried in the design binding and shown to the PO before the one signature, who accepts them knowingly or sends the design back.");
     }
     if (created.code === "DRR-DELTA-UNCHANGED") {
       return refuse(created.code, "design review receipt refused: DRR-DELTA-UNCHANGED: the documents did not change, so a second receipt may only withdraw findings of the first (fewer open ids, no new id, the reviewer's report says so). Otherwise change a document and review again.");

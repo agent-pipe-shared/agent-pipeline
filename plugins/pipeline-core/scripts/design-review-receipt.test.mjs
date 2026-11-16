@@ -4,7 +4,7 @@
 // Critic agent definition; no flag can supply any of those values.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -127,6 +127,51 @@ test("a delta round chains to the previous receipt by path and digest", withRepo
   assert.equal(parsed.receipt.previousReceiptSha256, sha(readFileSync(join(repo, RECEIPT1))));
   assert.equal(parsed.receipt.reviewedAt, "2026-10-18T10:45:00.000Z");
   assert.equal(parsed.receipt.sources.spec.sha256, sha(readFileSync(join(repo, SPEC))));
+}));
+
+// C30-6 (PO 2026-11-16): the open findings of a receipt are the report's blocking findings, read from the bound report text.
+const SPLIT = (blocking, questions) => ["Verdict: NOT READY", "", "Blocking findings:", ...blocking.map((id) => `- ${id} text`), "", "Questions:", ...questions.map((id) => `- ${id} text`), ""].join("\n");
+
+test("C30-6: the receipt's open findings must equal the report's blocking findings; a question never holds the design", withRepo((repo) => {
+  writeFileSync(join(repo, REPORT1), SPLIT(["DESIGN-REVIEW-1"], ["DESIGN-QUESTION-1", "DESIGN-QUESTION-2"]));
+  const asQuestion = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-QUESTION-1"] }), { env: CLAUDE, now });
+  assert.equal(asQuestion.ok, false);
+  assert.equal(asQuestion.code, "DRC-FINDINGS-SPLIT");
+  assert.match(asQuestion.message, /a question is not an open finding.*DESIGN-QUESTION-1/u);
+  const dropped = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });
+  assert.equal(dropped.code, "DRC-FINDINGS-SPLIT");
+  assert.match(dropped.message, /not passed as --open-finding: DESIGN-REVIEW-1/u);
+  assert.equal(readdirSync(join(repo, "specs/feat-x/review")).some((name) => name.endsWith(".receipt.json")), false, "nothing is written on a refusal");
+  const exact = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
+  assert.equal(exact.ok, true, JSON.stringify(exact));
+  assert.deepEqual(exact.receipt.openFindingIds, ["DESIGN-REVIEW-1"]);
+}));
+
+test("C30-6: a report with only questions makes a passing receipt", withRepo((repo) => {
+  writeFileSync(join(repo, REPORT1), SPLIT([], ["DESIGN-QUESTION-1"]).replace("Verdict: NOT READY", "Verdict: READY").replace("Blocking findings:\n", "Blocking findings:\n- none\n"));
+  const result = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.receipt.verdict, "pass");
+}));
+
+test("C30-6: one full round and two delta rounds; the replay of the stopped run (review, correction, no receipt, a second full review) is answered by the delta route, and round 4 is refused", withRepo((repo) => {
+  // Round 1, then two delta rounds, each over a corrected spec.
+  assert.equal(createReceiptFromDisk(request(repo, { openFindingIds: ["F-ONE"] }), { env: CLAUDE, now }).ok, true);
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
+  writeFileSync(join(repo, "specs/feat-x/review/design-review-3.md"), "# Round 3\n\nVerdict: NOT READY\n");
+  writeFileSync(join(repo, "specs/feat-x/review/design-review-4.md"), "# Round 4\n\nVerdict: NOT READY\n");
+  const second = createReceiptFromDisk(request(repo, { reportPath: REPORT2, previousPath: RECEIPT1, outPath: RECEIPT2, openFindingIds: ["F-ONE"] }), { env: CLAUDE, now });
+  assert.equal(second.ok, true, JSON.stringify(second));
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v3\n");
+  const third = createReceiptFromDisk(request(repo, { reportPath: "specs/feat-x/review/design-review-3.md", previousPath: RECEIPT2, outPath: "specs/feat-x/review/design-review-3.receipt.json", openFindingIds: ["F-ONE"] }), { env: CLAUDE, now });
+  assert.equal(third.ok, true, JSON.stringify(third));
+  assert.equal(third.receipt.round, 3);
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v4\n");
+  const fourth = createReceiptFromDisk(request(repo, { reportPath: "specs/feat-x/review/design-review-4.md", previousPath: "specs/feat-x/review/design-review-3.receipt.json", outPath: "specs/feat-x/review/design-review-4.receipt.json", openFindingIds: ["F-ONE"] }), { env: CLAUDE, now });
+  assert.equal(fourth.ok, false);
+  assert.equal(fourth.code, "DRR-ROUND-CAP");
+  assert.match(fourth.message, /one full round and at most two delta rounds/u);
+  assert.match(fourth.message, /present-plan/u, "the refusal names the way on");
 }));
 
 test("the runner comes from the runtime signal, with the claude, antigravity and codex signals and nothing else", () => {

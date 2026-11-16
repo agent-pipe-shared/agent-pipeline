@@ -19,6 +19,12 @@ import {
   parseDesignReviewReceipt,
   summarizeDesignReviewReceipt,
 } from "./design-review-receipt.mjs";
+import { checkOpenFindingsAgainstReport, designReviewReportSections } from "./design-review-report-sections.mjs";
+import { designReviewRoundFinding } from "./dispatch-policy.mjs";
+import { consumeDesignReviewObservation, listUnreceiptedDesignReviewRounds, recordDesignReviewObservation } from "./design-review-observation.mjs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 // AC-155: the decision-continuity exports are reached through the namespace so a missing export fails the
 // affected case (typeof check) instead of failing the whole file at link time.
 import * as receiptLib from "./design-review-receipt.mjs";
@@ -640,6 +646,95 @@ test("L3: only a receipt at the structural bound refuses a further round (DRR-RO
   const report = { path: "specs/feat-x/review/design-review-65.md", sha256: sha("report-65") };
   const atBound = previousOf(deltaObject({ round: 64, featureId: "feat-y" }), RECEIPT2_PATH);
   assert.deepStrictEqual(create({ previous: atBound, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"));
+});
+
+// ------------------------------------------------------------------ C30-6
+
+// PO 2026-11-16: one full round and two delta rounds. The policy bound is a creation rule: a longer chain made earlier still parses.
+test("C30-6: the review policy is one full round plus two delta rounds; a fourth receipt is DRR-ROUND-CAP, round 3 still parses", () => {
+  assert.equal(receiptLib.DESIGN_REVIEW_POLICY_ROUNDS, 3);
+  assert.ok(DESIGN_REVIEW_MAX_ROUNDS > receiptLib.DESIGN_REVIEW_POLICY_ROUNDS, "the parse bound stays above the policy bound");
+  const report = { path: "specs/feat-x/review/design-review-4.md", sha256: sha("report-4") };
+  const roundThree = previousOf(deltaObject({ round: 3 }), RECEIPT2_PATH);
+  const sources = sourcesWith((s) => { s.companions[0].sha256 = sha("design-4"); }, SOURCES_2);
+  assert.deepStrictEqual(create({ previous: roundThree, sources, report }), refuse("DRR-ROUND-CAP"));
+  assert.equal(parse(deltaObject({ round: 3 })).ok, true, "a round-3 receipt parses");
+  assert.equal(parse(deltaObject({ round: 4 })).ok, true, "a chain made before the policy (round 4 and later) still parses");
+  const chainLong = previousOf(deltaObject({ round: 4 }), RECEIPT2_PATH);
+  assert.deepStrictEqual(create({ previous: chainLong, sources, report }), refuse("DRR-ROUND-CAP"), "no new receipt is made on a legacy chain either");
+});
+
+test("C30-6: the next round after a source drift is named only while a delta round is left", () => {
+  const drifted = (round) => checkDesignReviewReceiptSources({ summary: summaryOf(deltaObject({ round }), RECEIPT2_PATH), currentSources: sourcesWith((s) => { s.companions[0].sha256 = sha("drift"); }, SOURCES_2) });
+  assert.equal(drifted(2).nextRound, 3);
+  assert.equal(drifted(3).nextRound, null, "after round 3 there is no next round to name");
+});
+
+const SPLIT_REPORT = [
+  "Verdict: NOT READY",
+  "",
+  "Blocking findings:",
+  "- DESIGN-REVIEW-1 the export of the first path would be refused by its own import (spec.md section 4)",
+  "2. AC-155 a criterion names no journey",
+  "",
+  "Questions:",
+  "- DESIGN-QUESTION-1 which slice runs first?",
+  "- DESIGN-QUESTION-2 is an ADR needed for the storage choice?",
+].join("\n");
+
+test("C30-6: the report separates blocking findings from questions, and only the blocking ids are the open findings", () => {
+  assert.deepStrictEqual(designReviewReportSections(SPLIT_REPORT), { structured: true, blocking: ["AC-155", "DESIGN-REVIEW-1"], questions: ["DESIGN-QUESTION-1", "DESIGN-QUESTION-2"] });
+  assert.deepStrictEqual(checkOpenFindingsAgainstReport(SPLIT_REPORT, ["DESIGN-REVIEW-1", "AC-155"]), { ok: true });
+  // The Elephant cannot hold the design with a question, and cannot drop a blocking finding.
+  assert.deepStrictEqual(checkOpenFindingsAgainstReport(SPLIT_REPORT, ["DESIGN-REVIEW-1", "AC-155", "DESIGN-QUESTION-1"]),
+    { ok: false, missing: [], extra: ["DESIGN-QUESTION-1"], questionsAsFindings: ["DESIGN-QUESTION-1"] });
+  assert.deepStrictEqual(checkOpenFindingsAgainstReport(SPLIT_REPORT, ["AC-155"]), { ok: false, missing: ["DESIGN-REVIEW-1"], extra: [], questionsAsFindings: [] });
+});
+
+test("C30-6: a report whose questions are all that is left reads as ready (no open finding), headings in markdown or bold count", () => {
+  const onlyQuestions = ["**Verdict: READY**", "", "## Blocking findings", "- none", "", "## Questions", "- DESIGN-QUESTION-1 the colour scheme has no criterion"].join("\n");
+  assert.deepStrictEqual(designReviewReportSections(onlyQuestions), { structured: true, blocking: [], questions: ["DESIGN-QUESTION-1"] });
+  assert.deepStrictEqual(checkOpenFindingsAgainstReport(onlyQuestions, []), { ok: true });
+  assert.deepStrictEqual(designReviewReportSections("**Blocking findings:**\n- DESIGN-REVIEW-4 a cycle\n**Questions:**\n- DESIGN-QUESTION-1 x").blocking, ["DESIGN-REVIEW-4"]);
+});
+
+test("C30-6: a legacy report without a Blocking findings section is not split and is not checked", () => {
+  const legacy = "NOT READY\nDESIGN-REVIEW-1 something\nDESIGN-REVIEW-2 something else";
+  assert.deepStrictEqual(designReviewReportSections(legacy), { structured: false });
+  assert.deepStrictEqual(checkOpenFindingsAgainstReport(legacy, ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"]), { ok: true });
+  assert.deepStrictEqual(designReviewReportSections(undefined), { structured: false });
+});
+
+// The replay of the stopped run, at the dispatch: a full review whose receipt was never made, then a second full dispatch.
+test("C30-6: a second readiness dispatch is refused while an observed round has no receipt, names the delta route, and is admitted once the round is receipted", (t) => {
+  const common = mkdtempSync(join(tmpdir(), "c30-6-"));
+  t.after(() => rmSync(common, { recursive: true, force: true }));
+  mkdirSync(join(common, "agent-pipeline"), { recursive: true });
+  const nowMs = Date.parse("2026-11-16T10:00:00.000Z");
+  const input = (text) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:readiness-reviewer" },
+    tool_response: { status: "completed", resolvedModel: "claude-sonnet-5-5", modelsUsed: ["claude-sonnet-5-5"], content: [{ type: "text", text }] } });
+  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs }), [], "nothing observed yet: the first dispatch is admitted");
+  assert.equal(designReviewRoundFinding({ subagentType: "pipeline-core:readiness-reviewer", unreceiptedRounds: [] }), null);
+  const recorded = recordDesignReviewObservation({ commonDir: common, runner: "claude", input: input("Verdict: NOT READY\nBlocking findings:\n- DESIGN-REVIEW-1 x"), nowMs });
+  assert.equal(recorded.status, "recorded");
+  const open = listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs: nowMs + 60_000 });
+  assert.equal(open.length, 1, "the observed round has no receipt");
+  const finding = designReviewRoundFinding({ subagentType: "pipeline-core:readiness-reviewer", unreceiptedRounds: open });
+  assert.equal(finding.code, "DISPATCH-DESIGN-REVIEW-NO-RECEIPT");
+  assert.match(finding.why, /one full round and at most two delta rounds/u);
+  assert.match(finding.why, /export-report/u);
+  assert.match(finding.why, /--previous/u, "the delta route is named");
+  // Only the reviewer is held; any other role is untouched.
+  assert.equal(designReviewRoundFinding({ subagentType: "pipeline-core:critic", unreceiptedRounds: open }), null);
+  assert.equal(designReviewRoundFinding({ subagentType: "readiness-reviewer", unreceiptedRounds: open }).code, "DISPATCH-DESIGN-REVIEW-NO-RECEIPT", "the bare spelling counts too");
+  // A round older than 48 hours is abandoned, never a permanent hold.
+  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs: nowMs + 49 * 3_600_000 }), []);
+  // The receipt stamps the observation: the next dispatch is admitted.
+  const sha = (value) => createHash("sha256").update(value).digest("hex");
+  assert.deepStrictEqual(consumeDesignReviewObservation({ commonDir: common, resultSha256: recorded.resultSha256, prdSha256: sha("prd"), specSha256: sha("spec") }), { ok: true });
+  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: common, nowMs: nowMs + 60_000 }), [], "a receipted round holds nothing");
+  // A store that cannot be read admits (the guard never invents a refusal).
+  assert.deepStrictEqual(listUnreceiptedDesignReviewRounds({ commonDir: join(common, "does-not-exist") }), []);
 });
 
 // ------------------------------------------------------------------ U2-14

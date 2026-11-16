@@ -242,6 +242,26 @@ function recriticFindings(text) {
 }
 
 /**
+ * C30-6 (PO 2026-11-16): the design review is one full round and at most two delta rounds, and each round gets its receipt BEFORE the
+ * correction (a receipt binds the bytes the review read; a delta chains to it). A greenfield run dispatched twelve full reviews and
+ * never made a receipt, so the cap in the receipt and the presentation gate never fired. This is the dispatch-side rule: a
+ * `readiness-reviewer` dispatch is refused while an earlier observed round has no receipt. Pure: the guard supplies the unreceipted rounds
+ * (`listUnreceiptedDesignReviewRounds`, Claude's observation store; other runners have none, so they are never refused here).
+ * @returns {{code: string, why: string} | null}
+ */
+export function designReviewRoundFinding({ subagentType, unreceiptedRounds } = {}) {
+  const type = typeof subagentType === "string" ? subagentType : "";
+  const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
+  if (bareType !== "readiness-reviewer" || !Array.isArray(unreceiptedRounds) || unreceiptedRounds.length === 0) return null;
+  const count = unreceiptedRounds.length;
+  return {
+    code: "DISPATCH-DESIGN-REVIEW-NO-RECEIPT",
+    why: `${count === 1 ? "an earlier readiness review round has" : `${count} earlier readiness review rounds have`} no receipt yet; the design review is one full round and at most two delta rounds (C30-6), so a next round is a delta of a receipted one. `
+      + "Repair, before correcting anything: write the report with `node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <report path>`, create the receipt over the unchanged sources with `design-review-receipt.mjs create` (one `--open-finding` per id under the report's \"Blocking findings:\"; a question is no finding), commit it, then correct the sources and dispatch the delta round (`create --previous <that receipt>`). A round older than 48 hours is treated as abandoned.",
+  };
+}
+
+/**
  * @param {{subagentType: string, prompt: string, transport?: "direct"|"workflow"|"antigravity"|"codex"}} dispatch
  * @returns {{role: "critic"|"goldfish"|"other", findings: {code: string, why: string}[]}}
  */
