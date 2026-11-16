@@ -17,7 +17,7 @@ Placeholders, filled as the results arrive: C30-3 findings of the Full Verify of
 rerunning it alone and comparing with the 29d tree; the known intermittent `native-goldfish-host-stop-pair` race is one
 of them to decide), C30-4 findings and toil of the PO's new greenfield tests.
 
-## C30-6: the design review does not converge, cap it at two rounds (PO, 2026-11-16, greenfield run 070_4 on Claude)
+## C30-6: the design review does not converge, cap it at one full round plus two diff rounds (PO, 2026-11-16, greenfield run 070_4 on Claude)
 
 **Observation (a greenfield handover, measured).** A feature design got twelve independent `readiness-reviewer` rounds and
 none said ready: open findings 8, 7, 6, 4, 2, 3, 7, 9, 5, 3, 2, 7; about 774 000 reviewer tokens; the spec grew from
@@ -39,8 +39,9 @@ active profile, a module cycle, an export the own import would refuse), so the r
 - No blocking/question split in the report, no machine check of the recurring mandatory questions, no scale switch for a
   one-developer project (decomposition drove 7 to 12 modules).
 
-**Wanted (PO: at most two rounds).** Round 1 is the one full review. Round 2 is one delta that checks only the round-1
-blocking findings and what the correction changed. After round 2 nothing triggers a round 3: remaining blocking findings
+**Wanted (PO 2026-11-16: like the Critic, QG-13 — one full round and two diff rounds).** Round 1 is the one full review.
+Rounds 2 and 3 are delta rounds (a fresh reviewer; only the open blocking findings of the round before and what the
+correction changed). After round 3 nothing triggers a round 4: remaining blocking findings
 stop the presentation as today; remaining questions are written into the signing request as accepted questions the PO
 sees and signs knowingly (a regulated state, not a bypass). Reviewer output has two lists, `blocking` (contradiction,
 data loss, not buildable, security, missing mandatory criterion) and `questions`; only `blocking` makes the verdict
@@ -48,8 +49,9 @@ not ready. Mandatory coverage and decomposition checks become a machine pre-chec
 A full rerun after round 1 is refused with a typed repair that names the delta route.
 
 **Open PO decision (tile before building).** The cap re-opens what D246 closed: signing with questions still open. Option
-A: questions only (never blocking findings) may be accepted after round 2, listed in the signature. Option B: after
-round 2 any open finding needs an explicit PO decision per finding. Recommendation: A.
+A: questions only (never blocking findings) may be accepted after round 3, listed in the signature. Option B: after
+round 3 any open finding needs an explicit PO decision per finding. Recommendation: A (built as A unless the PO says
+otherwise; the PO asked to build everything open for the next test).
 
 **Where it lives.** `plugins/pipeline-core/agents/readiness-reviewer.md`, `lib/design-review-receipt.mjs`,
 `scripts/design-review-receipt.mjs`, `lib/implementation-entry-gate.mjs` and the `present-plan` path in
@@ -57,7 +59,7 @@ round 2 any open finding needs an explicit PO decision per finding. Recommendati
 counterpart to QG-13). Protected plugin source: held patch and the PO's apply.
 
 **Immediate unblock for the stopped run (no Pipeline change).** Create the first receipt for the current state with the
-round-12 findings as `--open-finding`, fix only the one real gap, then run exactly one delta round with `--previous`.
+round-12 findings as `--open-finding`, fix only the one real gap, then run delta rounds with `--previous` (at most two).
 
 ## C30-5: tests and Verify leave their temporary folders in the home folder, nothing cleans them (PO, 2026-11-15)
 
