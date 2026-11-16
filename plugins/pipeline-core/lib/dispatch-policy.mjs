@@ -307,7 +307,8 @@ export function dispatchFindings({ subagentType, prompt, transport = "direct" } 
       });
     }
     if (!NAMES_MODEL.test(text)) {
-      findings.push({ code: "DISPATCH-NO-MODEL", why: "every dispatch names its model explicitly (MP-05); subagents otherwise inherit the session's silently" });
+      // C30d (Antigravity greenfield): the Critic there inherits the session's model and its call passes no Model, but the briefing still names the concrete id; the word `inherit` is not an id and sent the dispatcher round in circles.
+      findings.push({ code: "DISPATCH-NO-MODEL", why: "every dispatch names its model explicitly (MP-05); subagents otherwise inherit the session's silently. Name the concrete model id (for a Critic that inherits the session's model on Antigravity, the id this session runs on, in the briefing's `model:` row); the word `inherit` names none, and the call itself still passes no Model there" });
     }
     if (selectsOpus(text)) {
       const lines = text.split(/\r?\n/);

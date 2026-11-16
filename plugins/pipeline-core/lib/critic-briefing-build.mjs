@@ -171,7 +171,7 @@ function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, r
     else if (name === "EVIDENCE_PATH") for (const path of [...facts.evidence, ...(bindingsPath === null ? [] : [bindingsPath])]) lines.push(line.replace(`{{${name}}}`, abs(path)));
     else if (name === "TRIGGER_ROW") lines.push(line.replace(`{{${name}}}`, trigger));
     else if (name === "RULESET_SHA") lines.push(line.replace(`{{${name}}}`, facts.rulesetSha));
-    else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the Antigravity route model of the Critic duty"))); }
+    else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the concrete model id this session runs on (the Critic inherits it); never the word inherit, and the call itself passes no Model"))); }
     // C29e T5: one part of a split review names its scope marker; the template tells the Critic to begin trajectory_evidence with it. A whole-range review has no row.
     else if (name === "SCOPE_MARKER") { if (entry) lines.push(line.replace(`{{${name}}}`, entry.scopeMarker)); }
     else refuse("CBB-TEMPLATE-PLACEHOLDER", `the Antigravity envelope holds a placeholder this builder does not know: ${name}`);

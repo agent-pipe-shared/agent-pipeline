@@ -321,6 +321,20 @@ test("R14 (Antigravity run 3): on Antigravity the briefing use names the prepare
   assert.match(result.next.briefingUse, /antigravity-native-dispatch-prepare\.mjs prepare --root <root> --request <file>/u);
   assert.match(result.next.briefingUse, /AGY-NATIVE-ARTIFACT-MISSING/u);
   assert.match(result.next.briefingUse, /TypeName critic, no Model/u);
+  // C30d (Antigravity greenfield): the `model:` row takes the concrete id of the session; the word inherit sent the dispatcher round in circles (DISPATCH-NO-MODEL).
+  assert.match(result.next.briefingUse, /`model:` row takes the concrete model id this session runs on.*never the word inherit/u);
+});
+
+test("C30d: the Antigravity envelope's model row asks for the session's concrete id, and the policy finding says what to write for it", () => {
+  const { briefings: [{ text }] } = criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" });
+  const row = text.split("\n").find((line) => line.startsWith("model: "));
+  assert.match(row, /^model: <FILL MODEL: the concrete model id this session runs on \(the Critic inherits it\); never the word inherit, and the call itself passes no Model>$/u);
+  const findingsFor = (value) => dispatchFindings({ subagentType: "critic", prompt: text.replace(row, `model: ${value}`), transport: "antigravity" }).findings.filter(({ code }) => code === "DISPATCH-NO-MODEL");
+  const refused = findingsFor("inherit");
+  assert.equal(refused.length, 1, "the word inherit names no model");
+  assert.match(refused[0].why, /concrete model id/u);
+  assert.match(refused[0].why, /the word `inherit` names none/u);
+  assert.deepEqual(findingsFor("gemini-4-argon-medium"), [], "a concrete id passes");
 });
 
 test("a template that lost its copy marker or holds an unknown placeholder refuses instead of handing on an unfilled briefing", () => {
