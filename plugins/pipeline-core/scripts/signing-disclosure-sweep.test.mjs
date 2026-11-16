@@ -7,6 +7,7 @@ import {userInfo} from 'node:os';
 import {join,resolve,dirname,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {registerTestCaseCompletion} from '../lib/test-case-completion.mjs';
+import {keepTestHomes,removeTestTree} from '../lib/test-home-cleanup.mjs';
 const sourceRoot=fileURLToPath(new URL('../../../',import.meta.url));
 const fixtureRoot=fileURLToPath(new URL('./signing-disclosure-sweep/',import.meta.url));
 assert.equal(resolve(sourceRoot),resolve(fixtureRoot,'../../../..'));
@@ -33,8 +34,9 @@ for(let index=0;index<before.length;index++){
 const operation=directoryFact(operationRoot);assert.equal(operation.uid,BigInt(osUser.uid));assert.equal(operation.mode&0o777n,0o700n);
 for(const expected of [...parents,operation]){const actual=directoryFact(expected.path);for(const key of fields)assert.equal(actual[key],expected[key]);}
 process.chdir(operationRoot);assert.equal(process.cwd(),operationRoot);
-// Retain physical METHOD artifacts; cleanup is not an authority terminal claim.
-after(()=>process.chdir(originalCwd));
+// C30-5 (PO 2026-11-15): the METHOD folder in the home folder is removed when the suite ends (35 of them, left by earlier runs, were found in
+// one home folder); removing a test fixture is not an authority terminal claim. PIPELINE_KEEP_TEST_HOMES=1 keeps it for a diagnosis.
+after(()=>{process.chdir(originalCwd);if(!keepTestHomes())removeTestTree(operationRoot);});
 const {presentationCases}=await import('./signing-disclosure-sweep/presentation-cases.mjs');
 const {typedHgoCases}=await import('./signing-disclosure-sweep/typed-hgo-cases.mjs');
 const {sweepCases}=await import('./signing-disclosure-sweep/sweep-cases.mjs');

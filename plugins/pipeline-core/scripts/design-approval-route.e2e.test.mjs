@@ -536,6 +536,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
     // transcript), export-report writes the returned text as the report, and create (the CLI, on the Claude runner signal) stamps the
     // observation into the receipt itself. Nothing here supplies a model.
     const sessionBase = mkdtempSync(join(dirname(dir), "design-route-transcript-"));
+    DIRS.push(sessionBase); // C30-5: the transcript fixture left a home folder behind on every run
     mkdirSync(join(sessionBase, "session", "subagents"), { recursive: true });
     writeFileSync(join(sessionBase, "session.jsonl"), "");
     writeFileSync(join(sessionBase, "session", "subagents", "agent-a1.jsonl"),

@@ -15,14 +15,29 @@
 //          path and the red step names read from <clone-dir>/evidence/verify-latest.json (the run record). Exit code = verify's.
 // Data:    HOME and TMPDIR under <home>/.fv/<label>/ (recreated each run, outside every repository). The TMPDIR path must stay
 //          under 30 characters; a longer one is refused with exit 2 rather than silently breaking socket-path tests.
+//          C30-5: when the run ends, a green run removes that private home; a red run keeps it (the red-suite reruns use it); then the
+//          home-level leftovers of the suites on the cleaner's allowlist older than 12 h are removed (scripts/clean-test-leftovers.mjs).
+//          PIPELINE_KEEP_TEST_HOMES=1 keeps everything.
 // Read-only toward the source: it writes only the output file, the run record verify itself writes in the clone, and the temp dirs.
 import { spawn, execFileSync } from "node:child_process";
 import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { keepTestHomes, removeTestTree } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
+import { isLeftoverName, sweepLeftovers } from "./clean-test-leftovers.mjs";
 
 export const MAX_TMPDIR_CHARS = 29;
+
+/**
+ * C30-5: names a run added directly to the home folder that look like a leaked fixture folder (a `mkdtemp` shape: a name ending in a
+ * six-character random suffix) and are not already on the cleaner's allowlist, which the sweep removes. Pure. A name that is new but
+ * not of that shape (a shell history, a tool's config folder) is not a leak and is not reported.
+ */
+export function leakedFixtureNames({ before, after, isKnownLeftover }) {
+  const seen = new Set(before);
+  return [...after].filter((name) => !seen.has(name) && !isKnownLeftover(name) && /^\.?[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9]{6}$/u.test(name)).sort();
+}
 
 /** Pure: a private TMPDIR path is short enough to keep socket paths under the 96-byte limit. */
 export function tmpDirIsShortEnough(path) {
@@ -108,6 +123,8 @@ function main(argv) {
   const outputRel = `scratch/${label}-output${resume ? "-resume" : ""}.txt`;
   const out = createWriteStream(join(clone, outputRel));
   const started = Date.now();
+  let homeBefore = [];
+  try { homeBefore = readdirSync(homedir()); } catch { homeBefore = []; }
   const args = ["harness/scripts/verify.mjs", "--mode", "candidate", ...(reuse ? [] : ["--no-reuse"])];
   const child = spawn(nodeBinary, args, { cwd: clone, env, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.pipe(out, { end: false });
@@ -120,7 +137,20 @@ function main(argv) {
     let resumed = null;
     if (resume) { try { resumed = countResumed(readFileSync(join(clone, outputRel), "utf8")); } catch { resumed = 0; } }
     for (const line of summarize({ exitCode: code, seconds: Math.round((Date.now() - started) / 1000), outputPath: outputRel, record, resumed })) console.log(line);
-    process.exit(code ?? 1);
+    // C30-5 (PO 2026-11-15): a Verify run cleans up after itself. A GREEN run removes its own private HOME and TMPDIR; a RED run keeps
+    // them, because the red-suite reruns (`rerun-reds.mjs`) use that exact HOME and TMPDIR, and the next sweep removes them with the
+    // other old homes. Then the shared home-level leftovers of the suites (names on the cleaner's allowlist, older than 12 h) go.
+    // PIPELINE_KEEP_TEST_HOMES=1 skips all of it.
+    let leaked = [];
+    if (!keepTestHomes()) {
+      const homeRemoved = code === 0 ? removeTestTree(base) : false;
+      const swept = sweepLeftovers({ minAgeHours: 12, apply: true });
+      console.log(`cleanup: private home ${code === 0 ? (homeRemoved ? "removed" : "kept (removal failed)") : "kept for the red-suite reruns"}; ${swept.removed} of ${swept.planned} home-level leftovers removed (${(swept.bytes / 1073741824).toFixed(2)} GB)`);
+      // The check: a run that left a new fixture-shaped folder in the home folder that the cleaner does not know fails the wrapper.
+      try { leaked = leakedFixtureNames({ before: homeBefore, after: readdirSync(homedir()), isKnownLeftover: isLeftoverName }); } catch { leaked = []; }
+      if (leaked.length > 0) console.log(`LEAK: this run left ${leaked.length} unlisted fixture folder(s) in the home folder: ${leaked.join(", ")}. A suite must remove what it creates (PIPELINE_KEEP_TEST_HOMES=1 keeps them for a diagnosis), or the name joins the allowlist of scripts/clean-test-leftovers.mjs.`);
+    }
+    process.exit(code === 0 && leaked.length > 0 ? 1 : code ?? 1);
   });
   return null;
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { after } from 'node:test';
-import { mkdtempSync, chmodSync, lstatSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, chmodSync, lstatSync, realpathSync } from 'node:fs';
+import { keepTestHomes, removeTestTree } from '../lib/test-home-cleanup.mjs';
 import { join, dirname, resolve } from 'node:path';
 import { userInfo } from 'node:os';
 import { registerTestCaseCompletion } from '../lib/test-case-completion.mjs';
@@ -45,6 +46,7 @@ after(() => {
     throw Error('EPA-FIXTURE-CLEANUP-CAS');
   const beforeRemove = lstatSync(parent);
   if (!same(identity(current), identity(beforeRemove))) throw Error('EPA-FIXTURE-CLEANUP-CAS');
-  rmSync(parent, { recursive: true });
+  // C30-5: removed with the shared removal (a case may leave a folder unreadable); PIPELINE_KEEP_TEST_HOMES=1 keeps it.
+  if (!keepTestHomes()) removeTestTree(parent);
 });
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
