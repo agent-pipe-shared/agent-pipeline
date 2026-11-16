@@ -352,3 +352,22 @@ wall time and 30 times the uncached tokens for a small app, of which about 59 % 
    consent and bootstrap work of C30-1.
 
 **Order.** 1, 4, 3, 2a in 30d; 2b to the PO; 5 as capacity allows. Failing-first test per fix in an already registered suite.
+
+**PO decisions on these (2026-11-16, tile).** 2b: a sentence whose first sentence is one of the closed yes forms is an acceptance (the rest
+is recorded verbatim, never read; "yes, but ..." stays a decline because the comma continues the first sentence; a word like "good" is not
+on the list). 2a: built now, by a Goldfish dispatch (deep tier, from the template), in 30d. No authorship-preserving replay (the one-call route
+is enough). The push start stays as it is.
+
+## C30-9: the Critic runs several full rounds on Claude Code instead of one full round and then diff checks (PO, 2026-11-16, details to follow)
+
+**Finding (PO report, no transcript yet).** The fixed pattern is one full review round, then only delta checks on the code changed since.
+On Claude Code several full rounds are being run, which costs too much. Marked more critical than the Antigravity findings.
+
+**What the code already says (read, nothing changed).** `lib/critic-course-admission.mjs` requires the first review to be `full` and every
+later one to be requested as `delta` (`CCA-REQUESTED-MODE`, `CCA-DELTA-REQUIRED`). A delta that moves a trust boundary or is impact-ambiguous
+is admitted as an effective full round of the same course (`RE-DELTA-FALLBACK-FULL`). A damaged or discarded course ends the lineage, and the
+next feature starts with a full review again. Hypotheses to test against the PO's details: the fallback to full fires too easily (the delta
+request fields `trustBoundaryChanged` / `impactAmbiguous` set by default or by the agent); the delta route is skipped because the
+agent builds a full request by hand; the course breaks between rounds (takeover, registration commit, export commit) so the lineage resets;
+a split (batched) review counts each part as a full round. Do not guess the cause before the transcript: read which `requestedMode` and
+which admission result each round had.
