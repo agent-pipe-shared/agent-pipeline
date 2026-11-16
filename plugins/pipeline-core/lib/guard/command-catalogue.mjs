@@ -634,16 +634,20 @@ function sanctionedAgyNativeIntegrateArgs(args, root) {
   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
   const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-") && !value.startsWith("/")
     && !/[\u0000-\u001f\u007f\\]/u.test(value) && !value.split("/").some((part) => part === "" || part === "." || part === "..");
-  let branch = false, expect = false, commit = false, allowedCount = 0;
+  // C30d: the two files of the one-call route (take-over, commit and typed attested record). They are the recovery route's own inputs: repository-relative, under scratch/, evidence/ or specs/.
+  const inputFile = (value) => pathValue(value) && /^(?:scratch|evidence|specs)\/[A-Za-z0-9._/-]+$/u.test(value);
+  let branch = false, expect = false, commit = false, commitFlag = null, briefing = false, handback = false, allowedCount = 0;
   for (let index = 3; index < args.length; index += 2) {
     const flag = args[index], value = args[index + 1];
     if (flag === "--branch" && !branch && /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u.test(value ?? "")) branch = true;
     else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
-    else if ((flag === "--commit-dispatch-id" || flag === "--keep-authorship") && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
+    else if ((flag === "--commit-dispatch-id" || flag === "--keep-authorship") && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) { commit = true; commitFlag = flag; }
+    else if (flag === "--briefing" && !briefing && args[0] === "apply" && inputFile(value)) briefing = true;
+    else if (flag === "--handback" && !handback && args[0] === "apply" && inputFile(value)) handback = true;
     else if (flag === "--allowed-path" && pathValue(value) && allowedCount < 50) allowedCount += 1;
     else return false;
   }
-  return branch && allowedCount > 0 && (args[0] === "apply" ? expect : !expect);
+  return branch && allowedCount > 0 && (args[0] === "apply" ? expect : !expect) && briefing === handback && (!briefing || commitFlag === "--commit-dispatch-id");
 }
 
 // G20-20: only the read-only verbs, each with exactly its own flags: `inspect --root <root>`, `inspect-aside --root <root>

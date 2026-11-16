@@ -72,8 +72,11 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
   commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). When `plan` reports
   `fastForward.eligible` (the branch was cut from the current HEAD and every commit carries the briefed `Dispatch: <id> (goldfish)`
   trailer), run its `fastForward.next` instead: `apply ... --keep-authorship <id>` lands the child's own commits unchanged (ADR-0099), and
-  its `next` names the attested record over exactly those commits. The host owns the worktree and the
-  branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
+  its `next` names the attested record over exactly those commits. Every other branch, typically the second of two parallel slices whose HEAD a
+  sibling already moved, takes the one-call route that `plan`'s `next` prints: `apply ... --commit-dispatch-id <briefed id> --briefing
+  <generated briefing file> --handback <file holding the child's hand-back text>` takes the change over, commits it with the dispatch trailer
+  and writes the typed orchestrator-attested record in one call (`applyOnly` in the plan is the plain take-over without a commit). The host
+  owns the worktree and the branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
   <the child's branch>` read the shared object database, so no `git -C <worktree>` is needed. The tool budget is field 6 of the generated
   briefing and `guard-dispatch` reads it from there; nothing else is passed on the call. Neither step needs a look into the guard sources.
 - **Briefing text, not a file pointer.** The generated `promptPointer` (`pipeline-briefing-file:` line) is admitted only in a direct

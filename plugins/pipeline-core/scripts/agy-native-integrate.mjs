@@ -12,6 +12,9 @@
  *   apply ... --commit-dispatch-id <id>   (C28C) the same, then the recovery route's own plan and apply commit exactly those paths with the dispatch trailer
  *   apply ... --keep-authorship <id>      (C29 R5, ADR-0099) instead lands the child's own commits unchanged by fast-forward; only when plan's
  *                                         `fastForward.eligible` (branch cut from the current HEAD, every commit `Dispatch: <id> (goldfish)`)
+ *   apply ... --commit-dispatch-id <id> --briefing <file> --handback <file>   (C30d) the one-call route for every branch that cannot fast-forward (a second
+ *                                         parallel slice, whose HEAD a sibling already moved): take-over, dispatch-trailer commit and the typed
+ *                                         orchestrator-attested dispatch record in one command. The two files are forwarded to the recovery route unchanged.
  *
  * A refusal of the commit step never undoes the applied change: the result carries `commit: {status: "refused", ...}` and `next` names the manual route.
  *
@@ -32,7 +35,7 @@ const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "ru
 const SELF = fileURLToPath(import.meta.url);
 const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
 const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
-const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id> | --keep-authorship <briefed dispatch id>, apply only]";
+const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id> [--briefing <briefing file> --handback <hand-back file>] | --keep-authorship <briefed dispatch id>, apply only]";
 const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // the same token the recovery route accepts
 const MAX_COMMITS = 200;
 
@@ -47,7 +50,7 @@ const shellWord = (value) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value : 
 export function parseArgs(argv) {
   const [verb, ...rest] = argv;
   if (verb !== "plan" && verb !== "apply") return { error: `unknown verb; usage: ${SYNTAX}` };
-  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null, keepAuthorship: null };
+  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null, keepAuthorship: null, briefing: null, handback: null };
   for (let i = 0; i < rest.length; i += 2) {
     const flag = rest[i], value = rest[i + 1];
     if (typeof value !== "string" || value === "" || /[\u0000-\u001f\u007f]/u.test(value)) return { error: `flag ${flag} needs one value; usage: ${SYNTAX}` };
@@ -59,11 +62,16 @@ export function parseArgs(argv) {
     else if (flag === "--commit-dispatch-id" && out.commitDispatchId === null && DISPATCH_ID.test(value)) out.commitDispatchId = value;
     // C29 R5 (ADR-0099): apply may instead land the child's own commits unchanged by fast-forward, keeping their authorship.
     else if (flag === "--keep-authorship" && out.keepAuthorship === null && DISPATCH_ID.test(value)) out.keepAuthorship = value;
+    // C30d: the two files the recovery route binds into the typed attested record, so the take-over, the commit and the record are one call.
+    else if (flag === "--briefing" && out.briefing === null) out.briefing = value;
+    else if (flag === "--handback" && out.handback === null) out.handback = value;
     else return { error: `unexpected or repeated flag ${flag}; usage: ${SYNTAX}` };
   }
   if (out.commitDispatchId !== null && verb !== "apply") return { error: `--commit-dispatch-id belongs to apply; usage: ${SYNTAX}` };
   if (out.keepAuthorship !== null && verb !== "apply") return { error: `--keep-authorship belongs to apply; usage: ${SYNTAX}` };
   if (out.keepAuthorship !== null && out.commitDispatchId !== null) return { error: `--keep-authorship and --commit-dispatch-id exclude each other; usage: ${SYNTAX}` };
+  if ((out.briefing === null) !== (out.handback === null)) return { error: `--briefing and --handback come together; usage: ${SYNTAX}` };
+  if (out.briefing !== null && out.commitDispatchId === null) return { error: `--briefing and --handback belong to --commit-dispatch-id; usage: ${SYNTAX}` };
   return out;
 }
 
@@ -137,7 +145,10 @@ export function plan(options) {
   if (fastForward.eligible) fastForward.next = [...applyArgv, "--keep-authorship", fastForward.dispatchId].map(shellWord).join(" ");
   return { schema: PLAN_SCHEMA, status: "ready", code: "AGYI-READY", root, branch: options.branch, head: head.out.trim(), tip: tip.out.trim(),
     base: base.out.trim(), commits: Number(commits.out.trim()), paths, planSha256, refusals: [], fastForward,
-    next: applyArgv.map(shellWord).join(" ") };
+    // C30d: the one-call route for a branch that cannot fast-forward (a second parallel slice): take-over, dispatch-trailer commit and the typed attested record. `applyOnly` is the
+    // plain take-over that leaves the change uncommitted in the working tree.
+    next: `${applyArgv.map(shellWord).join(" ")} --commit-dispatch-id <the briefed dispatch id> --briefing <the generated briefing file> --handback <the file holding the child's hand-back text>`,
+    applyOnly: applyArgv.map(shellWord).join(" ") };
 }
 
 /**
@@ -233,9 +244,11 @@ export function apply(options) {
   }
   const next = `the child's change is now in the working tree, uncommitted: commit it with the existing recovery route: node ${shellWord(RECOVER)} plan --root ${shellWord(planned.root)} --dispatch-id <the briefed dispatch id> ${planned.paths.map((p) => `--allowed-path ${shellWord(p)}`).join(" ")}, then the same command as apply with the --expect-sha256 digest it printed`;
   if (options.commitDispatchId == null) return { ...planned, status: "applied", code: "AGYI-APPLIED", next };
-  const commit = commitThroughRecovery(planned, options.commitDispatchId);
+  const commit = commitThroughRecovery(planned, options.commitDispatchId, { briefing: options.briefing, handback: options.handback });
   return { ...planned, status: "applied", code: "AGYI-APPLIED", commit,
-    next: commit.status === "committed" ? "nothing left to do for this child: its change is committed with the dispatch trailer" : next };
+    next: commit.status !== "committed" ? next
+      : commit.record ? "nothing left to do for this child: its change is committed with the dispatch trailer and the typed orchestrator-attested dispatch record is written (not host-observed evidence)"
+        : "its change is committed with the dispatch trailer; no dispatch record is written (the briefing and hand-back files were not passed): write it with dispatch-record-write.mjs --attested-request, or pass --briefing and --handback next time" };
 }
 
 /**
@@ -266,21 +279,22 @@ function landWithAuthorship(planned, dispatchId) {
  * paths are the integrate plan's own, so there is nothing new to review between the two pairs; every refusal of the recovery route is returned as it is and the
  * working tree keeps the applied change (the manual route in `next` still works).
  */
-function commitThroughRecovery(planned, dispatchId) {
+function commitThroughRecovery(planned, dispatchId, files = {}) {
   const run = (args) => {
     const res = spawnSync(process.execPath, [RECOVER, ...args], { encoding: "utf8", shell: false, timeout: 120_000, maxBuffer: 1 << 26 });
     let json = null;
     try { json = JSON.parse(String(res.stdout ?? "")); } catch { /* typed below */ }
     return { json };
   };
-  const planArgs = ["plan", "--root", planned.root, "--dispatch-id", dispatchId, ...planned.paths.flatMap((p) => ["--allowed-path", p])];
+  const planArgs = ["plan", "--root", planned.root, "--dispatch-id", dispatchId, ...planned.paths.flatMap((p) => ["--allowed-path", p]),
+    ...(files.briefing == null || files.handback == null ? [] : ["--briefing", files.briefing, "--handback", files.handback])];
   const recoveryPlan = run(planArgs).json;
   if (recoveryPlan?.status !== "ready" || !Array.isArray(recoveryPlan.next) || recoveryPlan.next[2] !== "apply" || !recoveryPlan.next.every((word) => typeof word === "string")) {
     return { status: "refused", code: recoveryPlan?.code ?? "AGYI-COMMIT-PLAN-UNREADABLE", refusals: recoveryPlan?.refusals ?? [] };
   }
   const committed = run(recoveryPlan.next.slice(2)).json;
   if (committed?.status !== "committed") return { status: "refused", code: committed?.code ?? "AGYI-COMMIT-APPLY-UNREADABLE", refusals: committed?.refusals ?? [] };
-  return { status: "committed", commit: committed.commit, dispatchId };
+  return { status: "committed", commit: committed.commit, dispatchId, ...(committed.record ? { record: committed.record } : {}) };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === SELF) {

@@ -568,7 +568,9 @@ test("C28C: apply with a dispatch id lands the dispatch-trailer commit of exactl
     assert.equal(git(fx.workspace, "rev-list", "--count", `${head}..HEAD`), "1");
     assert.match(git(fx.workspace, "log", "-1", "--format=%B"), /Dispatch: C28C-AGY-COMMIT \(goldfish\)/u);
     assert.equal(git(fx.workspace, "show", "--name-only", "--format=", "HEAD"), "src/a.mjs", "only the applied path is committed");
-    assert.match(applied.next, /nothing left to do/u);
+    // C30d: without --briefing and --handback no dispatch record is written, and the text says so instead of claiming nothing is left to do.
+    assert.match(applied.next, /no dispatch record is written/u);
+    assert.match(applied.next, /--briefing and --handback/u);
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
@@ -686,6 +688,39 @@ test("C29 R5: no harvest with authorship for a commit without the trailer or a m
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
+// C30d (Antigravity greenfield, first parallel run): the second of two parallel slices cannot fast-forward (a sibling moved HEAD) and cost six hand-made calls. The plan now names the
+// one-call route for every branch, and apply forwards the briefing and hand-back files to the recovery route, which writes the typed attested record in the same command.
+test("C30d: the plan names the one-call route; --briefing and --handback travel to the recovery route; parse rules", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const wt = worktreeFixture(fx);
+    childCommit(wt, { "src/a.mjs": "export const a = 1;\n" }, "AI-Assisted: true\nDispatch: C30D-ONE (goldfish)");
+    git(fx.workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "a sibling slice landed first");
+    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
+    const planned = integrate.plan(options);
+    assert.equal(planned.status, "ready", JSON.stringify(planned));
+    assert.equal(planned.fastForward.eligible, false, "a moved HEAD cannot fast-forward");
+    assert.match(planned.next, / --commit-dispatch-id <the briefed dispatch id> --briefing <the generated briefing file> --handback <the file holding the child's hand-back text>$/u);
+    assert.doesNotMatch(planned.applyOnly, /--commit-dispatch-id|--briefing/u, "the plain take-over stays available");
+    // The files reach the recovery route: an unreadable briefing refuses the commit step there (without the flags the same call commits), and the take-over stays applied.
+    const head = git(fx.workspace, "rev-parse", "HEAD");
+    const refused = integrate.apply({ ...options, expect: planned.planSha256, commitDispatchId: "C30D-ONE", briefing: "scratch/no-such-briefing.md", handback: "scratch/no-such-handback.txt" });
+    assert.equal(refused.status, "applied", JSON.stringify(refused));
+    assert.equal(refused.commit.status, "refused", JSON.stringify(refused.commit));
+    assert.equal(refused.commit.code, "GHCR-INPUT-UNREADABLE", JSON.stringify(refused.commit));
+    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "nothing committed");
+    const parsed = (...args) => integrate.parseArgs(args);
+    const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a", "--expect-sha256", "a".repeat(64)];
+    const ok = parsed("apply", ...common, "--commit-dispatch-id", "C30D-ONE", "--briefing", "scratch/b.md", "--handback", "scratch/h.txt");
+    assert.equal(ok.briefing, "scratch/b.md"); assert.equal(ok.handback, "scratch/h.txt");
+    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "C30D-ONE", "--briefing", "scratch/b.md").error, /come together/u);
+    assert.match(parsed("apply", ...common, "--briefing", "scratch/b.md", "--handback", "scratch/h.txt").error, /belong to --commit-dispatch-id/u);
+    assert.match(parsed("apply", ...common, "--keep-authorship", "C30D-ONE", "--briefing", "scratch/b.md", "--handback", "scratch/h.txt").error, /belong to --commit-dispatch-id/u);
+    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "C30D-ONE", "--briefing", "a", "--briefing", "b", "--handback", "c").error, /unexpected or repeated/u);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
 test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
   const root = realpathSync(resolve(libDir, "..", "..", ".."));
@@ -699,6 +734,17 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-AGY-COMMIT`), true);
   // C29 R5: or one --keep-authorship id instead, never both, never on plan.
   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5`), true);
+  // C30d: the one-call route: the commit flag plus the briefing and hand-back files together, repository-relative under scratch/, evidence/ or specs/, never with --keep-authorship or on plan.
+  const oneCall = `apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C30D-ONE`;
+  assert.equal(admitted(`${oneCall} --briefing scratch/c.briefing.md --handback scratch/handback-C30D-ONE.txt`), true);
+  for (const args of [
+    `${oneCall} --briefing scratch/c.briefing.md`, `${oneCall} --handback scratch/h.txt`, `${oneCall} --briefing scratch/b.md --handback ../h.txt`,
+    `${oneCall} --briefing /etc/passwd --handback scratch/h.txt`, `${oneCall} --briefing src/app.mjs --handback scratch/h.txt`,
+    `${oneCall} --briefing scratch/b.md --briefing scratch/c.md --handback scratch/h.txt`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5 --briefing scratch/b.md --handback scratch/h.txt`,
+    `plan --root '${root}' --branch ${branch} --allowed-path a --briefing scratch/b.md --handback scratch/h.txt`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --briefing scratch/b.md --handback scratch/h.txt`,
+  ]) assert.equal(admitted(args), false, args);
   for (const args of [
     `plan --root '${root}' --branch ${branch} --allowed-path a --keep-authorship C29-R5`,
     `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --keep-authorship C29-R5 --commit-dispatch-id C29-R5`,
