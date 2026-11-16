@@ -346,6 +346,37 @@ test("G20-66: approve-plan and close-feature are the wired writers; the wrapper 
   failed.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(failed.root, MANIFEST), null, "a failed writer arms nothing");
 });
 
+test("C30c: the printed commit step carries the uncommitted evidence the written manifest lists, and nothing else", async () => {
+  // Codex greenfield 2026-11-16: an earlier step left the accepted-delivery receipt uncommitted, the writer only registered it in the
+  // manifest, and the printed `git commit -F ... -- <list>` took the manifest alone: the commit named a file it did not hold.
+  const { withWriterCommitCapability } = await wcLib();
+  const f = fixture("wc-companions"); closeInState(f);
+  mkdirSync(join(f.root, "specs/feature/evidence"), { recursive: true });
+  const receipt = `specs/feature/evidence/accepted-delivery-contract-${h("a")}.json`;
+  const committed = "specs/feature/evidence/committed-evidence.json";
+  const absent = "specs/feature/evidence/never-written.json";
+  writeFileSync(join(f.root, committed), "{}\n"); f.git("add", committed); f.git("commit", "-q", "-m", "evidence that is already committed", "--", committed);
+  writeFileSync(join(f.root, receipt), "{\"receipt\":1}\n");
+  const entry = (path) => ({ class: "candidate-evidence", path, sha256: h("b") });
+  const manifest = `${JSON.stringify({ artifacts: [entry(receipt), entry(committed), entry(absent)] })}\n`;
+  const printed = []; const original = console.error; console.error = (...v) => printed.push(v.join(" "));
+  let status;
+  try {
+    status = withWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs materialize-architecture", rerun: "node pipeline-state.mjs materialize-architecture" }, () => { writeFileSync(join(f.root, MANIFEST), manifest); return 0; });
+  } finally { console.error = original; }
+  assert.equal(status, 0);
+  const out = printed.join("\n");
+  const add = out.split("\n").find((line) => /git add -- /u.test(line)) ?? "";
+  const commit = out.split("\n").find((line) => /git commit -F /u.test(line)) ?? "";
+  for (const line of [add, commit]) {
+    assert.ok(line.includes(MANIFEST), `the manifest is in: ${line}`);
+    assert.ok(line.includes(receipt), `the uncommitted receipt the manifest lists is in the same step: ${line}`);
+    assert.ok(!line.includes(committed), "a listed file that is already committed adds nothing");
+    assert.ok(!line.includes(absent), "a listed file that does not exist adds nothing");
+  }
+  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST) === null, false, "the protected manifest is still armed");
+});
+
 test("D3 (3): with no protected path in the reconcile commit nothing is armed and nothing is staged (exit 0)", () => {
   const f = fixture("not-needed");
   const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");

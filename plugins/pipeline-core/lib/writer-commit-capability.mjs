@@ -146,6 +146,34 @@ export function captureWorktree(rootDir, { spawn = spawnSync } = {}) {
   } catch { return null; }
 }
 
+const FEATURE_MANIFEST_PATH = /^specs\/[^/]+\/lifecycle\.json$/u;
+
+/**
+ * C30c (Codex greenfield 2026-11-16): the printed commit step is built from what changed during the writer run, so an artifact that an
+ * EARLIER step left uncommitted (the accepted-delivery receipt) and that this run only registered in the feature manifest was left out of
+ * `git commit -F ... -- <list>`; the manifest was committed alone and every later Critic course read refused it for good (CCA-EVIDENCE-MODE).
+ * Every file a manifest the writer wrote lists, that is still uncommitted in the working tree (git status keys, so never a path outside
+ * the repository), joins the same step. A listed file that is committed and clean, or absent, adds nothing.
+ */
+function manifestCompanions(after, files) {
+  const known = new Set(files.map((file) => file.path));
+  const companions = [];
+  for (const file of files) {
+    if (!FEATURE_MANIFEST_PATH.test(file.path)) continue;
+    let manifest;
+    try { manifest = JSON.parse(readFileSync(resolve(after.root, file.path), "utf8")); } catch { continue; }
+    for (const artifact of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
+      const path = typeof artifact?.path === "string" ? artifact.path.replace(/\\/gu, "/") : null;
+      if (path === null || known.has(path)) continue;
+      const digest = after.files.get(path);
+      if (typeof digest !== "string") continue;
+      known.add(path);
+      companions.push({ path, sha256: digest });
+    }
+  }
+  return companions;
+}
+
 /** Arms what changed in the working tree since `before` (a `captureWorktree` result). Never throws for "nothing written". */
 export function armWrittenSince({ rootDir, before, writer, rerun, spawn = spawnSync } = {}) {
   const after = captureWorktree(rootDir, { spawn });
@@ -153,6 +181,7 @@ export function armWrittenSince({ rootDir, before, writer, rerun, spawn = spawnS
   const files = [];
   for (const [path, sha256] of after.files) if (sha256 !== null && before.files.get(path) !== sha256) files.push({ path, sha256 });
   if (files.length === 0) return { status: "not-needed", reason: "nothing-written", paths: [], protectedPaths: [], excluded: [], steps: [], message: commitSubject(writer), writer, rerun };
+  files.push(...manifestCompanions(after, files));
   return armWriterCommitCapability({ rootDir, writer, rerun, files, spawn });
 }
 
