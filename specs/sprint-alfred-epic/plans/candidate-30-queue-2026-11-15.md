@@ -52,6 +52,19 @@ gate admits only domains and public keys (the security scan is CLEAN, 0 findings
 now parsing the JSON line (the second line is the writer's intended next-step commit guidance; the suite is 10 of 10 green). The wrapper change below
 is on main, not in the chain.
 
+**Candidate 30c (2026-11-16, Codex greenfield blocker, project and actor names left out).** A Critic course read refused with CCA-EVIDENCE-MODE for good
+(a commit registered an accepted-delivery receipt it did not hold), and the prescribed recovery, `discard-feature` in the PO's own terminal,
+refused with SDC-AUTHORITY-UNAVAILABLE (`companion-owning-lifecycle-context-required`). Two causes, two fixes, a held chain of two patches against
+`81937492b` under `evidence/held-patches/candidate30c/`, rehearsed clean, 122 affected suites green:
+1. Root cause of the damaged commit: the commit step a sanctioned writer prints is built from what changed during the writer run. The receipt is written by
+   an earlier step and left uncommitted; `materialize-architecture` only registers it in the feature manifest, so the printed
+   `git commit -F ... -- <list>` took the manifest alone. Fix: every uncommitted file a manifest the writer wrote lists joins the same step
+   (`lib/writer-commit-capability.mjs`); the case fails without it. The `commit-pipeline-owned` route already carried listed candidate evidence (candidate 27).
+   A pre-commit completeness check for a manifest and its listed evidence is not built (defense in depth, a hook change; PO to decide).
+2. Dead end of the recovery: in a catalogue project a plain shell never has an owning lifecycle context. `discard-feature` joins the verbs that take the
+   direct PF-54 route without one (refused while a State operation is in flight; the writer re-proves its own gates; the hook still keeps the agent from it).
+Not repaired retroactively: the damaged historical commit of the affected project stays; the prescribed recovery now runs (end the feature, continue as a new one).
+
 **Orphaned Verify homes (PO question 2026-11-16).** A green run removed only its own home, a red run kept it and no later run removed it, so mostly red
 runs would orphan one home each. `scripts/full-verify.mjs` now passes `VERIFY_HOME_KEEP_DAYS` (3) to the sweep on every run: the homes and
 clones of earlier finished runs older than three days go, a recent red home stays for the reruns; a case pins it.
