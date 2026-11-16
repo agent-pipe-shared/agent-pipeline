@@ -5,7 +5,7 @@ import test from "node:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { countResumed, leakedFixtureNames, newestRunId, summarize } from "./full-verify.mjs";
+import { VERIFY_HOME_KEEP_DAYS, countResumed, leakedFixtureNames, newestRunId, summarize } from "./full-verify.mjs";
 import { isLeftoverName, planLeftovers, sweepLeftovers } from "./clean-test-leftovers.mjs";
 import { activeRunsIn, applyPlan, isInsideScratch, planScratch } from "./clean-repo-scratch.mjs";
 import { keepTestHomes, removeTestTree, sweepOldChildren } from "../plugins/pipeline-core/lib/test-home-cleanup.mjs";
@@ -87,6 +87,20 @@ test("C30-5: finished Full Verify homes and clones are planned only when asked, 
   assert.equal(sweepLeftovers({ home, verifyHomeDays: 14 }).removed, 2);
   assert.equal(existsSync(join(home, ".fv", "fv29e")), true, "the recent run stays");
   assert.equal(existsSync(join(home, ".fv")), true, "the folder itself stays");
+});
+
+test("C30-5: the end-of-run sweep removes the kept home and clone of an earlier red run after the keep days, never a recent one", (t) => {
+  assert.equal(VERIFY_HOME_KEEP_DAYS, 3);
+  const home = fakeHome(t);
+  for (const path of [".fv/fv-old-red", ".fv/fv-recent-red", "fvc/c-old", "fvc/c-recent"]) mkdirSync(join(home, path), { recursive: true });
+  for (const path of [".fv/fv-old-red", "fvc/c-old"]) agedBy(join(home, path), 24 * (VERIFY_HOME_KEEP_DAYS + 1));
+  for (const path of [".fv/fv-recent-red", "fvc/c-recent"]) agedBy(join(home, path), 24);
+  const swept = sweepLeftovers({ home, minAgeHours: 12, apply: true, verifyHomeDays: VERIFY_HOME_KEEP_DAYS });
+  assert.equal(swept.removed, 2);
+  assert.equal(existsSync(join(home, ".fv", "fv-old-red")), false);
+  assert.equal(existsSync(join(home, "fvc", "c-old")), false);
+  assert.equal(existsSync(join(home, ".fv", "fv-recent-red")), true, "a recent red home stays for the reruns");
+  assert.equal(existsSync(join(home, "fvc", "c-recent")), true);
 });
 
 test("C30-5: a new fixture-shaped folder the cleaner does not know is a leak; known names, ordinary new names and old names are not", () => {

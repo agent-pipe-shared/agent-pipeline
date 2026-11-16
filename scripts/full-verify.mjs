@@ -15,9 +15,10 @@
 //          path and the red step names read from <clone-dir>/evidence/verify-latest.json (the run record). Exit code = verify's.
 // Data:    HOME and TMPDIR under <home>/.fv/<label>/ (recreated each run, outside every repository). The TMPDIR path must stay
 //          under 30 characters; a longer one is refused with exit 2 rather than silently breaking socket-path tests.
-//          C30-5: when the run ends, a green run removes that private home; a red run keeps it (the red-suite reruns use it); then the
-//          home-level leftovers of the suites on the cleaner's allowlist older than 12 h are removed (scripts/clean-test-leftovers.mjs).
-//          PIPELINE_KEEP_TEST_HOMES=1 keeps everything.
+//          C30-5: when the run ends, a green run removes that private home; a red run keeps it (the red-suite reruns use it); then,
+//          green or red, the home-level leftovers of the suites on the cleaner's allowlist older than 12 h and the finished Verify
+//          homes (`.fv/<label>`) and clones (`fvc/<name>`) older than VERIFY_HOME_KEEP_DAYS (3) days are removed, so a red run's kept
+//          home does not orphan (scripts/clean-test-leftovers.mjs). PIPELINE_KEEP_TEST_HOMES=1 keeps everything.
 // Read-only toward the source: it writes only the output file, the run record verify itself writes in the clone, and the temp dirs.
 import { spawn, execFileSync } from "node:child_process";
 import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -28,6 +29,8 @@ import { keepTestHomes, removeTestTree } from "../plugins/pipeline-core/lib/test
 import { isLeftoverName, sweepLeftovers } from "./clean-test-leftovers.mjs";
 
 export const MAX_TMPDIR_CHARS = 29;
+/** Days a finished run's private home and clone are kept (the red-suite reruns need them); older ones go at the end of every run. */
+export const VERIFY_HOME_KEEP_DAYS = 3;
 
 /**
  * C30-5: names a run added directly to the home folder that look like a leaked fixture folder (a `mkdtemp` shape: a name ending in a
@@ -138,14 +141,15 @@ function main(argv) {
     if (resume) { try { resumed = countResumed(readFileSync(join(clone, outputRel), "utf8")); } catch { resumed = 0; } }
     for (const line of summarize({ exitCode: code, seconds: Math.round((Date.now() - started) / 1000), outputPath: outputRel, record, resumed })) console.log(line);
     // C30-5 (PO 2026-11-15): a Verify run cleans up after itself. A GREEN run removes its own private HOME and TMPDIR; a RED run keeps
-    // them, because the red-suite reruns (`rerun-reds.mjs`) use that exact HOME and TMPDIR, and the next sweep removes them with the
-    // other old homes. Then the shared home-level leftovers of the suites (names on the cleaner's allowlist, older than 12 h) go.
-    // PIPELINE_KEEP_TEST_HOMES=1 skips all of it.
+    // them, because the red-suite reruns (`rerun-reds.mjs`) use that exact HOME and TMPDIR. Every run, green or red, then removes the
+    // homes and clones of EARLIER finished runs older than VERIFY_HOME_KEEP_DAYS (a red run's kept home is therefore removed by a
+    // later run, never orphaned) and the shared home-level leftovers of the suites (names on the cleaner's allowlist, older than
+    // 12 h). PIPELINE_KEEP_TEST_HOMES=1 skips all of it.
     let leaked = [];
     if (!keepTestHomes()) {
       const homeRemoved = code === 0 ? removeTestTree(base) : false;
-      const swept = sweepLeftovers({ minAgeHours: 12, apply: true });
-      console.log(`cleanup: private home ${code === 0 ? (homeRemoved ? "removed" : "kept (removal failed)") : "kept for the red-suite reruns"}; ${swept.removed} of ${swept.planned} home-level leftovers removed (${(swept.bytes / 1073741824).toFixed(2)} GB)`);
+      const swept = sweepLeftovers({ minAgeHours: 12, apply: true, verifyHomeDays: VERIFY_HOME_KEEP_DAYS });
+      console.log(`cleanup: private home ${code === 0 ? (homeRemoved ? "removed" : "kept (removal failed)") : `kept ${VERIFY_HOME_KEEP_DAYS} days for the red-suite reruns`}; ${swept.removed} of ${swept.planned} leftovers removed, home-level and finished Verify homes and clones older than ${VERIFY_HOME_KEEP_DAYS} days (${(swept.bytes / 1073741824).toFixed(2)} GB)`);
       // The check: a run that left a new fixture-shaped folder in the home folder that the cleaner does not know fails the wrapper.
       try { leaked = leakedFixtureNames({ before: homeBefore, after: readdirSync(homedir()), isKnownLeftover: isLeftoverName }); } catch { leaked = []; }
       if (leaked.length > 0) console.log(`LEAK: this run left ${leaked.length} unlisted fixture folder(s) in the home folder: ${leaked.join(", ")}. A suite must remove what it creates (PIPELINE_KEEP_TEST_HOMES=1 keeps them for a diagnosis), or the name joins the allowlist of scripts/clean-test-leftovers.mjs.`);
