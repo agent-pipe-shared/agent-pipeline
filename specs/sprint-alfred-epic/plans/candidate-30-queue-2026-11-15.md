@@ -17,6 +17,48 @@ Placeholders, filled as the results arrive: C30-3 findings of the Full Verify of
 rerunning it alone and comparing with the 29d tree; the known intermittent `native-goldfish-host-stop-pair` race is one
 of them to decide), C30-4 findings and toil of the PO's new greenfield tests.
 
+## C30-6: the design review does not converge, cap it at two rounds (PO, 2026-11-16, greenfield run 070_4 on Claude)
+
+**Observation (a greenfield handover, measured).** A feature design got twelve independent `readiness-reviewer` rounds and
+none said ready: open findings 8, 7, 6, 4, 2, 3, 7, 9, 5, 3, 2, 7; about 774 000 reviewer tokens; the spec grew from
+about 25 KB to 61 KB and the modules from 8 to 12; no application code existed at the stop. Real defects were found (no
+active profile, a module cycle, an export the own import would refuse), so the review stays; its termination is wrong.
+
+**Causes in the Pipeline (the agent text and ADR-0085 read directly; the handover's own claims marked).**
+
+- Every round was a fresh full review. The course (`design-course.md`, ADR-0085) intends one initial round plus delta
+  rounds (`--previous`, open findings and changed text only); the Elephant never created the first receipt, so no delta
+  was ever possible. Nothing in the course states that a full rerun is a deviation, and the handover reports
+  that `create --open-finding` was not usable on a source that changed after the review (to be verified in
+  `design-review-receipt.mjs` before building), which pushes the agent to a fresh start.
+- ADR-0085 amendment D246 (2026-11-13) removed every round cap ("delta rounds until pass", structural bound 64) after a
+  signature over a not-ready review; the cap and the no-signature-over-open-review rule were not separated.
+- `readiness-reviewer.md` tells the reviewer to raise coverage materialisation, decomposition, first path and ADR
+  coverage as questions in every round, to give every open finding an id, and to say ready only when none is open: a
+  question therefore blocks, although the text calls it "never a block".
+- No blocking/question split in the report, no machine check of the recurring mandatory questions, no scale switch for a
+  one-developer project (decomposition drove 7 to 12 modules).
+
+**Wanted (PO: at most two rounds).** Round 1 is the one full review. Round 2 is one delta that checks only the round-1
+blocking findings and what the correction changed. After round 2 nothing triggers a round 3: remaining blocking findings
+stop the presentation as today; remaining questions are written into the signing request as accepted questions the PO
+sees and signs knowingly (a regulated state, not a bypass). Reviewer output has two lists, `blocking` (contradiction,
+data loss, not buildable, security, missing mandatory criterion) and `questions`; only `blocking` makes the verdict
+not ready. Mandatory coverage and decomposition checks become a machine pre-check before round 1 or are asked once.
+A full rerun after round 1 is refused with a typed repair that names the delta route.
+
+**Open PO decision (tile before building).** The cap re-opens what D246 closed: signing with questions still open. Option
+A: questions only (never blocking findings) may be accepted after round 2, listed in the signature. Option B: after
+round 2 any open finding needs an explicit PO decision per finding. Recommendation: A.
+
+**Where it lives.** `plugins/pipeline-core/agents/readiness-reviewer.md`, `lib/design-review-receipt.mjs`,
+`scripts/design-review-receipt.mjs`, `lib/implementation-entry-gate.mjs` and the `present-plan` path in
+`scripts/pipeline-state.mjs`, `design-course.md`, ADR-0085 (new amendment), `guardrails/quality-gates.md` (a design-round
+counterpart to QG-13). Protected plugin source: held patch and the PO's apply.
+
+**Immediate unblock for the stopped run (no Pipeline change).** Create the first receipt for the current state with the
+round-12 findings as `--open-finding`, fix only the one real gap, then run exactly one delta round with `--previous`.
+
 ## C30-5: tests and Verify leave their temporary folders in the home folder, nothing cleans them (PO, 2026-11-15)
 
 **Finding.** Measured on 2026-11-15 in the PO's home folder: 62 leftover entries, 40.7 GB. The PO's rule: it is fine that
