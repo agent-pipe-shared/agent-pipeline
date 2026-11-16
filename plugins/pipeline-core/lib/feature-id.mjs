@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // The one shape a feature id must have to walk the whole lifecycle: a lowercase letter, then 2 to 63 lowercase letters, digits or
 // hyphens. It is the narrowest shape any step after set-feature checks (the design review receipt, the approval binding, the PO
 // approval proof and the design consistency check take ^[a-z][a-z0-9-]{0,63}$; the feature close, the close-commit split, the

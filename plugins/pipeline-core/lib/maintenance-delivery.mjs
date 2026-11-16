@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * ADR-0097 (D249, K-28): the maintenance delivery. A Goldfish item binding names `maintenance` instead of a criterion locator when it
  * repairs a check that was red before the feature and that no criterion of the approved Spec covers. This module holds the parts the
