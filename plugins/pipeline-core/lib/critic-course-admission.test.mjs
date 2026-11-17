@@ -673,6 +673,39 @@ test("D167-PF78 (2,3) produce into specs/<id>/evidence with a copied full-verify
   const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", registrationCommit}));
   assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
 });
+// C30F-G2: the diagnostic is produced while an evidence-only commit already follows the candidate; it binds the candidate, registers, and the admission accepts it with no carry.
+test("C30F-G2 a diagnostic produced behind an evidence-only follower is registered and admitted for the candidate, with the exact-commit digest and no carry", () => {
+  const fx = unitFixture({late: false});
+  writeFileSync(join(fx.root, ".git/info/exclude"), "/evidence/\n");
+  const dir = `specs/${fx.featureId}/evidence`, specPath = `specs/${fx.featureId}/spec.md`;
+  // The candidate under review: the feature topology (a manifest change and its documents).
+  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"]].map(([klass, rel, authority, mutability, retention]) => {
+    const path = `specs/${fx.featureId}/${rel}`; writeFileSync(join(fx.root, path), `${klass}\n`);
+    return {class: klass, path, sha256: hash(readFileSync(join(fx.root, path))), authority, mutability, retention};
+  });
+  const readManifest = () => JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  const writeManifest = (value) => writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...value, candidate: null, supersedes: null})}\n`);
+  writeManifest({...readManifest(), artifacts: [...readManifest().artifacts, ...topo]});
+  const candidate = fx.commit("topology candidate");
+  // The follower: one exact manifest registration of an earlier round's evidence file, made BEFORE this candidate's diagnostic exists.
+  mkdirSync(join(fx.root, dir), {recursive: true});
+  const earlier = `${dir}/earlier-round.json`, earlierBody = "{\"note\":\"earlier round\"}\n";
+  writeFileSync(join(fx.root, earlier), earlierBody);
+  writeManifest({...readManifest(), artifacts: [...readManifest().artifacts, {class: "candidate-evidence", path: earlier, sha256: hash(earlierBody), authority: false, mutability: "immutable", retention: "retain"}]});
+  const follower = fx.commit("evidence registered after the candidate");
+  assert.notEqual(follower, candidate);
+  const jsonPath = `${dir}/diagnostic.json`, logPath = `${dir}/targeted.log`;
+  const value = produceCriticDiagnostic({root: fx.root, candidate, specPath, command: [process.execPath, "-e", "console.log('ok')"], logPath});
+  assert.equal(value.candidate.commit, candidate, "the diagnostic binds the candidate, not the follower HEAD");
+  assert.match(readFileSync(join(fx.root, logPath), "utf8"), new RegExp(`head: ${follower}`, "u"), "the capture names the follower HEAD");
+  writeFileSync(join(fx.root, jsonPath), `${JSON.stringify(value, null, 2)}\n`);
+  const result = addCriticDiagnosticEvidence({root: fx.root, state: {activeFeature: {id: fx.featureId}}, path: jsonPath});
+  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
+  const registrationCommit = fx.commit("register the candidate-bound diagnostic");
+  const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: candidate}, {requestedMode: "full", registrationCommit}));
+  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+  assert.equal(actual.deterministicEvidenceSha256, sha256Canonical([{path: jsonPath, sha256: hash(readFileSync(join(fx.root, jsonPath)))}]), "exact-commit digest, no carry entry");
+});
 test("D167-PF78 (3) a diagnostic whose full-verify member is the fixed evidence/verify-latest.json is refused FPR-DIAG-PATH naming the copy-then-produce route", () => {
   const fx = chainFixture({verifyAt: "evidence/verify-latest.json"});
   const before = readFileSync(join(fx.root, fx.manifestPath));

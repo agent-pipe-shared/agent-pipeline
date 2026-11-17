@@ -12,7 +12,7 @@ import { readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
 import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
-import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { installEvidenceOnlyFollowerClassifier, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
 import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
 import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
@@ -571,7 +571,9 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
         if (!object(ref) || addedByPath.get(ref.path)?.sha256 !== ref.sha256) return false;
         requiredLogs.add(ref.path);
       }
-      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree},
+      // C30F-G2: this classifier decides what "evidence-only" is, and `classifyEvidenceOnlyFollowers` is built on it, so its own check of a registered
+      // diagnostic keeps the exact capture head: it must not admit a log made at a later head, which would let the classifier call itself.
+      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree}, exactCaptureHead: true,
         readArtifact: path => {
           if (!addedByPath.has(path)) throw new Error("unregistered diagnostic member");
           return gitBytes(root, ["show", `${commit}:${path}`], "CCA-EVIDENCE-READ");
@@ -581,6 +583,36 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
     return changed.every((path) => path === manifestPath || newPaths.has(path));
   } catch { return false; }
 }
+
+/** The per-commit decision of the classifier below, shared with `classifyEvidenceOnlyFollowers` so that there is one rule for "evidence-only". */
+function registeredEvidenceOnlyCommit(root, commit, manifestPath, featureId, admitCriticExports, readReceipt, admitClose = admitCriticExports) {
+  return evidenceOnlyCommit(root, commit, manifestPath, featureId)
+    || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readReceipt)
+      || criticAddendumOnlyCommit(root, commit) || (admitClose === true && criticCloseCommit(root, commit, featureId, readReceipt))));
+}
+
+/**
+ * C30F-G2: are all commits between a candidate and a later HEAD evidence-only, by the same per-commit rule the Critic carry-forward uses
+ * (manifest registration, consumed-review export, disposition addendum)? The carry's close commit (it may change the Spec and documents under
+ * specs/<feature>/ and docs/) and its administration/documentation pass-over are NOT admitted here: such a commit changes non-evidence content. `ok` is true for HEAD == candidate (no follower) and for
+ * a descendant whose every commit is evidence-only; `reason` is "not-a-descendant", "not-evidence-only" (with `offending`) or "unreadable". Never throws.
+ */
+export function classifyEvidenceOnlyFollowers({ repoRoot, featureId, candidateCommit, headCommit, readConsumedCandidateReceiptFn = readConsumedCandidateReceipt }) {
+  const result = (ok, reason, offending, commits) => Object.freeze({ ok, reason, offending, commits: Object.freeze(commits) });
+  try {
+    if (!OID.test(candidateCommit) || !OID.test(headCommit) || !FEATURE_ID.test(featureId ?? "")) return result(false, "unreadable", null, []);
+    if (candidateCommit === headCommit) return result(true, null, null, []);
+    const root = realpathSync(repoRoot);
+    try { gitBytes(root, ["merge-base", "--is-ancestor", candidateCommit, headCommit], "CCA-RANGE-ANCESTRY"); } catch { return result(false, "not-a-descendant", null, []); }
+    const commits = gitBytes(root, ["rev-list", "--reverse", `${candidateCommit}..${headCommit}`], "CCA-RANGE-READ").toString("utf8").trim().split("\n").filter(Boolean);
+    if (commits.length === 0 || commits.length > 512 || commits.some((oid) => !OID.test(oid))) return result(false, "unreadable", null, []);
+    const manifestPath = `specs/${featureId}/lifecycle.json`;
+    for (const commit of commits) if (!registeredEvidenceOnlyCommit(root, commit, manifestPath, featureId, true, readConsumedCandidateReceiptFn, false)) return result(false, "not-evidence-only", commit, []);
+    return result(true, null, null, commits);
+  } catch { return result(false, "unreadable", null, []); }
+}
+// The diagnostic validator is a leaf this module imports, so it cannot import this classifier back; it takes it from here.
+installEvidenceOnlyFollowerClassifier(classifyEvidenceOnlyFollowers);
 
 /**
  * Classify only exact manifest-registration commits as budget-neutral. `admitCriticExports` also admits commits that
@@ -594,9 +626,7 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   const correction = [];
   const administration = [];
   for (const commit of source.rangeCommits) {
-    const registered = evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
-      || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
-        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId, readConsumedCandidateReceiptFn)));
+    const registered = registeredEvidenceOnlyCommit(root, commit, source.manifestPath, featureId, admitCriticExports, readConsumedCandidateReceiptFn);
     // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
     const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
     if (passedOver && !registered) administration.push(commit);

@@ -484,6 +484,53 @@ test("first Critic admits actual failed targeted diagnostics with full Verify no
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+// C30F-G2: a diagnostic produced while only evidence-only commits follow the candidate binds the CANDIDATE and the preflight judges it exactly as one produced at the candidate.
+test("C30F-G2 the preflight and the course admission accept a registered diagnostic produced behind an evidence-only follower, bound to the candidate", () => {
+  const fx = fixture();
+  try {
+    const featureId = "follow-feat", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`;
+    mkdirSync(join(fx.root, dir, "evidence"), { recursive: true }); mkdirSync(join(fx.root, dir, "design"), { recursive: true });
+    writeFileSync(join(fx.root, `${dir}/spec.md`), "# Follow feature\nAC-1: behavior boundary\n");
+    const unitPath = `${dir}/design/critic-review-unit.json`;
+    writeFileSync(join(fx.root, unitPath), JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior boundary", specPath: `${dir}/spec.md`, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(fx.root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
+    const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", artifacts: [
+      { class: "spec", path: `${dir}/spec.md`, sha256: sha256(readFileSync(join(fx.root, `${dir}/spec.md`))), authority: true, mutability: "mutable", retention: "active" },
+      { class: "design", path: unitPath, sha256: sha256(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }] };
+    writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
+    git(fx.root, ["add", dir]);
+    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature genesis"]);
+    const base = git(fx.root, ["rev-parse", "HEAD"]);
+    writeFileSync(join(fx.root, `${dir}/spec.md`), "# Follow feature\nchanged\n");
+    git(fx.root, ["add", dir]);
+    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature candidate"]);
+    const candidate = git(fx.root, ["rev-parse", "HEAD"]);
+    const body = "{\"note\":\"earlier round\"}\n";
+    writeFileSync(join(fx.root, `${dir}/evidence/earlier.json`), body);
+    manifest.artifacts.push({ class: "candidate-evidence", path: `${dir}/evidence/earlier.json`, sha256: sha256(body), authority: false, mutability: "immutable", retention: "retain" });
+    writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
+    git(fx.root, ["add", dir]);
+    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "evidence registered after the candidate"]);
+    assert.notEqual(git(fx.root, ["rev-parse", "HEAD"]), candidate);
+    const value = produceCriticDiagnostic({ root: fx.root, candidate, specPath: `${dir}/spec.md`, guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/follower-targeted.log" });
+    assert.deepEqual(value.candidate, { commit: candidate, tree: git(fx.root, ["rev-parse", `${candidate}^{tree}`]) });
+    assert.match(readFileSync(join(fx.root, "evidence/follower-targeted.log"), "utf8"), new RegExp(`head: ${git(fx.root, ["rev-parse", "HEAD"])}`, "u"), "the capture names HEAD, the follower, not the candidate");
+    // Register it the way the course reads it (one evidence-only commit), then run the preflight with the registration commit.
+    const diagnosticPath = `${dir}/evidence/diagnostic.json`, logPath = `${dir}/evidence/targeted.log`;
+    writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, "evidence/follower-targeted.log")));
+    writeFileSync(join(fx.root, diagnosticPath), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, path: logPath } } }));
+    for (const path of [diagnosticPath, logPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
+    writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
+    git(fx.root, ["add", dir]);
+    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "register the candidate-bound diagnostic"]);
+    const registrationCommit = git(fx.root, ["rev-parse", "HEAD"]);
+    const result = preflightCriticDispatch(input(fx, { base, candidate, specPath: `${dir}/spec.md`, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } }));
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
+    assert.equal(result.candidate.commit, candidate);
+    assert.equal(result.coordinatorOnly.courseAdmission.featureId, featureId);
+    assert.equal(result.evidence[0].candidate.commit, candidate);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("failed canonical Verify admits review without satisfying final qualification", () => {
   const fx = fixture();
   try {
@@ -1139,7 +1186,8 @@ test("N43 (a) the missing-guardrails refusal for a changed calibration names the
       // Toolbox follow-up: the base stays the preflight base, the diagnostic is made while HEAD is the candidate, a second one binds to the delta request.
       assert.match(reason, /Keep --base exactly as printed/u);
       assert.match(reason, /a base equal to the candidate derives an empty set/u);
-      assert.match(reason, /still the candidate and the tree is clean \(CDI-DIRTY-CANDIDATE/u);
+      // QG-04 restatement (C30F-G2): the intent (the text names the clean-tree rule and CDI-DIRTY-CANDIDATE) stays; the pinned wording changed because an evidence-only follower no longer refuses.
+      assert.match(reason, /still the candidate or only evidence-only commits \(a registration, an export, an addendum\) follow it, and the tree is clean \(CDI-DIRTY-CANDIDATE after a follow-up commit that is not evidence-only\)/u);
       assert.match(reason, /CCA-DELTA-BINDING/u);
       assert.equal(error.details.diagnosticBase, fx.candidate);
       return true;

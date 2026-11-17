@@ -83,7 +83,9 @@ test("C30d: a candidate behind HEAD is refused CDI-DIRTY-CANDIDATE with the orde
     let behind = null;
     try { produceCriticDiagnostic({ ...options(f), candidate: f.candidate.commit }); } catch (error) { behind = error; }
     assert.equal(behind?.code, "CDI-DIRTY-CANDIDATE");
-    for (const needle of ["is not the candidate", "1 commit(s) follow the candidate", "BEFORE any evidence, export or lineage commit", "clean checkout of exactly the candidate", "Nothing was written"]) assert.ok(behind.message.includes(needle), `the refusal says "${needle}": ${behind.message}`);
+    // QG-04 restatement (C30F-G2): the intent (the refusal names the order trap and its repair) stays; only the needle "BEFORE any evidence, export or lineage commit" changed, because an evidence-only commit after
+    // the candidate no longer refuses when the spec lies under specs/<feature-id>/. This fixture's later.md is a non-evidence commit and its spec is spec.md, so the order trap still applies and says why.
+    for (const needle of ["is not the candidate", "1 commit(s) follow the candidate", "BEFORE any commit that is not evidence-only", "does not lie under specs/<feature-id>/", "clean checkout of exactly the candidate", "Nothing was written"]) assert.ok(behind.message.includes(needle), `the refusal says "${needle}": ${behind.message}`);
     assert.equal(existsSync(join(f.root, "evidence/targeted.log")), false, "no capture log was written");
     writeFileSync(join(f.root, "spec.md"), "dirty");
     let dirty = null;
@@ -372,3 +374,95 @@ test("N40 (d) the CLI prints the cause and the repair on stderr, not only the co
 });
 import { createHash as n40CreateHash } from "node:crypto";
 const diagnosticDigestOf = (text) => n40CreateHash("sha256").update(text).digest("hex");
+// C30F-G2: the diagnostic is produced while HEAD is the candidate OR while every commit after it is an evidence-only commit (the classifier of critic-course-admission.mjs decides) and the tracked tree is clean.
+const FEATURE = "feat-a";
+function followerFixture() {
+  const root = mkdtempSync(join(tmpdir(), "critic-follower-"));
+  git(root, ["init", "-q"]);
+  mkdirSync(join(root, "specs", FEATURE), { recursive: true }); mkdirSync(join(root, "src"));
+  writeFileSync(join(root, "specs", FEATURE, "spec.md"), "Frozen specification\n");
+  writeFileSync(join(root, "guard.md"), "Frozen guardrail\n");
+  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 1;\n");
+  writeFileSync(join(root, "specs", FEATURE, "lifecycle.json"), `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
+  commitAll(root, "candidate");
+  return { root, candidate: { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) } };
+}
+// An exact manifest-registration commit: one new candidate-evidence json file and its manifest entry (the form evidenceOnlyCommit classifies).
+function evidenceFollower(f, name) {
+  const path = `specs/${FEATURE}/evidence/${name}.json`, manifestPath = `specs/${FEATURE}/lifecycle.json`;
+  mkdirSync(join(f.root, "specs", FEATURE, "evidence"), { recursive: true });
+  const body = `{"note":"${name}"}\n`;
+  writeFileSync(join(f.root, path), body);
+  const manifest = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8"));
+  manifest.artifacts.push({ class: "candidate-evidence", path, sha256: n40CreateHash("sha256").update(body).digest("hex"), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest)}\n`);
+  return commitAll(f.root, `evidence ${name}`);
+}
+const followerOptions = f => ({ root: f.root, candidate: f.candidate.commit, specPath: `specs/${FEATURE}/spec.md`, guardrailPaths: ["guard.md"], command: [process.execPath, "-e", "console.log('follower targeted run')"], logPath: `specs/${FEATURE}/evidence/targeted.log` });
+const refusal = (run) => { try { run(); } catch (error) { return error; } return null; };
+test("C30F-G2 (a) HEAD is the candidate plus evidence-only followers: the diagnostic is produced, binds the CANDIDATE, and validates", () => {
+  const f = followerFixture();
+  try {
+    const first = evidenceFollower(f, "one"), second = evidenceFollower(f, "two");
+    assert.notEqual(first, second);
+    assert.equal(git(f.root, ["rev-parse", "HEAD"]), second);
+    const value = produceCriticDiagnostic(followerOptions(f));
+    assert.deepEqual(value.candidate, f.candidate, "the candidate, not HEAD, stays the bound identity");
+    assert.equal(value.targeted.status, "passed");
+    assert.match(readFileSync(join(f.root, value.targeted.log.path), "utf8"), /follower targeted run/u);
+    assert.equal(validateCriticDiagnostic(value, { root: f.root, candidate: f.candidate }).targeted.status, "passed");
+    assert.deepEqual(Object.keys(value).sort(), ["assurance", "candidate", "fullVerify", "guardrails", "pending", "producer", "schema", "spec", "targeted"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30F-G2 (b) a follower that changes a source path, a spec text, a protected path or a guardrail is refused CDI-DIRTY-CANDIDATE, also behind an evidence-only follower, and nothing is written", () => {
+  const changes = [
+    ["source path", f => writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 2;\n")],
+    ["spec text", f => writeFileSync(join(f.root, "specs", FEATURE, "spec.md"), "Changed specification\n")],
+    ["protected path", f => { mkdirSync(join(f.root, ".claude")); writeFileSync(join(f.root, ".claude/settings.json"), "{}\n"); }],
+    ["guardrail", f => writeFileSync(join(f.root, "guard.md"), "Weakened guardrail\n")],
+  ];
+  for (const [name, change] of changes) {
+    const f = followerFixture();
+    try {
+      evidenceFollower(f, "one");
+      change(f); commitAll(f.root, `not evidence-only: ${name}`);
+      const error = refusal(() => produceCriticDiagnostic(followerOptions(f)));
+      assert.equal(error?.code, "CDI-DIRTY-CANDIDATE", name);
+      assert.ok(error.message.includes("Nothing was written") && error.message.includes("is not an evidence-only commit"), error.message);
+      assert.equal(existsSync(join(f.root, "specs", FEATURE, "evidence/targeted.log")), false, name);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+test("C30F-G2 (c) a rewritten history (HEAD is not a descendant of the candidate) and a dirty tree behind an evidence-only follower stay refused", () => {
+  const f = followerFixture();
+  try {
+    git(f.root, ["checkout", "-q", "--detach", "HEAD"]);
+    writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 3;\n"); commitAll(f.root, "the candidate");
+    const candidate = git(f.root, ["rev-parse", "HEAD"]);
+    git(f.root, ["checkout", "-q", "--detach", f.candidate.commit]);
+    evidenceFollower(f, "side");
+    const sibling = refusal(() => produceCriticDiagnostic({ ...followerOptions(f), candidate }));
+    assert.equal(sibling?.code, "CDI-DIRTY-CANDIDATE");
+    assert.ok(sibling.message.includes("not a descendant"), sibling.message);
+    writeFileSync(join(f.root, "specs", FEATURE, "spec.md"), "dirty");
+    const dirty = refusal(() => produceCriticDiagnostic(followerOptions(f)));
+    assert.equal(dirty?.code, "CDI-DIRTY-CANDIDATE");
+    assert.ok(dirty.message.includes("the working tree differs"), dirty.message);
+    assert.equal(existsSync(join(f.root, "specs", FEATURE, "evidence/targeted.log")), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30F-G2 (d) a capture header naming a commit that is no evidence-only follower of the candidate is still refused by the validator", () => {
+  const f = followerFixture();
+  try {
+    evidenceFollower(f, "one");
+    const value = produceCriticDiagnostic(followerOptions(f));
+    const logPath = join(f.root, value.targeted.log.path), good = readFileSync(logPath, "utf8");
+    const head = git(f.root, ["rev-parse", "HEAD"]);
+    assert.ok(good.includes(`head: ${head}`), "the capture log names HEAD, the evidence-only follower");
+    const forged = (text) => { writeFileSync(logPath, text); return { ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, sha256: diagnosticDigestOf(text) } } }; };
+    assert.throws(() => validateCriticDiagnostic(forged(good.replace(`head: ${head}`, `head: ${"a".repeat(40)}`)), { root: f.root, candidate: f.candidate }), /CDI-DIGEST/);
+    writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 9;\n"); const code = commitAll(f.root, "source change");
+    assert.throws(() => validateCriticDiagnostic(forged(good.replace(`head: ${head}`, `head: ${code}`)), { root: f.root, candidate: f.candidate }), /CDI-DIGEST/);
+    assert.equal(validateCriticDiagnostic(forged(good), { root: f.root, candidate: f.candidate }).targeted.status, "passed", "the log as produced stays accepted: the commits between the candidate and its head are evidence-only");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});

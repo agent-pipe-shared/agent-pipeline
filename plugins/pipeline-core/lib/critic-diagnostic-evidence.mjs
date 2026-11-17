@@ -74,13 +74,29 @@ function validateReference(value) {
   if (!exact(value, ["path", "sha256"]) || !SHA.test(value.sha256)) fail("CDI-REFERENCE");
   diagnosticPath(value.path);
 }
-function validateCaptureHeader(text, label, exitCode, candidate) {
+/**
+ * C30F-G2: a capture made at a HEAD AFTER the candidate is admitted only when that HEAD's tree is the one the header names and every commit between the
+ * candidate and it is evidence-only by the course classifier (the feature is named by the diagnostic's own spec path); anything else stays refused.
+ * This leaf cannot import the classifier (critic-course-admission.mjs imports this file, and the graph behind it is order-sensitive), so that module
+ * installs it when it loads. Where it is not loaded, or for an exact-head caller, no follower is admitted: the capture must name the candidate, as before.
+ */
+let followerClassifier = null;
+export function installEvidenceOnlyFollowerClassifier(classify) { followerClassifier = typeof classify === "function" ? classify : null; }
+function evidenceOnlyFollowerIdentity(identity, candidate, { root, specPath, exactCaptureHead }) {
+  const featureId = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\//u.exec(specPath ?? "")?.[1];
+  if (exactCaptureHead === true || followerClassifier === null || typeof root !== "string" || featureId === undefined) return false;
+  try {
+    if (git(root, ["rev-parse", `${identity[1]}^{tree}`]).trim() !== identity[2]) return false;
+  } catch { return false; }
+  return followerClassifier({ repoRoot: root, featureId, candidateCommit: candidate.commit, headCommit: identity[1] }).ok === true;
+}
+function validateCaptureHeader(text, label, exitCode, candidate, followerContext) {
   const prefix = /^command: ([^\r\n]+)\nlabel: ([a-z0-9][a-z0-9-]{0,63})\nexitCode: (0|[1-9][0-9]*)\n/u.exec(text);
   if (!prefix || prefix[2] !== label || Number(prefix[3]) !== exitCode) return false;
   let body = text.slice(prefix[0].length);
   if (!body.startsWith("--- stdout ---\n")) {
     const identity = /^head: ([a-f0-9]{40})\ntree: ([a-f0-9]{40})\ndirty: (true|false)\n/u.exec(body);
-    if (!identity || identity[1] !== candidate.commit || identity[2] !== candidate.tree) return false;
+    if (!identity || (identity[1] !== candidate.commit || identity[2] !== candidate.tree) && !evidenceOnlyFollowerIdentity(identity, candidate, followerContext)) return false;
     body = body.slice(identity[0].length);
   }
   if (!body.startsWith("--- stdout ---\n")) return false;
@@ -88,7 +104,7 @@ function validateCaptureHeader(text, label, exitCode, candidate) {
   const separator = body.indexOf(stderrMarker, "--- stdout ---\n".length);
   return separator >= 0;
 }
-export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path) } = {}) {
+export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path), exactCaptureHead = false } = {}) {
   if (!exact(value, ["schema", "producer", "assurance", "candidate", "spec", "guardrails", "fullVerify", "targeted", "pending"]) || value.schema !== CRITIC_DIAGNOSTIC_SCHEMA || value.producer !== "critic-diagnostic-evidence" || value.assurance !== "captured-process-output-not-host-attested" || !exact(value.candidate, ["commit", "tree"]) || !OID.test(value.candidate.commit) || !OID.test(value.candidate.tree) || value.candidate.commit !== candidate.commit || value.candidate.tree !== candidate.tree) fail("CDI-BINDING");
   validateReference(value.spec);
   if (!Array.isArray(value.guardrails) || value.guardrails.length > 128 || new Set(value.guardrails.map(row => row?.path)).size !== value.guardrails.length) fail("CDI-GUARDRAILS");
@@ -111,7 +127,7 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   validateReference(t.log);
   const log = readArtifact(t.log.path);
   const logText = log.toString("utf8");
-  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate)) fail("CDI-DIGEST");
+  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate, { root, specPath: value.spec.path, exactCaptureHead })) fail("CDI-DIGEST");
   if (!Array.isArray(value.pending) || value.pending.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id)) || new Set(value.pending).size !== value.pending.length || (value.fullVerify.status === "not-run" && !value.pending.includes("full-verify"))) fail("CDI-PENDING");
   return { kind: "critic-diagnostic", fullVerify: value.fullVerify.status, targeted: { status: t.status, exitCode: t.exitCode, log: t.log }, pending: value.pending };
 }
