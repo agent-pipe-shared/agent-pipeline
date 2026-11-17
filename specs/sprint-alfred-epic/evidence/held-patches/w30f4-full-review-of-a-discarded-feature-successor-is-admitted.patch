@@ -1,0 +1,344 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 047004970..a3640bd2f 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -18,6 +18,7 @@ import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } fr
+ import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+ import { locateCourseEvidenceGap } from "./course-evidence-gap.mjs";
+ import { isSpecAddendumPath } from "./spec-addendum.mjs";
++import { bytes as projectAuthorityBytes, resolveProjectAuthorityPaths } from "./project-authority-read.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const MODES = new Set(["full", "delta"]);
+@@ -68,6 +69,8 @@ const REPAIRS = Object.freeze({
+   "CCA-REVIEW-UNIT-REQUIRED": "No commit between the base and the candidate lists a Critic review unit in the feature manifest. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit. The first review may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it; the unit may be added after delivery. A course that already has a retained review keeps its first base and cannot use the unit.",
+   "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
+ });
++// C30F-G4: only a feature whose manifest declares a predecessor is told about the successor route.
++const SUCCESSOR_REPAIR_SENTENCE = "This manifest declares a predecessor feature (supersedes): when that predecessor is recorded as discarded in the State, the first review may instead start from the commit before the inherited implementation, which must be a strict ancestor of the commit that first added this manifest, and the review then covers the whole inherited range.";
+ /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
+ const REPAIRS_EXTRA = {};
+ Object.assign(REPAIRS_EXTRA, {
+@@ -82,6 +85,8 @@ export function criticCourseRepair(code, detail = null) {
+   if (typeof code !== "string") return null;
+   const gap = courseEvidenceGapText(code, detail);
+   if (gap !== null) return gap;
++  // C30F-G4: the plain text stays byte-identical; the one added sentence names the successor route and no feature.
++  if (code === "CCA-MANIFEST-READ" && detail !== null && typeof detail === "object" && detail.declaresPredecessor === true) return `${REPAIRS[code]} ${SUCCESSOR_REPAIR_SENTENCE}`;
+   if (Object.hasOwn(REPAIRS, code)) return REPAIRS[code];
+   if (Object.hasOwn(REPAIRS_EXTRA, code)) return REPAIRS_EXTRA[code];
+   if (!code.startsWith("CCA-")) return null;
+@@ -836,8 +841,34 @@ function aliasRead(root,commit,featureId){
+   if(e.path!==`specs/${featureId}/evidence/critic-course-alias-${r.blob.sha256}.json`)fail('CCA-ALIAS-PATH');
+   candidates.push({registration:r.registration,descriptor});
+  }
++ // C30F-G4: `supersedes` without any registered alias descriptor, naming a feature the State records as discarded, is the successor of a discarded feature, not a rename or split.
++ if(isAlias&&candidates.length===0&&recordedDiscarded(root,original))return {original:featureId,aliases:[],successorOf:original};
+  if((isAlias&&candidates.length!==1)||new Set(candidates.map(row=>row.descriptor.aliasFeatureId)).size!==candidates.length)unavailable('CCA-ALIAS-MAPPING-UNAVAILABLE');return {original,aliases:candidates};
+ }
++// The State's own record of a discarded feature, read through the project authority resolver (neutral tier first, legacy compatibility), never from a path of this module's choosing.
++function recordedDiscarded(root,featureId){
++ try{
++  const paths=resolveProjectAuthorityPaths({rootDir:root});if(paths.status!=='ready'||typeof paths.state!=='string')return false;
++  const raw=projectAuthorityBytes(root,paths.state);if(raw===null)return false;
++  const state=JSON.parse(raw.toString('utf8'));
++  return Array.isArray(state?.discardedFeatures)&&state.discardedFeatures.some(e=>object(e)&&e.id===featureId&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0);
++ }catch{return false;}}
++/** True when the feature manifest at the commit declares a predecessor feature (read-only; only decides which repair sentence a CCA-MANIFEST-READ refusal prints). */
++export function criticCourseDeclaresPredecessor({repoRoot,featureId,commit}){
++ try{if(!FEATURE_ID.test(featureId??'')||!OID.test(commit??''))return false;const m=manifestAt(realpathSync(repoRoot),commit,`specs/${featureId}/lifecycle.json`).value;return typeof m.supersedes==='string'&&FEATURE_ID.test(m.supersedes);}catch{return false;}}
++// C30F-G4: the sanctioned first review of the successor of a discarded feature starts BEFORE the manifest exists. The base must be a strict ancestor of the commit that
++// first added the manifest (the last `--diff-filter=A` commit) and that commit an ancestor of the candidate, so base..candidate is the whole inherited range. Every unmet
++// condition keeps the plain refusal CCA-MANIFEST-READ.
++function successorGenesis(root,predecessor,base,candidate,manifestPath){
++ const added=gitBytes(root,['log','--diff-filter=A','--format=%H',candidate,'--',manifestPath],'CCA-MANIFEST-READ').toString('utf8').trim().split('\n').filter(Boolean);
++ const introducingCommit=added.at(-1);
++ if(!introducingCommit||added.length>512||!OID.test(introducingCommit)||introducingCommit===base)fail('CCA-MANIFEST-READ');
++ gitBytes(root,['merge-base','--is-ancestor',base,introducingCommit],'CCA-MANIFEST-READ');
++ gitBytes(root,['merge-base','--is-ancestor',introducingCommit,candidate],'CCA-MANIFEST-READ');
++ if(manifestAt(root,candidate,manifestPath).value.supersedes!==predecessor)fail('CCA-MANIFEST-READ');
++ return {predecessorFeatureId:predecessor,introducingCommit,manifestSha256:manifestAt(root,introducingCommit,manifestPath).sha256};
++}
++function manifestReadable(root,commit,path){try{manifestAt(root,commit,path);return true;}catch(error){if(error?.code==='CCA-MANIFEST-READ')return false;throw error;}}
+ function repository(root){const repo=discoverRepository(root);return {repoRoot:realpathSync(root),gitCommonDir:repo.commonDir,controlRoot:join(repo.commonDir,'agent-pipeline','critic-packets'),repositoryFingerprint:derivePoGateRepositoryFingerprint({gitCommonDir:repo.commonDir,primaryRoot:repo.primaryRoot})};}
+ export function resolveRegisteredCriticCourseIdentity(input){try{
+  if(!exact(input,['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'])||!FEATURE_ID.test(input.featureId??'')||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??'')))fail('CCA-IDENTITY-SHAPE');
+@@ -850,9 +881,14 @@ export function resolveRegisteredCriticCourseIdentity(input){try{
+  const first=history[0]?.record, binding=first?.courseBinding;
+  const genesisCandidate=first?{base:first.diff.base,commit:first.candidate.commit,tree:first.candidate.tree}:{base:input.baseCommit,commit:input.candidateCommit,tree:gitBytes(root,['rev-parse',`${input.candidateCommit}^{tree}`],'CCA-RANGE-TREE').toString('utf8').trim()};
+  const manifestPath=`specs/${alias.original}/lifecycle.json`;
+- const originalManifestSha256=binding?.originalManifestSha256??manifestAt(root,genesisCandidate.base,manifestPath).sha256;
+- const keySubject={repositoryFingerprint:repo.repositoryFingerprint,originalFeatureId:alias.original,manifestPath,originalManifestSha256,genesisCandidate};
+- const courseIdentity={courseKey:sha256Canonical(keySubject),repositoryFingerprint:repo.repositoryFingerprint,originalFeatureId:alias.original,manifestPath,originalManifestSha256,genesisCandidate,submissionSha256:binding?.submissionSha256??accepted?.submissionSha256??null,envelopeSha256:binding?.envelopeSha256??accepted?.envelopeSha256??null,genesisRecordSha256:first?.recordSha256??null};
++ // C30F-G4: a successor of a discarded feature whose genesis base predates its manifest takes the manifest as first added in the place of the missing manifest at the base,
++ // and binds that introducing commit and the predecessor into the course key, on every round (the binding of a later round is checked against this recomputation).
++ const successor=alias.successorOf&&!manifestReadable(root,genesisCandidate.base,manifestPath)?successorGenesis(root,alias.successorOf,genesisCandidate.base,input.candidateCommit,manifestPath):null;
++ if(successor&&binding&&binding.originalManifestSha256!==successor.manifestSha256)fail('CCA-GENESIS-BINDING');
++ const originalManifestSha256=binding?.originalManifestSha256??successor?.manifestSha256??manifestAt(root,genesisCandidate.base,manifestPath).sha256;
++ const successorSubject=successor?{successor:{predecessorFeatureId:successor.predecessorFeatureId,introducingCommit:successor.introducingCommit}}:{};
++ const keySubject={repositoryFingerprint:repo.repositoryFingerprint,originalFeatureId:alias.original,manifestPath,originalManifestSha256,genesisCandidate,...successorSubject};
++ const courseIdentity={courseKey:sha256Canonical(keySubject),repositoryFingerprint:repo.repositoryFingerprint,originalFeatureId:alias.original,manifestPath,originalManifestSha256,genesisCandidate,...successorSubject,submissionSha256:binding?.submissionSha256??accepted?.submissionSha256??null,envelopeSha256:binding?.envelopeSha256??accepted?.envelopeSha256??null,genesisRecordSha256:first?.recordSha256??null};
+  for(const row of history){const b=row.record.courseBinding;if(b && (b.courseKey!==courseIdentity.courseKey||b.originalFeatureId!==alias.original||!equal(b.genesisCandidate,genesisCandidate)||b.originalManifestSha256!==originalManifestSha256||b.submissionSha256!==courseIdentity.submissionSha256||b.envelopeSha256!==courseIdentity.envelopeSha256))fail('CCA-GENESIS-BINDING');}
+  if(accepted && (courseIdentity.envelopeSha256!==accepted.envelopeSha256||courseIdentity.submissionSha256!==accepted.submissionSha256))fail('CCA-ACCEPTANCE-BINDING');
+  for(const row of alias.aliases){const d=row.descriptor;if(d.courseKey!==courseIdentity.courseKey||!equal(d.genesisCandidate,genesisCandidate)||d.genesisRecordSha256!==courseIdentity.genesisRecordSha256||d.acceptedEnvelopeSha256!==courseIdentity.envelopeSha256)fail('CCA-ALIAS-GENESIS');}
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 22a115a21..f1abc487b 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -5,13 +5,13 @@ const completionCases = [];
+ function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
+ import { runRegisterFeaturePackage } from "../scripts/register-feature-package.mjs";
+ import { tmpdir } from "node:os";
+ import { join, dirname } from "node:path";
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+-import { transitionCode as lineageTransitionCode } from "./critic-review-lineage-core.mjs";
++import { transitionCode as lineageTransitionCode, compiledRequest, recordCore, validateCriticReviewLineage } from "./critic-review-lineage-core.mjs";
+ import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
+ 
+@@ -448,7 +448,7 @@ test("CCA18 dropping retained registration cannot create new genesis in the runt
+ 
+ test("CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle", diagnosticCarryCase);
+ // D165-PF75B: the review unit is read at the commit that introduced it, not only at the genesis base.
+-function unitFixture({late, unit = true, bulk = 0}) {
++function unitFixture({late, unit = true, bulk = 0, supersedes = null}) {
+   const root = mkdtempSync(join(tmpdir(), "critic-unit-intro-"));
+   const featureId = "unit-feature", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, specPath = `${dir}/spec.md`, unitPath = `${dir}/design/critic-review-unit.json`;
+   mkdirSync(join(root, dir, "design"), {recursive: true}); mkdirSync(join(root, "src"), {recursive: true});
+@@ -458,7 +458,7 @@ function unitFixture({late, unit = true, bulk = 0}) {
+   const pre = commit("pre-manifest");
+   writeFileSync(join(root, specPath), "# Spec\nAC-1 behavior\n");
+   const artifacts = [{class: "spec", path: specPath, sha256: hash(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active"}];
+-  const write = () => writeFileSync(join(root, manifestPath), `${JSON.stringify({schema: "pipeline.feature-package.v1", feature: {id: featureId, rigor: 1}, state: "approved", artifacts})}\n`);
++  const write = () => writeFileSync(join(root, manifestPath), `${JSON.stringify({schema: "pipeline.feature-package.v1", feature: {id: featureId, rigor: 1}, state: "approved", artifacts, ...(supersedes === null ? {} : {supersedes})})}\n`);
+   const unitBody = (purpose) => JSON.stringify({schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose, specPath, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: {mainRef: git(root, ["symbolic-ref", "HEAD"])}, singletonRationale: null});
+   const addUnit = (purpose) => { writeFileSync(join(root, unitPath), unitBody(purpose)); const entry = {class: "design", path: unitPath, sha256: hash(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain"}; const at = artifacts.findIndex(e => e.path === unitPath); if (at >= 0) artifacts[at] = entry; else artifacts.push(entry); write(); };
+   const out = {root, featureId, manifestPath, unitPath, pre, addUnit, commit, write, git: (...a) => git(root, a)};
+@@ -531,6 +531,105 @@ test("D165-PF75B (g) the missing-unit repair no longer says the unit commit is t
+   assert.match(repair, /any base on the candidate history that already lists the feature manifest/u);
+   assert.match(repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
+ });
++// C30F-G4 (Codex greenfield 2026-11-16): the successor of a DISCARDED feature is reviewed in full over the inherited implementation. Its manifest
++// declares the predecessor through `supersedes`, the predecessor is recorded in the State's discardedFeatures, and the first review's base is a
++// strict ancestor of the commit that first added the successor manifest. Neutral ids only.
++const PREDECESSOR = "feature-a";
++function recordDiscarded(fx, ids = [PREDECESSOR]) {
++  mkdirSync(join(fx.root, ".claude"), {recursive: true});
++  writeFileSync(join(fx.root, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++  writeFileSync(join(fx.root, ".claude/pipeline-state.json"), JSON.stringify({schema: "pipeline.state.v0", discardedFeatures: ids.map((id) => ({id, planPath: `specs/${id}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null}))}));
++  appendFileSync(join(fx.root, ".git/info/exclude"), ".claude/\n");
++}
++const successorIdentity = (fx, base) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: base, candidateCommit: fx.candidate, registrationCommit: fx.candidate, acceptedReference: null});
++test("C30F-G4 (a) the successor of a discarded feature is admitted over the inherited range and the identity binds the introducing commit, the range and the predecessor", () => {
++  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx);
++  assert.equal(fx.git("rev-list", "--count", `${fx.pre}..${fx.candidate}`), "4", "the inherited range holds the manifest, the delivered code, the unit and the candidate");
++  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
++  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++  const identity = successorIdentity(fx, fx.pre);
++  assert.equal(identity.ok, true, JSON.stringify(identity));
++  const course = identity.value.courseIdentity, introduced = hash(`${git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])}\n`);
++  assert.equal(course.originalFeatureId, fx.featureId);
++  assert.equal(course.originalManifestSha256, introduced, "the manifest as first added takes the place of the missing manifest at the base");
++  assert.equal(course.genesisCandidate.base, fx.pre);
++  assert.deepEqual(course.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
++  const {courseKey, submissionSha256, envelopeSha256, genesisRecordSha256, ...rest} = course;
++  assert.equal(courseKey, sha256Canonical({repositoryFingerprint: course.repositoryFingerprint, originalFeatureId: fx.featureId, manifestPath: fx.manifestPath, originalManifestSha256: introduced, genesisCandidate: course.genesisCandidate, successor: course.successor}));
++  assert.deepEqual(identity.value.aliases, []);
++});
++test("C30F-G4 (b) a feature without a predecessor relation keeps CCA-MANIFEST-READ, also when the State records a discarded feature", () => {
++  const fx = unitFixture({late: true}); recordDiscarded(fx);
++  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
++  assert.equal(actual.decision.code, "CCA-MANIFEST-READ", JSON.stringify(actual.decision));
++  assert.equal(successorIdentity(fx, fx.pre).code, "CCA-MANIFEST-READ");
++});
++test("C30F-G4 (c) a predecessor that is not recorded discarded keeps the refusal with a typed reason", () => {
++  for (const state of [null, ["feature-other"]]) {
++    const fx = unitFixture({late: true, supersedes: PREDECESSOR}); if (state) recordDiscarded(fx, state);
++    const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
++    assert.notEqual(actual.decision.status, "admitted", JSON.stringify(actual.decision));
++    assert.equal(actual.decision.code, "CCA-ALIAS-MAPPING-UNAVAILABLE", JSON.stringify(actual.decision));
++  }
++});
++test("C30F-G4 (d) a base that is not an ancestor of the commit that first added the manifest is refused CCA-MANIFEST-READ, a later base keeps the ordinary identity", () => {
++  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx);
++  const sibling = git(fx.root, ["commit-tree", `${fx.pre}^{tree}`, "-p", fx.pre, "-m", "sibling"]);
++  assert.equal(readCriticCourseAdmission(unitRequest(fx, {baseCommit: sibling})).decision.code, "CCA-MANIFEST-READ");
++  assert.equal(successorIdentity(fx, sibling).code, "CCA-MANIFEST-READ");
++  const later = successorIdentity(fx, fx.code);
++  assert.equal(later.ok, true, JSON.stringify(later));
++  assert.equal(later.value.courseIdentity.successor, undefined, "a base that holds the manifest never takes the successor route");
++  assert.equal(later.value.courseIdentity.originalManifestSha256, hash(`${git(fx.root, ["show", `${fx.code}:${fx.manifestPath}`])}\n`));
++});
++test("C30F-G4 (e) a retained round 1 binds the successor course: a later round resolves the SAME course, a different base opens no second one, a changed predecessor fails the genesis binding", () => {
++  // The finalizer cannot consume round 1 of a successor yet (critic-generic-batch.mjs reads the review unit at the genesis base), so the round-1 record is a real
++  // consumed v2 record of another fixture, re-bound to this repository's course identity and re-sealed with the lineage's own seal functions.
++  const template = consumedCourseRoundFixture();
++  const record = JSON.parse(readFileSync(join(template.root, template.finalizedLineage.lineagePath), "utf8"));
++  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx);
++  const round1 = successorIdentity(fx, fx.pre);
++  assert.equal(round1.ok, true, JSON.stringify(round1));
++  const course = round1.value.courseIdentity;
++  record.candidate = {commit: fx.candidate, tree: git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`])};
++  record.diff.base = fx.pre;
++  record.courseBinding = {...record.courseBinding, courseKey: course.courseKey, originalFeatureId: fx.featureId, originalManifestSha256: course.originalManifestSha256, genesisCandidate: course.genesisCandidate};
++  record.request.compiledSha256 = sha256Canonical(compiledRequest(record));
++  record.recordSha256 = sha256Canonical(recordCore(record));
++  assert.equal(validateCriticReviewLineage(record).ok, true, JSON.stringify(validateCriticReviewLineage(record)));
++  const evidencePath = `specs/${fx.featureId}/evidence/critic-review-lineage-1.json`, bytes = `${JSON.stringify(record)}\n`;
++  mkdirSync(join(fx.root, `specs/${fx.featureId}/evidence`), {recursive: true});
++  writeFileSync(join(fx.root, evidencePath), bytes);
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  manifest.artifacts.push({class: "candidate-evidence", path: evidencePath, sha256: hash(bytes), authority: false, mutability: "immutable", retention: "retain"});
++  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest)}\n`);
++  const registration = fx.commit("register the lineage of round 1");
++  const later = (overrides = {}) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.candidate, candidateCommit: fx.candidate, registrationCommit: registration, acceptedReference: null, ...overrides});
++  const again = later();
++  assert.equal(again.ok, true, JSON.stringify(again));
++  assert.equal(again.value.courseIdentity.courseKey, course.courseKey, "the same course, not a second one");
++  assert.deepEqual(again.value.courseIdentity.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
++  assert.deepEqual(again.value.courseIdentity.genesisCandidate, course.genesisCandidate);
++  assert.equal(again.value.courseIdentity.genesisRecordSha256, record.recordSha256);
++  assert.equal(later({baseCommit: fx.code}).value.courseIdentity.courseKey, course.courseKey, "another request base never derives another genesis");
++  // A predecessor named differently after round 1 recomputes another course key: the existing genesis binding refuses it instead of opening a second course.
++  manifest.supersedes = "feature-b";
++  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest)}\n`);
++  recordDiscarded(fx, [PREDECESSOR, "feature-b"]);
++  const renamed = fx.commit("name another predecessor");
++  const drift = later({candidateCommit: renamed, registrationCommit: renamed});
++  assert.equal(drift.ok, false);
++  assert.equal(drift.code, "CCA-GENESIS-BINDING", JSON.stringify(drift));
++});
++test("C30F-G4 (g) the repair text of CCA-MANIFEST-READ is unchanged and gains one sentence only when the manifest declares a predecessor, naming no feature", () => {
++  const plain = criticCourseRepair("CCA-MANIFEST-READ");
++  assert.equal(criticCourseRepair("CCA-MANIFEST-READ", {declaresPredecessor: false}), plain);
++  const extended = criticCourseRepair("CCA-MANIFEST-READ", {declaresPredecessor: true});
++  assert.ok(extended.startsWith(plain) && extended.length > plain.length);
++  assert.equal(extended.slice(plain.length).split(/(?<=\.)\s/u).filter(Boolean).length, 1, "exactly one added sentence");
++  assert.match(extended, /discarded/u);
++  assert.doesNotMatch(extended, new RegExp(PREDECESSOR, "u"));
++});
+ // D165-CDR: a sanctioned command registers Critic diagnostic evidence in the feature manifest.
+ function diagFixture() {
+   const fx = unitFixture({late: false});
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 161347d54..dc4abaf03 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -38,7 +38,7 @@ import {
+   RequirementTraceabilityError,
+   evaluateRequirementTraceability,
+ } from "../lib/requirement-traceability.mjs";
+-import { COURSE_EVIDENCE_GAP_CODES, criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, locateCourseEvidenceGap, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
++import { COURSE_EVIDENCE_GAP_CODES, criticCourseDeclaresPredecessor, criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, locateCourseEvidenceGap, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+ import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
+ import { criticRunnerFromEnv, describeCriticRouteAssurance } from "../lib/critic-route-assurance.mjs";
+ 
+@@ -462,8 +462,11 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     if (admission?.decision?.status !== "admitted") {
+       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
+       const gapCode = COURSE_EVIDENCE_GAP_CODES.includes(admission?.decision?.code);
++      // C30F-G4: a CCA-MANIFEST-READ refusal of a manifest that declares a predecessor also names the successor route (one added sentence, no feature name).
++      const manifestReadDetail = admission?.decision?.code === "CCA-MANIFEST-READ"
++        ? { declaresPredecessor: criticCourseDeclaresPredecessor({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) } : null;
+       let repair = criticCourseRepair(admission?.decision?.code,
+-        gapCode ? locateCourseEvidenceGap({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) : null);
++        gapCode ? locateCourseEvidenceGap({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) : manifestReadDetail);
+       // CCA-PARENT: name the last registered round and the base this preflight accepts, and the route that admits from here.
+       const parentDetail = admission?.decision?.code === "CCA-PARENT"
+         ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index a5b9947e8..336fd8452 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -28,6 +28,7 @@ import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+ import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
+ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
++import { criticCourseRepair } from "../lib/critic-course-admission.mjs";
+ import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+ 
+ function verifyValue(commit, tree, exitCode = 0) {
+@@ -531,6 +532,78 @@ test("C30F-G2 the preflight and the course admission accept a registered diagnos
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// C30F-G4 (Codex greenfield 2026-11-16): the first full review of the successor of a DISCARDED feature starts before the inherited implementation, i.e. before
++// the successor manifest exists. Neutral ids only; the State records the predecessor as discarded in the working tree, like a real project.
++function c30fG4Fixture({ supersedes = null, discarded = true, supersedesLate = false } = {}) {
++  const fx = fixture();
++  const featureId = "feature-a-successor", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, unitPath = `${dir}/design/critic-review-unit.json`;
++  const pre = git(fx.root, ["rev-parse", "HEAD"]);
++  mkdirSync(join(fx.root, "src"), { recursive: true });
++  writeFileSync(join(fx.root, "src", "inherited.mjs"), "export const inherited = 1;\n");
++  git(fx.root, ["add", "src"]);
++  git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "inherited implementation of the discarded feature"]);
++  mkdirSync(join(fx.root, dir, "evidence"), { recursive: true }); mkdirSync(join(fx.root, dir, "design"), { recursive: true });
++  writeFileSync(join(fx.root, `${dir}/spec.md`), "# Successor feature\nAC-1: behavior boundary\n");
++  writeFileSync(join(fx.root, unitPath), JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior boundary", specPath: `${dir}/spec.md`, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(fx.root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", artifacts: [
++    { class: "spec", path: `${dir}/spec.md`, sha256: sha256(readFileSync(join(fx.root, `${dir}/spec.md`))), authority: true, mutability: "mutable", retention: "active" },
++    { class: "design", path: unitPath, sha256: sha256(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }], ...(supersedes === null || supersedesLate ? {} : { supersedes }) };
++  const write = () => writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
++  const save = (message) => { git(fx.root, ["add", dir]); git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(fx.root, ["rev-parse", "HEAD"]); };
++  write(); const introduced = save("successor feature genesis");
++  writeFileSync(join(fx.root, `${dir}/spec.md`), "# Successor feature\nchanged\n");
++  const candidate = save("successor candidate");
++  const value = produceCriticDiagnostic({ root: fx.root, candidate, specPath: `${dir}/spec.md`, guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/successor-targeted.log" });
++  const diagnosticPath = `${dir}/evidence/diagnostic.json`, logPath = `${dir}/evidence/targeted.log`;
++  writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, "evidence/successor-targeted.log")));
++  writeFileSync(join(fx.root, diagnosticPath), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, path: logPath } } }));
++  for (const path of [diagnosticPath, logPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  if (supersedesLate) manifest.supersedes = supersedes;
++  write(); const registrationCommit = save("register the candidate-bound diagnostic");
++  if (discarded) {
++    writeFileSync(join(fx.root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", discardedFeatures: [{ id: "feature-a", planPath: "specs/feature-a/prd.md", phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null }] }));
++  }
++  const request = (base) => input(fx, { base, candidate, specPath: `${dir}/spec.md`, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
++  return { fx, featureId, pre, introduced, candidate, registrationCommit, request };
++}
++test("C30F-G4 (f) the preflight of the successor of a discarded feature reaches packet-ready over the whole inherited range, bound to the successor manifest", () => {
++  const s = c30fG4Fixture({ supersedes: "feature-a" });
++  try {
++    const result = preflightCriticDispatch(s.request(s.pre));
++    assert.equal(result.status, "packet-ready", JSON.stringify(result));
++    assert.equal(result.coordinatorOnly.courseAdmission.featureId, "feature-a-successor");
++    assert.equal(result.coordinatorOnly.courseAdmission.round, 1);
++    assert.equal(result.base.commit, s.pre, "the reviewed range starts before the inherited implementation");
++    assert.ok(git(s.fx.root, ["diff", "--name-only", result.base.commit, result.candidate.commit]).split("\n").includes("src/inherited.mjs"), "the inherited implementation is inside the reviewed diff");
++  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
++});
++test("C30F-G4 (f2) without the predecessor relation the refusal text is the plain one, and with it a sibling base adds exactly one sentence and names no feature", () => {
++  const plain = c30fG4Fixture();
++  try {
++    const refused = preflightCriticDispatch(plain.request(plain.pre));
++    assert.equal(refused.code, "CCA-MANIFEST-READ", JSON.stringify(refused));
++    assert.equal(refused.repair, criticCourseRepair("CCA-MANIFEST-READ"));
++  } finally { rmSync(plain.fx.root, { recursive: true, force: true }); }
++  // A predecessor declared only AFTER the candidate (the registration commit) is not read at the candidate: the plain refusal stands and the repair names the route.
++  const declared = c30fG4Fixture({ supersedes: "feature-a", supersedesLate: true });
++  try {
++    const refused = preflightCriticDispatch(declared.request(declared.pre));
++    assert.equal(refused.code, "CCA-MANIFEST-READ", JSON.stringify(refused));
++    const plainText = criticCourseRepair("CCA-MANIFEST-READ");
++    assert.ok(refused.repair.startsWith(plainText) && refused.repair.length > plainText.length);
++    assert.equal(refused.repair, criticCourseRepair("CCA-MANIFEST-READ", { declaresPredecessor: true }));
++    assert.doesNotMatch(refused.repair, /feature-a/u);
++  } finally { rmSync(declared.fx.root, { recursive: true, force: true }); }
++});
++test("C30F-G4 (f3) a predecessor that the State does not record as discarded is not admitted", () => {
++  const s = c30fG4Fixture({ supersedes: "feature-a", discarded: false });
++  try {
++    const refused = preflightCriticDispatch(s.request(s.pre));
++    assert.notEqual(refused.status, "packet-ready", JSON.stringify(refused));
++    assert.equal(refused.code, "CCA-ALIAS-MAPPING-UNAVAILABLE", JSON.stringify(refused));
++  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
++});
++
+ test("failed canonical Verify admits review without satisfying final qualification", () => {
+   const fx = fixture();
+   try {
