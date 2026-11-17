@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+// C30F-G2C: loading this module installs the evidence-only follower classifier (a side effect of course admission) BEFORE the imports below that reach
+// critic-diagnostic-packet.mjs, which cannot import it itself (a measured TDZ through runtime-projection-v3). Every packet consumer reaches
+// diagnostic validation through this module, so none of them can validate without the classifier.
+import "../lib/critic-course-admission.mjs";
 import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
 import { randomBytes } from "node:crypto";
 import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, linkSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
@@ -302,7 +306,11 @@ function revalidateCandidate(packet) {
     if (!entry?.readable || entry.blobOid !== reference.candidateBlobOid) fail("CPP-REFERENCE", `Reference drift: ${reference.path}`);
   }
   if (packet.diagnostics !== undefined) {
-    try { revalidateDiagnosticBundle({ checkout, candidate: packet.candidate, bundle: packet.diagnostics }); }
+    // The checkout holds the candidate commit only, while a diagnostic made behind evidence-only follower commits names a later head: those commits are read from the
+    // repository that prepared the packet, whose Git common directory is the packet root's grandparent (<common>/agent-pipeline/critic-packets/<id>/checkout).
+    // Nothing else is read from it; a directory that is not that repository fails the follower check closed.
+    const followerRoot = resolve(checkout, "..", "..", "..", "..");
+    try { revalidateDiagnosticBundle({ checkout, candidate: packet.candidate, bundle: packet.diagnostics, followerRoot }); }
     catch { fail("CPP-DIAGNOSTIC", "Diagnostic snapshot drifted or is invalid."); }
   }
 }

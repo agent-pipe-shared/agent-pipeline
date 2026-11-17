@@ -82,13 +82,16 @@ function validateReference(value) {
  */
 let followerClassifier = null;
 export function installEvidenceOnlyFollowerClassifier(classify) { followerClassifier = typeof classify === "function" ? classify : null; }
-function evidenceOnlyFollowerIdentity(identity, candidate, { root, specPath, exactCaptureHead }) {
+function evidenceOnlyFollowerIdentity(identity, candidate, { root, followerRoot, specPath, exactCaptureHead }) {
   const featureId = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\//u.exec(specPath ?? "")?.[1];
-  if (exactCaptureHead === true || followerClassifier === null || typeof root !== "string" || featureId === undefined) return false;
+  // The follower commits live in the repository the capture was made in. A caller that validates inside a disposable checkout (which holds the candidate only) names
+  // that repository as `followerRoot`; the classifier and the tree check run there, everything else still runs against `root`.
+  const where = followerRoot ?? root;
+  if (exactCaptureHead === true || followerClassifier === null || typeof where !== "string" || featureId === undefined) return false;
   try {
-    if (git(root, ["rev-parse", `${identity[1]}^{tree}`]).trim() !== identity[2]) return false;
+    if (git(where, ["rev-parse", `${identity[1]}^{tree}`]).trim() !== identity[2]) return false;
   } catch { return false; }
-  return followerClassifier({ repoRoot: root, featureId, candidateCommit: candidate.commit, headCommit: identity[1] }).ok === true;
+  return followerClassifier({ repoRoot: where, featureId, candidateCommit: candidate.commit, headCommit: identity[1] }).ok === true;
 }
 function validateCaptureHeader(text, label, exitCode, candidate, followerContext) {
   const prefix = /^command: ([^\r\n]+)\nlabel: ([a-z0-9][a-z0-9-]{0,63})\nexitCode: (0|[1-9][0-9]*)\n/u.exec(text);
@@ -104,7 +107,7 @@ function validateCaptureHeader(text, label, exitCode, candidate, followerContext
   const separator = body.indexOf(stderrMarker, "--- stdout ---\n".length);
   return separator >= 0;
 }
-export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path), exactCaptureHead = false } = {}) {
+export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path), exactCaptureHead = false, followerRoot } = {}) {
   if (!exact(value, ["schema", "producer", "assurance", "candidate", "spec", "guardrails", "fullVerify", "targeted", "pending"]) || value.schema !== CRITIC_DIAGNOSTIC_SCHEMA || value.producer !== "critic-diagnostic-evidence" || value.assurance !== "captured-process-output-not-host-attested" || !exact(value.candidate, ["commit", "tree"]) || !OID.test(value.candidate.commit) || !OID.test(value.candidate.tree) || value.candidate.commit !== candidate.commit || value.candidate.tree !== candidate.tree) fail("CDI-BINDING");
   validateReference(value.spec);
   if (!Array.isArray(value.guardrails) || value.guardrails.length > 128 || new Set(value.guardrails.map(row => row?.path)).size !== value.guardrails.length) fail("CDI-GUARDRAILS");
@@ -127,7 +130,7 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   validateReference(t.log);
   const log = readArtifact(t.log.path);
   const logText = log.toString("utf8");
-  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate, { root, specPath: value.spec.path, exactCaptureHead })) fail("CDI-DIGEST");
+  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate, { root, followerRoot, specPath: value.spec.path, exactCaptureHead })) fail("CDI-DIGEST");
   if (!Array.isArray(value.pending) || value.pending.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id)) || new Set(value.pending).size !== value.pending.length || (value.fullVerify.status === "not-run" && !value.pending.includes("full-verify"))) fail("CDI-PENDING");
   return { kind: "critic-diagnostic", fullVerify: value.fullVerify.status, targeted: { status: t.status, exitCode: t.exitCode, log: t.log }, pending: value.pending };
 }

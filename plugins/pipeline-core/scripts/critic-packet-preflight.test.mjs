@@ -27,6 +27,7 @@ import { createLocalDispatchEvidenceBinding } from "./check-critic-skip-coverage
 import { runAttestedRequest } from "./dispatch-record-write.mjs";
 import { projectCriticReviewEconomy, sha256Canonical } from "../lib/review-economy.mjs";
 import { diagnosticEvidenceLocation, diagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -66,9 +67,10 @@ function fixture(extraCandidateFiles = []) {
   writeFileSync(join(root, "specs", "review.md"), "candidate\n");
   mkdirSync(join(root, "roles"));
   writeFileSync(join(root, "roles", "critic.md"), "critic contract\n");
-  for (const extra of extraCandidateFiles) {
+  for (const entry of extraCandidateFiles) {
+    const [extra, content = "added\n"] = Array.isArray(entry) ? entry : [entry];
     mkdirSync(dirname(join(root, extra)), { recursive: true });
-    writeFileSync(join(root, extra), "added\n");
+    writeFileSync(join(root, extra), content);
   }
   git(root, ["add", "."]);
   git(root, ["commit", "--quiet", "-m", "candidate"]);
@@ -313,14 +315,14 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged 
     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
     const disposed = records.filter((record) => record.event === "DISPOSED");
     assert.equal(records[0].event, "DECLARED");
-    assert.equal(records[0].caseCount, 18);
-    assert.equal(disposed.length, 18);
+    assert.equal(records[0].caseCount, 20);
+    assert.equal(disposed.length, 20);
     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
     assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
     assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
-    assert.deepEqual(records.at(-1).counts, { pass: 17, fail: 1, skip: 0, todo: 0 });
-    assert.equal(records.at(-1).declaredCount, 18);
-    assert.equal(records.at(-1).disposedCount, 18);
+    assert.deepEqual(records.at(-1).counts, { pass: 19, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 20);
+    assert.equal(records.at(-1).disposedCount, 20);
   }
 });
 
@@ -551,7 +553,79 @@ check("CPPW-1 walk: a real candidate packet adding special file names passes the
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 18,"the complete candidate packet corpus must be registered before execution begins");
+// C30F-G2C: a diagnostic produced behind evidence-only follower commits (HEAD is the candidate plus its registration commits) is honoured end to end: the
+// diagnostic bundle is created from the host repository, then revalidated inside the disposable checkout, which holds the candidate commit ONLY.
+const FOLLOWER_FEATURE = "feat-a";
+const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
+function followerFixture() {
+  const manifest = `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: FOLLOWER_FEATURE, rigor: 1 }, state: "approved", artifacts: [] })}\n`;
+  return fixture([[`specs/${FOLLOWER_FEATURE}/spec.md`, "Frozen specification\n"], [`specs/${FOLLOWER_FEATURE}/lifecycle.json`, manifest]]);
+}
+function commitPaths(root, paths, message) {
+  git(root, ["add", "-f", "--", ...paths]);
+  git(root, ["commit", "--quiet", "-m", message]);
+  return git(root, ["rev-parse", "HEAD"]);
+}
+function registerEvidenceFollower(f, name) {
+  const path = `specs/${FOLLOWER_FEATURE}/evidence/${name}.json`, manifestPath = `specs/${FOLLOWER_FEATURE}/lifecycle.json`, body = `{"note":"${name}"}\n`;
+  mkdirSync(join(f.root, "specs", FOLLOWER_FEATURE, "evidence"), { recursive: true });
+  writeFileSync(join(f.root, path), body);
+  const manifest = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8"));
+  manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256Hex(body), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest)}\n`);
+  return commitPaths(f.root, [path, manifestPath], `evidence ${name}`);
+}
+const FOLLOWER_DIAGNOSTIC = `specs/${FOLLOWER_FEATURE}/evidence/diagnostic.json`;
+function writeFollowerDiagnostic(f) {
+  const value = produceCriticDiagnostic({ root: f.root, candidate: f.candidate, specPath: `specs/${FOLLOWER_FEATURE}/spec.md`, guardrailPaths: [], command: [process.execPath, "-e", "console.log('follower targeted run')"], logPath: `specs/${FOLLOWER_FEATURE}/evidence/targeted.log` });
+  writeFileSync(join(f.root, FOLLOWER_DIAGNOSTIC), JSON.stringify(value));
+  return value;
+}
+function followerOptions(f, packetId) {
+  return { ...options(f, packetId), references: [{ kind: "spec", path: `specs/${FOLLOWER_FEATURE}/spec.md` }], evidencePaths: [FOLLOWER_DIAGNOSTIC] };
+}
+check("a diagnostic produced behind evidence-only follower commits is prepared, inspected and bound to the CANDIDATE", () => {
+  const f = followerFixture();
+  try {
+    const head = registerEvidenceFollower(f, "one");
+    assert.notEqual(head, f.candidate);
+    writeFollowerDiagnostic(f);
+    const prepared = prepareCandidatePacket(followerOptions(f, "e".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 41) });
+    assert.equal(prepared.packet.candidate.commit, f.candidate, "the packet binds the candidate, not the follower HEAD");
+    assert.equal(prepared.packet.diagnostics.items[0].status.targeted, "passed");
+    assert.notEqual(spawnSync("git", ["-C", prepared.packet.checkout.realPath, "cat-file", "-e", `${head}^{commit}`]).status, 0, "premise: the disposable checkout does not hold the follower commit");
+    const inspected = inspectCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:00:30.000Z") });
+    assert.equal(inspected.code, "CPP-INSPECTED");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+check("behind a follower a forged capture header, a non-evidence head and a diagnostic changed after capture stay refused", () => {
+  const f = followerFixture();
+  try {
+    const head = registerEvidenceFollower(f, "one");
+    const value = writeFollowerDiagnostic(f);
+    const logPath = join(f.root, value.targeted.log.path), good = readFileSync(logPath, "utf8");
+    mkdirSync(join(f.root, "src"), { recursive: true });
+    writeFileSync(join(f.root, "src", "code.mjs"), "export const delivered = 2;\n");
+    const code = commitPaths(f.root, ["src/code.mjs"], "source change");
+    const forged = good.replace(`head: ${head}`, `head: ${code}`);
+    assert.notEqual(forged, good);
+    writeFileSync(logPath, forged);
+    writeFileSync(join(f.root, FOLLOWER_DIAGNOSTIC), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, sha256: sha256Hex(forged) } } }));
+    assert.throws(() => prepareCandidatePacket(followerOptions(f, "f".repeat(32))), expectCode("CPP-DIAGNOSTIC"));
+    const unrelated = good.replace(`head: ${head}`, `head: ${"0".repeat(40)}`);
+    writeFileSync(logPath, unrelated);
+    writeFileSync(join(f.root, FOLLOWER_DIAGNOSTIC), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, sha256: sha256Hex(unrelated) } } }));
+    assert.throws(() => prepareCandidatePacket(followerOptions(f, "a".repeat(32))), expectCode("CPP-DIAGNOSTIC"));
+    writeFileSync(logPath, good);
+    writeFileSync(join(f.root, FOLLOWER_DIAGNOSTIC), JSON.stringify(value));
+    const prepared = prepareCandidatePacket(followerOptions(f, "b".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 42) });
+    const artifact = prepared.packet.diagnostics.artifacts.find((a) => a.sourcePath === value.targeted.log.path);
+    writeFileSync(join(prepared.packet.checkout.realPath, artifact.path), `${good}tampered\n`);
+    assert.throws(() => inspectCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:00:30.000Z") }), expectCode("CPP-DIAGNOSTIC"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 20,"the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

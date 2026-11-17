@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { validateCriticDiagnostic, inspectCriticVerifyDiagnostic } from "./critic-diagnostic-evidence.mjs";
 import { produceCriticDiagnostic } from "./critic-diagnostic-producer.mjs";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
@@ -465,4 +466,105 @@ test("C30F-G2 (d) a capture header naming a commit that is no evidence-only foll
     assert.throws(() => validateCriticDiagnostic(forged(good.replace(`head: ${head}`, `head: ${code}`)), { root: f.root, candidate: f.candidate }), /CDI-DIGEST/);
     assert.equal(validateCriticDiagnostic(forged(good), { root: f.root, candidate: f.candidate }).targeted.status, "passed", "the log as produced stays accepted: the commits between the candidate and its head are evidence-only");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+// C30F-G2B: the follower rule must hold in a consumer that loads only the packet module, whatever else was loaded first. This file imports critic-course-admission.mjs
+// (which installs the classifier), so every proof of that runs in a FRESH child process that imports exactly one module.
+const CHILD_VALIDATE = `
+import { pathToFileURL } from "node:url";
+const input = JSON.parse(process.env.CHILD_INPUT);
+if (input.entry) await import(pathToFileURL(input.entry).href);
+const module = await import(pathToFileURL(input.module).href);
+try {
+  if (input.mode === "leaf") { const result = module.validateCriticDiagnostic(JSON.parse(input.diagnosticJson), { root: input.root, candidate: input.candidate }); console.log(JSON.stringify({ ok: true, status: result.targeted.status })); }
+  else { const bundle = module.createDiagnosticBundle({ root: input.root, candidate: input.candidate, evidencePaths: input.evidencePaths }); console.log(JSON.stringify({ ok: true, status: bundle.items[0].status.targeted })); }
+} catch (error) { console.log(JSON.stringify({ ok: false, code: error.code ?? null, message: String(error.message) })); }
+`;
+function importOnly(mode, file, f, diagnosticPath, entryFile = null) {
+  const input = { mode, entry: entryFile === null ? null : fileURLToPath(new URL(entryFile, import.meta.url)), module: fileURLToPath(new URL(file, import.meta.url)), root: f.root, candidate: f.candidate, evidencePaths: [diagnosticPath], diagnosticJson: mode === "leaf" ? readFileSync(join(f.root, diagnosticPath), "utf8") : null };
+  const run = spawnSync(process.execPath, ["--input-type=module", "-e", CHILD_VALIDATE], { encoding: "utf8", env: { ...process.env, CHILD_INPUT: JSON.stringify(input) } });
+  assert.equal(run.status, 0, run.stderr);
+  return JSON.parse(run.stdout.trim().split("\n").at(-1));
+}
+function writeFollowerDiagnostic(f) {
+  const value = produceCriticDiagnostic(followerOptions(f)), diagnosticPath = `specs/${FEATURE}/evidence/diagnostic.json`;
+  writeFileSync(join(f.root, diagnosticPath), JSON.stringify(value));
+  return { value, diagnosticPath };
+}
+// C30F-G2C restates (a): the packet module cannot import course admission (a measured TDZ through runtime-projection-v3), so the classifier is installed by the
+// consumer ENTRY scripts instead. Each entry is proven in its own fresh child process: load the entry, then validate through the packet module, no TDZ.
+for (const entry of ["../scripts/critic-packet-preflight.mjs", "../scripts/critic-claude-host.mjs", "../scripts/codex-critic-packet-host.mjs"]) {
+  test(`C30F-G2B (a) loading ${entry.slice(3)} installs the classifier: a diagnostic produced behind an evidence-only follower validates through the packet module`, () => {
+    const f = followerFixture();
+    try {
+      evidenceFollower(f, "one");
+      const { diagnosticPath } = writeFollowerDiagnostic(f);
+      const viaEntry = importOnly("packet", "./critic-diagnostic-packet.mjs", f, diagnosticPath, entry);
+      assert.deepEqual(viaEntry, { ok: true, status: "passed" });
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  });
+}
+test("C30F-G2B (a) the packet module alone, with no consumer entry loaded, keeps the fail-closed contract", () => {
+  const f = followerFixture();
+  try {
+    evidenceFollower(f, "one");
+    const { diagnosticPath } = writeFollowerDiagnostic(f);
+    const viaPacket = importOnly("packet", "./critic-diagnostic-packet.mjs", f, diagnosticPath);
+    assert.equal(viaPacket.ok, false);
+    assert.equal(viaPacket.code, "CDI-DIGEST");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30F-G2B (b) the leaf alone keeps the documented fail-closed contract: no classifier installed, no follower admitted", () => {
+  const f = followerFixture();
+  try {
+    evidenceFollower(f, "one");
+    const { diagnosticPath } = writeFollowerDiagnostic(f);
+    const viaLeaf = importOnly("leaf", "./critic-diagnostic-evidence.mjs", f, diagnosticPath);
+    assert.equal(viaLeaf.ok, false);
+    assert.equal(viaLeaf.code, "CDI-DIGEST");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30F-G2B (c) with the consumer entry loaded a capture header naming a non-evidence commit is still refused CDI-DIGEST", () => {
+  const f = followerFixture();
+  try {
+    evidenceFollower(f, "one");
+    const { value, diagnosticPath } = writeFollowerDiagnostic(f);
+    const logPath = join(f.root, value.targeted.log.path), good = readFileSync(logPath, "utf8"), head = git(f.root, ["rev-parse", "HEAD"]);
+    writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 9;\n"); const code = commitAll(f.root, "source change");
+    const forgedLog = good.replace(`head: ${head}`, `head: ${code}`);
+    writeFileSync(logPath, forgedLog);
+    writeFileSync(join(f.root, diagnosticPath), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, sha256: diagnosticDigestOf(forgedLog) } } }));
+    const refused = importOnly("packet", "./critic-diagnostic-packet.mjs", f, diagnosticPath, "../scripts/critic-packet-preflight.mjs");
+    assert.equal(refused.ok, false);
+    assert.equal(refused.code, "CDI-DIGEST");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+// C30F-G2C: the disposable checkout of a packet holds the candidate commit ONLY. `followerRoot` names the repository the follower commits are read from; it is the one new input.
+test("C30F-G2C followerRoot: inside a candidate-only repository the follower is read from followerRoot, and every other header stays refused", () => {
+  const f = followerFixture(), only = mkdtempSync(join(tmpdir(), "critic-candidate-only-"));
+  try {
+    const head = evidenceFollower(f, "one"), { value } = writeFollowerDiagnostic(f);
+    const good = readFileSync(join(f.root, value.targeted.log.path), "utf8");
+    git(only, ["init", "-q"]); git(only, ["fetch", "-q", "--no-tags", f.root, f.candidate.commit]); git(only, ["checkout", "-q", "--detach", f.candidate.commit]);
+    assert.notEqual(spawnSync("git", ["-C", only, "cat-file", "-e", `${head}^{commit}`]).status, 0, "premise: the checkout does not hold the follower commit");
+    // The classifier reads receipts through the common directory of the root it is given: that directory must name itself when it is the root.
+    const common = join(f.root, ".git");
+    assert.equal(git(common, ["rev-parse", "--path-format=absolute", "--git-common-dir"]), git(f.root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
+    const header = (headOid, treeOid) => good.replace(/^head: [a-f0-9]{40}\ntree: [a-f0-9]{40}\n/mu, `head: ${headOid}\ntree: ${treeOid}\n`);
+    const run = (log, followerRoot) => {
+      const v = { ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, sha256: diagnosticDigestOf(log) } } };
+      return refusal(() => validateCriticDiagnostic(v, { root: only, candidate: f.candidate, readArtifact: () => Buffer.from(log), ...(followerRoot === undefined ? {} : { followerRoot }) })) ?? "accepted";
+    };
+    assert.equal(run(good, join(f.root, ".git")), "accepted", "the Git common directory of the host repository is a valid followerRoot");
+    assert.equal(run(good, f.root), "accepted");
+    assert.equal(run(good)?.code, "CDI-DIGEST", "no followerRoot: the follower commit is unknown in the candidate-only checkout");
+    assert.equal(run(good, only)?.code, "CDI-DIGEST", "followerRoot is the candidate-only repository: nothing to classify");
+    // A header naming a non-evidence descendant together with that commit's own tree: the tree check passes, the classifier decides and refuses.
+    writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 9;\n"); const code = commitAll(f.root, "source change");
+    assert.equal(run(header(code, git(f.root, ["rev-parse", `${code}^{tree}`])), f.root)?.code, "CDI-DIGEST");
+    // A non-descendant head (a sibling of the candidate) together with its own tree.
+    git(f.root, ["checkout", "-q", "--detach", f.candidate.commit]); writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 7;\n"); const sibling = commitAll(f.root, "sibling");
+    assert.equal(run(header(sibling, git(f.root, ["rev-parse", `${sibling}^{tree}`])), f.root)?.code, "CDI-DIGEST");
+    // The follower's own head with a tree that is not its tree.
+    assert.equal(run(header(head, f.candidate.tree), f.root)?.code, "CDI-DIGEST");
+  } finally { rmSync(f.root, { recursive: true, force: true }); rmSync(only, { recursive: true, force: true }); }
 });

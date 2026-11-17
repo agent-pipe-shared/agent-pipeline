@@ -73,7 +73,7 @@ export function materializeDiagnosticBundle(checkout, bundle) {
     written.add(artifact.path);
   }
 }
-export function revalidateDiagnosticBundle({ checkout, candidate, bundle, spec, guardrails }) {
+export function revalidateDiagnosticBundle({ checkout, candidate, bundle, spec, guardrails, followerRoot }) {
   if (!validateDiagnosticBundleShape(bundle)) fail();
   const bySource = new Map(bundle.artifacts.map(a => [a.sourcePath, a]));
   const readArtifact = path => {
@@ -89,7 +89,7 @@ export function revalidateDiagnosticBundle({ checkout, candidate, bundle, spec, 
   for (const artifact of bundle.artifacts) readArtifact(artifact.sourcePath);
   for (const item of bundle.items) {
     const value = JSON.parse(readArtifact(item.sourcePath));
-    const status = statusOf(value, { root: checkout, candidate, spec, guardrails, readArtifact });
+    const status = statusOf(value, { root: checkout, candidate, spec, guardrails, readArtifact, followerRoot });
     if (JSON.stringify(status) !== JSON.stringify(item.status)) fail();
   }
   return true;
