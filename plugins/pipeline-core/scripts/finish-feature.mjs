@@ -28,6 +28,7 @@ import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatch
 import { closeSbom, sbomFindingHelp } from "../lib/sbom-close.mjs";
 import { SBOM_OVERRIDE_CODES, createSbomOverrideRequest, verifySbomOverrideProof } from "../lib/sbom-override-authority.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { diagnoseResultCloseBinding } from "./pipeline-state.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -70,6 +71,16 @@ function readFeatureState(root, deps) {
   return state;
 }
 function command(runner, executable, argv, code) { return parseJsonOutput(runner(executable, argv), code); }
+// C30G-D1: a refused owner-route entry ends its stderr with the one-line result envelope, whose `message` is the entry's own refusal text. The plain lines before it stay; the raw JSON does not.
+function withEntryRefusalText(message) {
+  const lines = String(message ?? "").trim().split("\n");
+  let envelope = null;
+  try { envelope = JSON.parse(lines.at(-1)); } catch { envelope = null; }
+  if (envelope?.schema !== "pipeline.continuity-owner-route-result.v1") return String(message ?? "");
+  const plain = lines.slice(0, -1).join("\n").trim();
+  const entry = typeof envelope.message === "string" ? envelope.message.trim() : "";
+  return [plain, `${envelope.code ?? "refused"}${entry === "" || plain.includes(entry) ? "" : `: ${entry}`}`].filter(Boolean).join(" ");
+}
 function flagPairs(values) {
   const argv = [];
   for (const [name, value] of Object.entries(values)) {
@@ -282,6 +293,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   // C24 (Claude greenfield): a resume dropped the packet, and with two Critic rounds on record the printed command stopped at ONESHOT-CRITIC-PACKET-MISSING.
   const rerun = (id) => `${rerunBase}${packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
   const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
+  // C30G-D1 (AC-108): a bound Result that cannot close is named read-only, with the repair that works, before the close block ever plans (nothing is written).
+  const resultCloseBlocked = (current, id) => {
+    const authority = current.continuity?.authority;
+    const cause = diagnoseResultCloseBinding(root, authority?.result, authority?.prd?.path, authority?.spec?.path);
+    return cause === null ? null : stopResult("result-close-block", "ONESHOT-RESULT-CLOSE-BLOCKED", cause.text, `nothing was written. ${cause.repair} Then rerun the identical command: ${rerun(id)}`);
+  };
   const stages = [];
   // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
   const handoverPath = (() => {
@@ -487,6 +504,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         const entered = oneShotClose({ rootDir: root, by: actor, architectureImpact, criticPacketId: packet, resumeLifecycleId, humanAcceptance: null, humanDecline: null, openChecks, sbomOverrideProof: null }, { ...deps, resultBootstrapped: info });
         if (entered.status === "stopped") return Object.freeze({ ...entered, stop: Object.freeze({ ...entered.stop, repair: `${note} ${entered.stop.repair}` }), resultBootstrap: info });
         return Object.freeze({ ...entered, ...(Array.isArray(entered.stages) ? { stages: ["result-bootstrap", ...entered.stages] } : {}), resultBootstrap: info });
+      }
+      // C30G-D1: the same cause is named here, before Verify and the package moves, so a Result that changed after it was bound costs no partial close evidence.
+      if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && state.continuity.authority?.result) {
+        const blocked = resultCloseBlocked(state, again);
+        if (blocked !== null) return blocked;
       }
       // C21C: the missing PO acknowledgement of a caller-authored Critic used to surface only inside the close, after Verify and the package move. Its signature needs
       // a clean tree, so the close's evidence had to be committed and the bound candidate went stale. Named here, it stops before anything was written.
@@ -703,6 +725,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         let current = state;
         if (state.continuity.queueHead?.nextAction !== "close") {
           stages.push("result-close-block");
+          const blockedAtBlock = resultCloseBlocked(state, resumeLifecycleId);
+          if (blockedAtBlock !== null) return blockedAtBlock;
           const result = state.continuity.authority?.result;
           try {
             const flags = ["--feature-id", featureId, "--expected-revision", String(state.continuity.revision), "--result-path", result?.path, "--result-sha256", result?.sha256];
@@ -716,7 +740,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
               command(runner, plan.applyAction?.executable, plan.applyAction?.argv, "ONESHOT-RESULT-CLOSE-APPLY");
             }
           } catch (error) {
-            return stopResult("result-close-block", error.refusalCode ?? error.code, error.message, repairFor(error, resumeLifecycleId));
+            return stopResult("result-close-block", error.refusalCode ?? error.code, withEntryRefusalText(error.message), repairFor(error, resumeLifecycleId));
           }
           current = readFeatureState(root, deps);
         }

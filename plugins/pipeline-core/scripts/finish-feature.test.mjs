@@ -426,6 +426,69 @@ test("P3: a feature with Continuity gets its Result close block and close reques
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+// ---- C30G-D1 (AC-108): a Result that cannot close is named before the close block, with the repair that works ------------------------------------
+const RESULT_FILE = "specs/feature-abc/result.md";
+
+test("C30G-D1: a bound Result whose bytes changed after the bootstrap stops the close before Verify and any State write, names the cause and the Git restore, and the stop is gone after that repair", () => {
+  const f = oneShotFixture({ continuity: true });
+  try {
+    writeFileSync(join(f.root, RESULT_FILE), "# Result\n\nChanged after the Result bootstrap bound it.\n");
+    f.git("add", "-A"); f.git("commit", "-q", "-m", "change the result after it was bound");
+    const stateBefore = readFileSync(join(f.root, STATE_PATH));
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stage, "result-close-block");
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-CLOSE-BLOCKED");
+    assert.match(stopped.stop.reason, new RegExp(`digest-changed: .*bound ${f.resultSha.slice(0, 12)}, current [0-9a-f]{12}`, "u"));
+    assert.match(stopped.stop.reason, /commit or revert of the Result after the Result bootstrap changes the bytes the State binds/u);
+    assert.match(stopped.stop.reason, /git restore --source=<commit> -- specs\/feature-abc\/result\.md/u);
+    assert.doesNotMatch(`${stopped.stop.reason} ${stopped.stop.repair}`, /rebind/iu, "the rebind route cannot repair a changed digest");
+    assert.match(stopped.stop.repair, /git restore -- specs\/feature-abc\/result\.md[\s\S]*git restore --source=<commit> -- specs\/feature-abc\/result\.md[\s\S]*rerun the identical command/u);
+    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false, "stopped before Verify");
+    assert.equal(f.calls.some((call) => call.includes("continuity-result-close")), false, "no close plan or apply ran");
+    assert.deepEqual(readFileSync(join(f.root, STATE_PATH)), stateBefore, "no State write");
+    // The named repair, run as printed: the bound bytes come back from the commit before the change.
+    f.git("restore", "--source=HEAD~1", "--", RESULT_FILE);
+    assert.equal(readFileSync(join(f.root, RESULT_FILE), "utf8"), "# Result\n");
+    f.git("add", "-A"); f.git("commit", "-q", "-m", "restore the bound result");
+    const proceeded = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(proceeded.status, "commit-required", JSON.stringify(proceeded).slice(0, 400));
+    assert.ok(f.calls.includes("pipeline-state continuity-result-close-apply"), "the close went past the Result close block");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-D1: a Result that changes between the first check and the close block is still named at the block, before its plan runs", () => {
+  const f = oneShotFixture({ continuity: true });
+  try {
+    const runner = (executable, argv) => {
+      if (argv[1] === "feature-package-apply") writeFileSync(join(f.root, RESULT_FILE), "# Result\n\nChanged by a stage in between.\n");
+      return f.runner(executable, argv);
+    };
+    const stopped = oneShotClose(f.input, { runCommand: runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-CLOSE-BLOCKED");
+    assert.match(stopped.stop.reason, /digest-changed: /u);
+    assert.equal(f.calls.some((call) => call.includes("continuity-result-close")), false, "the plan never ran");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-D1: a refused close plan or apply on the owner route appends the entry's own refusal text and never dumps the raw envelope", () => {
+  const f = oneShotFixture({ continuity: true, ownerRoute: true });
+  try {
+    const envelope = { schema: "pipeline.continuity-owner-route-result.v1", status: "refused", code: "COR-ENTRY-EXIT", entry: "continuity-result-close-plan", exitCode: 2, message: "Error: Result-close plan refused (PS-RESULT-CLOSE-RESULT: a cause only the entry knows); zero mutation.", released: true };
+    const runner = (executable, argv) => {
+      if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs" && argv.includes("continuity-result-close-plan")) return { status: 2, stdout: "", stderr: `${JSON.stringify(envelope)}\n` };
+      return f.runner(executable, argv);
+    };
+    const stopped = oneShotClose(f.input, { runCommand: runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stage, "result-close-block");
+    assert.match(stopped.stop.reason, /COR-ENTRY-EXIT/u);
+    assert.match(stopped.stop.reason, /a cause only the entry knows/u);
+    assert.doesNotMatch(stopped.stop.reason, /"schema"/u, "the raw envelope is not the message");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("C21B: a Continuity feature with no bound Result stops before Verify with the exact bootstrap chain and writes no close evidence", () => {
   // C30D-G1 (QG-04, restated in place): the close now takes the bootstrap plan itself, so the one State call it makes is the plan; this fixture's plan is refused, so the stop, the manual chain and the
   // guarantee that nothing past the plan ran (no Verify, no package stage, no apply, no commit) stay exactly as they were.

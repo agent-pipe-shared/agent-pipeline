@@ -896,6 +896,69 @@ test("D231 owner route: the four Close-route entries run through the spawned CLI
   assertReleased(c, "close-apply");
 });
 
+test("C30G-D1: a refused owner-route entry never ends in a bare COR-ENTRY-EXIT: the envelope carries the entry's own refusal text, bounded, and nothing is written", () => {
+  const c = ownerRouteProject("cor-entry-exit");
+  const before = readFileSync(c.statePath);
+  const refused = ownerRun(c, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", "7",
+    "--result-path", "specs/feature/result.md", "--result-sha256", hash(Buffer.from("bytes the State never bound\n"))]);
+  assert.equal(refused.status, 2, refused.stderr);
+  const envelope = envelopeOf(refused);
+  assert.equal(envelope.status, "refused");
+  assert.equal(envelope.code, "COR-ENTRY-EXIT");
+  assert.equal(envelope.exitCode, 2);
+  assert.equal(typeof envelope.message, "string");
+  assert.match(envelope.message, /PS-RESULT-CLOSE-RESULT: digest-changed: /u, "the entry's refusal text names the cause");
+  assert.ok(envelope.message.length <= 400, "the carried text is bounded");
+  assert.doesNotMatch(envelope.message, /\u001b/u, "no ANSI sequence is carried");
+  assert.match(refused.stderr, /Error: Result-close plan refused \(PS-RESULT-CLOSE-RESULT: digest-changed: /u, "the entry's own stderr still passes through");
+  assert.deepEqual(readFileSync(c.statePath), before, "a refused entry writes nothing");
+  assertReleased(c, "refused entry");
+});
+
+test("C30G-D1 (Part D): on a real bootstrap, an edited, then committed-and-reverted Result is named digest-changed, and the Git restore the text names brings the close plan and apply back", () => {
+  const p = ownerRouteProject("cor-restore");
+  const relative = "specs/feature/result.md";
+  const git = (...args) => execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-C", p.root, ...args], { encoding: "utf8" }).trim();
+  const planned = ownerRun(p, ["continuity-result-bootstrap-plan"]);
+  assert.equal(planned.status, 0, planned.stderr);
+  const applied = ownerRun(p, JSON.parse(planned.stdout).applyAction.argv.slice(1));
+  assert.equal(applied.status, 0, applied.stderr);
+  const stateOf = () => JSON.parse(readFileSync(p.statePath, "utf8"));
+  const bound = stateOf().continuity.authority.result;
+  assert.equal(hash(readFileSync(p.resultPath)), bound.sha256, "the bootstrap bound the appended bytes");
+  git("add", "--", relative); git("commit", "-q", "-m", "bind the Result"); // the owned commit of the bootstrap
+  const closeArgv = () => ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(stateOf().continuity.revision), "--result-path", relative, "--result-sha256", bound.sha256];
+  const stateBefore = readFileSync(p.statePath);
+  // (1) an edit that was not committed: git restore -- <path>
+  writeFileSync(p.resultPath, Buffer.concat([readFileSync(p.resultPath), Buffer.from("\nAn agent edit after the bootstrap.\n")]));
+  const edited = ownerRun(p, closeArgv());
+  assert.equal(edited.status, 2, edited.stderr);
+  assert.match(edited.stderr, /PS-RESULT-CLOSE-RESULT: digest-changed: /u);
+  assert.match(edited.stderr, /git restore -- specs\/feature\/result\.md/u);
+  assert.equal(envelopeOf(edited).code, "COR-ENTRY-EXIT");
+  git("restore", "--", relative);
+  assert.equal(hash(readFileSync(p.resultPath)), bound.sha256);
+  const restoredPlan = ownerRun(p, closeArgv());
+  assert.equal(restoredPlan.status, 0, restoredPlan.stderr);
+  // (2) the bound bytes committed, then a revert committed: git restore --source=<commit that holds the bound bytes> -- <path>
+  writeFileSync(p.resultPath, p.historical); git("add", "--", relative); git("commit", "-q", "-m", "revert the Result");
+  const reverted = ownerRun(p, closeArgv());
+  assert.equal(reverted.status, 2, reverted.stderr);
+  assert.match(reverted.stderr, /PS-RESULT-CLOSE-RESULT: digest-changed: .*bound [0-9a-f]{12}, current [0-9a-f]{12}/u);
+  assert.match(reverted.stderr, /git restore --source=<commit> -- specs\/feature\/result\.md/u);
+  assert.deepEqual(readFileSync(p.statePath), stateBefore, "the refused plans wrote nothing to the State");
+  const holder = git("log", "--format=%h", "--", relative).split("\n").find((commit) => hash(execFileSync("git", ["-C", p.root, "show", `${commit}:${relative}`])) === bound.sha256);
+  assert.ok(holder, "a commit holds the bound bytes");
+  git("restore", `--source=${holder}`, "--", relative);
+  assert.equal(hash(readFileSync(p.resultPath)), bound.sha256);
+  const closePlan = ownerRun(p, closeArgv());
+  assert.equal(closePlan.status, 0, closePlan.stderr);
+  const closeApplied = ownerRun(p, JSON.parse(closePlan.stdout).applyAction.argv.slice(1));
+  assert.equal(closeApplied.status, 0, closeApplied.stderr);
+  assert.equal(stateOf().continuity.queueHead.nextAction, "close", "the close went past the Result close block");
+  assertReleased(p, "restored close");
+});
+
 test("C23 F25: a released member counts as settled only when its facts and its release evidence name one image, and a recovered binding only when it never wrote", () => {
   const { onboardingContinuityReleasedSettledImage: settled } = continuityApi;
   const facts = (...shas) => shas.map((sha256) => ({ namespaceId: "selected-state", sha256 }));

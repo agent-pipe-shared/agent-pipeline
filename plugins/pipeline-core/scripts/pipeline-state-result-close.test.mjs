@@ -323,3 +323,61 @@ test("physical Result must be a stable regular single-link file", () => {
     ]).status, 2, mode);
   }
 });
+
+// ---- C30G-D1 (AC-108): a refused Result close names its cause; the code PS-RESULT-CLOSE-RESULT and the exit code 2 stay as they were ----
+const closePlanArgv = (f, resultPath = f.resultPath, resultSha256 = f.resultSha256) => [
+  "continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(f.revision), "--result-path", resultPath, "--result-sha256", resultSha256];
+
+const CAUSES = [
+  ["missing", "missing-or-unsafe", /does not exist/u, (f, abs) => rmSync(abs)],
+  ["symlink", "missing-or-unsafe", /symbolic link/u, (f, abs) => { const target = join(f.root, "specs", "feature", "real-result.md"); const bytes = readFileSync(abs); rmSync(abs); writeFileSync(target, bytes); symlinkSync("real-result.md", abs); }],
+  ["hardlink", "missing-or-unsafe", /more than one hard link/u, (f, abs) => linkSync(abs, join(f.root, "specs", "feature", "second-name.md"))],
+  ["changed", "digest-changed", /bound [0-9a-f]{12}, current [0-9a-f]{12}/u, (f, abs) => writeFileSync(abs, "# Result\n\nEdited after the Result was bound.\n")],
+  ["empty", "empty-or-oversized", /is empty/u, (f, abs) => writeFileSync(abs, "")],
+  ["oversized", "empty-or-oversized", /larger than 1048576 bytes/u, (f, abs) => writeFileSync(abs, Buffer.alloc(1048577, 97))],
+];
+
+test("C30G-D1: a refused Result close plan and apply name the cause after the unchanged code, and write nothing", () => {
+  for (const [name, cause, pattern, mutate] of CAUSES) {
+    const f = fixture(`cause-${name}`);
+    const planned = plan(f);
+    mutate(f, join(f.root, f.resultPath));
+    const before = readFileSync(f.statePath);
+    const refusedPlan = invoke(f.root, closePlanArgv(f));
+    assert.equal(refusedPlan.status, 2, name);
+    assert.match(refusedPlan.stderr, new RegExp(`PS-RESULT-CLOSE-RESULT: ${cause}: `, "u"), `${name} plan: ${refusedPlan.stderr}`);
+    assert.match(refusedPlan.stderr, pattern, `${name} plan: ${refusedPlan.stderr}`);
+    assert.match(refusedPlan.stderr, new RegExp(f.resultPath.replaceAll(".", "\\."), "u"), `${name} plan names the Result path`);
+    const refusedApply = invoke(f.root, planned.applyAction.argv.slice(1));
+    assert.equal(refusedApply.status, 2, name);
+    assert.match(refusedApply.stderr, new RegExp(`Result-close apply refused \\(PS-RESULT-CLOSE-RESULT: ${cause}: `, "u"), `${name} apply: ${refusedApply.stderr}`);
+    assert.match(refusedApply.stderr, pattern, `${name} apply: ${refusedApply.stderr}`);
+    assert.match(refusedApply.stderr, /zero mutation/u);
+    assert.deepEqual(readFileSync(f.statePath), before, `${name}: nothing is written`);
+  }
+});
+
+test("C30G-D1: a Result that equals the Spec path is named as such (the plan; its apply cannot be planned)", () => {
+  const f = fixture("spec-path");
+  const specBytes = Buffer.from("# Spec\n", "utf8");
+  writeFileSync(join(f.root, AUTHORITY.specPath), specBytes);
+  const refused = invoke(f.root, closePlanArgv(f, AUTHORITY.specPath, sha256(specBytes)));
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /PS-RESULT-CLOSE-RESULT: is-prd-or-spec: /u);
+  assert.match(refused.stderr, /specs\/feature\/spec\.md/u);
+});
+
+test("C30G-D1: a changed Result is repaired by restoring the bound bytes, never by a rebind; the same plan then goes through", () => {
+  const f = fixture("restore");
+  const abs = join(f.root, f.resultPath);
+  const bound = readFileSync(abs);
+  writeFileSync(abs, "# Result\n\nReverted to something else.\n");
+  const refused = invoke(f.root, closePlanArgv(f));
+  assert.match(refused.stderr, /digest-changed: /u);
+  assert.match(refused.stderr, /commit or revert of the Result after the Result bootstrap changes the bytes the State binds/u);
+  assert.match(refused.stderr, /git restore --source=<commit> -- specs\/feature\/Result\.md/u);
+  assert.doesNotMatch(refused.stderr, /rebind/iu, "the rebind route cannot repair a changed digest and is never named as the repair");
+  writeFileSync(abs, bound);
+  const accepted = invoke(f.root, closePlanArgv(f));
+  assert.equal(accepted.status, 0, accepted.stderr);
+});

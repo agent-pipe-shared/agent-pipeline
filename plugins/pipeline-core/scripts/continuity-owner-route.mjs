@@ -70,6 +70,25 @@ function courseMessage(refusal, root, entry) {
   }
 }
 
+const ANSI_SEQUENCE = /\u001b\[[0-9;?]*[ -/]*[@-~]/gu;
+/**
+ * C30G-D1 (AC-108): the entry runs in this process and prints its refusal on the process streams, where the caller of this script saw it only as a bare COR-ENTRY-EXIT.
+ * The streams are tee'd for exactly the synchronous entry call: everything still passes through unchanged; `text()` is the bounded refusal text (stderr first, then stdout; first 400 characters, no ANSI).
+ */
+function teeEntryOutput() {
+  const captured = { stderr: [], stdout: [] };
+  const restore = [];
+  for (const name of ['stderr', 'stdout']) {
+    const stream = process[name], original = stream.write;
+    stream.write = function (chunk, ...rest) { captured[name].push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8')); return original.call(this, chunk, ...rest); };
+    restore.push(() => { stream.write = original; });
+  }
+  return {
+    stop: () => { for (const undo of restore) undo(); },
+    text: () => (captured.stderr.join('').trim() || captured.stdout.join('').trim()).replace(ANSI_SEQUENCE, '').slice(0, 400),
+  };
+}
+
 async function run(argv) {
   const { root, lifecycleId, entry, tail } = parseRun(argv);
   if (entry === 'close-feature') {
@@ -103,13 +122,16 @@ async function run(argv) {
       const bound = observeSessionCleanupState(root);
       const expectedStateSha256 = createHash('sha256').update(readFileSync(bound.path)).digest('hex');
       let result;
+      const tee = teeEntryOutput();
       try {
         result = executeOnboardingContinuityOwnerRouteEntry({ rootDir: root, sessionCleanup: runtime.sessionCleanup, entry, argv: [...tail], expectedStateSha256 });
       } catch (error) {
         result = { status: 'unavailable', code: error?.code ?? 'COR-ENTRY-REFUSED', attempted: false, exitCode: null };
-      }
+      } finally { tee.stop(); }
+      const entryText = tee.text();
+      const entryTail = entryText === '' ? '' : `: ${entryText}`;
       if (result.status === 'unavailable' && result.attempted === true) {
-        refuse('COR-ENTRY-HELD', `the entry was attempted and then refused (${result.code}); the binding is kept because a write may have happened. Release it only after reading the State: ${healCommand(root)}`, { held: true });
+        refuse('COR-ENTRY-HELD', `the entry was attempted and then refused (${result.code}${entryTail}); the binding is kept because a write may have happened. Release it only after reading the State: ${healCommand(root)}`, { held: true });
       }
       try {
         const before = observeSessionCleanupState(root);
@@ -120,8 +142,8 @@ async function run(argv) {
       } catch (error) {
         refuse('COR-RELEASE-HELD', `the entry ran but its owner-route binding could not be released (${error?.code ?? 'error'}). Release it with: ${healCommand(root)}`, { held: true });
       }
-      if (result.status !== 'completed') refuse(result.code ?? 'COR-ENTRY-REFUSED', `the entry was refused before it wrote anything (${result.code ?? 'refused'}); the binding is released`);
-      return { status: result.exitCode === 0 ? 'completed' : 'refused', code: result.exitCode === 0 ? null : 'COR-ENTRY-EXIT', entry, exitCode: result.exitCode, released: true };
+      if (result.status !== 'completed') refuse(result.code ?? 'COR-ENTRY-REFUSED', `the entry was refused before it wrote anything (${result.code ?? 'refused'}${entryTail}); the binding is released`);
+      return { status: result.exitCode === 0 ? 'completed' : 'refused', code: result.exitCode === 0 ? null : 'COR-ENTRY-EXIT', entry, exitCode: result.exitCode, ...(result.exitCode === 0 ? {} : { message: entryText === '' ? `the entry exited ${result.exitCode} and printed no refusal text` : entryText }), released: true };
     });
   } finally {
     await runtime.dispose();

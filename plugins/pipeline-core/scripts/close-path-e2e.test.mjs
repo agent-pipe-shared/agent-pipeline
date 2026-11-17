@@ -44,6 +44,7 @@ import { readState, run } from "./pipeline-state.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
 import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
 import * as po from "../lib/po-gate-authority.mjs";
@@ -442,6 +443,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
       }
       let ownerLifecycle = null;
+      let boundAtBootstrap = null;
       if (oneShot) {
         // C30d (QG-04, restated in place; was C22 CGF-04 "first stop of the real CLI ONESHOT-RESULT-NOT-BOUND"): a Continuity feature with no bound Result no longer stops the close with a repair chain, because
         // every step of that chain is agent authority. The first call of the real CLI runs the bootstrap plan, its apply action (owner route when the project has a catalogue), the agent-run reconcile and the
@@ -456,6 +458,11 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         // the owned commit (commit-pipeline-owned --agent, the same step 4 of the old repair chain) takes every pipeline-owned path that was waiting, so the tree is clean, not just unchanged
         assert.equal(porcelain(), "", `${identity.runner}: the bootstrap is committed and the question wrote nothing more (before: ${JSON.stringify(treeBefore)})`);
         assert.notEqual(JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result, null, "the Result is bound");
+        // C30G-D1 (Part D, root cause): the committed Result file carries exactly the digest the State binds and the package validates, so the normal flow does not leave the state in which a bound Result cannot close.
+        boundAtBootstrap = JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result.sha256;
+        assert.equal(fileSha(resultPath), boundAtBootstrap, `${identity.runner}: the Result file the bootstrap committed is the bound digest`);
+        const packageAfterBootstrap = validateFeaturePackage(fx.root, MANIFEST);
+        assert.equal(packageAfterBootstrap.ok, true, `${identity.runner}: the package validates after the bootstrap commit: ${JSON.stringify(packageAfterBootstrap.findings)}`);
       }
       const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
       // C28 (QG-04, restated in place): the Result binding is one function because a declined acceptance retires the bound Result and the second close binds it again through the very same verbs.
@@ -602,6 +609,8 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         const finalRecord = JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "publication-close", last.result.lifecycleId, "evidence", "final-verification.json"), "utf8"));
         assert.ok(["required-checks", "optional-checks-only", "empty-plan", "unavailable"].includes(finalRecord.securityCoverage), `${identity.runner}: coverage label ${finalRecord.securityCoverage}`);
         assert.match(last.result.message, /until then this feature's audit bundle holds no security evidence\.$/u);
+        // C30G-D1 (Part D): no stage between the bootstrap and the end of the close (acceptance, Verify, package moves, audit request, Result close block, close) changed the Result the State binds.
+        if (!decline && boundAtBootstrap !== null) assert.equal(fileSha(resultPath), boundAtBootstrap, `${identity.runner}: the Result file is unchanged from the bootstrap to the end of the close`);
         assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
         if (selfExport) {
           const exportDir = `specs/${FEATURE_ID}/evidence/critic/${packetId}`;

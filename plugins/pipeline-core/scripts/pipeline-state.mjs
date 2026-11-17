@@ -7035,6 +7035,37 @@ function observeResultCloseArtifact(dir, binding) {
     : null;
 }
 
+/**
+ * C30G-D1 (AC-108): why a bound Result cannot close, in the exact conditions observeResultCloseArtifact and the PRD/Spec check refuse today; null when it can.
+ * Pure and read-only (it never writes). The repair names only the route that works: no entry moves the binding to a changed file, so the way back is the bound bytes from Git.
+ */
+export function diagnoseResultCloseBinding(dir, binding, prdPath, specPath) {
+  const path = typeof binding?.path === "string" ? binding.path : "(no path)";
+  const bound = String(binding?.sha256 ?? "").slice(0, 12);
+  const restore = `Repair: bring the bound bytes (digest ${bound}) back from Git, then rerun the same command: git restore -- ${path} for an edit that was not committed; for a change that was committed or reverted, run git restore --source=<commit> -- ${path} with the newest commit before the change that holds the bound bytes (git log --format=%h -- ${path} lists the commits that touched it; the commit that bound the Result is the one before the change). The rerun names bound and current again: equal digests mean it is repaired, otherwise restore from the next older commit. If no commit holds those bytes, stop and report it: the State is never edited by hand.`;
+  if (path === prdPath || path === specPath) {
+    return { cause: "is-prd-or-spec", text: `is-prd-or-spec: the bound Result path ${path} is the PRD or the Spec path, so it is not an Implementation Result. This is a defect of the State binding, not of the file: the Result bootstrap binds specs/<feature>/result.md. Report it; the State is never edited by hand.`, repair: "Report it; the State is never edited by hand." };
+  }
+  const observed = physicalRebindFile(dir, binding?.path);
+  if (observed === null) {
+    let detail = "does not exist or is not a safe repository-relative path";
+    try {
+      const info = lstatSync(join(dir, path));
+      detail = info.isSymbolicLink() ? "is a symbolic link" : !info.isFile() ? "is not a regular file" : info.nlink !== 1 ? "has more than one hard link"
+        : "changed while it was read, or a directory above it is a symbolic link";
+    } catch { /* the default detail */ }
+    return { cause: "missing-or-unsafe", text: `missing-or-unsafe: the bound Result ${path} ${detail}; a Result must be one regular file with a single link. ${restore}`, repair: restore };
+  }
+  const size = observed.bytes.byteLength;
+  if (size < 1 || size > CONTINUITY_RESULT_MAX_BYTES) {
+    return { cause: "empty-or-oversized", text: `empty-or-oversized: the bound Result ${path} ${size < 1 ? "is empty (0 bytes)" : `is ${size} bytes, larger than ${CONTINUITY_RESULT_MAX_BYTES} bytes`}. ${restore}`, repair: restore };
+  }
+  if (observed.sha256 !== binding?.sha256) {
+    return { cause: "digest-changed", text: `digest-changed: the bound Result ${path} no longer has the bytes the State binds (bound ${bound}, current ${observed.sha256.slice(0, 12)}). A commit or revert of the Result after the Result bootstrap changes the bytes the State binds, and so does any later edit. No Pipeline entry moves the binding to a changed file. ${restore}`, repair: restore };
+  }
+  return null;
+}
+
 function resultClosePlanPayload(root, request, resultFile, expectedStateSha256,
   expectedPostStateSha256, updatedAt) {
   return {
@@ -7084,7 +7115,7 @@ function buildResultClosePlan(dir, request, existing, updatedAt) {
   if (resultFile === null
     || request.result.path === existing.state.continuity.authority.prd.path
     || request.result.path === existing.state.continuity.authority.spec.path) {
-    return { ok: false, code: "PS-RESULT-CLOSE-RESULT" };
+    return { ok: false, code: "PS-RESULT-CLOSE-RESULT", cause: diagnoseResultCloseBinding(dir, request.result, existing.state.continuity.authority.prd.path, existing.state.continuity.authority.spec.path)?.text };
   }
   const transition = bindContinuityResultForClose(
     existing.state.continuity,
@@ -7154,7 +7185,7 @@ function runResultCloseCommand(sub, rest, deps) {
     const updatedAt = deps.now();
     const planned = buildResultClosePlan(deps.dir, plannedRequest, readStateRaw(deps.dir), updatedAt);
     if (!planned.ok) {
-      console.error(`Error: Result-close plan refused (${planned.code}); zero mutation.`);
+      console.error(`Error: Result-close plan refused (${planned.code}${planned.cause ? `: ${planned.cause}` : ""}); zero mutation.`);
       return 2;
     }
     const writer = fileURLToPath(import.meta.url);
@@ -7198,7 +7229,9 @@ function runResultCloseCommand(sub, rest, deps) {
   try {
     const resultFile = observeResultCloseArtifact(deps.dir, request.result);
     if (resultFile === null) {
-      console.error("Error: Result-close apply refused (PS-RESULT-CLOSE-RESULT); zero mutation.");
+      const state = readStateRaw(deps.dir);
+      const cause = state.status === "ok" ? diagnoseResultCloseBinding(deps.dir, request.result, state.state.continuity?.authority?.prd?.path, state.state.continuity?.authority?.spec?.path)?.text : undefined;
+      console.error(`Error: Result-close apply refused (PS-RESULT-CLOSE-RESULT${cause ? `: ${cause}` : ""}); zero mutation.`);
       return 2;
     }
     const payload = resultCloseApplyPayload(deps.dir, request, apply, resultFile);
