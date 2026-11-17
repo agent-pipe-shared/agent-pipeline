@@ -96,7 +96,8 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const digest=value=>hash(canonical(value));
 const equal=(a,b)=>canonical(a)===canonical(b);
 const freeze=value=>{if(value&&typeof value==='object'){for(const v of Object.values(value))freeze(v);Object.freeze(value);}return value;};
-const fail=(code,reason)=>{const error=new Error(reason);error.name='SessionAuthorityError';error.code=code;error.reason=reason;throw error;};
+const fail=(code,reason)=>{const error=new Error(reason);error.name='SessionAuthorityError';error.code=code;error.reason=reason;const repair=sessionAuthorityRefusalRepair(code,reason,refusalRoot());if(repair!==null)error.repair=repair;throw error;};
+function refusalRoot(){try{return boundaryContext.getStore()?.repository?.primaryRoot??legacyControlContext.getStore()?.repo?.primaryRoot;}catch{return undefined;}}
 const unavailable=(producer,reason)=>freeze({status:'unavailable',code:'SDC-AUTHORITY-UNAVAILABLE',producer,reason});
 function exact(value,keys,label){if(!value||typeof value!=='object'||Array.isArray(value)||![Object.prototype,null].includes(Object.getPrototypeOf(value))||!equal(Object.keys(value).sort(),[...keys].sort()))fail('SDC-AUTHORITY-UNAVAILABLE',`${label}:closed-shape`);return value;}
 function sha(value){if(typeof value!=='string'||!SHA.test(value))fail('SDC-AUTHORITY-UNAVAILABLE','invalid-digest');return value;}
@@ -342,6 +343,24 @@ export function registryLockRepairText(observed,root){
     ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
     :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
   return `${head}. If it stays held although its owner has finished (for example the repair run that was just started): node ${REPAIR_SCRIPT} inspect --root ${root}, then node ${routine} run heal --root ${root} --reason "<why>", and as the last resort when no Goldfish runs node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root ${root} --reason "<why>"`;
+}
+/** C30G-D3: the one recovery a registry refusal names, so a reload never leaves a dead end. Covered: the two reasons heal repairs
+ * (`windows-native-identity-drift`, and `catalogue-source-closure`, a catalogue another plugin version wrote) and the HELD refusals.
+ * Any other reason keeps no repair here: the namespace-drift refusal and the lock refusal carry their own (`driftRepair`,
+ * `registryLockRepairText`) and an integrity fault is not healed away. A reason is named for a command only where that command really repairs it: heal re-enters the registry
+ * once with fresh readings (the identity witnesses live per boundary), and move-aside is the route for a registry that holds records
+ * but no catalogue (heal returns `absent` there). Every other HELD reason is a contract refusal, so it gets the read-only `inspect`. */
+export function sessionAuthorityRefusalRepair(code,reason,root){
+  const at=typeof root==='string'&&root!==''?root:'<repository root>';
+  const verb=name=>`node ${REPAIR_SCRIPT} ${name} --root ${at}`;
+  if(code==='SDC-AUTHORITY-CAS'&&reason==='windows-native-identity-drift')
+    return `a registry record changed while this operation was reading it (another process, or the previous plugin version still running after a reload, replaced it). Once no Goldfish or other authority operation runs, run ${verb('heal')}: it re-enters the registry once with fresh readings and heals only a producer that has no armed or running member; then repeat the refused command. If it refuses again, ${verb('inspect')} names the exact next command`;
+  if(code==='SDC-AUTHORITY-UNAVAILABLE'&&reason==='catalogue-source-closure')
+    return `the registry catalogue was written by another plugin version (typical right after a plugin reload or update). Once no Goldfish or other authority operation runs, run ${verb('heal')}: it migrates the catalogue and retains the previous registry aside; then repeat the refused command. If it refuses again, ${verb('inspect')} names the exact next command`;
+  if(code!=='SDC-AUTHORITY-HELD')return null;
+  if(reason==='legacy-partial-registry'||reason==='legacy-retained-registry')
+    return `the registry directory holds records but no catalogue (an interrupted or deleted registry). Read it with ${verb('inspect')}; once no Goldfish or other authority operation runs, put the registry aside (it is retained, never deleted, and the next governed dispatch starts it fresh): ${verb('move-aside')} --no-goldfish-running --reason "<why>"`;
+  return `the registry refused this operation in its current state. Read the state with ${verb('inspect')}: it names the exact next command for every finding, or none when nothing blocks; when it names none, the refusal is a rule of the operation and not a stale state, so report the refusal code and reason`;
 }
 function lockHeldFault(repo,observed,reason){
   const root=repo.primaryRoot;

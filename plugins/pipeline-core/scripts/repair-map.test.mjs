@@ -196,3 +196,78 @@ test("AC-8: the emitted map validates against its own schema's required/enum sha
     assert.ok(rowSchema.properties.by.enum.includes(row.by), `row ${row.code} has an unrecognized by value`);
   }
 });
+
+// C30G-D3 (AC-108, fresh bounded attempt): a refusal after a plugin reload names the ONE recovery, spelled as the repair
+// script spells it. The proofs of the registry and the hook renderer live here because this is the test file of the
+// refusal-teaching surface that this dispatch may edit; the production code is in lib/session-authority-registry.mjs
+// and lib/hook-currentness.mjs.
+const D3_ROOT = "/work/<root>";
+const D3_HEAL_OR_RELEASE = /\bheal\b|\brelease-lock\b|\bmove-aside\b/u;
+
+test("C30G-D3 A: SDC-AUTHORITY-CAS windows-native-identity-drift names heal in the script's own spelling, with when it applies", async () => {
+  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
+  const { sessionAuthorityRepairCommand } = await import("./session-authority-repair.mjs");
+  assert.equal(typeof sessionAuthorityRefusalRepair, "function");
+  const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-CAS", "windows-native-identity-drift", D3_ROOT);
+  assert.equal(typeof text, "string");
+  assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "heal")), "heal is spelled as sessionAuthorityRepairCommand spells it");
+  assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "inspect")), "the read-only inspect is the fallback");
+  assert.match(text, /no Goldfish/u, "the precondition is stated");
+  assert.doesNotMatch(text, /release-lock|move-aside/u, "a repair this reason does not need is not named");
+});
+
+test("C30G-D3 A: a catalogue another plugin version wrote (SDC-AUTHORITY-UNAVAILABLE catalogue-source-closure, the reload case) names heal, which the repair script's own inspect also treats as healable", async () => {
+  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
+  const { sessionAuthorityRepairCommand } = await import("./session-authority-repair.mjs");
+  const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-UNAVAILABLE", "catalogue-source-closure", D3_ROOT);
+  assert.equal(typeof text, "string");
+  assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "heal")));
+  assert.match(text, /no Goldfish/u);
+  const repair = readFileSync(join(PLUGIN_ROOT, "scripts", "session-authority-repair.mjs"), "utf8");
+  assert.match(repair, /reason === "catalogue-source-closure" \|\| drifted/u, "inspect lists this reason among the ones heal clears");
+  assert.equal(sessionAuthorityRefusalRepair("SDC-AUTHORITY-UNAVAILABLE", "producer-record-bound", D3_ROOT), null, "another UNAVAILABLE reason keeps no repair");
+});
+
+test("C30G-D3 A: SDC-AUTHORITY-HELD names move-aside only for a registry left without its catalogue, and inspect (never heal or release) for every other reason", async () => {
+  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
+  const { sessionAuthorityRepairCommand } = await import("./session-authority-repair.mjs");
+  for (const reason of ["legacy-partial-registry", "legacy-retained-registry"]) {
+    const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-HELD", reason, D3_ROOT);
+    assert.ok(text.includes(`${sessionAuthorityRepairCommand(D3_ROOT, "move-aside")} --no-goldfish-running --reason "<why>"`), reason);
+    assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "inspect")), reason);
+    assert.doesNotMatch(text, /\bheal\b|release-lock/u, `${reason}: heal does not repair a registry without a catalogue`);
+  }
+  for (const reason of ["retired-terminal-entry-only", "domain-transition-foreign-or-lost-mutable-owner", "terminal-not-observed", "legacy-full-catalogue-missing"]) {
+    const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-HELD", reason, D3_ROOT);
+    assert.equal(typeof text, "string", reason);
+    assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "inspect")), reason);
+    assert.doesNotMatch(text.replace(sessionAuthorityRepairCommand(D3_ROOT, "inspect"), ""), D3_HEAL_OR_RELEASE, `${reason}: only inspect is named`);
+  }
+});
+
+test("C30G-D3 A: a reason this table does not know and every other code get no invented repair; an unknown root is a placeholder, never a guess", async () => {
+  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
+  assert.equal(typeof sessionAuthorityRefusalRepair, "function");
+  assert.equal(sessionAuthorityRefusalRepair("SDC-AUTHORITY-CAS", "producer-source-binding", D3_ROOT), null, "an integrity fault is not healed away");
+  assert.equal(sessionAuthorityRefusalRepair("SDC-AUTHORITY-UNAVAILABLE", "invalid-digest", D3_ROOT), null);
+  assert.equal(sessionAuthorityRefusalRepair("SDC-LOCK-HELD", "registry-lock-held", D3_ROOT), null, "the lock refusal keeps its own, richer repair");
+  assert.match(sessionAuthorityRefusalRepair("SDC-AUTHORITY-CAS", "windows-native-identity-drift", undefined), /--root <repository root>/u);
+});
+
+test("C30G-D3 A: the registry's fail helper routes through the repair table and never overwrites a repair already set", () => {
+  const source = readFileSync(join(PLUGIN_ROOT, "lib", "session-authority-registry.mjs"), "utf8");
+  const failLine = source.split("\n").find((line) => line.startsWith("const fail="));
+  assert.ok(failLine, "the shared failure helper exists");
+  assert.match(failLine, /sessionAuthorityRefusalRepair\(code,reason,/u);
+  assert.match(failLine, /error\.code=code;error\.reason=reason;/u, "code and reason are unchanged: other code matches on them");
+});
+
+test("C30G-D3 A: HOOK-SNAPSHOT-STALE names the one refresh command in refresh-mandatory-hooks.mjs's own spelling and says what happens next", async () => {
+  const { renderSnapshotStaleCheck } = await import("../lib/hook-currentness.mjs");
+  const rendered = renderSnapshotStaleCheck({ sourcePluginLibDir: join(PLUGIN_ROOT, "lib"), installerName: "commit-msg-hook-install.mjs", rootDir: D3_ROOT });
+  const command = JSON.parse(rendered.match(/const SNAPSHOT_REFRESH_COMMAND = (".*");/u)[1]);
+  assert.equal(command, `node "${join(PLUGIN_ROOT, "scripts", "refresh-mandatory-hooks.mjs")}" --root "${D3_ROOT}"`);
+  const script = readFileSync(join(PLUGIN_ROOT, "scripts", "refresh-mandatory-hooks.mjs"), "utf8");
+  assert.ok(script.includes("usage: refresh-mandatory-hooks.mjs --root <repo>"), "the command is spelled as the script's usage prints it");
+  assert.match(rendered, /HOOK-SNAPSHOT-STALE: [^\n]*then repeat the refused command/u, "the refusal says what to do once the refresh ran");
+});

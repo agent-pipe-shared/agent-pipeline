@@ -34,3 +34,35 @@ source per scope. Refresh with `install-agy.mjs --refresh` (plan printed first,
 confirmation required, `--yes` only together with `--refresh`), then restart
 and read the session lock. `agy plugin list` and `plugins.json` are not proof
 of what is loaded.
+
+## After a plugin reload or update
+
+Happy path: the person installs or updates the plugin for the marketplace, the
+session is restarted (after a reload alone the host registry can still list
+the previous version), and the same preflight reports `status: "ready"`. When a
+step refuses instead, each refusal names its recovery; `<plugin-root>` is the
+plugin root the bootstrap printed and `<root>` the repository root:
+
+- `IPA-HOST-REGISTRY-BINDING-UNAVAILABLE` (`plugin-attestation-required`,
+  `nextAction: null`): `installedPluginAttestation.repair` prints the loaded
+  version and the versions the host registry lists (`none` when it lists none).
+  A person completes the host install or update so the registry lists the
+  loaded version, restarts the session and reruns the same preflight. Nothing
+  is guessed and nothing is attested by hand.
+- `HOOK-SNAPSHOT-STALE`: `node <plugin-root>/scripts/refresh-mandatory-hooks.mjs --root <root>`
+  rebinds every mandatory git hook to the loaded plugin; run it once, then
+  repeat the refused command. Never bypass the hook.
+- `SDC-AUTHORITY-CAS` with reason `windows-native-identity-drift` (a record
+  changed while it was read), or `SDC-AUTHORITY-UNAVAILABLE` with reason
+  `catalogue-source-closure` (a catalogue another plugin version wrote): once no
+  Goldfish or other authority operation runs,
+  `node <plugin-root>/scripts/session-authority-repair.mjs heal --root <root>`,
+  then repeat the refused command. For any other reason,
+  `... session-authority-repair.mjs inspect --root <root>` names the next command.
+- `SDC-AUTHORITY-HELD`: `... session-authority-repair.mjs inspect --root <root>`
+  names the exact next command or none; when the registry holds records but no
+  catalogue (`legacy-partial-registry`, `legacy-retained-registry`), once no
+  Goldfish runs: `... session-authority-repair.mjs move-aside --root <root> --no-goldfish-running --reason "<why>"`.
+- `SDC-LOCK-HELD`: wait with `... session-authority-repair.mjs wait --root <root> --timeout 120`; when the owner
+  cannot be confirmed alive and no Pipeline process runs for this repository,
+  `... session-authority-repair.mjs release-lock --root <root> --no-pipeline-running --reason "<why>"`.

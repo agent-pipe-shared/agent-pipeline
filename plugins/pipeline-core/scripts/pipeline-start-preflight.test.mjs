@@ -1798,6 +1798,77 @@ test("a Gitless Codex local-development install is ready only with its installer
   assert.equal(mismatch.nextAction, null, "an unresolved registry source cannot produce a host writer action");
 });
 
+// C30G-D3 (AC-108, fresh bounded attempt): after a plugin reload the readback must say what differs and what to do. The
+// registry stays authoritative; the text is advice for a person, never an action, and carries no path.
+test("C30G-D3: a Claude registry that lists another pipeline-core version says so, with both versions and the one recovery, and still has no nextAction", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "preflight-claude-reload-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const installedRoot = join(base, "cache", "pipeline-core", "loaded");
+  mkdirSync(join(installedRoot, "scripts"), { recursive: true });
+  const scriptUrl = pathToFileURL(join(installedRoot, "scripts", "pipeline-start-preflight.mjs")).href;
+  const result = preflight({
+    env: { CLAUDECODE: "1" }, pluginList: claudePluginList("0.5.2+claude.previous"),
+    knownMarketplaces: claudeKnownMarketplaces(), read: () => claudeManifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn: () => { throw new Error("no binding means no receipt verification"); },
+  });
+  assert.equal(result.status, "plugin-attestation-required");
+  assert.deepEqual(result.installedPluginAttestation.reasonCodes, ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"]);
+  assert.equal(result.nextAction, null, "the deliberate null stays: no source path is guessed");
+  const repair = result.installedPluginAttestation.repair;
+  assert.equal(typeof repair, "string", "a deliberate null still tells the person what to do");
+  assert.match(repair, /0\.5\.2\+claude\.test/u, "the loaded version");
+  assert.match(repair, /0\.5\.2\+claude\.previous/u, "the version the host registry lists");
+  assert.match(repair, /restart/iu);
+  assert.match(repair, /references\/local-plugin-attestation\.md/u);
+  assert.doesNotMatch(repair, /\/cache\/claude|installPath|projectPath/u, "no path is printed");
+  assert.deepEqual(executableActionPaths(result.installedPluginAttestation), [], "nothing executable");
+  const scoped = preflight({
+    env: { CLAUDECODE: "1" }, pluginList: claudePluginList("0.5.2+claude.previous"),
+    knownMarketplaces: claudeKnownMarketplaces(), read: () => claudeManifest, scriptUrl, role: "goldfish",
+  });
+  assert.equal(scoped.installedPluginAttestation.repair, repair, "advice is not withheld from a Goldfish");
+});
+
+test("C30G-D3: the registry-binding repair text prints 'none' when the snapshot lists no pipeline-core entry, and survives an unreadable snapshot", () => {
+  const describe = preflightModule.describeClaudeRegistryBindingRepair;
+  assert.equal(typeof describe, "function");
+  for (const snapshot of [JSON.stringify([]), null, "{", JSON.stringify([{ id: "other-plugin@market", version: "9.9.9" }])]) {
+    const text = describe({ version: "1.2.3+claude.x", pluginListSnapshot: snapshot });
+    assert.match(text, /1\.2\.3\+claude\.x/u, String(snapshot));
+    assert.match(text, /registry lists: none/u, String(snapshot));
+    assert.doesNotMatch(text, /9\.9\.9/u, "another plugin's version is not printed");
+  }
+  // The binding is also null when the registry lists the loaded version but no single enabled entry binds to this root:
+  // the text must not ask for an update to a version the registry already lists.
+  const sameVersion = describe({ version: "1.2.3+claude.x", pluginListSnapshot: JSON.stringify([{ id: "pipeline-core@agent-pipeline-local", version: "1.2.3+claude.x" }]) });
+  assert.match(sameVersion, /registry lists: 1\.2\.3\+claude\.x\./u);
+  assert.match(sameVersion, /no single enabled entry binds to this loaded root/u);
+  assert.doesNotMatch(sameVersion, /so that the registry lists/u, "no version gap is claimed");
+  const bounded = describe({
+    version: "1.0.0",
+    pluginListSnapshot: JSON.stringify(Array.from({ length: 20 }, (_, index) => ({ id: "pipeline-core@agent-pipeline-local", version: `0.${index}.0\u0007${"x".repeat(200)}` }))),
+  });
+  assert.ok(bounded.length < 1200, "the text is bounded");
+  assert.doesNotMatch(bounded, /[\u0000-\u001f]/u, "control characters are stripped");
+});
+
+test("C30G-D3: local-plugin-attestation.md has one 'After a plugin reload or update' section: happy path first, then each recovery by code with its command", () => {
+  const doc = readFileSync(fileURLToPath(new URL("../skills/pipeline-start/references/local-plugin-attestation.md", import.meta.url)), "utf8");
+  const heading = doc.indexOf("## After a plugin reload or update");
+  assert.ok(heading >= 0, "the section exists");
+  const next = doc.indexOf("\n## ", heading + 5);
+  const section = doc.slice(heading, next === -1 ? undefined : next);
+  assert.ok(section.length < 3500, "the section is short");
+  const order = ["restart", "IPA-HOST-REGISTRY-BINDING-UNAVAILABLE", "HOOK-SNAPSHOT-STALE", "SDC-AUTHORITY-CAS", "SDC-AUTHORITY-HELD", "SDC-LOCK-HELD"].map((word) => section.indexOf(word));
+  assert.ok(order.every((index) => index >= 0), `every step is named: ${order}`);
+  assert.deepEqual([...order].sort((a, b) => a - b), order, "happy path first, then the recoveries in this order");
+  assert.match(section, /refresh-mandatory-hooks\.mjs --root/u);
+  assert.match(section, /session-authority-repair\.mjs heal --root/u);
+  assert.match(section, /session-authority-repair\.mjs release-lock --root <root> --no-pipeline-running --reason/u);
+  assert.match(section, /session-authority-repair\.mjs move-aside --root <root> --no-goldfish-running --reason/u);
+  assert.doesNotMatch(section, /\/home\/|[A-Z]:\\/u, "no machine path");
+});
+
 test("Agy managed copy missing a receipt has an exact host recovery action from a Git source", () => {
   const installedRoot = mkdtempSync(join(tmpdir(), "agy-managed-copy-"));
   const sourceRoot = fileURLToPath(new URL("../", import.meta.url));

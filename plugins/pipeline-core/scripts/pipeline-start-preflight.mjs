@@ -394,6 +394,34 @@ export function installedPipelineIdentity(
     : installedPipelineIdentityCodex(payload);
 }
 
+/**
+ * C30G-D3: advice for a person when a Claude session has loaded a version of pipeline-core that the host plugin registry does
+ * not list for this root (typically right after a plugin reload or update). It states the loaded version, the pipeline-core
+ * versions the SAME plugin-list snapshot holds (`none` when it holds none or cannot be read) and the recovery. It is bounded text
+ * only: no path from the list or the environment is printed, nextAction stays null (the Pipeline never guesses a source path or
+ * treats a marketplace copy as its own provenance), and no attestation check is relaxed.
+ */
+export function describeClaudeRegistryBindingRepair({ version, pluginListSnapshot } = {}) {
+  let listed = [];
+  try {
+    const entries = typeof pluginListSnapshot === "string" ? JSON.parse(pluginListSnapshot) : null;
+    if (Array.isArray(entries)) {
+      listed = [...new Set(entries
+        .filter((entry) => [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.id) && typeof entry?.version === "string")
+        .map((entry) => entry.version.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 60))
+        .filter((entry) => entry !== ""))];
+    }
+  } catch { /* an unreadable snapshot lists none */ }
+  const shown = listed.length === 0 ? "none" : `${listed.slice(0, 5).join(", ")}${listed.length > 5 ? ` (+${listed.length - 5} more)` : ""}`;
+  const loaded = String(version ?? "unknown").replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 60);
+  // The binding is null for more than a version gap (a second or disabled entry, a registration that is not a directory
+  // source, an install path that is not the loaded root), so a listed loaded version gets its own wording.
+  const recovery = listed.includes(loaded)
+    ? `The registry lists the loaded version, but no single enabled entry binds to this loaded root through a directory marketplace registration. A person repairs or reinstalls the host registration for this marketplace so that exactly one enabled entry names this loaded root, restarts the session, and reruns the same preflight`
+    : `The registry must list the loaded version before it can be attested. A person completes the host install or update for this marketplace so that the registry lists ${loaded}, restarts the session, and reruns the same preflight`;
+  return `the loaded pipeline-core is ${loaded}, and the host plugin registry lists: ${shown}. ${recovery}; nothing here guesses a source path. See references/local-plugin-attestation.md, section "After a plugin reload or update".`;
+}
+
 export function installedPipelineVersion(pluginList = () => readInstalledPluginList("codex"), runner = "codex") {
   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
 }
@@ -1335,7 +1363,10 @@ export function observePipelineStartPreflight({
     ? runner === "codex" && registrySourcePluginRoot === null
       ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-SOURCE-UNAVAILABLE"] }
       : runner === "claude" && claudeRegistryBinding === null
-        ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] }
+        ? {
+            schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"],
+            repair: describeClaudeRegistryBindingRepair({ version, pluginListSnapshot }),
+          }
       : runner === "antigravity" && registryInstalledPluginRoot === null
         ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] }
       : verifyLocalInstalledPluginReceiptFn({
