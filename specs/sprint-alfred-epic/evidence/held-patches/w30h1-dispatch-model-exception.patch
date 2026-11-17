@@ -1,0 +1,1438 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 664cdd0ee..efe2a7324 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -444,6 +444,7 @@
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-model-enforcement-tests",
++        "verify-phase:harness/scripts/verify.mjs:dispatch-model-exception-script-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-liveness-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 6ff0e77e8..7d3be8901 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3666,6 +3666,12 @@
+       "invariantPinned": "The native Goldfish binding generator derives every generated briefing field from its own source (spec acceptance row, backlog item, agent definition, git and protected baseline) in a throwaway fixture repository",
+       "nonOverlapNote": "Unique contract suite for scripts/dispatch-briefing.mjs binding; route-record handling keeps its own suite dispatch-briefing-route-record-tests"
+     },
++    {
++      "name": "dispatch-model-exception-script-tests",
++      "file": "plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs",
++      "invariantPinned": "The PO model-exception script and store record, list and revoke an attribution record of the PO's request (--by required, no default), expire by time, consume once per new dispatch, and a store that does not verify grants nothing and names the repair",
++      "nonOverlapNote": "Unique suite for scripts/dispatch-model-exception.mjs and lib/dispatch-model-exception.mjs; the admission decision and the host-commit reader keep their cases in dispatch-model-enforcement tests"
++    },
+     {
+       "name": "pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
+       "file": "plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs",
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index 709d08ac0..b6b51c8f1 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -709,6 +709,30 @@ function touchesGrantStore(input) {
+   return /dispatch-budget-grant\.mjs(?![a-z0-9._-])/u.test(normalized) || normalized.includes("dispatch-budget/grants");
+ }
+ 
++export const MODEL_EXCEPTION_REFUSAL_CODE = "DISPATCH-MODEL-EXCEPTION-ORCHESTRATOR-ONLY";
++
++/**
++ * C30G-M16: does this call run the PO model-exception script or touch its store (any tool: a read of the store is refused too)? Only the
++ * orchestrator may; a dispatched agent that could record an exception would choose its own model. The script pattern is anchored on `scripts/`
++ * (or a bare word), so `lib/dispatch-model-exception.mjs` and the script's test file stay reachable to a Goldfish that works on them.
++ */
++function touchesModelExceptionStore(input) {
++  const toolInput = input?.tool_input;
++  if (toolInput === null || typeof toolInput !== "object") return false;
++  const text = ["command", "CommandLine", "file_path", "path", "pattern", "notebook_path", "glob"].map((key) => (typeof toolInput[key] === "string" ? toolInput[key] : "")).join("\n");
++  const normalized = text.replaceAll("\\", "/").toLowerCase();
++  return /(?:^|[\s"'=]|scripts\/)dispatch-model-exception\.mjs(?![a-z0-9._-])/mu.test(normalized) || /dispatch-model-exception(?:\/|$|[\s"'])/mu.test(normalized);
++}
++
++function modelExceptionRefused({ agentId, agentType }) {
++  return verdict(
++    2,
++    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
++      + `${MODEL_EXCEPTION_REFUSAL_CODE}: this dispatch (${agentType}, agent ${agentId}) touched the PO model-exception store or its script. `
++      + "Only the orchestrating session may record or read a model exception; a dispatched agent never chooses its own model. End your turn with your interim report and let the dispatcher decide.\n",
++  );
++}
++
+ function grantRefused({ agentId, agentType }) {
+   return verdict(
+     2,
+@@ -1796,6 +1820,9 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
+   if (touchesGrantStore(input)) {
+     return grantRefused({ agentId: identity.agentId ?? "unresolved", agentType: identity.agentType ?? "unresolved" });
+   }
++  if (touchesModelExceptionStore(input)) {
++    return modelExceptionRefused({ agentId: identity.agentId ?? "unresolved", agentType: identity.agentType ?? "unresolved" });
++  }
+ 
+   if (identity.kind === "unresolved") {
+     recordUnresolved(commonDir, {
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
+index 11be9bbaf..8acd21446 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
+@@ -542,6 +542,34 @@ test("evaluateDispatchBudgetGuard: a write failure in the new orchestrator obser
+   assert.equal(results[1].exitCode, 0);
+ });
+ 
++test("evaluateDispatchBudgetGuard (C30G-M16): a dispatched agent can neither run the PO model-exception script nor read or write its store; the orchestrator and the lib and test files stay reachable", () => {
++  const CODE = "DISPATCH-MODEL-EXCEPTION-ORCHESTRATOR-ONLY";
++  const subagent = (tool_name, tool_input) => ({ transcript_path: SUBAGENT_TRANSCRIPT, tool_name, tool_input, agent_id: "abc123", agent_type: "pipeline-core:goldfish-deep" });
++  const store = `${COMMON_DIR}/agent-pipeline/dispatch-model-exception/store.json`;
++  const refused = [
++    subagent("Bash", { command: `node ${FAKE_ROOT}/plugins/pipeline-core/scripts/dispatch-model-exception.mjs record --model fable --count 1 --reason r --by someone` }),
++    subagent("Bash", { command: "node dispatch-model-exception.mjs list" }),
++    subagent("Bash", { command: `cat ${store}` }),
++    subagent("Write", { file_path: store, content: "{}" }),
++    subagent("Read", { file_path: store }),
++    subagent("Grep", { path: `${COMMON_DIR}/agent-pipeline/dispatch-model-exception`, pattern: "fable" }),
++    { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "node plugins/pipeline-core/scripts/dispatch-model-exception.mjs list" }, agent_type: "pipeline-core:goldfish-deep" },
++  ];
++  const reachable = [
++    subagent("Bash", { command: "node --test plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs" }),
++    subagent("Read", { file_path: `${FAKE_ROOT}/plugins/pipeline-core/lib/dispatch-model-exception.mjs` }),
++    subagent("Bash", { command: "node --test plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs" }),
++  ];
++  const orchestrator = { transcript_path: ORCHESTRATOR_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "node plugins/pipeline-core/scripts/dispatch-model-exception.mjs list" } };
++  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(60), steps: [...refused, ...reachable, orchestrator].map((input) => ({ op: "guard", input })) });
++  refused.forEach((_, index) => {
++    assert.equal(results[index].exitCode, 2, `refused case ${index}`);
++    assert.match(results[index].stderr, new RegExp(CODE, "u"), `refused case ${index}`);
++  });
++  reachable.forEach((_, index) => assert.ok(!results[refused.length + index].stderr.includes(CODE), `reachable case ${index}: ${results[refused.length + index].stderr.slice(0, 200)}`));
++  assert.equal(results[refused.length + reachable.length].exitCode, 0, "the orchestrator may run the script");
++});
++
+ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a subagents/-shaped transcript_path with no agent_id is still the orchestrator to this guard -- transcript_path shape is no longer read at all for this guard's own identity step", () => {
+   const { results } = run({
+     rootDir: FAKE_ROOT, // subagents/-shaped transcript_path, deliberately no agent_id, no meta.json seeded
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+index 48449c5cd..148bf812c 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+@@ -105,7 +105,47 @@ register("K152B check every native Model and preserve explicit model admission",
+   }
+ });
+ 
+-assert.equal(cases.length, 5,"the dispatch-model hook corpus must register five cases");
++// C30G-M16 (PO 2026-11-17): a PO-requested, recorded, expiring model exception, through the real hook and the real script and store.
++const EXCEPTION_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-model-exception.mjs", import.meta.url));
++const exceptionCli = (...args) => {
++  const res = spawnSync(process.execPath, [EXCEPTION_SCRIPT, ...args, "--root", bindingRepo], { encoding: "utf8" });
++  return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
++};
++const fableCall = (prompt = "find where X is defined") => ({ tool_name: "Agent", tool_input: { subagent_type: "general-purpose", model: "fable", prompt } });
++
++register("C30G-M16 a model no route selects is refused with the one record command, then admitted with a warning once the PO's exception is recorded", () => {
++  const refused = run(fableCall());
++  assert.equal(refused.code, BLOCK);
++  assert.ok(refused.stderr.includes("DISPATCH-MODEL-UNROUTED"), refused.stderr.slice(0, 300));
++  assert.ok(/dispatch-model-exception\.mjs" record --model fable --count 1 --reason/u.test(refused.stderr), refused.stderr.slice(0, 600));
++  const recorded = exceptionCli("record", "--model", "fable", "--count", "1", "--reason", "design analysis on the Fable family", "--by", "label-from-the-po");
++  assert.equal(recorded.code, 0, recorded.stderr);
++  const admitted = run(fableCall());
++  assert.ok(!admitted.stderr.includes("DISPATCH-MODEL-UNROUTED"), admitted.stderr.slice(0, 300));
++  assert.ok(/DISPATCH-MODEL-EXCEPTION: model exception: fable, requested by the PO at \S+ \(label-from-the-po\)/u.test(admitted.stderr), admitted.stderr.slice(0, 400));
++  assert.ok(admitted.stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), "the exception changes only the model: every other guard still judges the dispatch");
++  const listed = exceptionCli("list");
++  assert.equal(listed.code, 0, listed.stderr);
++  assert.ok(/MX-1\b.*\blive\b/u.test(listed.stdout), `a dispatch the hook refused for another reason never consumes the exception: ${listed.stdout}`);
++  assert.equal(exceptionCli("revoke", "--id", "MX-1").code, 0);
++  assert.equal(run(fableCall()).stderr.includes("DISPATCH-MODEL-UNROUTED"), true, "a revoked exception admits nothing");
++});
++
++register("C30G-M16 a dispatch the hook admits consumes a count exception once, and the next new dispatch is refused as consumed", () => {
++  const recorded = exceptionCli("record", "--model", "fable", "--count", "1", "--reason", "design analysis on the Fable family", "--by", "label-from-the-po");
++  assert.equal(recorded.code, 0, recorded.stderr);
++  const carrier = (prompt) => run({ tool_name: "Agent", tool_input: { subagent_type: "Explore", model: "fable", prompt } });
++  const first = carrier("find where X is defined");
++  assert.equal(first.code, ALLOW, first.stderr.slice(0, 400));
++  const listed = exceptionCli("list");
++  assert.ok(/\bconsumed\b/u.test(listed.stdout), listed.stdout);
++  assert.equal(carrier("find where X is defined").code, ALLOW, "an identical call is the retry of the same dispatch: it is admitted and burns nothing more");
++  const second = carrier("find where Y is defined");
++  assert.equal(second.code, BLOCK);
++  assert.ok(/consumed/u.test(second.stderr), second.stderr.slice(0, 400));
++});
++
++assert.equal(cases.length, 7,"the dispatch-model hook corpus must register seven cases");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
+ registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index ef1ea5e1b..00e7a544e 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -99,6 +99,7 @@ const parseAdmissionBriefing = (prompt) => parseNativeGoldfishBriefing(prompt, {
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+ import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
+ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
++import { consumeModelException } from "../lib/dispatch-model-exception.mjs";
+ import { enterAntigravityHookSessionOwner, enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+@@ -772,6 +773,25 @@ export function dispatchWriteScope(prompt) {
+   } catch { return { id: null, scope: null }; }
+ }
+ 
++// C30G-M16: the dispatch id a PO model exception is keyed by. The model check runs before the briefing pointer is expanded, so a pointer prompt is
++// read here through the same verified loader (read-only); a prompt that declares no id gives null and the exception is then keyed by the call itself.
++let modelExceptionIdCache;
++function modelExceptionDispatchId(toolInput, root, subagentType) {
++  if (modelExceptionIdCache !== undefined) return modelExceptionIdCache;
++  let id = null;
++  try {
++    let prompt = typeof toolInput.prompt === "string" ? toolInput.prompt : typeof toolInput.message === "string" ? toolInput.message : "";
++    if (carriesBriefingFilePointer(prompt)) {
++      const loaded = loadReferencedBriefing({ root, prompt, subagentType });
++      if (loaded?.ok) prompt = loaded.text;
++    }
++    const named = dispatchWriteScope(prompt).id;
++    id = typeof named === "string" && named !== "" ? named : null;
++  } catch { id = null; }
++  modelExceptionIdCache = id;
++  return id;
++}
++
+ // Gate the entire hook body on being the process entrypoint (matching
+ // guard-dispatch-budget.mjs's shape). Importing this module for `extractWorkflowDispatches`
+ // must never itself read stdin, parse it, or call `process.exit` -- see `../lib/entrypoint.mjs`'s
+@@ -812,7 +832,10 @@ if (isDirectInvocation(import.meta.url)) {
+     const modelRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+     const modelCheck = Array.isArray(toolInput.Subagents)
+       ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model, root: modelRoot }))
+-      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, effort: toolInput.effort, root: modelRoot })];
++      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, effort: toolInput.effort, root: modelRoot,
++        // C30G-M16: the id the briefing declares (read from the pointed-at briefing when the prompt is a pointer) keys a PO model exception; without one the call itself does.
++        dispatchId: () => modelExceptionDispatchId(toolInput, modelRoot, subagentType),
++        dispatchKey: () => modelExceptionDispatchId(toolInput, modelRoot, subagentType) ?? `call-${sha256Hex(JSON.stringify([subagentType, toolInput.model ?? null, toolInput.effort ?? null, toolInput.prompt ?? toolInput.message ?? ""]))}` })];
+     for (const check of modelCheck) {
+       const modelWarnings = dispatchModelWarningText(check);
+       if (modelWarnings !== "") process.stderr.write(modelWarnings);
+@@ -821,6 +844,17 @@ if (isDirectInvocation(import.meta.url)) {
+         process.exit(2);
+       }
+     }
++    // C30G-M16: a dispatch admitted under a PO model exception consumes it now, and puts it back if any later guard refuses the dispatch
++    // (the same undo-on-refusal shape as the briefing route record below), so a refused dispatch never burns an exception.
++    for (const check of modelCheck) {
++      if (!check.exceptionUse) continue;
++      const consumed = consumeModelException({ root: modelRoot, use: check.exceptionUse });
++      if (!consumed.ok) {
++        process.stderr.write(`BLOCKED (guard-dispatch): DISPATCH-MODEL-EXCEPTION-NOT-CONSUMED: the PO model exception ${check.exceptionUse.id} could not be consumed for this dispatch (${consumed.code}), so the dispatch is refused and nothing was consumed. Repair: run \`node "${fileURLToPath(new URL("../scripts/dispatch-model-exception.mjs", import.meta.url))}" list --root "${modelRoot}"\` to see the exception and its state, then re-issue the dispatch.\n`);
++        process.exit(2);
++      }
++      process.once("exit", (code) => { if (code !== 0) consumed.undo(); });
++    }
+   }
+ 
+   let dispatches;
+diff --git a/plugins/pipeline-core/lib/agent-model-registry.mjs b/plugins/pipeline-core/lib/agent-model-registry.mjs
+index 78b2152d8..5a96c8138 100644
+--- a/plugins/pipeline-core/lib/agent-model-registry.mjs
++++ b/plugins/pipeline-core/lib/agent-model-registry.mjs
+@@ -206,7 +206,7 @@ export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR, c
+   if (configured && (familyMatches || configured.model === true) && (effortMatches || configured.effort === true)) {
+     return {
+       classification: "model-route-configured",
+-      reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` differs from \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and is named by the project's routing configuration`,
++      reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` differs from \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and is named by the project's routing configuration${configured.exception === true ? " or by a PO model exception that admitted this dispatch (the model-exception store, `list`, is the audit source)" : ""}`,
+     };
+   }
+   return {
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index 938a020e9..ab6bcc8f2 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -8,8 +8,11 @@
+  * selectors the configuration allows. An unreadable route source gives no opinion, so a broken
+  * configuration can never leave a dispatch that no caller can repair.
+  */
++import { randomUUID } from "node:crypto";
++import { fileURLToPath } from "node:url";
+ import { projectFunctionalTaskRoutes, registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+ import { isShippedPipelineAgentType } from "./dispatch-policy.mjs";
++import { aliasOfModel, deriveExceptionStates, exceptionScopeText, findModelException, readModelExceptionStore } from "./dispatch-model-exception.mjs";
+ 
+ /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
+ const ENFORCED_RUNNERS = Object.freeze(["claude"]);
+@@ -40,7 +43,54 @@ const AGENT_TYPE_DUTIES = Object.freeze({
+ const normalized = (value) => String(value).trim().toLowerCase();
+ 
+ /** The Claude family aliases the Agent tool's `model` parameter accepts (it takes no full model id). */
+-const CLAUDE_FAMILY_ALIASES = Object.freeze(["opus", "sonnet", "haiku", "fable"]);
++export const CLAUDE_FAMILY_ALIASES = Object.freeze(["opus", "sonnet", "haiku", "fable"]);
++
++// C30G-M16 (PO 2026-11-17): a PO-requested, recorded, expiring model exception (lib/dispatch-model-exception.mjs) admits ONE model no configured
++// route selects. Claude runner only; it changes the model (and effort) and nothing else about the dispatch.
++const EXCEPTION_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-model-exception.mjs", import.meta.url)).replaceAll("\\", "/");
++const EXCEPTION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++
++/** The decision's view of the exception store: lazy (nothing is read for a dispatch the routing already admits), memoized, null when there is no source to read. */
++function exceptionContext({ root, runner, exceptionStore, dispatchId, dispatchKey, nowFn }) {
++  if (runner !== "claude" || (exceptionStore === undefined && !(typeof root === "string" && root !== ""))) return null;
++  let snapshot, id, key;
++  const idOf = () => { id ??= { value: (() => { const given = typeof dispatchId === "function" ? dispatchId() : dispatchId; return typeof given === "string" && EXCEPTION_ID.test(given) ? given : null; })() }; return id.value; };
++  const keyOf = () => { key ??= { value: (() => { const given = typeof dispatchKey === "function" ? dispatchKey() : dispatchKey; return typeof given === "string" && EXCEPTION_ID.test(given) ? given : (idOf() ?? `anon-${randomUUID()}`); })() }; return key.value; };
++  const now = nowFn ?? (() => new Date().toISOString());
++  return {
++    root, dispatchId: idOf,
++    find(alias) {
++      snapshot ??= exceptionStore ?? readModelExceptionStore(root);
++      if (!snapshot.ok) return { outcome: "broken", snapshot };
++      return { ...findModelException(deriveExceptionStates(snapshot.store, Date.parse(now())), { alias, dispatchId: idOf(), dispatchKey: keyOf() }), snapshot };
++    },
++    use(found, alias, effortApplied) {
++      return { id: found.exception.id, dispatchKey: keyOf(), dispatchId: idOf(), model: alias, effort: effortApplied, reused: found.reused, requestedAt: found.exception.at, by: found.exception.by };
++    },
++  };
++}
++
++function exceptionRecordCommand({ alias, effort, dispatchId, root }) {
++  const effortFlag = typeof effort === "string" && /^[a-z]{2,12}$/u.test(effort) ? ` --effort ${effort}` : "";
++  const scope = dispatchId === null ? "--count 1" : `--dispatch-id ${dispatchId}`;
++  return `node "${EXCEPTION_SCRIPT}" record --model ${alias}${effortFlag} ${scope} --reason "<reason the PO gave>" --by "<label the PO gave>"${exceptionRootFlag(root)}`;
++}
++const exceptionRootFlag = (root) => (typeof root === "string" && root !== "" ? ` --root "${root.replaceAll("\\", "/")}"` : "");
++
++/** The recovery a refused, exceptable model gets appended: the ONE record command (the PO supplies only --reason and --by), the decline path, and `list`. */
++function exceptionRecoveryText({ found, alias, effort, context }) {
++  const record = exceptionRecordCommand({ alias, effort, dispatchId: context.dispatchId(), root: context.root });
++  const decline = "If the PO declines, no exception is recorded: re-issue the dispatch with one of the configured selectors above.";
++  if (found.outcome === "broken") {
++    if (found.snapshot.code === "git-common-dir-unresolved") return "";
++    return ` The PO model-exception store does not verify (${found.snapshot.code}), so no exception is honoured. Repair: re-run the record command with --move-broken-store-aside (the broken file is kept beside the store, never deleted): ${record} --move-broken-store-aside. ${decline}`;
++  }
++  const why = found.why.length === 0 ? " (none is recorded)"
++    : `: ${found.why.map((row) => `${row.id}: ${row.cause} (${row.model}, ${exceptionScopeText(row.scope)}, recorded ${row.at} by ${row.by})`).join("; ")}`;
++  return ` No PO model exception is live for it${why}. If the PO wants this model for this dispatch, ask the PO for the reason and the label to record, then run exactly: ${record} `
++    + `(an attribution record of the PO's request, not a signature; it changes only the model${typeof effort === "string" && effort !== "" ? " and effort" : ""} of this dispatch and ends on its own). ${decline} `
++    + `\`list\` shows every exception and why one does not apply: node "${EXCEPTION_SCRIPT}" list${exceptionRootFlag(context.root)}`;
++}
+ 
+ function selectorMatches(selector, model) {
+   const wanted = normalized(selector.value);
+@@ -78,15 +128,29 @@ export function observeEffectiveEffort({ configuredEffort, stopInput } = {}) {
+  * Claude duty route counts, not only the agent type's own (a differing one is the warned escalation shape). Null when nothing is readable,
+  * and for anything but a v4 Claude record: a v3 record is hand-typed, and the comparison with the agent definition is what catches a mistyped one.
+  */
+-export function configuredRecordRoute(root, { routeSource } = {}) {
++export function configuredRecordRoute(root, { routeSource, exceptionStore } = {}) {
+   return (record) => {
+     if (record?.schema !== "pipeline.dispatch-record.v4" || record.runner !== "claude") return null;
+-    if (routeSource === undefined && (typeof root !== "string" || root === "")) return null;
++    const hasRoot = typeof root === "string" && root !== "";
++    if (routeSource === undefined && !hasRoot) return null;
+     const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: () => {} });
+-    if (!source?.ok || !Array.isArray(source.taskRoutes)) return null;
+-    const routes = source.taskRoutes.filter((route) => route.runner === "claude" && route.state !== "unavailable" && route.taskRoute.startsWith("duty."));
+-    return { model: typeof record?.model === "string" && record.model.trim() !== "" && routes.some((route) => selectorMatches(route.selector, record.model)),
+-      effort: routes.some((route) => route.effort === record?.effort) };
++    let base = null;
++    if (source?.ok && Array.isArray(source.taskRoutes)) {
++      const routes = source.taskRoutes.filter((route) => route.runner === "claude" && route.state !== "unavailable" && route.taskRoute.startsWith("duty."));
++      base = { model: typeof record?.model === "string" && record.model.trim() !== "" && routes.some((route) => selectorMatches(route.selector, record.model)),
++        effort: routes.some((route) => route.effort === record?.effort) };
++    }
++    if (base !== null && base.model && base.effort) return base;
++    // C30G-M16: a dispatch admitted under a PO model exception recorded its use (the exception id, this dispatch id, the alias, the effort it
++    // applied); the host commit accepts exactly that model and effort for exactly that dispatch, or the finished work would be refused at the end.
++    const snapshot = exceptionStore ?? (hasRoot ? readModelExceptionStore(root) : null);
++    const alias = aliasOfModel(record?.model, CLAUDE_FAMILY_ALIASES);
++    const uses = snapshot?.ok && typeof record?.taskId === "string" ? snapshot.store.entries.filter((entry) => entry.type === "use" && entry.dispatchId === record.taskId) : [];
++    const viaModel = alias !== null && uses.some((entry) => entry.model === alias);
++    const viaEffort = typeof record?.effort === "string" && uses.some((entry) => entry.effort === record.effort);
++    if (!viaModel && !viaEffort) return base;
++    const model = base?.model === true || viaModel, effort = base?.effort === true || viaEffort;
++    return { model, effort, ...((viaModel && base?.model !== true) || (viaEffort && base?.effort !== true) ? { exception: true } : {}) };
+   };
+ }
+ 
+@@ -94,17 +158,19 @@ export function configuredRecordRoute(root, { routeSource } = {}) {
+  * The route source is the project's own routing for `root` unless a caller injects one (draft ADR "a project's pipeline.user.yaml
+  * owns its routing"). A fallback to the registry is reported through `warn`, else as a warning on the returned evaluation.
+  */
+-export function evaluateDispatchModel({ root, warn, routeSource, ...rest } = {}) {
++export function evaluateDispatchModel({ root, warn, routeSource, exceptionStore, dispatchId, dispatchKey, nowFn, ...rest } = {}) {
+   const notes = [];
+   const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: warn ?? ((text) => notes.push(text)) });
+-  const result = decideDispatchModel({ ...rest, routeSource: source });
++  // The decision stays read-only: an admission under an exception comes back as `exceptionUse`, and the caller consumes it
++  // (consumeModelException) only once the whole dispatch is admitted.
++  const result = decideDispatchModel({ ...rest, routeSource: source, exceptions: exceptionContext({ root, runner: rest.runner, exceptionStore, dispatchId, dispatchKey, nowFn }) });
+   // A tolerated conflict between two cells of one project (C23) is named beside a fallback; both are warnings, never refusals.
+   const extra = [...notes.map((message) => ({ code: "DISPATCH-ROUTING-SOURCE-FALLBACK", message })),
+     ...(source?.ok && Array.isArray(source.warnings) ? source.warnings.map(({ code, message }) => ({ code, message })) : [])];
+   return extra.length === 0 ? result : { ...result, warnings: [...(result.warnings ?? []), ...extra] };
+ }
+ 
+-function decideDispatchModel({ runner, subagentType, model, effort, routeSource } = {}) {
++function decideDispatchModel({ runner, subagentType, model, effort, routeSource, exceptions = null } = {}) {
+   if (runner === "antigravity") {
+     // Antigravity's enum is routed through the explicit PO-approved nativeTier projection
+     // in model-role-route-source. Concrete V3 model IDs remain a separate CLI route.
+@@ -178,16 +244,25 @@ function decideDispatchModel({ runner, subagentType, model, effort, routeSource
+         + `${routeHint}).`,
+     }] };
+   }
++  // The model's family alias is the only thing a PO model exception can name; a model with no such alias can never be excepted.
++  const alias = exceptions === null ? null : aliasOfModel(model, CLAUDE_FAMILY_ALIASES);
++  let modelException = null;
+   if (!dutyRoutes.some((route) => selectorMatches(route.selector, model))) {
+-    return { ok: false, skipped: null, findings: [{
+-      code: "DISPATCH-MODEL-UNROUTED",
+-      message: `the dispatch names model "${model}", which no available configured route selects. `
+-        + `Re-issue it with one of the configured selectors: ${allSelectors.map((value) => `"${value}"`).join(", ")}.`,
+-    }] };
++    const found = alias === null ? null : exceptions.find(alias);
++    if (found?.outcome === "live") {
++      modelException = found;
++    } else {
++      return { ok: false, skipped: null, findings: [{
++        code: "DISPATCH-MODEL-UNROUTED",
++        message: `the dispatch names model "${model}", which no available configured route selects. `
++          + `Re-issue it with one of the configured selectors: ${allSelectors.map((value) => `"${value}"`).join(", ")}.`
++          + (found === null ? "" : exceptionRecoveryText({ found, alias, effort, context: exceptions })),
++      }] };
++    }
+   }
+   const routes = ownRoutes;
+   const warnings = [];
+-  if (routes.length > 0 && !routes.some((route) => selectorMatches(route.selector, model))) {
++  if (modelException === null && routes.length > 0 && !routes.some((route) => selectorMatches(route.selector, model))) {
+     const expected = [...new Set(routes.map((route) => `"${route.selector.value}"`))].join(" or ");
+     // A configured but different selector is the MP-05/MP-07 escalation shape (a stated tier change), so it
+     // warns instead of refusing; a model no route selects, or none at all, still refuses.
+@@ -198,15 +273,31 @@ function decideDispatchModel({ runner, subagentType, model, effort, routeSource
+     });
+   }
+   // C23: the Agent tool's per-invocation `effort` is admitted. One the configuration does not name for the duty is a warning, never a refusal.
++  let effortApplied = null;
+   if (typeof effort === "string" && effort.trim() !== "" && routes.length > 0 && !routes.some((route) => route.effort === effort)) {
+-    const configured = [...new Set(routes.map((route) => `"${route.effort}"`))].join(" or ");
+-    warnings.push({
+-      code: "DISPATCH-EFFORT-DUTY-MISMATCH",
+-      message: `agent type ${subagentType} serves ${routes.map((route) => route.taskRoute).join(" / ")}, which the configuration runs at effort ${configured}, but the dispatch names effort "${effort}". `
+-        + `Keep it only as a stated MP-05/MP-07 escalation; otherwise re-issue the dispatch with \`effort\` set to ${configured}.`,
+-    });
++    // C30G-M16: the effort an exception for this model names is admitted under that exception, not as an unexplained escalation.
++    const effortFound = modelException ?? (alias === null ? null : exceptions.find(alias));
++    if (effortFound?.outcome === "live" && effortFound.exception.effort === effort) {
++      modelException = effortFound;
++      effortApplied = effort;
++    } else {
++      const configured = [...new Set(routes.map((route) => `"${route.effort}"`))].join(" or ");
++      warnings.push({
++        code: "DISPATCH-EFFORT-DUTY-MISMATCH",
++        message: `agent type ${subagentType} serves ${routes.map((route) => route.taskRoute).join(" / ")}, which the configuration runs at effort ${configured}, but the dispatch names effort "${effort}". `
++          + `Keep it only as a stated MP-05/MP-07 escalation; otherwise re-issue the dispatch with \`effort\` set to ${configured}.`,
++      });
++    }
+   }
+-  return warnings.length === 0 ? { ok: true, findings: [], skipped: null } : { ok: true, skipped: null, findings: [], warnings };
++  if (modelException === null) return warnings.length === 0 ? { ok: true, findings: [], skipped: null } : { ok: true, skipped: null, findings: [], warnings };
++  const granted = modelException.exception;
++  warnings.unshift({
++    code: "DISPATCH-MODEL-EXCEPTION",
++    message: `model exception: ${alias}, requested by the PO at ${granted.at} (${granted.by}); exception ${granted.id} for ${exceptionScopeText(granted.scope)}, reason: ${granted.reason}. `
++      + `It changes only the model ${model}${effortApplied === null ? "" : ` and effort ${effortApplied}`} of this dispatch; the agent type, tools, prompt checks, the budget guard and every other guard are unchanged. `
++      + "It is an attribution record of the PO's request (not a signature), kept in the model-exception store; `list` shows it.",
++  });
++  return { ok: true, skipped: null, findings: [], warnings, exceptionUse: exceptions.use(modelException, alias, effortApplied) };
+ }
+ 
+ export function dispatchModelRefusalText(evaluation) {
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index 7ad40ef14..d23d26749 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -2,7 +2,7 @@
+ // D84: a dispatch takes its model from the configured routing, never from inheritance or the Elephant's choice.
+ import test from "node:test";
+ import assert from "node:assert/strict";
+-import { configuredRecordRoute, evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
++import { CLAUDE_FAMILY_ALIASES, configuredRecordRoute, evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
+ import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+ 
+ const claudeSelectors = {
+@@ -294,3 +294,164 @@ test("DME-C23d the effort that really ran is the one the stop reports; absent, i
+     assert.match(unobserved.warning.message, /unobserved/iu);
+   }
+ });
++
++// C30G-M16 (PO 2026-11-17): a PO-requested, recorded, expiring model exception. The store is an in-memory snapshot here; the script and the
++// hook cases exercise the real file store.
++const NOON = "2026-11-17T12:00:00.000Z";
++const at = (minutesAfterNoon) => new Date(Date.parse(NOON) + minutesAfterNoon * 60000).toISOString();
++async function exceptionFixture(specs) {
++  const lib = await import("./dispatch-model-exception.mjs");
++  let store = lib.emptyExceptionStore();
++  for (const spec of specs) {
++    const recorded = lib.recordModelException(store, { by: "label-from-the-po", reason: "design analysis", at: NOON, aliases: CLAUDE_FAMILY_ALIASES, ...spec });
++    assert.equal(recorded.ok, true, JSON.stringify(recorded));
++    store = recorded.store;
++  }
++  return { lib, store, snapshot: () => ({ ok: true, store }) };
++}
++const call = (extra) => ({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "fable", root: "/fixture-root", routeSource: routes(), nowFn: () => at(10), ...extra });
++
++test("DME-X1 a model no route selects is admitted, with a named warning, exactly when a live exception names it", async () => {
++  const { snapshot } = await exceptionFixture([{ model: "fable", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }]);
++  const admitted = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: snapshot() }));
++  assert.equal(admitted.ok, true, JSON.stringify(admitted));
++  const warning = admitted.warnings.find((entry) => entry.code === "DISPATCH-MODEL-EXCEPTION");
++  assert.match(warning.message, /model exception: fable, requested by the PO at 2026-11-17T12:00:00\.000Z \(label-from-the-po\)/u);
++  assert.equal(admitted.exceptionUse.model, "fable");
++  assert.equal(admitted.warnings.some((entry) => entry.code === "DISPATCH-MODEL-DUTY-MISMATCH"), false, "the exception replaces the escalation warning, it does not stack on it");
++  assert.match(dispatchModelWarningText(admitted), /DISPATCH-MODEL-EXCEPTION/u);
++  const without = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: { ok: true, store: (await import("./dispatch-model-exception.mjs")).emptyExceptionStore() } }));
++  assert.equal(without.ok, false);
++  assert.equal(without.exceptionUse, undefined);
++});
++
++test("DME-X2 without a live exception the refusal names the ONE record command, what the PO supplies, and the decline path", async () => {
++  const { lib } = await exceptionFixture([]);
++  const refused = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", effort: "max", exceptionStore: { ok: true, store: lib.emptyExceptionStore() } }));
++  assert.equal(refused.ok, false);
++  assert.equal(refused.findings[0].code, "DISPATCH-MODEL-UNROUTED");
++  const text = refused.findings[0].message;
++  assert.match(text, /dispatch-model-exception\.mjs" record --model fable --effort max --dispatch-id FEATURE-A-1 --reason "<reason the PO gave>" --by "<label the PO gave>" --root "\/fixture-root"/u);
++  assert.match(text, /decline/u);
++  assert.match(text, /sonnet/u, "the decline path re-issues with a configured selector");
++  assert.match(text, /no exception is recorded/u);
++  const noId = evaluateDispatchModel(call({ exceptionStore: { ok: true, store: lib.emptyExceptionStore() } }));
++  assert.match(noId.findings[0].message, /record --model fable --count 1 --reason/u, "a dispatch with no declared id gets the one-dispatch count scope");
++  const other = evaluateDispatchModel(call({ model: "gpt-6", exceptionStore: { ok: true, store: lib.emptyExceptionStore() } }));
++  assert.doesNotMatch(other.findings[0].message, /dispatch-model-exception/u, "only a Claude family alias can be excepted");
++  assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: "fable", routeSource: routes() }).findings[0].message,
++    "the dispatch names model \"fable\", which no available configured route selects. Re-issue it with one of the configured selectors: \"sonnet\", \"haiku\", \"opus\".",
++    "no root and no injected store: the refusal is byte-identical to the one before the exception existed");
++});
++
++test("DME-X3 an expired, consumed, wrong-alias or wrong-dispatch-id exception is refused and said as such, naming list and record", async () => {
++  const noOpus = routes({ test_author: "sonnet", critic_normal: "sonnet", critic_high_risk: "sonnet", advisory: "sonnet" });
++  const cases = [
++    { specs: [{ model: "fable", scope: { kind: "minutes", value: 30 } }], extra: { nowFn: () => at(31) }, cause: "expired" },
++    { specs: [{ model: "fable", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }], extra: { dispatchId: "FEATURE-A-2" }, cause: "wrong-dispatch-id" },
++    { specs: [{ model: "fable", scope: { kind: "count", value: 1 } }], uses: ["FEATURE-A-9"], extra: { dispatchId: "FEATURE-A-2" }, cause: "consumed" },
++    { specs: [{ model: "fable", scope: { kind: "count", value: 2 } }], extra: { model: "opus", routeSource: noOpus }, cause: "wrong-alias" },
++  ];
++  for (const entry of cases) {
++    const { lib, store } = await exceptionFixture(entry.specs);
++    let current = store;
++    for (const key of entry.uses ?? []) current = lib.applyModelExceptionUse(current, { id: "MX-1", dispatchKey: key, dispatchId: key, model: "fable", effort: null, reused: false }, NOON).store;
++    const refused = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", ...entry.extra, exceptionStore: { ok: true, store: current } }));
++    assert.equal(refused.ok, false, entry.cause);
++    assert.equal(refused.exceptionUse, undefined);
++    assert.match(refused.findings[0].message, new RegExp(`MX-1[^.]*${entry.cause}`, "u"), entry.cause);
++    assert.match(refused.findings[0].message, /dispatch-model-exception\.mjs" list /u, entry.cause);
++    assert.match(refused.findings[0].message, /dispatch-model-exception\.mjs" record /u, entry.cause);
++  }
++});
++
++test("DME-X4 an exception for one alias never admits another model", async () => {
++  const noOpus = routes({ test_author: "sonnet", critic_normal: "sonnet", critic_high_risk: "sonnet", advisory: "sonnet" });
++  const { snapshot } = await exceptionFixture([{ model: "fable", scope: { kind: "minutes", value: 60 } }]);
++  assert.equal(evaluateDispatchModel(call({ model: "opus", routeSource: noOpus, exceptionStore: snapshot() })).ok, false);
++  assert.equal(evaluateDispatchModel(call({ model: "claude-fable-5", exceptionStore: snapshot() })).ok, true, "a full Claude id of the excepted family is the same alias");
++  assert.equal(evaluateDispatchModel(call({ model: "fable-extra", exceptionStore: snapshot() })).ok, false, "a prefix of the alias is not the alias");
++});
++
++test("DME-X5 a count exception is consumed once per new dispatch, never by a refusal, never twice by a retry of the same dispatch", async () => {
++  const { lib, store, snapshot } = await exceptionFixture([{ model: "fable", scope: { kind: "count", value: 1 } }]);
++  const first = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: snapshot() }));
++  assert.equal(first.ok, true);
++  assert.equal(first.exceptionUse.reused, false);
++  assert.equal(evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: snapshot() })).exceptionUse.id, "MX-1", "deciding is read-only: the same store admits the same call again");
++  const used = lib.applyModelExceptionUse(store, first.exceptionUse, at(10));
++  assert.equal(used.ok, true);
++  const after = { ok: true, store: used.store };
++  const retry = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: after }));
++  assert.equal(retry.ok, true, "a retried identical call after a transient failure is still admitted");
++  assert.equal(retry.exceptionUse.reused, true);
++  assert.equal(lib.applyModelExceptionUse(used.store, retry.exceptionUse, at(11)).store.digest, used.store.digest, "the retry appends nothing: the exception is not burnt twice");
++  const next = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-2", exceptionStore: after }));
++  assert.equal(next.ok, false, "the count was one dispatch");
++  assert.match(next.findings[0].message, /consumed/u);
++  // A SendMessage continuation is not a new dispatch: it is no Agent call and never reaches this decision (the hook is registered on Task/Agent only).
++});
++
++test("DME-X6 a window exception expires by time on an injected clock and records each admitted dispatch once", async () => {
++  const { lib, store } = await exceptionFixture([{ model: "fable", scope: { kind: "minutes", value: 30 } }]);
++  const live = (minutes, dispatchId) => evaluateDispatchModel(call({ dispatchId, nowFn: () => at(minutes), exceptionStore: { ok: true, store: current } }));
++  let current = store;
++  assert.equal(live(29, "FEATURE-A-1").ok, true);
++  current = lib.applyModelExceptionUse(current, live(29, "FEATURE-A-1").exceptionUse, at(29)).store;
++  assert.equal(live(29, "FEATURE-A-2").ok, true, "a window is not decremented by a dispatch");
++  assert.equal(live(30, "FEATURE-A-3").ok, false, "the window ends at its stated time");
++  assert.match(live(30, "FEATURE-A-3").findings[0].message, /expired/u);
++});
++
++test("DME-X7 an effort the configuration does not name is admitted under an exception that names it, with the exception warning", async () => {
++  const { snapshot } = await exceptionFixture([{ model: "fable", effort: "max", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }]);
++  const admitted = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", effort: "max", exceptionStore: snapshot() }));
++  assert.equal(admitted.ok, true);
++  assert.match(admitted.warnings.find((entry) => entry.code === "DISPATCH-MODEL-EXCEPTION").message, /effort max/u);
++  assert.equal(admitted.warnings.some((entry) => entry.code === "DISPATCH-EFFORT-DUTY-MISMATCH"), false);
++  assert.equal(admitted.exceptionUse.effort, "max");
++  const sonnetOnly = evaluateDispatchModel(call({ model: "sonnet", dispatchId: "FEATURE-A-1", effort: "max", exceptionStore: snapshot() }));
++  assert.equal(sonnetOnly.ok, true, "an exception for fable never touches a sonnet dispatch");
++  assert.equal(sonnetOnly.exceptionUse, undefined);
++});
++
++test("DME-X8 a corrupt or unreadable store grants nothing and the refusal names the repair", async () => {
++  const { lib, store } = await exceptionFixture([{ model: "fable", scope: { kind: "minutes", value: 60 } }]);
++  const tampered = JSON.parse(JSON.stringify(store));
++  tampered.entries[0].reason = "another reason";
++  const verdict = lib.validateExceptionStore(tampered);
++  assert.equal(verdict.ok, false);
++  const refused = evaluateDispatchModel(call({ exceptionStore: { ok: false, code: verdict.code, path: "/fixture-root/.git/agent-pipeline/dispatch-model-exception/store.json" } }));
++  assert.equal(refused.ok, false, "a store that does not verify admits nothing");
++  assert.match(refused.findings[0].message, /does not verify/u);
++  assert.match(refused.findings[0].message, /--move-broken-store-aside/u);
++});
++
++test("DME-X9b the record comparison binds an exception-admitted record to its dispatch and still reports an unexplained mismatch", async () => {
++  const { compareRecordedModel } = await import("./agent-model-registry.mjs");
++  const { lib, store } = await exceptionFixture([{ model: "fable", effort: "max", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }]);
++  const used = lib.applyModelExceptionUse(store, { id: "MX-1", dispatchKey: "FEATURE-A-1", dispatchId: "FEATURE-A-1", model: "fable", effort: "max", reused: false }, NOON).store;
++  const record = (taskId, model) => ({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, agentType: "goldfish-deep", model, effort: "max" });
++  const configuredRoute = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: true, store: used } });
++  const admitted = compareRecordedModel(record("FEATURE-A-1", "claude-fable-5"), { configuredRoute });
++  assert.equal(admitted.classification, "model-route-configured");
++  assert.match(admitted.reason, /PO model exception/u);
++  assert.equal(compareRecordedModel(record("FEATURE-A-2", "claude-fable-5"), { configuredRoute }).classification, "model-mismatch", "another dispatch's record is an unexplained mismatch");
++  assert.equal(compareRecordedModel(record("FEATURE-A-1", "gpt-6"), { configuredRoute }).classification, "model-mismatch", "a model the exception does not name is an unexplained mismatch");
++  assert.equal(compareRecordedModel(record("FEATURE-A-1", "claude-fable-5")).classification, "model-mismatch", "no reader, no acceptance");
++});
++
++test("DME-X9 the host commit accepts the model and effort of a dispatch admitted under an exception, and still refuses an unexplained mismatch", async () => {
++  const { lib, store } = await exceptionFixture([{ model: "fable", effort: "max", scope: { kind: "count", value: 1 } }]);
++  const used = lib.applyModelExceptionUse(store, { id: "MX-1", dispatchKey: "FEATURE-A-1", dispatchId: "FEATURE-A-1", model: "fable", effort: "max", reused: false }, NOON).store;
++  const v4 = (taskId, model, effort) => ({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, model, effort });
++  const read = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: true, store: used } });
++  assert.deepEqual(read(v4("FEATURE-A-1", "claude-fable-5", "max")), { model: true, effort: true, exception: true });
++  assert.deepEqual(read(v4("FEATURE-A-2", "fable", "max")), { model: false, effort: false }, "another dispatch id was not admitted under it");
++  assert.deepEqual(read(v4("FEATURE-A-1", "opus", "max")), { model: true, effort: true, exception: true }, "opus is configured: the route answers the model half, the exception only the effort half");
++  assert.deepEqual(read(v4("FEATURE-A-1", "gpt-6", "max")), { model: false, effort: true, exception: true }, "the exception names no other model; the effort half is its own");
++  const none = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: true, store: lib.emptyExceptionStore() } });
++  assert.deepEqual(none(v4("FEATURE-A-1", "fable", "max")), { model: false, effort: false }, "no exception, no acceptance");
++  const unreadable = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: false, code: "store-unverifiable" } });
++  assert.deepEqual(unreadable(v4("FEATURE-A-1", "fable", "max")), { model: false, effort: false });
++});
+diff --git a/plugins/pipeline-core/lib/dispatch-model-exception.mjs b/plugins/pipeline-core/lib/dispatch-model-exception.mjs
+new file mode 100644
+index 000000000..8eea84150
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-model-exception.mjs
+@@ -0,0 +1,282 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * A PO-requested, recorded, expiring MODEL EXCEPTION for the Claude dispatch route (C30G-M16, PO decision 2026-11-17).
++ *
++ * The project's routing (`pipeline.user.yaml`, read by dispatch-model-enforcement.mjs) decides which model a dispatch runs. When the PO
++ * wants ONE dispatch on a model no configured route selects (first use: a design-tier analysis on the Fable family), the orchestrator records
++ * that request here instead of editing the gate-strength routing file. The record is an ATTRIBUTION record: the PO's request as relayed
++ * by the orchestrator, labelled with the `--by` label the PO supplied. It is NOT a signature and proves nothing about who typed it.
++ *
++ * Store: one closed-shape, digest-chained, append-only file under `<git-common-dir>/agent-pipeline/dispatch-model-exception/store.json`
++ * (the same shape and rules as the dispatch-budget grant store, lib/dispatch-budget-core.mjs). Three entry types: `record` (the request),
++ * `revoke` (ends one) and `use` (one admitted dispatch consumed from it, written by the dispatch guard). State is derived by replay, so the
++ * audit trail is the file itself. Anything that does not verify grants NOTHING (the safe direction). One orchestrator at a time is the
++ * contract; a short lock file bounds two concurrent hooks. A dispatched agent can never reach the store or its script (hooks/guard-dispatch-budget.mjs).
++ */
++import { createHash, randomUUID } from "node:crypto";
++import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++
++import { resolveGitCommonDir } from "./po-key-directory.mjs";
++
++export const MODEL_EXCEPTION_STORE_SCHEMA = "pipeline.dispatch-model-exception-store.v1";
++export const MODEL_EXCEPTION_GENESIS_DIGEST = "0".repeat(64);
++export const MODEL_EXCEPTION_MAX_ENTRIES = 500;
++export const MODEL_EXCEPTION_MAX_REASON = 500;
++export const MODEL_EXCEPTION_MAX_BY = 80;
++/** A dispatch-id or count exception that is never used still ends here; a minutes exception ends at its own window. */
++export const MODEL_EXCEPTION_DEFAULT_LIFETIME_MINUTES = 1440;
++export const MODEL_EXCEPTION_COUNT_RANGE = Object.freeze([1, 5]);
++export const MODEL_EXCEPTION_MINUTES_RANGE = Object.freeze([1, 240]);
++const MAX_FILE_BYTES = 786432;
++const STORE_DIR_PARTS = Object.freeze(["agent-pipeline", "dispatch-model-exception"]);
++const STORE_FILE = "store.json";
++
++const ALIAS_SHAPE = /^[a-z][a-z0-9]{1,15}$/u;
++const EFFORT_SHAPE = /^[a-z]{2,12}$/u;
++const DISPATCH_ID_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++const KEY_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++const ISO_SHAPE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,3})?Z$/u;
++const ID_SHAPE = /^MX-[1-9][0-9]{0,3}$/u;
++const SHA256_SHAPE = /^[a-f0-9]{64}$/u;
++// eslint-disable-next-line no-control-regex
++const CONTROL = /[\u0000-\u001f\u007f]/u;
++
++const canonical = (value) => (value === null || typeof value !== "object" ? JSON.stringify(value)
++  : Array.isArray(value) ? `[${value.map(canonical).join(",")}]`
++    : `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`);
++const entryDigest = (entry) => { const { digest: _ignored, ...body } = entry; return createHash("sha256").update(canonical([MODEL_EXCEPTION_STORE_SCHEMA, body])).digest("hex"); };
++const hasExactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
++  && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
++const text = (value, max) => typeof value === "string" && value.trim() === value && value.length >= 1 && value.length <= max && !CONTROL.test(value);
++const validScope = (scope) => hasExactKeys(scope, ["kind", "value"]) && (
++  (scope.kind === "dispatch-id" && typeof scope.value === "string" && DISPATCH_ID_SHAPE.test(scope.value))
++  || (scope.kind === "count" && Number.isSafeInteger(scope.value) && scope.value >= MODEL_EXCEPTION_COUNT_RANGE[0] && scope.value <= MODEL_EXCEPTION_COUNT_RANGE[1])
++  || (scope.kind === "minutes" && Number.isSafeInteger(scope.value) && scope.value >= MODEL_EXCEPTION_MINUTES_RANGE[0] && scope.value <= MODEL_EXCEPTION_MINUTES_RANGE[1]));
++
++const KEYS = Object.freeze({
++  record: ["seq", "type", "id", "model", "effort", "scope", "reason", "by", "at", "expiresAt", "prevDigest", "digest"],
++  revoke: ["seq", "type", "target", "at", "prevDigest", "digest"],
++  use: ["seq", "type", "target", "dispatchKey", "dispatchId", "model", "effort", "at", "prevDigest", "digest"],
++});
++
++export function emptyExceptionStore() {
++  return { schema: MODEL_EXCEPTION_STORE_SCHEMA, entries: [], digest: MODEL_EXCEPTION_GENESIS_DIGEST };
++}
++
++/** Closed-shape validation: exact keys, contiguous sequence, recomputed digest chain, referential integrity. Anything else is `ok: false`. */
++export function validateExceptionStore(store) {
++  if (!hasExactKeys(store, ["schema", "entries", "digest"])) return { ok: false, code: "store-shape" };
++  if (store.schema !== MODEL_EXCEPTION_STORE_SCHEMA) return { ok: false, code: "store-schema" };
++  if (!Array.isArray(store.entries)) return { ok: false, code: "store-entries" };
++  if (store.entries.length > MODEL_EXCEPTION_MAX_ENTRIES) return { ok: false, code: "store-full" };
++  const records = new Map();
++  const seen = new Set();
++  let previous = MODEL_EXCEPTION_GENESIS_DIGEST;
++  for (let index = 0; index < store.entries.length; index += 1) {
++    const entry = store.entries[index];
++    const keys = KEYS[entry?.type];
++    if (!keys || !hasExactKeys(entry, keys)) return { ok: false, code: "entry-shape" };
++    if (entry.seq !== index + 1) return { ok: false, code: "entry-sequence" };
++    if (typeof entry.at !== "string" || !ISO_SHAPE.test(entry.at)) return { ok: false, code: "entry-time" };
++    if (typeof entry.digest !== "string" || !SHA256_SHAPE.test(entry.digest) || seen.has(entry.digest)) return { ok: false, code: "entry-digest-shape" };
++    if (entry.prevDigest !== previous) return { ok: false, code: "entry-chain" };
++    if (entryDigest(entry) !== entry.digest) return { ok: false, code: "entry-digest-mismatch" };
++    if (entry.type === "record") {
++      if (entry.id !== `MX-${entry.seq}` || !ID_SHAPE.test(entry.id)) return { ok: false, code: "record-id" };
++      if (typeof entry.model !== "string" || !ALIAS_SHAPE.test(entry.model)) return { ok: false, code: "record-model" };
++      if (entry.effort !== null && !(typeof entry.effort === "string" && EFFORT_SHAPE.test(entry.effort))) return { ok: false, code: "record-effort" };
++      if (!validScope(entry.scope)) return { ok: false, code: "record-scope" };
++      if (!text(entry.reason, MODEL_EXCEPTION_MAX_REASON) || !text(entry.by, MODEL_EXCEPTION_MAX_BY)) return { ok: false, code: "record-text" };
++      if (typeof entry.expiresAt !== "string" || !ISO_SHAPE.test(entry.expiresAt) || Date.parse(entry.expiresAt) <= Date.parse(entry.at)) return { ok: false, code: "record-expiry" };
++      records.set(entry.id, entry);
++    } else if (!records.has(entry.target)) {
++      return { ok: false, code: "entry-target" };
++    } else if (entry.type === "use") {
++      const target = records.get(entry.target);
++      if (typeof entry.dispatchKey !== "string" || !KEY_SHAPE.test(entry.dispatchKey)) return { ok: false, code: "use-key" };
++      if (entry.dispatchId !== null && !(typeof entry.dispatchId === "string" && DISPATCH_ID_SHAPE.test(entry.dispatchId))) return { ok: false, code: "use-dispatch-id" };
++      if (entry.model !== target.model || (entry.effort !== null && entry.effort !== target.effort)) return { ok: false, code: "use-binding" };
++    }
++    seen.add(entry.digest);
++    previous = entry.digest;
++  }
++  if (store.digest !== previous) return { ok: false, code: "store-digest" };
++  return { ok: true };
++}
++
++function append(store, body) {
++  const checked = validateExceptionStore(store);
++  if (!checked.ok) return checked;
++  if (store.entries.length >= MODEL_EXCEPTION_MAX_ENTRIES) return { ok: false, code: "store-full" };
++  const entry = { seq: store.entries.length + 1, ...body, prevDigest: store.digest, digest: "" };
++  entry.digest = entryDigest(entry);
++  const next = { schema: MODEL_EXCEPTION_STORE_SCHEMA, entries: [...store.entries, entry], digest: entry.digest };
++  const verified = validateExceptionStore(next);
++  return verified.ok ? { ok: true, store: next, entry } : { ok: false, code: `entry-refused-${verified.code}` };
++}
++
++/** The Claude family alias a tool-layer `model` names (`fable`, or a full id such as `claude-fable-5`); null when it names none of `aliases`. */
++export function aliasOfModel(model, aliases) {
++  if (typeof model !== "string") return null;
++  const given = model.trim().toLowerCase();
++  if (aliases.includes(given)) return given;
++  const family = /^claude-([a-z][a-z0-9]*)(?:-|$)/u.exec(given)?.[1];
++  return family !== undefined && aliases.includes(family) ? family : null;
++}
++
++/** Append one PO request. `aliases` is the closed list the caller allows (the enforcement module's CLAUDE_FAMILY_ALIASES). */
++export function recordModelException(store, { model, effort = null, scope, reason, by, at, aliases } = {}) {
++  if (!Array.isArray(aliases) || typeof model !== "string" || !aliases.includes(model)) return { ok: false, code: "model-not-allowed" };
++  if (effort !== null && !(typeof effort === "string" && EFFORT_SHAPE.test(effort))) return { ok: false, code: "effort-invalid" };
++  if (!validScope(scope)) return { ok: false, code: "scope-invalid" };
++  if (!text(by, MODEL_EXCEPTION_MAX_BY)) return { ok: false, code: "by-invalid" };
++  if (!text(reason, MODEL_EXCEPTION_MAX_REASON)) return { ok: false, code: "reason-invalid" };
++  if (typeof at !== "string" || !ISO_SHAPE.test(at)) return { ok: false, code: "time-invalid" };
++  const minutes = scope.kind === "minutes" ? scope.value : MODEL_EXCEPTION_DEFAULT_LIFETIME_MINUTES;
++  const expiresAt = new Date(Date.parse(at) + minutes * 60000).toISOString();
++  const id = `MX-${store.entries.length + 1}`;
++  const appended = append(store, { type: "record", id, model, effort, scope: { kind: scope.kind, value: scope.value }, reason, by, at, expiresAt });
++  return appended.ok ? { ok: true, store: appended.store, id } : appended;
++}
++
++export function revokeModelException(store, { target, at } = {}) {
++  const state = deriveExceptionStates(store, Date.parse(at)).find((entry) => entry.id === target);
++  if (!state) return { ok: false, code: "revoke-unknown-id" };
++  if (state.state === "revoked") return { ok: false, code: "revoke-already-revoked" };
++  const appended = append(store, { type: "revoke", target, at });
++  return appended.ok ? { ok: true, store: appended.store } : appended;
++}
++
++/** Append the consumption of `use.id` by one admitted dispatch. A `reused` use (the same dispatch again) appends nothing: a retry never burns it twice. */
++export function applyModelExceptionUse(store, use, at) {
++  if (use?.reused === true) return { ok: true, store };
++  const appended = append(store, { type: "use", target: use?.id, dispatchKey: use?.dispatchKey, dispatchId: use?.dispatchId ?? null, model: use?.model, effort: use?.effort ?? null, at });
++  return appended.ok ? { ok: true, store: appended.store } : appended;
++}
++
++/** One state row per `record` entry: live | consumed | expired | revoked (revoked beats consumed beats expired). `nowMs` is the clock the caller injects. */
++export function deriveExceptionStates(store, nowMs) {
++  const rows = new Map();
++  for (const entry of store.entries) {
++    if (entry.type === "record") rows.set(entry.id, { ...entry, uses: [], revokedAt: null });
++    else if (entry.type === "revoke") rows.get(entry.target).revokedAt = entry.at;
++    else rows.get(entry.target).uses.push(entry);
++  }
++  return [...rows.values()].map((row) => {
++    const distinct = new Set(row.uses.map((use) => use.dispatchKey)).size;
++    const used = row.scope.kind === "dispatch-id" ? distinct >= 1 : row.scope.kind === "count" ? distinct >= row.scope.value : false;
++    const expired = !(nowMs < Date.parse(row.expiresAt));
++    return { ...row, state: row.revokedAt !== null ? "revoked" : used ? "consumed" : expired ? "expired" : "live", remaining: row.scope.kind === "count" ? Math.max(0, row.scope.value - distinct) : null };
++  });
++}
++
++/**
++ * Does a LIVE exception name this alias for this dispatch? `live` carries the exception and whether this very dispatch (same key) already
++ * used it (`reused`: admitted again, nothing more consumed). `none` carries one cause per recent exception: wrong-alias | wrong-dispatch-id |
++ * consumed | expired | revoked.
++ */
++export function findModelException(states, { alias, dispatchId = null, dispatchKey = null } = {}) {
++  const scoped = (row) => row.scope.kind !== "dispatch-id" || row.scope.value === dispatchId;
++  const mine = states.filter((row) => row.model === alias && scoped(row) && row.state !== "revoked");
++  // A dispatch that already used an exception is admitted again (a retry after a transient failure) unless that exception was revoked or ran out
++  // unused: the use was already counted, so the retry consumes nothing more even when the count is spent.
++  const again = mine.find((row) => dispatchKey !== null && row.state !== "expired" && row.uses.some((use) => use.dispatchKey === dispatchKey));
++  if (again) return { outcome: "live", exception: again, reused: true };
++  const live = mine.find((row) => row.state === "live" && row.model === alias);
++  if (live) return { outcome: "live", exception: live, reused: false };
++  const why = states.slice(-4).map((row) => ({ id: row.id, model: row.model, scope: row.scope, at: row.at, by: row.by,
++    cause: row.state === "revoked" ? "revoked" : row.model !== alias ? "wrong-alias" : !scoped(row) ? "wrong-dispatch-id" : row.state }));
++  return { outcome: "none", why };
++}
++
++export const exceptionScopeText = (scope) => (scope.kind === "dispatch-id" ? `dispatch ${scope.value}` : scope.kind === "count" ? `${scope.value} dispatch${scope.value === 1 ? "" : "es"}` : `${scope.value} minutes`);
++
++// ---------------------------------------------------------------------------
++// The file store (read by the dispatch guard and the briefing generator, written by the orchestrator's script and the guard's consumption).
++// ---------------------------------------------------------------------------
++
++export function modelExceptionStorePath(commonDir) { return join(commonDir, ...STORE_DIR_PARTS, STORE_FILE); }
++/** The directory a dispatched agent may never reach. */
++export const MODEL_EXCEPTION_STORE_DIR = STORE_DIR_PARTS.join("/");
++
++/** `{ ok: true, store, path, missing }` (a missing file is an empty store) or `{ ok: false, code, path }`; never throws. */
++export function readModelExceptionStore(root, dependencies = {}) {
++  const commonDir = dependencies.commonDir ?? (typeof root === "string" && root !== "" ? resolveGitCommonDir(root, dependencies) : null);
++  if (typeof commonDir !== "string" || commonDir === "") return { ok: false, code: "git-common-dir-unresolved", path: null };
++  const path = modelExceptionStorePath(commonDir);
++  if (!existsSync(path)) return { ok: true, store: emptyExceptionStore(), path, missing: true };
++  let raw;
++  try {
++    if (statSync(path).size > MAX_FILE_BYTES) return { ok: false, code: "store-oversized", path };
++    raw = readFileSync(path, "utf8");
++  } catch { return { ok: false, code: "store-unreadable", path }; }
++  let parsed;
++  try { parsed = JSON.parse(raw); } catch { return { ok: false, code: "store-malformed", path }; }
++  const checked = validateExceptionStore(parsed);
++  return checked.ok ? { ok: true, store: parsed, path, missing: false } : { ok: false, code: checked.code, path };
++}
++
++export function writeModelExceptionStore(path, store) {
++  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
++  const temporary = `${path}.${process.pid}-${randomUUID()}.tmp`;
++  try {
++    writeFileSync(temporary, `${JSON.stringify(store, null, 2)}\n`, { flag: "wx", mode: 0o600 });
++    renameSync(temporary, path);
++  } catch {
++    try { unlinkSync(temporary); } catch { /* best effort */ }
++    return { ok: false, code: "store-write-failed" };
++  }
++  return { ok: true };
++}
++
++/** Run `work` while holding a short lock beside the store (a stale lock, older than 10 s, is taken over). */
++export function withModelExceptionLock(path, work) {
++  const lock = `${path}.lock`;
++  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
++  for (let attempt = 0; attempt < 60; attempt += 1) {
++    try { closeSync(openSync(lock, "wx", 0o600)); } catch (error) {
++      if (error?.code !== "EEXIST") return { ok: false, code: "store-lock-failed" };
++      try { if (Date.now() - statSync(lock).mtimeMs > 10000) unlinkSync(lock); } catch { /* raced */ }
++      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
++      continue;
++    }
++    try { return work(); } finally { try { unlinkSync(lock); } catch { /* best effort */ } }
++  }
++  return { ok: false, code: "store-lock-busy" };
++}
++
++/**
++ * Consume `use` for one ADMITTED dispatch: re-checks under the lock that the exception is still live for this dispatch (a concurrent
++ * dispatch may have taken the last count), appends the `use` entry, and returns `undo()`, which puts the previous bytes back (the hook calls it
++ * when a later guard refuses the dispatch, so a refused dispatch never consumes). Never throws.
++ */
++export function consumeModelException({ root, use, nowFn = () => new Date().toISOString() }, dependencies = {}) {
++  try {
++    const first = readModelExceptionStore(root, dependencies);
++    if (!first.ok) return { ok: false, code: first.code, undo() {} };
++    return withModelExceptionLock(first.path, () => {
++      const read = readModelExceptionStore(root, dependencies);
++      if (!read.ok) return { ok: false, code: read.code, undo() {} };
++      const now = nowFn();
++      const found = findModelException(deriveExceptionStates(read.store, Date.parse(now)), { alias: use.model, dispatchId: use.dispatchId, dispatchKey: use.dispatchKey });
++      if (found.outcome !== "live" || found.exception.id !== use.id) return { ok: false, code: "exception-no-longer-live", undo() {} };
++      if (found.reused) return { ok: true, undo() {} };
++      const applied = applyModelExceptionUse(read.store, { ...use, reused: false }, now);
++      if (!applied.ok) return { ok: false, code: applied.code, undo() {} };
++      const previous = read.missing ? null : readFileSync(read.path, "utf8");
++      const written = writeModelExceptionStore(read.path, applied.store);
++      if (!written.ok) return { ok: false, code: written.code, undo() {} };
++      return { ok: true, undo() {
++        withModelExceptionLock(read.path, () => {
++          try {
++            const current = JSON.parse(readFileSync(read.path, "utf8"));
++            if (current.digest !== applied.store.digest) return null;
++            if (previous === null) unlinkSync(read.path); else writeFileSync(read.path, previous, { mode: 0o600 });
++          } catch { /* best effort: a later entry or a vanished file is left as it is */ }
++          return null;
++        });
++      } };
++    });
++  } catch { return { ok: false, code: "consume-internal-error", undo() {} }; }
++}
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 7f16eba33..8bbb22f61 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -692,7 +692,7 @@ function sanctionedProofWaitArgs(args, root) {
+ // script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
+ const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
+ export const SCRIPTS_ANSWERING_HELP = new Map([
+-  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "audit-proof-followup", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "maintenance-red-check", "onboarding-init",
++  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "audit-proof-followup", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "dispatch-model-exception", "maintenance-red-check", "onboarding-init",
+     "pipeline-state", "prepare-dispatch", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+     "publication-readback", "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+     "validate-runner-profiles-v2", "wait-host-commit"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+diff --git a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+index 664cdd0ee..efe2a7324 100644
+--- a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
++++ b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+@@ -444,6 +444,7 @@
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-model-enforcement-tests",
++        "verify-phase:harness/scripts/verify.mjs:dispatch-model-exception-script-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-liveness-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 93a5cf5a2..2bcf2973b 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -123,7 +123,7 @@ const {
+   validateItemDeliveryBriefing,
+ } = cliHelp ? {} : await import("../lib/native-goldfish-host-return.mjs");
+ const { acceptedFamilyForms, modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
+-const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
++const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute, evaluateDispatchModel } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
+ const { functionalTaskRoutesForRunner, projectFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
+ const {
+   BRIEFING_BUILD_SCHEMA,
+@@ -1107,6 +1107,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   // and no effect on a Codex dispatch beyond that is claimed). Claude: the alias family of the agent definition. Codex: the
+   // agent definition's alias is a Claude concept, so the id is checked against the model the Codex route yields for the role.
+   let codexRoute = null;
++  let modelExceptionUse = null;
+   if (runner === "codex") {
+     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+     codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute, root);
+@@ -1134,7 +1135,13 @@ export function generateDispatchBinding(options, deps = {}) {
+     const accepted = forms === null ? "" : ` (for the ${resolved.model} family: accepted prefixes ${forms.prefixes.map((prefix) => `\`${prefix}\``).join(", ")}; for example \`${forms.example}\`)`;
+     refuse("DBG-MODEL-FAMILY", `model id ${modelId} is a model of another provider's family, not a Claude model id or alias, and agent definition ${agentType} declares the ${resolved.model} family; repair: pass a Claude --model-id${accepted} (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}); or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? `; a Gemini id belongs to an Antigravity dispatch: pass --runner antigravity with an alias of its route (${ANTIGRAVITY_NATIVE_MODELS.join(", ")}; the generated briefing is then the packet Prompt of the prepare request, references/antigravity-native-dispatch.md)` : ""}`);
+   } else if (!modelBelongsToFamily(modelId, resolved.model)) {
+-    warnings.push({ code: "DBG-MODEL-DIFFERS-FROM-AGENT", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares; it is admitted because the configuration names it, and the tool-layer \`model\` parameter of the dispatch call selects it (MP-29)` });
++    // C30G-M16: a model no configured route selects is admitted when a LIVE PO model exception names it (read-only here: the briefing never consumes; the
++    // dispatch guard does, when it admits the dispatch). The generated briefing then says so in its dispatch metadata, so the Goldfish and the audit see it.
++    const exceptionDecision = (deps.evaluateModel ?? evaluateDispatchModel)({ root, runner: "claude", subagentType: `pipeline-core:${agentType}`, model: modelId, dispatchId, dispatchKey: dispatchId, warn: () => {} });
++    modelExceptionUse = exceptionDecision?.ok === true && exceptionDecision.exceptionUse ? exceptionDecision.exceptionUse : null;
++    warnings.push(modelExceptionUse === null
++      ? { code: "DBG-MODEL-DIFFERS-FROM-AGENT", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares; it is admitted because the configuration names it, and the tool-layer \`model\` parameter of the dispatch call selects it (MP-29)` }
++      : { code: "DBG-MODEL-EXCEPTION", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares and no configured route selects it; it is admitted under the PO model exception ${modelExceptionUse.id} (alias ${modelExceptionUse.model}, requested by the PO at ${modelExceptionUse.requestedAt}, ${modelExceptionUse.by}); the tool-layer \`model\` parameter of the dispatch call selects it (MP-29) and the dispatch guard consumes the exception when it admits the dispatch` });
+   }
+   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
+   // Claude (C23): the configured route's effort for the duty is the briefed effort and the dispatch call carries it as the Agent tool's
+@@ -1319,6 +1326,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       : runner === "antigravity"
+         ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType], root) ?? "not registered"}\`).`
+         : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
++    ...(modelExceptionUse === null ? [] : [`- model exception: ${modelExceptionUse.model}, requested by the PO at ${modelExceptionUse.requestedAt} (${modelExceptionUse.by}); no configured route selects this model, it changes only the model of this dispatch, and the exception store (\`list\`) is the audit source.`]),
+     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
+     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
+     `- Slice: ${dispatchId}`,
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 872aaa3b6..9ab11d721 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -263,6 +263,27 @@ for (const [agentType, modelId, effort, maxTurns] of [
+   });
+ }
+ 
++test("C30G-M16 a model a live PO exception names prints its model-exception line in the dispatch metadata; without one nothing changes; another provider's model is still refused", async () => {
++  const { runDispatchBriefing } = await lib();
++  const exception = { id: "MX-1", model: "fable", requestedAt: "2026-11-17T12:00:00.000Z", by: "label-from-the-po", dispatchKey: "ALF-T1", dispatchId: "ALF-T1", effort: null, reused: false };
++  const seen = [];
++  const withException = (decision) => (options) => { seen.push(options); return decision; };
++  const fx = makeFixture();
++  const admitted = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep", "--model-id": "fable" }), depsOf(fx, { evaluateModel: withException({ ok: true, exceptionUse: exception }) }));
++  assert.equal(admitted.ok, true, JSON.stringify(admitted));
++  assert.match(admitted.skeleton, /^- model exception: fable, requested by the PO at 2026-11-17T12:00:00\.000Z \(label-from-the-po\)/mu);
++  assert.ok(admitted.warnings.some((entry) => entry.code === "DBG-MODEL-EXCEPTION" && /MX-1/u.test(entry.message)));
++  assert.equal(admitted.warnings.some((entry) => entry.code === "DBG-MODEL-DIFFERS-FROM-AGENT"), false);
++  assert.deepEqual([seen[0].runner, seen[0].model, seen[0].subagentType, seen[0].dispatchId], ["claude", "fable", "pipeline-core:goldfish-deep", seen[0].dispatchId], "the decision is asked for this model and this dispatch id, and never consumes");
++  const plain = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep", "--model-id": "fable" }), depsOf(fx, { evaluateModel: withException({ ok: false, findings: [] }) }));
++  assert.equal(plain.ok, true, JSON.stringify(plain));
++  assert.doesNotMatch(plain.skeleton, /model exception:/u);
++  assert.ok(plain.warnings.some((entry) => entry.code === "DBG-MODEL-DIFFERS-FROM-AGENT"), "without a live exception the existing warning and checks are unchanged");
++  const foreign = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep", "--model-id": "gpt-5.5" }), depsOf(fx, { evaluateModel: withException({ ok: true, exceptionUse: exception }) }));
++  assert.equal(foreign.ok, false);
++  assert.equal(foreign.code, "DBG-MODEL-FAMILY", "an exception never admits another provider's model");
++});
++
+ test("the criterion locator validates against the original bytes", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();
+diff --git a/plugins/pipeline-core/scripts/dispatch-model-exception.mjs b/plugins/pipeline-core/scripts/dispatch-model-exception.mjs
+new file mode 100644
+index 000000000..99b125299
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-model-exception.mjs
+@@ -0,0 +1,213 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * dispatch-model-exception.mjs -- the ORCHESTRATOR's sanctioned way to record, list and end a PO-requested MODEL EXCEPTION
++ * (C30G-M16, PO decision 2026-11-17): one dispatch may run a model that no configured route selects, without editing pipeline.user.yaml.
++ *
++ *   node dispatch-model-exception.mjs record --model <opus|sonnet|haiku|fable> [--effort <level>]
++ *        (--dispatch-id <id> | --count <1..5> | --minutes <1..240>) --reason <text> --by <label> [--root <repo>] [--move-broken-store-aside]
++ *   node dispatch-model-exception.mjs list [--root <repo>]
++ *   node dispatch-model-exception.mjs revoke --id <MX-n> [--root <repo>]
++ *
++ * WHAT THE RECORD IS: an ATTRIBUTION record of the PO's request, like `gates.push_approval: chat` -- NOT a signature. `--by` is REQUIRED and has
++ * NO default: it is the label the PO supplied (an agent never invents an operator label, EL-36). `--reason` is stored verbatim (500 characters at most).
++ * A dispatch admitted under an exception changes only its model (and effort): the agent type, tools, prompt checks, the budget guard and every
++ * other guard still apply, and an exception for one alias never admits another. Claude runner only: the Antigravity and Codex model paths are unchanged.
++ *
++ * Store: `<git-common-dir>/agent-pipeline/dispatch-model-exception/store.json`, a closed-shape, digest-chained, append-only file
++ * (lib/dispatch-model-exception.mjs). A dispatched agent can never run this script or read or write the store: hooks/guard-dispatch-budget.mjs
++ * refuses any non-orchestrator call that names them. The dispatch guard (hooks/guard-dispatch.mjs) consumes an exception when it ADMITS a new
++ * dispatch (a refused dispatch consumes nothing; a retry of the same dispatch consumes nothing more). A store that does not verify grants NOTHING;
++ * `record` over it refuses and names the repair: re-run the same command with --move-broken-store-aside (the file is renamed beside the store, never deleted).
++ *
++ * Exit 0 + one JSON object (record, revoke) or one text line per exception (list) on stdout; exit 2 + one
++ * `DISPATCH-MODEL-EXCEPTION-REFUSED: <code>: <message>` line on stderr otherwise, and every refusal names the step that repairs it.
++ */
++import { existsSync, renameSync } from "node:fs";
++
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { CLAUDE_FAMILY_ALIASES } from "../lib/dispatch-model-enforcement.mjs";
++import {
++  MODEL_EXCEPTION_COUNT_RANGE,
++  MODEL_EXCEPTION_MAX_BY,
++  MODEL_EXCEPTION_MAX_ENTRIES,
++  MODEL_EXCEPTION_MAX_REASON,
++  MODEL_EXCEPTION_MINUTES_RANGE,
++  deriveExceptionStates,
++  exceptionScopeText,
++  readModelExceptionStore,
++  recordModelException,
++  revokeModelException,
++  withModelExceptionLock,
++  writeModelExceptionStore,
++} from "../lib/dispatch-model-exception.mjs";
++
++const REFUSAL_PREFIX = "DISPATCH-MODEL-EXCEPTION-REFUSED";
++const VALUE_FLAGS = new Set(["--model", "--effort", "--dispatch-id", "--count", "--minutes", "--reason", "--by", "--root", "--id"]);
++const BOOLEAN_FLAGS = new Set(["--move-broken-store-aside"]);
++const ALLOWED_FLAGS = Object.freeze({
++  record: ["--model", "--effort", "--dispatch-id", "--count", "--minutes", "--reason", "--by", "--root", "--move-broken-store-aside"],
++  list: ["--root"],
++  revoke: ["--id", "--root"],
++});
++
++export const MODEL_EXCEPTION_USAGE = "usage:\n"
++  + "  node dispatch-model-exception.mjs record --model <opus|sonnet|haiku|fable> [--effort <level>] (--dispatch-id <id> | --count <1..5> | --minutes <1..240>) --reason <text> --by <label> [--root <repo>]\n"
++  + "  node dispatch-model-exception.mjs list [--root <repo>]\n"
++  + "  node dispatch-model-exception.mjs revoke --id <MX-n> [--root <repo>]\n"
++  + "record stores the PO's request as an attribution record (not a signature): --by is the label the PO supplied and has no default; --reason is stored verbatim.\n"
++  + "A dispatch admitted under an exception changes only its model (and effort). `list` shows every exception with its state (live, consumed, expired, revoked).\n";
++
++class Refusal extends Error {
++  constructor(code, message) { super(message); this.code = code; }
++}
++
++function parseArgs(argv) {
++  const [verb, ...rest] = argv;
++  if (!Object.hasOwn(ALLOWED_FLAGS, verb ?? "")) throw new Refusal("unknown-subcommand", `the subcommand must be record, list or revoke; ${MODEL_EXCEPTION_USAGE.split("\n")[0]} (run with --help for the full usage)`);
++  const values = new Map();
++  for (let index = 0; index < rest.length; index += 1) {
++    const flag = rest[index];
++    if (!ALLOWED_FLAGS[verb].includes(flag)) throw new Refusal("unknown-argument", `unknown argument ${JSON.stringify(flag)} for ${verb}; the flags of ${verb} are ${ALLOWED_FLAGS[verb].join(", ")}`);
++    if (values.has(flag)) throw new Refusal("duplicate-argument", `${flag} given twice; give it once`);
++    if (BOOLEAN_FLAGS.has(flag)) { values.set(flag, true); continue; }
++    if (!VALUE_FLAGS.has(flag)) throw new Refusal("unknown-argument", `unknown argument ${JSON.stringify(flag)}`);
++    const value = rest[index + 1];
++    if (typeof value !== "string" || (value.startsWith("--") && value.length > 2)) throw new Refusal("missing-value", `${flag} needs a value`);
++    values.set(flag, value);
++    index += 1;
++  }
++  return { verb, values };
++}
++
++const integerIn = (text, [low, high], flag) => {
++  const value = /^[0-9]{1,3}$/u.test(text) ? Number(text) : NaN;
++  if (!Number.isSafeInteger(value) || value < low || value > high) throw new Refusal(`${flag.slice(2)}-out-of-range`, `${flag} must be an integer from ${low} to ${high}; re-run with a value in that range`);
++  return value;
++};
++
++function recordRequest(values) {
++  const model = values.get("--model");
++  if (model === undefined) throw new Refusal("model-missing", `--model is required: one of ${CLAUDE_FAMILY_ALIASES.join(", ")}`);
++  if (!CLAUDE_FAMILY_ALIASES.includes(model)) throw new Refusal("model-not-allowed", `--model ${JSON.stringify(model)} is not a Claude family alias; the allowed aliases are ${CLAUDE_FAMILY_ALIASES.join(", ")} (an exception names the alias the Agent tool's model parameter takes)`);
++  const by = values.get("--by");
++  if (by === undefined || by.trim() === "") throw new Refusal("by-missing", "--by is required and has no default: it is the label the PO supplied for this request (an agent never invents an operator label, EL-36). Ask the PO which label to record, then re-run with --by \"<that label>\"");
++  if (by.trim() !== by || by.length > MODEL_EXCEPTION_MAX_BY || /[\u0000-\u001f\u007f]/u.test(by)) throw new Refusal("by-invalid", `--by must be one line of up to ${MODEL_EXCEPTION_MAX_BY} characters without leading or trailing space; re-run with the PO's label in that shape`);
++  const reason = values.get("--reason");
++  if (reason === undefined || reason.trim() === "") throw new Refusal("reason-missing", "--reason is required: the PO's stated reason, stored verbatim. Ask the PO, then re-run with --reason \"<that reason>\"");
++  if (reason.trim() !== reason || reason.length > MODEL_EXCEPTION_MAX_REASON || /[\u0000-\u001f\u007f]/u.test(reason)) throw new Refusal("reason-invalid", `--reason must be one line of up to ${MODEL_EXCEPTION_MAX_REASON} characters without leading or trailing space; shorten it and re-run`);
++  const scopes = ["--dispatch-id", "--count", "--minutes"].filter((flag) => values.has(flag));
++  if (scopes.length !== 1) throw new Refusal(scopes.length === 0 ? "scope-missing" : "scope-ambiguous", "give exactly one scope: --dispatch-id <id> (this one dispatch), --count <1..5> (that many new dispatches) or --minutes <1..240> (a time window)");
++  const flag = scopes[0];
++  const scope = flag === "--dispatch-id" ? { kind: "dispatch-id", value: values.get(flag) }
++    : flag === "--count" ? { kind: "count", value: integerIn(values.get(flag), MODEL_EXCEPTION_COUNT_RANGE, flag) }
++      : { kind: "minutes", value: integerIn(values.get(flag), MODEL_EXCEPTION_MINUTES_RANGE, flag) };
++  if (scope.kind === "dispatch-id" && !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(scope.value)) throw new Refusal("dispatch-id-invalid", "--dispatch-id must be the dispatch id of the briefing (letters, digits, . _ : -, up to 128 characters); copy it from the briefing's `Slice:` line");
++  const effort = values.get("--effort") ?? null;
++  if (effort !== null && !/^[a-z]{2,12}$/u.test(effort)) throw new Refusal("effort-invalid", "--effort must be a lowercase effort level such as low, medium, high, xhigh or max");
++  return { model, effort, scope, by, reason };
++}
++
++const rootOf = (values, dependencies) => values.get("--root") ?? dependencies.cwd ?? process.cwd();
++
++function readStore(root, dependencies) {
++  const read = readModelExceptionStore(root, dependencies);
++  if (!read.ok && read.code === "git-common-dir-unresolved") throw new Refusal(read.code, "no git common directory resolves from the working directory; re-run with --root <the repository root>");
++  return read;
++}
++
++function brokenRefusal(read) {
++  return new Refusal("store-does-not-verify", `the model-exception store does not verify (${read.code}), so no exception is honoured. Repair: re-run this same command with --move-broken-store-aside (the broken file is renamed beside the store, never deleted); \`list\` shows the cause`);
++}
++
++function stateLine(row) {
++  const used = row.uses.length === 0 ? "" : `; used by ${[...new Set(row.uses.map((use) => use.dispatchId ?? use.dispatchKey))].join(", ")}`;
++  const left = row.remaining === null ? "" : `; ${row.remaining} left`;
++  return `${row.id} ${row.state} ${row.model}${row.effort === null ? "" : ` effort ${row.effort}`} for ${exceptionScopeText(row.scope)}; requested by the PO at ${row.at} (${row.by}); expires ${row.expiresAt}${left}${used}; reason: ${row.reason}${row.revokedAt === null ? "" : `; revoked ${row.revokedAt}`}`;
++}
++
++/** Runs one subcommand. Policy refusals come back as `{ status: "refused", code, message }`; nothing throws. */
++export function dispatchModelException(argv, dependencies = {}) {
++  try {
++    const { verb, values } = parseArgs(argv);
++    const root = rootOf(values, dependencies);
++    const nowFn = dependencies.nowFn ?? (() => new Date().toISOString());
++    if (verb === "list") {
++      const read = readStore(root, dependencies);
++      if (!read.ok) return { status: "listed", lines: [`the model-exception store does not verify (${read.code}), so no exception is honoured; repair: re-run a record command with --move-broken-store-aside (the broken file is kept beside the store, never deleted)`] };
++      const rows = deriveExceptionStates(read.store, Date.parse(nowFn()));
++      return { status: "listed", lines: rows.length === 0 ? ["no model exception is recorded; record one with: record --model <alias> (--dispatch-id <id> | --count <n> | --minutes <n>) --reason <PO's reason> --by <PO's label>"] : rows.map(stateLine) };
++    }
++    const read = readStore(root, dependencies);
++    if (verb === "revoke") {
++      const id = values.get("--id");
++      if (id === undefined) throw new Refusal("id-missing", "--id is required: an exception id such as MX-1; `list` shows the ids");
++      if (!read.ok) throw new Refusal("store-does-not-verify", `the model-exception store does not verify (${read.code}), so no exception is honoured and there is nothing to revoke; to start clean re-run a record command with --move-broken-store-aside (the broken file is kept beside the store, never deleted)`);
++      return withModelExceptionLock(read.path, () => {
++        const fresh = readModelExceptionStore(root, dependencies);
++        if (!fresh.ok) return { status: "refused", code: "store-does-not-verify", message: `the model-exception store does not verify (${fresh.code}); \`list\` shows the cause` };
++        const revoked = revokeModelException(fresh.store, { target: id, at: nowFn() });
++        if (!revoked.ok) return { status: "refused", code: revoked.code, message: revoked.code === "revoke-already-revoked" ? `${id} is already revoked; \`list\` shows every exception and its state` : `no exception ${id} is recorded; \`list\` shows the ids` };
++        const written = writeModelExceptionStore(fresh.path, revoked.store);
++        return written.ok ? { status: "revoked", result: { schema: "pipeline.dispatch-model-exception-result.v1", status: "revoked", id, digest: revoked.store.digest } } : { status: "refused", code: written.code, message: "the store could not be written; check the directory permissions and re-run" };
++      });
++    }
++    const request = recordRequest(values);
++    const moveAside = values.get("--move-broken-store-aside") === true;
++    if (!read.ok && !moveAside) throw brokenRefusal(read);
++    return withModelExceptionLock(read.path, () => {
++      let store = read.ok ? read.store : null;
++      let movedTo = null;
++      const at = nowFn();
++      if (!read.ok || (moveAside && store.entries.length >= MODEL_EXCEPTION_MAX_ENTRIES)) {
++        // The broken (or full) file is evidence: it is renamed, never deleted, and the new chain starts empty.
++        movedTo = `${read.path}.broken-${at.replace(/[:.]/gu, "-")}`;
++        if (existsSync(read.path)) {
++          try { renameSync(read.path, movedTo); } catch { return { status: "refused", code: "store-move-failed", message: "the broken store could not be renamed aside; check the directory permissions and re-run" }; }
++        } else movedTo = null;
++        store = readModelExceptionStore(root, dependencies).store;
++      }
++      const recorded = recordModelException(store, { ...request, at, aliases: CLAUDE_FAMILY_ALIASES });
++      if (!recorded.ok) {
++        return { status: "refused", code: recorded.code, message: recorded.code === "store-full"
++          ? "the model-exception store holds its maximum number of entries; re-run this same command with --move-broken-store-aside (the full file is renamed beside the store, never deleted)"
++          : "the request was refused by policy; run with --help for the accepted shapes" };
++      }
++      const written = writeModelExceptionStore(read.path, recorded.store);
++      if (!written.ok) return { status: "refused", code: written.code, message: "the store could not be written; check the directory permissions and re-run" };
++      const back = readModelExceptionStore(root, dependencies);
++      if (!back.ok || back.store.digest !== recorded.store.digest) return { status: "refused", code: "store-readback-mismatch", message: "the written store does not verify on read-back; `list` shows the cause" };
++      const entry = recorded.store.entries.at(-1);
++      return { status: "recorded", result: {
++        schema: "pipeline.dispatch-model-exception-result.v1", status: "recorded", id: recorded.id, model: request.model, effort: request.effort, scope: request.scope,
++        by: request.by, requestedAt: entry.at, expiresAt: entry.expiresAt, digest: recorded.store.digest, ...(movedTo === null ? {} : { brokenStoreMovedTo: movedTo }),
++        note: "an attribution record of the PO's request, not a signature; the dispatch guard consumes it when it admits a new dispatch; `list` shows its state",
++      } };
++    });
++  } catch (error) {
++    if (error instanceof Refusal) return { status: "refused", code: error.code, message: error.message };
++    return { status: "refused", code: "exception-internal-error", message: "unexpected failure; nothing was recorded" };
++  }
++}
++
++export function isHelpRequest(argv) {
++  return argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h");
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  if (isHelpRequest(process.argv.slice(2))) {
++    process.stdout.write(MODEL_EXCEPTION_USAGE);
++    process.exit(0);
++  }
++  const outcome = dispatchModelException(process.argv.slice(2));
++  if (outcome.status === "listed") {
++    process.stdout.write(`${outcome.lines.join("\n")}\n`);
++    process.exit(0);
++  }
++  if (outcome.status === "recorded" || outcome.status === "revoked") {
++    process.stdout.write(`${JSON.stringify(outcome.result)}\n`);
++    process.exit(0);
++  }
++  process.stderr.write(`${REFUSAL_PREFIX}: ${outcome.code}: ${outcome.message}\n`);
++  process.exit(2);
++}
+diff --git a/plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs b/plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs
+new file mode 100644
+index 000000000..dda7ca660
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs
+@@ -0,0 +1,184 @@
++// SPDX-License-Identifier: SUL-1.0
++// C30G-M16: the PO model-exception script and its store (record, list, revoke, refusals, chain break, expiry, count, idempotence).
++import assert from "node:assert/strict";
++import { execFileSync, spawnSync } from "node:child_process";
++import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++import { dispatchModelException } from "./dispatch-model-exception.mjs";
++import {
++  MODEL_EXCEPTION_MAX_ENTRIES,
++  consumeModelException,
++  emptyExceptionStore,
++  modelExceptionStorePath,
++  readModelExceptionStore,
++  recordModelException,
++  writeModelExceptionStore,
++} from "../lib/dispatch-model-exception.mjs";
++import { CLAUDE_FAMILY_ALIASES } from "../lib/dispatch-model-enforcement.mjs";
++
++const SCRIPT = fileURLToPath(new URL("./dispatch-model-exception.mjs", import.meta.url));
++const NOON = Date.parse("2026-11-17T12:00:00.000Z");
++const clock = (minutesAfterNoon) => () => new Date(NOON + minutesAfterNoon * 60000).toISOString();
++const sandboxes = [];
++function repository() {
++  const root = mkdtempSync(join(tmpdir(), "model-exception-"));
++  sandboxes.push(root);
++  execFileSync("git", ["init", "-q"], { cwd: root });
++  return root;
++}
++process.on("exit", () => { for (const root of sandboxes) { try { rmSync(root, { recursive: true, force: true }); } catch { /* best effort */ } } });
++const run = (root, argv, minutes = 0) => dispatchModelException([...argv, "--root", root], { nowFn: clock(minutes) });
++const RECORD = ["record", "--model", "fable", "--reason", "design analysis", "--by", "label-from-the-po"];
++const storeFile = (root) => modelExceptionStorePath(join(root, ".git"));
++
++test("MXS-1 record stores the PO's request in a digest-chained store and list shows it live", () => {
++  const root = repository();
++  const first = run(root, [...RECORD, "--count", "2"]);
++  assert.equal(first.status, "recorded", JSON.stringify(first));
++  assert.deepEqual([first.result.id, first.result.model, first.result.scope.kind, first.result.by], ["MX-1", "fable", "count", "label-from-the-po"]);
++  assert.match(first.result.note, /attribution record.*not a signature/u);
++  const second = run(root, ["record", "--model", "opus", "--effort", "max", "--dispatch-id", "FEATURE-A-1", "--reason", "second", "--by", "label-from-the-po"], 1);
++  assert.equal(second.result.id, "MX-2");
++  const store = JSON.parse(readFileSync(storeFile(root), "utf8"));
++  assert.equal(store.entries[1].prevDigest, store.entries[0].digest, "append-only chain");
++  const listed = run(root, ["list"], 2);
++  assert.equal(listed.lines.length, 2);
++  assert.match(listed.lines[0], /^MX-1 live fable for 2 dispatches; requested by the PO at 2026-11-17T12:00:00\.000Z \(label-from-the-po\)/u);
++  assert.match(listed.lines[1], /^MX-2 live opus effort max for dispatch FEATURE-A-1/u);
++  assert.match(run(repository(), ["list"]).lines[0], /no model exception is recorded; record one with/u);
++});
++
++test("MXS-2 --by is required and has no default; --reason, model, scope and ranges are refused with the repair", () => {
++  const root = repository();
++  const without = (flag) => { const copy = [...RECORD, "--count", "1"]; const at = copy.indexOf(flag); copy.splice(at, 2); return copy; };
++  const byMissing = run(root, without("--by"));
++  assert.equal(byMissing.code, "by-missing");
++  assert.match(byMissing.message, /no default.*label the PO supplied.*EL-36/u);
++  assert.equal(run(root, [...without("--by"), "--by", ""]).code, "by-missing", "an empty label is refused too");
++  assert.equal(run(root, [...without("--by"), "--by", "  "]).code, "by-missing");
++  assert.equal(run(root, without("--reason")).code, "reason-missing");
++  assert.equal(run(root, ["record", "--model", "gpt-6", "--count", "1", "--reason", "r", "--by", "b"]).code, "model-not-allowed");
++  assert.match(run(root, ["record", "--model", "gpt-6", "--count", "1", "--reason", "r", "--by", "b"]).message, /opus, sonnet, haiku, fable/u);
++  assert.equal(run(root, RECORD).code, "scope-missing");
++  assert.equal(run(root, [...RECORD, "--count", "1", "--minutes", "5"]).code, "scope-ambiguous");
++  assert.equal(run(root, [...RECORD, "--count", "6"]).code, "count-out-of-range");
++  assert.equal(run(root, [...RECORD, "--count", "0"]).code, "count-out-of-range");
++  assert.equal(run(root, [...RECORD, "--minutes", "241"]).code, "minutes-out-of-range");
++  assert.equal(run(root, [...RECORD, "--dispatch-id", "bad id"]).code, "dispatch-id-invalid");
++  assert.equal(run(root, [...RECORD, "--count", "1", "--effort", "MAX!"]).code, "effort-invalid");
++  assert.equal(run(root, [...without("--reason"), "--reason", "x".repeat(501)]).code, "reason-invalid");
++  assert.equal(run(root, ["record", "--bogus", "1"]).code, "unknown-argument");
++  assert.equal(run(root, ["frobnicate"]).code, "unknown-subcommand");
++  assert.equal(existsSync(storeFile(root)), false, "a refused request leaves no store behind");
++});
++
++test("MXS-3 revoke ends one exception; an unknown or already revoked id is refused naming list", () => {
++  const root = repository();
++  run(root, [...RECORD, "--count", "1"]);
++  const revoked = run(root, ["revoke", "--id", "MX-1"], 5);
++  assert.equal(revoked.status, "revoked");
++  assert.match(run(root, ["list"], 6).lines[0], /^MX-1 revoked fable/u);
++  assert.match(run(root, ["list"], 6).lines[0], /revoked 2026-11-17T12:05:00\.000Z/u);
++  const unknown = run(root, ["revoke", "--id", "MX-9"]);
++  assert.equal(unknown.code, "revoke-unknown-id");
++  assert.match(unknown.message, /list/u);
++  assert.equal(run(root, ["revoke", "--id", "MX-1"]).code, "revoke-already-revoked");
++  assert.equal(run(root, ["revoke"]).code, "id-missing");
++});
++
++test("MXS-4 a window and an unused count or dispatch-id exception expire by time on the injected clock", () => {
++  const root = repository();
++  run(root, [...RECORD, "--minutes", "30"]);
++  run(root, [...RECORD, "--count", "1"]);
++  run(root, [...RECORD, "--dispatch-id", "FEATURE-A-1"]);
++  const states = (minutes) => run(root, ["list"], minutes).lines.map((line) => line.split(" ")[1]);
++  assert.deepEqual(states(29), ["live", "live", "live"]);
++  assert.deepEqual(states(30), ["expired", "live", "live"]);
++  assert.deepEqual(states(1439), ["expired", "live", "live"]);
++  assert.deepEqual(states(1440), ["expired", "expired", "expired"], "an unused count or dispatch-id exception ends after a day");
++});
++
++test("MXS-5 consumption is once per dispatch: a retry burns nothing, a spent count refuses, undo puts the exception back", () => {
++  const root = repository();
++  run(root, [...RECORD, "--count", "1"]);
++  const use = (key) => ({ id: "MX-1", dispatchKey: key, dispatchId: key, model: "fable", effort: null, reused: false });
++  const first = consumeModelException({ root, use: use("FEATURE-A-1"), nowFn: clock(1) });
++  assert.equal(first.ok, true);
++  const afterFirst = readFileSync(storeFile(root), "utf8");
++  const retry = consumeModelException({ root, use: use("FEATURE-A-1"), nowFn: clock(2) });
++  assert.equal(retry.ok, true, "the same dispatch again is admitted");
++  assert.equal(readFileSync(storeFile(root), "utf8"), afterFirst, "and appends nothing");
++  const other = consumeModelException({ root, use: use("FEATURE-A-2"), nowFn: clock(3) });
++  assert.equal(other.ok, false);
++  assert.equal(other.code, "exception-no-longer-live");
++  assert.match(run(root, ["list"], 3).lines[0], /^MX-1 consumed fable.*used by FEATURE-A-1/u);
++  first.undo();
++  assert.match(run(root, ["list"], 3).lines[0], /^MX-1 live fable/u, "a dispatch refused later puts the exception back");
++  assert.equal(consumeModelException({ root, use: use("FEATURE-A-2"), nowFn: clock(4) }).ok, true, "and the next dispatch can take it");
++});
++
++test("MXS-6 a store that does not verify grants nothing, and record refuses with the one runnable repair, which keeps the broken file", () => {
++  const root = repository();
++  run(root, [...RECORD, "--count", "1"]);
++  const tampered = JSON.parse(readFileSync(storeFile(root), "utf8"));
++  tampered.entries[0].reason = "another reason";
++  writeFileSync(storeFile(root), `${JSON.stringify(tampered)}\n`);
++  const read = readModelExceptionStore(root);
++  assert.equal(read.ok, false);
++  assert.equal(read.code, "entry-digest-mismatch");
++  assert.equal(consumeModelException({ root, use: { id: "MX-1", dispatchKey: "FEATURE-A-1", dispatchId: "FEATURE-A-1", model: "fable", effort: null, reused: false } }).ok, false, "a tampered store consumes and grants nothing");
++  assert.match(run(root, ["list"]).lines[0], /does not verify \(entry-digest-mismatch\).*--move-broken-store-aside/u);
++  const refused = run(root, [...RECORD, "--count", "1"]);
++  assert.equal(refused.code, "store-does-not-verify");
++  assert.match(refused.message, /re-run this same command with --move-broken-store-aside.*never deleted/u);
++  assert.equal(run(root, ["revoke", "--id", "MX-1"]).code, "store-does-not-verify");
++  const repaired = run(root, [...RECORD, "--count", "1", "--move-broken-store-aside"], 1);
++  assert.equal(repaired.status, "recorded", JSON.stringify(repaired));
++  assert.equal(repaired.result.id, "MX-1", "the new chain starts empty");
++  assert.match(repaired.result.brokenStoreMovedTo, /store\.json\.broken-2026-11-17T12-01-00-000Z$/u);
++  assert.equal(readdirSync(join(root, ".git", "agent-pipeline", "dispatch-model-exception")).filter((name) => name.includes(".broken-")).length, 1);
++  assert.equal(readModelExceptionStore(root).ok, true);
++  // Garbage that is not JSON is the same case.
++  writeFileSync(storeFile(root), "{not json");
++  assert.equal(readModelExceptionStore(root).code, "store-malformed");
++  assert.equal(run(root, [...RECORD, "--count", "1", "--move-broken-store-aside"], 2).status, "recorded");
++});
++
++test("MXS-7 a full store names the same repair and the flag archives it", () => {
++  const root = repository();
++  let store = emptyExceptionStore();
++  for (let index = 0; index < MODEL_EXCEPTION_MAX_ENTRIES; index += 1) {
++    const next = recordModelException(store, { model: "fable", scope: { kind: "count", value: 1 }, reason: "r", by: "b", at: "2026-11-17T12:00:00.000Z", aliases: CLAUDE_FAMILY_ALIASES });
++    assert.equal(next.ok, true);
++    store = next.store;
++  }
++  assert.equal(recordModelException(store, { model: "fable", scope: { kind: "count", value: 1 }, reason: "r", by: "b", at: "2026-11-17T12:00:00.000Z", aliases: CLAUDE_FAMILY_ALIASES }).code, "store-full");
++  assert.equal(writeModelExceptionStore(storeFile(root), store).ok, true);
++  const refused = run(root, [...RECORD, "--count", "1"]);
++  assert.equal(refused.code, "store-full");
++  assert.match(refused.message, /--move-broken-store-aside/u);
++  assert.equal(run(root, [...RECORD, "--count", "1", "--move-broken-store-aside"]).status, "recorded");
++});
++
++test("MXS-8 a directory that is no git repository is refused naming --root; the CLI prints usage for --help and one refusal line with exit 2", () => {
++  const outside = mkdtempSync(join(tmpdir(), "model-exception-plain-"));
++  sandboxes.push(outside);
++  const refused = run(outside, ["list"]);
++  assert.equal(refused.code, "git-common-dir-unresolved");
++  assert.match(refused.message, /--root/u);
++  const help = spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" });
++  assert.equal(help.status, 0);
++  assert.match(help.stdout, /record --model <opus\|sonnet\|haiku\|fable>/u);
++  const root = repository();
++  const cli = spawnSync(process.execPath, [SCRIPT, "record", "--model", "fable", "--count", "1", "--reason", "r", "--root", root], { encoding: "utf8" });
++  assert.equal(cli.status, 2);
++  assert.match(cli.stderr, /^DISPATCH-MODEL-EXCEPTION-REFUSED: by-missing: --by is required and has no default/u);
++  const ok = spawnSync(process.execPath, [SCRIPT, "record", "--model", "fable", "--count", "1", "--reason", "r", "--by", "label-from-the-po", "--root", root], { encoding: "utf8" });
++  assert.equal(ok.status, 0, ok.stderr);
++  assert.equal(JSON.parse(ok.stdout).id, "MX-1");
++  assert.match(spawnSync(process.execPath, [SCRIPT, "list", "--root", root], { encoding: "utf8" }).stdout, /^MX-1 live fable/u);
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index c115d73b8..ebb13c768 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -188,6 +188,8 @@ A returned `outcome: checkpoint` keeps the reservation live and the agent resuma
+ 
+ `dispatch-budget-grant.mjs` is for Claude agents only; do not read it for another runner. On Codex the route is the checkpoint plus a narrow continuation: the agent returns `outcome: checkpoint` with its continuation card (done, remaining, next step), and the Coordinator dispatches one narrow continuation limited to the remaining step, instead of a grant.
+ 
++A model no configured route selects (first use: a design-tier analysis on the Fable family) is ordered by the PO as a recorded, expiring exception, never by editing `pipeline.user.yaml`: when `guard-dispatch` refuses `DISPATCH-MODEL-UNROUTED` for a Claude family alias, run the one `dispatch-model-exception.mjs record` line the refusal prints, supplying only the `--reason` and the `--by` label the PO gave (never an invented label); `list` shows each exception and its state, `revoke --id` ends one. It is an attribution record, not a signature, it changes only the model (and effort) of the admitted dispatch, and it is Claude-runner only; if the PO declines, re-issue with a configured selector.
++
+ The generator reminds the dispatcher at build time and never refuses (D196): `DBG-CHECKPOINTED-OWNER` names another started, unfinished slice of the same item with the grant-and-resume commands and the release route (`slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`; when the scope must change instead, `--class wrong-premise`, then `goldfish-host-commit-recover.mjs` for the diff it left, then a successor under a new id, roles/elephant.md EL-25a (6)) and is not raised for a slice whose recorded write scope is disjoint from this one (D205: a parallel slice); `DBG-ESTIMATE-ABOVE-BASE` fires when `estimatedToolCalls` exceeds the base cap and `budgetRationale` does not say a grant is planned; `DBG-ESTIMATE-NEEDS-SPLIT` asks for a split along independent criteria when the estimate exceeds twice the base cap plus one grant step of 30.
+ 
+ ## The dispatch-record artifact is not automatic — verify the prompt actually carries it
