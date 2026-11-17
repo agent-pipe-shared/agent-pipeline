@@ -1,0 +1,470 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 263ba02ac..230f19361 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -38,7 +38,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
+ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+-import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
++import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, featurePackageDigestRoute, validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
+ import { COURSE_EVIDENCE_GAP_CODES, FEATURE_ID, courseEvidenceGapText, discardedFeatureIdsOfState, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+@@ -72,6 +72,8 @@ const PROFILE_RIGOR = Object.freeze({ mini: 1, feature: 1, epic: 2 });
+ const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ const refused = (code, reason, extra = {}) => ({ schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "refused", code, reason, ...extra });
++// C30I-S7 (AC-110): a refusal for an invalid manifest whose findings are stale digests also names the sanctioned route to bind the manifest to the changed bytes (never a hand edit); any other invalidity keeps its text.
++const withDigestRoute = (root, manifestPath, reason) => { const route = featurePackageDigestRoute(root, manifestPath); return route === null ? reason : `${reason}. ${route}`; };
+ 
+ /** A repository-relative, forward-slash path with no parent segment: the only kind this writer ever names. */
+ const repositoryRelative = (path) => typeof path === "string" && path !== "" && !isAbsolute(path) && !/^[A-Za-z]:/u.test(path)
+@@ -307,7 +309,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+       const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
+       return refused("FPR-MANIFEST-CONFLICT", checked.ok
+         ? "a valid manifest exists but does not register this envelope as candidate-evidence; it is never overwritten"
+-        : "a manifest exists but is invalid; it is never overwritten", { manifestPath, envelopePath, findings: checked.findings });
++        : withDigestRoute(root, manifestPath, "a manifest exists but is invalid; it is never overwritten"), { manifestPath, envelopePath, findings: checked.findings });
+     }
+   }
+ 
+@@ -469,7 +471,7 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
+   const manifestRead = inspect(root, manifestPath);
+   if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>), which writes the review unit with it`, { manifestPath });
+   const checked = validateFeaturePackage(root, manifestPath);
+-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+   let manifest;
+   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+   if (manifest.artifacts.some((entry) => entry.path === unitPath)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-present", manifestPath, reviewUnitPath: unitPath };
+@@ -550,7 +552,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+     const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === diagnosticRel && entry.class === "candidate-evidence") : null;
+     const present = registered ? inspect(root, diagnosticRel) : null;
+     if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-DIAG-IMMUTABLE", `${diagnosticRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: diagnosticRel });
+-    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++    return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+   }
+   // A path under the feature's evidence directory, a regular file, no symlink on the way.
+   const pathProblem = (path) => {
+@@ -635,7 +637,7 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
+     const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === evidenceRel && entry.class === "candidate-evidence") : null;
+     const present = registered ? inspect(root, evidenceRel) : null;
+     if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
+-    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++    return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+   }
+   // Registered candidate evidence is read back by the course history (CCA-REGISTRATION-SHAPE requires specs/<feature>/evidence/), so a path
+   // directly under the package directory would register here and then end the Critic carry-forward at push time (VEP-CVL-CARRY-RANGE).
+@@ -697,7 +699,7 @@ export function addSpecAddendum({ root: rootInput, state, approvalPath, readAcce
+   let manifest;
+   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+   const checked = validateFeaturePackage(root, manifestPath);
+-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+   const where = { manifestPath, path: approvalPath };
+   if (!SPEC_ADDENDUM_APPROVAL_FILE.test(approvalPath) || !approvalPath.startsWith(`specs/${featureId}/evidence/`)) {
+     return refused("FPR-SPEC-ADDENDUM-PATH", `${approvalPath} is not a Spec addendum approval record of this feature (specs/${featureId}/evidence/spec-addendum-approval-<sha256>.json, written by pipeline-state.mjs approve-spec-addendum)`, where);
+@@ -808,7 +810,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
+   const manifestRead = inspect(root, manifestPath);
+   const checked = validateFeaturePackage(root, manifestPath);
+-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+   let manifest;
+   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+   // Idempotent replay: a registered lineage record of this packet is the answer, before anything is compiled.
+@@ -1049,7 +1051,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+   const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
+   const manifestRead = inspect(root, manifestPath);
+   const checked = validateFeaturePackage(root, manifestPath);
+-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+   let manifest;
+   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+   // The registered history tail: the lineage record with the highest round.
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index 78fdcd28b..d266586b3 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -10,6 +10,7 @@
+ import { createHash } from "node:crypto";
+ import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
+ 
+ export const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
+@@ -226,6 +227,46 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
+   return { ok: findings.length === 0, findings, receipt, rebinds };
+ }
+ 
++const STATE_WRITER_PATH = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
++
++/**
++ * C30I-S7 (AC-110): the sanctioned route for a manifest whose bound digests no longer match the bytes of its files, as text for the refusals that carry the
++ * `FTP-ARTIFACT-<n>: digest does not bind file bytes` finding (the finding strings themselves stay as they are: other readers compare them). Read-only: it
++ * names, never rebinds. `null` when no entry is stale.
++ *
++ * It adds no way to rebind a digest. A `mutable` entry has its explicit agent-run verb (`feature-package-rebind-mutable`, PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND);
++ * an `immutable` or `append-only` entry stays with the PO-signed `feature-package-reconcile` ceremony, whose signing command and plan digest the owning command
++ * (`continuity-result-bootstrap-plan`, which calls `planFeaturePackageReconcile` and renders the critical-action request) prints, so they are named, never recomputed here.
++ */
++export function featurePackageDigestRoute(rootDir = process.cwd(), manifestPath) {
++  const root = resolve(rootDir);
++  let value;
++  try { value = JSON.parse(readFileSync(join(root, manifestPath), "utf8")); } catch { return null; }
++  const id = value?.feature?.id;
++  if (!SAFE_ID.test(id ?? "") || !Array.isArray(value?.artifacts)) return null;
++  const stale = [];
++  for (const [index, artifact] of value.artifacts.entries()) {
++    if (!object(artifact) || !SHA256.test(artifact.sha256 ?? "") || !featurePackageArtifactPath(root, id, artifact.class, artifact.path)) continue;
++    const file = regularFile(root, artifact.path, [], "FTP-ROUTE");
++    if (!file) continue;
++    const current = digest(readFileSync(join(root, file)));
++    if (current !== artifact.sha256) stale.push({ index, path: artifact.path, class: artifact.class, mutability: artifact.mutability, bound: artifact.sha256, current });
++  }
++  if (stale.length === 0) return null;
++  const mutable = stale.filter((entry) => entry.mutability === "mutable");
++  const gated = stale.filter((entry) => entry.mutability !== "mutable");
++  const named = (entries) => entries.map((entry) => entry.path).join(", ");
++  const parts = [
++    `Stale digest in ${manifestPath} (feature ${id}): ${stale.map((entry) => `FTP-ARTIFACT-${entry.index} ${entry.path} (${entry.class}, ${entry.mutability}) is bound to ${entry.bound} but its bytes hash to ${entry.current}`).join("; ")}.`,
++    "The manifest is never edited by hand. If the file as it is now is the intended content, the manifest is the stale side and the Pipeline's own route rebinds its digest; if the file is not the intended content, restore the bytes that hash to the bound digest instead.",
++  ];
++  if (mutable.length > 0) parts.push(`Mutable (${named(mutable)}): run node ${STATE_WRITER_PATH} feature-package-rebind-mutable --root ${root} --manifest ${manifestPath} (agent-run, no signature; it rebinds only mutable entries and prints each before and after digest).`);
++  if (gated.length > 0) {
++    parts.push(`Immutable or append-only (${named(gated)}): the digest is rebound only by the feature-package-reconcile ceremony, which needs the PO's own signature in an attended terminal, never the agent's. Read the pending plan with node ${STATE_WRITER_PATH} continuity-result-bootstrap-plan in the project root ${root} (read-only, no flags; for a feature with Continuity authority it prints preview, planSha256, signatureCommand and reconcileCommand while the package lags its bytes). Hand the PO exactly the signatureCommand line; afterwards run reconcileCommand (feature-package-reconcile --root ${root} --manifest ${manifestPath} --plan-sha256 <planSha256>, with the PO's name and the three proof files the signing step printed). A plan whose preview.requiredAuthority is "agent" moves only the Result entry and needs no signature: run its reconcileCommand as printed. A signature names HEAD: commit nothing between it and the reconcile.`);
++  }
++  return parts.join(" ");
++}
++
+ /**
+  * A non-mutating, idempotent transition preview by default. Application remains a
+  * human-gated writer. `options.autoRebindMutable` (default false) is passed straight
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.test.mjs b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+index f855bca67..24ccbec89 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.test.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+@@ -317,3 +317,43 @@ try {
+   assert.match(foreign.findings.join("\n"), /FTP-ARTIFACT-0: path must be canonical within specs\/renamed-feature\/ or, for the approved PRD or Spec, within another specs\/ folder that is no feature package/u);
+   console.log("feature-package-topology: approved PRD/Spec path outside the package, 12 passed, 0 failed");
+ } finally { rmSync(approvedPathRoot, { recursive: true, force: true }); }
++
++// ---- C30I-S7 (AC-110): a stale artifact digest is reported with the sanctioned route, never as a bare finding ----
++// The finding strings themselves stay byte-identical (other readers compare them); the route rides in a separate helper the refusal sites call.
++const routeRoot = mkdtempSync(join(tmpdir(), "feature-topology-route-"));
++try {
++  const id = "route-feature"; const base = `specs/${id}`; const manifestPath = `${base}/lifecycle.json`;
++  const topology = await import("./feature-package-topology.mjs");
++  const artifacts = [
++    ["prd", "prd.md", true, "mutable", "active"], ["spec", "spec.md", true, "mutable", "active"], ["acceptance", "acceptance.md", true, "mutable", "active"], ["result", "result.md", true, "append-only", "active"], ["candidate-evidence", "evidence/verify.json", false, "immutable", "retain"],
++  ].map(([klass, name, authority, mutability, retention]) => ({ class: klass, ...fileIn(routeRoot, `${base}/${name}`, `${klass}\n`), authority, mutability, retention }));
++  fileIn(routeRoot, manifestPath, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "implementing", artifacts, candidate: null, supersedes: null })}\n`);
++  assert.equal(validateFeaturePackage(routeRoot, manifestPath).ok, true);
++  assert.equal(topology.featurePackageDigestRoute(routeRoot, manifestPath), null, "a package whose digests bind its bytes has no route to name");
++  const manifestBefore = readFileSync(join(routeRoot, manifestPath), "utf8");
++  // The reported case: the acceptance entry and the Result entry were committed after the registration, so the manifest binds their OLD bytes.
++  const acceptance = artifacts[2]; const result = artifacts[3];
++  const acceptanceNow = fileIn(routeRoot, acceptance.path, "acceptance edited later\n"); const resultNow = fileIn(routeRoot, result.path, "result with the reconciliation fence\n");
++  const findings = validateFeaturePackage(routeRoot, manifestPath).findings;
++  assert.ok(findings.includes("FTP-ARTIFACT-2: digest does not bind file bytes") && findings.includes("FTP-ARTIFACT-3: digest does not bind file bytes"), "the finding strings stay as they are");
++  const route = topology.featurePackageDigestRoute(routeRoot, manifestPath);
++  assert.equal(typeof route, "string");
++  for (const expected of [acceptance.path, result.path, acceptance.sha256, acceptanceNow.sha256, result.sha256, resultNow.sha256, "FTP-ARTIFACT-2", "FTP-ARTIFACT-3", id]) assert.ok(route.includes(expected), `names ${expected}`);
++  assert.match(route, /never edited by hand/u);
++  assert.match(route, /file as it is now is the intended content[\s\S]*manifest is the stale side/u);
++  // mutable entry: the explicit agent-run rebind verb, with its arguments filled
++  assert.match(route, new RegExp(`feature-package-rebind-mutable --root ${routeRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")} --manifest ${manifestPath.replace(/\./gu, "\\.")}`, "u"));
++  // append-only entry: the PO-signed reconcile, read from the plan the owning command prints; the signature is the PO's, in an attended terminal
++  assert.match(route, /continuity-result-bootstrap-plan/u);
++  assert.match(route, /feature-package-reconcile/u);
++  assert.match(route, /PO's own signature[\s\S]*attended terminal/u);
++  assert.equal(readFileSync(join(routeRoot, manifestPath), "utf8"), manifestBefore, "naming the route never writes the manifest");
++  // only a mutable entry stale: no PO signature is demanded; only an append-only entry stale: no rebind-mutable verb is named
++  fileIn(routeRoot, result.path, "result\n");
++  const mutableOnly = topology.featurePackageDigestRoute(routeRoot, manifestPath);
++  assert.match(mutableOnly, /feature-package-rebind-mutable/u); assert.doesNotMatch(mutableOnly, /attended terminal|feature-package-reconcile/u);
++  fileIn(routeRoot, acceptance.path, "acceptance\n"); fileIn(routeRoot, result.path, "result with the reconciliation fence\n");
++  const appendOnly = topology.featurePackageDigestRoute(routeRoot, manifestPath);
++  assert.match(appendOnly, /attended terminal/u); assert.doesNotMatch(appendOnly, /feature-package-rebind-mutable/u);
++  console.log("feature-package-topology: stale digest names its route, 1 passed, 0 failed");
++} finally { rmSync(routeRoot, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 12311c256..488b8bbb7 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -30,7 +30,7 @@ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } fro
+ import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+-import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
++import { featurePackageDigestRoute, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import {
+   assertPrivateRegularFile,
+   ensurePrivateDirectory,
+@@ -735,7 +735,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+       const checked = validateFeaturePackage(root, registeredManifest);
+       if (!checked.ok) {
+         const digestOnly = checked.findings.every((finding) => /: digest does not bind file bytes$/u.test(finding));
+-        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256 and whether the agent runs it or the PO signs it), then plan this transition again on the same lifecycle` : ""}`);
++        // C30I-S7 (AC-110): the refusal names the entry, both digests and the sanctioned route (never a hand edit of the manifest).
++        const digestRoute = digestOnly ? featurePackageDigestRoute(root, registeredManifest) : null;
++        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256 and whether the agent runs it or the PO signs it), then plan this transition again on the same lifecycle` : ""}${digestRoute === null ? "" : `. ${digestRoute}`}`);
+       }
+       const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
+       for (const [kind, path, digest] of [
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index dd8b01f82..a74e3cac2 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -582,6 +582,35 @@ test("process: registered package digest drift blocks close preparation before a
+   assert.equal(f.refused.code, "CLOSE-PACKAGE");
+ });
+ 
++// C30I-S7 (AC-110): the same refusal names the entry, both digests and the sanctioned route (the PO-signed reconcile for an append-only Result entry), never a hand edit of the manifest.
++test("process: a stale registered package at the close names the entry, both digests and the PO-signed reconcile route", () => {
++  const f = processFixture("package-drift-route", {
++    beforePrepared({ root, paths }) {
++      writeFileSync(join(root, "specs/feature", "acceptance.md"), "acceptance.md\n");
++      writeFileSync(join(root, "specs/feature", "candidate-evidence.md"), "candidate-evidence.md\n");
++      const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: digest(readFileSync(join(root, path))), authority, mutability, retention: "active" });
++      writeJson(join(root, "specs/feature/lifecycle.json"), {
++        schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++        artifacts: [
++          artifact("prd", paths.prd, true, "mutable"), artifact("spec", paths.spec, true, "immutable"),
++          artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++          { ...artifact("result", paths.result, true, "append-only"), sha256: h("f") },
++          artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++        ], candidate: null, supersedes: null,
++      });
++    },
++    expectPreparedRefusal: "CLOSE-PACKAGE",
++  });
++  const manifest = JSON.parse(readFileSync(join(f.root, "specs/feature/lifecycle.json"), "utf8"));
++  const result = manifest.artifacts[3];
++  const message = f.refused.message;
++  assert.match(message, /FTP-ARTIFACT-3: digest does not bind file bytes/u, "the finding is still printed as it was");
++  for (const expected of [result.path, h("f"), digest(readFileSync(join(f.root, result.path))), "feature-package-reconcile", "continuity-result-bootstrap-plan"]) assert.ok(message.includes(expected), `names ${expected}: ${message}`);
++  assert.match(message, /PO's own signature[\s\S]*attended terminal/u);
++  assert.match(message, /never edited by hand/u);
++  assert.doesNotMatch(message, /feature-package-rebind-mutable/u, "no mutable entry is stale, so no rebind verb is named");
++});
++
+ // N31/N32 (D210): the refusal for a Continuity close request that is not bound to the close-ready State names the rule
+ // that failed (the three closeEvidence rules) and the skill section that carries the whole ordered route.
+ test("process: a close request whose closeEvidence is the Result is refused with the closeEvidence rules and the skill section named", () => {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index c78246bce..528882fc7 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -363,6 +363,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     // checkpointed, so the one-shot opens that lifecycle itself and drives the entries through the route. A rerun finds the open lifecycle again, also one an agent started by hand.
+     const coordinatorOf = (lifecycle) => { try { return command(runner, process.execPath, [COORDINATOR, "inspect", "--root", root, "--lifecycle", lifecycle], "ONESHOT-INSPECT"); } catch { return null; } };
+     const ownerRouteRequired = (() => { try { return existsSync(join(common(), "agent-pipeline", "session-authority", "catalogue.json")); } catch { return false; } })();
++    // C30I-S7 (AC-110): a PO-run `session-authority-repair.mjs move-aside` retains the whole registry, catalogue included, under session-authority-abandoned (the directory name ends in
++    // `-repair-move-aside`) and leaves an open Close lifecycle behind. `ownerRouteRequired` is then false, and that is right for the ROUTE (the owner route refuses COR-NO-CATALOGUE; the State entries run
++    // directly), but the RESUME of the lifecycle the owner-route close opened must not turn into a direct close of a different kind: it is adopted and requalified exactly as before the move-aside.
++    // The signal is the retained aside, so a repository that never had an owner-route close (no such directory) keeps its direct behaviour unchanged.
++    const ownerRouteMovedAside = !ownerRouteRequired && (() => { try { return readdirSync(join(common(), "agent-pipeline", "session-authority-abandoned")).some((name) => name.endsWith("-repair-move-aside")); } catch { return false; } })();
++    const ownerRouteResume = ownerRouteRequired || ownerRouteMovedAside;
+     const onlyOpenLifecycle = () => {
+       let names;
+       try { names = readdirSync(join(common(), "agent-pipeline", "publication-close")); } catch { return null; }
+@@ -372,7 +378,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       });
+       return open.length === 1 ? open[0] : null;
+     };
+-    if (ownerRouteRequired && resumeLifecycleId === null) resumeLifecycleId = onlyOpenLifecycle();
++    if (ownerRouteResume && resumeLifecycleId === null) resumeLifecycleId = onlyOpenLifecycle();
+     const ensureOwnerLifecycle = () => {
+       const lifecycle = resumeLifecycleId ?? `${featureId}-close`;
+       const flags = ["--root", root, "--lifecycle", lifecycle, "--actor", actor];
+@@ -385,7 +391,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     };
+     // The first pass stopped before it wrote the requests a resume reads (an agent's hand-started lifecycle has none either): the evidence stages still have to run.
+     const firstPassUnfinished = () => !existsSync(resolve(root, auditRequestPath)) || (state.continuity !== null && typeof state.continuity === "object" && !existsSync(resolve(root, closeRequestPath)));
+-    const requalify = resumeLifecycleId !== null && (packageAt().moved || (ownerRouteRequired && firstPassUnfinished())) && coordinatorStillBeforePrepared();
++    const requalify = resumeLifecycleId !== null && (packageAt().moved || (ownerRouteResume && firstPassUnfinished())) && coordinatorStillBeforePrepared();
+     const again = requalify ? resumeLifecycleId : null;
+     if (resumeLifecycleId === null || requalify) {
+       let accepted = null;
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index f85a7cee1..bb30b0140 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -279,7 +279,7 @@ const SIGNATURE_COMMAND = { executable: "node", argv: ["po-human-approval.mjs",
+ // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
+ // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
+ // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
+-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false } = {}) {
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false, movedAside = false } = {}) {
+   // C30D-G1: `bootstrap` names what the Result bootstrap stand-ins answer (a refused plan by default, so the cases written before the close ran the bootstrap itself keep their stop); `ownerRoute` gives the repository a session-authority catalogue.
+   const independenceChecks = []; const gateChangeChecks = []; const ownerRouteCalls = []; let retired = false; let bootstrapped = false;
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+@@ -298,13 +298,24 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+   const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
+   if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
+   if (ownerRoute) { mkdirSync(join(root, ".git/agent-pipeline/session-authority"), { recursive: true }); writeFileSync(join(root, ".git/agent-pipeline/session-authority/catalogue.json"), "{}\n"); mkdirSync(join(root, ".git/agent-pipeline/publication-close/lc-1"), { recursive: true }); }
++  // C30I-S7 (AC-110): `movedAside` is the repository after a PO-run `session-authority-repair.mjs move-aside`: the catalogue is gone, the registry sits retained under session-authority-abandoned (the directory name is the one the move-aside writes), and the close lifecycle lc-1 stays open.
++  if (movedAside) {
++    const aside = join(root, ".git/agent-pipeline/session-authority-abandoned/20261117101500-0a1b2c3d-repair-move-aside");
++    mkdirSync(aside, { recursive: true }); writeFileSync(join(aside, "catalogue.json"), "{}\n"); writeFileSync(join(aside, "repair.json"), `${JSON.stringify({ schema: "pipeline.session-authority-repair-move-aside.v1", reason: "fixture", movedAt: "2026-11-17T10:15:00.000Z" })}\n`);
++    mkdirSync(join(root, ".git/agent-pipeline/publication-close/lc-1"), { recursive: true });
++  }
+   const calls = []; let phase = startPhase ?? "none"; let addendaPending = addendaWritten;
+   const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
+   const flag = (argv, name) => argv[argv.indexOf(name) + 1];
+   const runner = (executable, argv) => {
+     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
+     // The owner route forwards the State argv after `--` to the same State writer stand-ins.
+-    if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs") { const inner = argv.slice(argv.indexOf("--") + 1); ownerRouteCalls.push(inner); return runner(executable, [STATE_WRITER, ...inner]); }
++    // C30I-S7: like the real route (COR-NO-CATALOGUE), the stand-in refuses a repository without a catalogue, so a close that picks the owner route there cannot pass green.
++    if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs") {
++      const inner = argv.slice(argv.indexOf("--") + 1); ownerRouteCalls.push(inner);
++      if (!existsSync(join(root, ".git/agent-pipeline/session-authority/catalogue.json"))) return { status: 2, stdout: "", stderr: "COR-NO-CATALOGUE: this project has no session-authority catalogue, so the entry needs no owner: run it on the direct route\n" };
++      return runner(executable, [STATE_WRITER, ...inner]);
++    }
+     const script = argv[0].split("/").at(-1); const sub = argv[1];
+     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
+     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
+@@ -1200,6 +1211,64 @@ test("C22 CGR-06: a resumed close never asks (the question belongs to the eviden
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// ---- C30I-S7 (AC-110): a close resumed after a move-aside keeps the owner-route resume behaviour ----
++// The first pass wrote the audit request and then stopped before the close request existed (a PO-run move-aside removed the catalogue in between).
++const firstPassStopped = (f) => writeFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), `${JSON.stringify({ criticVerifyLifecycleId: "d".repeat(64) })}\n`);
++const closeRequestOf = (f) => join(f.root, "specs/feature-abc/evidence/close-request.json");
++
++test("C30I-S7: a resume after a move-aside requalifies and writes the close request on the direct route instead of ending in CLOSE-PATH-MISSING", () => {
++  const f = oneShotFixture({ continuity: true, movedAside: true, startPhase: "checkpointed" });
++  try {
++    firstPassStopped(f);
++    assert.equal(existsSync(closeRequestOf(f)), false);
++    const result = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
++    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 600));
++    assert.ok(result.stages.includes("requalify-candidate"), result.stages.join());
++    assert.equal(existsSync(closeRequestOf(f)), true, "the close request the coordinator reads was written");
++    assert.equal(JSON.parse(readFileSync(closeRequestOf(f), "utf8")).schema, "pipeline.continuity-close.v0");
++    assert.deepEqual(f.ownerRouteCalls, [], "no catalogue, so the State entries run on the direct route (the owner route refuses COR-NO-CATALOGUE)");
++    assert.equal(f.calls.includes("close-coordinator plan-start"), false, "the open lifecycle is continued, never restarted");
++    assert.equal(result.resumeLifecycleId, "lc-1");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30I-S7: a run without --resume-lifecycle-id finds the one open lifecycle after a move-aside and continues it instead of starting a second close", () => {
++  const f = oneShotFixture({ continuity: true, movedAside: true, startPhase: "checkpointed" });
++  try {
++    firstPassStopped(f);
++    const result = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 600));
++    assert.equal(result.resumeLifecycleId, "lc-1", "the open lifecycle was adopted");
++    assert.equal(f.calls.includes("close-coordinator plan-start"), false, "no second lifecycle was started");
++    assert.equal(existsSync(closeRequestOf(f)), true);
++    assert.deepEqual(f.ownerRouteCalls, []);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30I-S7: a repository that never had an owner route keeps its direct resume exactly as it was (no requalify, no close request written)", () => {
++  const f = oneShotFixture({ continuity: true, startPhase: "checkpointed" });
++  try {
++    firstPassStopped(f);
++    const result = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
++    assert.equal(result.stages?.includes("requalify-candidate") ?? false, false, JSON.stringify(result).slice(0, 300));
++    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false);
++    assert.equal(existsSync(closeRequestOf(f)), false);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30I-S7: after a move-aside a lifecycle past the prepared phase, or a first pass that did finish, is not requalified", () => {
++  for (const options of [{ startPhase: "tracked-close-finalized" }, { startPhase: "checkpointed", finished: true }]) {
++    const f = oneShotFixture({ continuity: true, movedAside: true, startPhase: options.startPhase });
++    try {
++      firstPassStopped(f);
++      if (options.finished) writeFileSync(closeRequestOf(f), "{}\n");
++      const result = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
++      assert.equal(result.stages?.includes("requalify-candidate") ?? false, false, JSON.stringify(options));
++      assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false, JSON.stringify(options));
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++});
++
+ // ---- C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form, and a decline route that returns the feature to a correction round ----
+ const GERMAN_BUG_REPORT = "Man kann die raeder in level 2 nicht drehen. sonst gut"; // the answer a Codex greenfield human gave to the acceptance question
+ test("C28: the acceptance question states the one fixed yes form and the stop names both ways on", () => {
+diff --git a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+index 78f1108f2..e15f177cd 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+@@ -12,7 +12,7 @@ import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatMo
+ import {
+   PUSH_THREAT_MODEL_UNCHANGED_MARKER, collectPushThreatModelFacts, isPushThreatModelTemplateUnchanged, renderPushThreatModel,
+ } from "../lib/push-threat-model-materialize.mjs";
+-import { registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import { PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ import { REGISTER_FEATURE_PACKAGE_HELP, pushThreatModelReadback, runRegisterFeaturePackage } from "./register-feature-package.mjs";
+@@ -308,6 +308,61 @@ test("SUP9: a re-approval rebuilds a flagged manifest only with the same flag: t
+   assert.equal(validateFeaturePackage(root, `specs/${SUCCESSOR}/lifecycle.json`).ok, true);
+ });
+ 
++// C30I-S7 (AC-110): the manifest of a registered package binds the Result and acceptance bytes of the registration; committed later, they leave it stale. Every
++// FPR-MANIFEST-CONFLICT of that state names the entry, both digests and the sanctioned route, and the manifest is never touched.
++function staleRegistered() {
++  const root = successorRoot(), state = approvedState(root);
++  // A successor of a discarded feature: its flagged manifest is never rebuilt by a plain re-approval (SUP9), so a stale one meets FPR-MANIFEST-CONFLICT.
++  assert.equal(register(root, state, PREDECESSOR).status, "registered");
++  const manifest = JSON.parse(sameBytes(root));
++  const bound = (kind) => manifest.artifacts.find((entry) => entry.class === kind);
++  // The registration binds the generated acceptance pointer and Result record as immutable entries (a rebuilt manifest binds found ones as mutable and append-only) and the Spec as mutable.
++  const acceptance = bound("acceptance"), result = bound("result"), spec = bound("spec");
++  assert.deepEqual([acceptance.mutability, result.mutability, spec.mutability], ["immutable", "immutable", "mutable"]);
++  const second = approvedState(root, { tag: "two" });
++  put(root, acceptance.path, "acceptance entry committed after the registration\n");
++  put(root, result.path, "# Result\n\nresult-reconciliation fence committed after the registration\n");
++  put(root, spec.path, "# Spec\nAC-1 behavior, edited after the registration\n");
++  return { root, state, second, acceptance, result, spec, once: sameBytes(root) };
++}
++function assertRouteNamed(reason, f) {
++  assert.match(reason, /it is never (amended|overwritten)/u, "the refusal itself is unchanged");
++  for (const entry of [f.acceptance, f.result, f.spec]) for (const expected of [entry.path, entry.sha256, sha(readFileSync(join(f.root, entry.path)))]) assert.ok(reason.includes(expected), `the reason names ${expected}: ${reason}`);
++  assert.ok(reason.includes(SUCCESSOR));
++  assert.match(reason, /feature-package-rebind-mutable --root \S+ --manifest specs\/feature-b\/lifecycle\.json/u, "the mutable Spec entry has its agent-run verb");
++  assert.match(reason, /feature-package-reconcile[\s\S]*PO's own signature[\s\S]*attended terminal/u, "the immutable acceptance and Result entries need the PO's signature");
++  assert.match(reason, /never edited by hand/u);
++}
++
++test("S7-1: a registration that meets a manifest stale against committed acceptance and Result bytes names the route with both digests, and writes nothing", () => {
++  const f = staleRegistered();
++  const result = register(f.root, f.second);
++  assert.equal(result.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(result));
++  assertRouteNamed(result.reason, f);
++  assert.equal(sameBytes(f.root), f.once, "the manifest is never amended by the refusal");
++});
++
++test("S7-2: the Verify evidence registration and the review-unit registration name the same route", () => {
++  const f = staleRegistered();
++  const evidence = addVerifyEvidence({ root: f.root, state: f.state, path: `specs/${SUCCESSOR}/evidence/verify-candidate.json`, readAcceptedDeliveryContract: envelopeReader });
++  assert.equal(evidence.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(evidence));
++  assertRouteNamed(evidence.reason, f);
++  const unit = addCriticReviewUnit({ root: f.root, state: f.state, readAcceptedDeliveryContract: envelopeReader });
++  assert.equal(unit.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(unit));
++  assertRouteNamed(unit.reason, f);
++  assert.equal(sameBytes(f.root), f.once);
++});
++
++test("S7-3: a manifest that is invalid for another reason keeps its refusal text unchanged (no route is invented)", () => {
++  const root = successorRoot(), state = approvedState(root);
++  assert.equal(register(root, state, PREDECESSOR).status, "registered");
++  const broken = JSON.parse(sameBytes(root)); broken.artifacts[0].retention = "nonsense";
++  put(root, `specs/${SUCCESSOR}/lifecycle.json`, `${JSON.stringify(broken, null, 2)}\n`);
++  const result = register(root, approvedState(root, { tag: "two" }));
++  assert.equal(result.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(result));
++  assert.equal(result.reason, "a manifest exists but is invalid; it is never overwritten");
++});
++
+ test("SUP10: the CLI accepts exactly --root <root> --supersedes <id> as the new shape, names it in the help, and refuses every other composition FPR-ARGS", () => {
+   const root = tempRoot();
+   const run = (argv) => { let text = ""; const code = runRegisterFeaturePackage(argv, (chunk) => { text += chunk; }); return { code, out: JSON.parse(text) }; };
