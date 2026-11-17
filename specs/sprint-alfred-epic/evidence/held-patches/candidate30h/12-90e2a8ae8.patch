@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index 42edc8d8b32c1dbadd9c6cf1a2cc32c151e553a4..dc26b2dcc1f66f7c620efe3ca021390ca4cfd791 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -31,6 +31,13 @@
+       "antigravity": "see `references/antigravity-native-dispatch.md`",
+       "owner": "scripts/dispatch-record-write.mjs"
+     },
++    {
++      "topic": "Model exception",
++      "claude": "a PO-recorded, expiring exception admits one model outside the routing",
++      "codex": "not applicable (no tool-layer model parameter to admit)",
++      "antigravity": "not applicable (the native alias list is fixed)",
++      "owner": "scripts/dispatch-model-exception.mjs"
++    },
+     {
+       "topic": "Own session descriptor at close",
+       "claude": "derived for Claude",
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index afcfa25730347fa16cba2f4fd0351329a4efefed..874b886c10c5f0df2bc998dbaf0812de54215537 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -172,6 +172,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
+ | Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
+ | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
+ | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |
++| Model exception | a PO-recorded, expiring exception admits one model outside the routing | not applicable (no tool-layer model parameter to admit) | not applicable (the native alias list is fixed) |
+ | Own session descriptor at close | derived for Claude | derived for the closing runner | derived for the closing runner |
+ | Close entry | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` |
+ | Telemetry row at close | `usage-ledger.mjs` | not available | not available |

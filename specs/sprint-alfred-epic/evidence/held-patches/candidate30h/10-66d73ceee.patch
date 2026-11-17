@@ -1,0 +1,16 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 70d6c41dadcb0069d2800a33a5b63535f2cccbff..3c5cab5e743f29a9fc926d13ea006dc589f7eb30 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -492,7 +492,10 @@
+           "CCA095",
+           "CCA096",
+           "CCA097",
+-          "CCA098"
++          "CCA098",
++          "CCA099",
++          "CCA100",
++          "CCA101"
+         ],
+         "maxBytes": 65536
+       }

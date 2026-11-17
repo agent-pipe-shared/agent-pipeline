@@ -1,0 +1,33 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index faece1739f344b4573b320b0fc1173da33512016..003b6a1953f0be3f70ee48ed1d8c50fa1f1165fb 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -167,7 +167,11 @@ below assumes it holds and is written to catch a change that would break it.
+   dynamic `import()` edges, resolved via a declared table rather than the
+   static scanner, plus two unrelated pre-existing gaps GMWKC01 found already
+   open) added: `hooks/guard-dispatch-budget.mjs`,
+-  followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh;
++  followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh and
++  `lib/dispatch-model-exception.mjs` (2026-11-17: the PO-recorded model exception
++  store, imported by `hooks/guard-dispatch.mjs` and `lib/dispatch-model-enforcement.mjs`,
++  so a window covering it would let one edit decide which model a dispatch is
++  admitted on);
+   the original group continues with `lib/plan-authority-staging-guard.mjs`,
+   `lib/security-completeness-gate.mjs`,
+   `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 2871b371a2d705269fbb8247431f3677f2d920de..5671f223972e1fa50f0b2e84c694f3e45a59bb7d 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -319,6 +319,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // non-decomposable closure assertion, not by the dynamic-import fix.
+   "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+   "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
++  // 2026-11-17: dispatch-model-exception.mjs holds the PO-recorded model exception store and the
++  // consumption rule; guard-dispatch.mjs and dispatch-model-enforcement.mjs import it, so it is
++  // kernel by construction: a window covering it would let one edit decide which model a
++  // dispatch is admitted on.
++  "plugins/pipeline-core/lib/dispatch-model-exception.mjs",
+   "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
+   "plugins/pipeline-core/lib/security-completeness-gate.mjs",
+   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",

@@ -1,0 +1,15 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 3c5cab5e743f29a9fc926d13ea006dc589f7eb30..101f09e7577e2d3088d80ba7a7652a00446706ad 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1327,7 +1327,9 @@
+           "GDM02",
+           "GDM03",
+           "GDM04",
+-          "GDM05"
++          "GDM05",
++          "GDM06",
++          "GDM07"
+         ],
+         "maxBytes": 65536
+       }
