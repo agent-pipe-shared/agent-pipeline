@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index efe2a73242c565983ab4fad8b2edc2a419b55cd5..b368e3f5a8a94d825f18e774583498d72f9df2ba 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -2755,6 +2755,7 @@
+       "surfaceIds": [
+         "verify-phase:harness/scripts/verify.mjs:chat-gate-ceremony-tests",
+         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-signed-integration-tests",
++        "verify-phase:harness/scripts/verify.mjs:critical-action-approval-card-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-signature-round-trip-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 7d3be89019f91ee9ec294c47499dbf2401aeca4b..56036749f78898272a29919ee87170c3e0b9d8ab 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4078,6 +4078,12 @@
+         "maxBytes": 65536
+       }
+     },
++    {
++      "name": "critical-action-approval-card-tests",
++      "file": "plugins/pipeline-core/lib/critical-action-approval-card.test.mjs",
++      "invariantPinned": "The attended signature confirmation opens with a plain-language card of what is signed, in English and the configured human-facing language, built only from facts the request holds, for every critical action kind.",
++      "nonOverlapNote": "Unique unit witness of the pure card builder; po-human-approval-tests pins the integration into the authorize-critical confirmation."
++    },
+     {
+       "name": "security-remote-identity-tests",
+       "file": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",

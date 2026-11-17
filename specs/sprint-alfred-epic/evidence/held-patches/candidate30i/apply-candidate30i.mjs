@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 30i: 11 held patches exported from the build clone chain 6d8226f72..69ac37983
+# PO apply script for candidate 30i: 12 held patches exported from the build clone chain 6d8226f72..a9e4bd3e2
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -25,6 +25,7 @@ step 08-af69eb9ec 'docs(plans): state machine simplification analysis and staged
 step 09-511f8f66c 'fix(obligations): the generated agent obligations teach the one-command commit and state the guard-push limit exactly'
 step 10-6df52f018 'feat(approval): the attended signature confirmation opens with a plain-language card of what is signed'
 step 11-69ac37983 'docs(plans): the state machine analysis carries its last refinement'
+step 12-a9e4bd3e2 'test(verify): register the signature card unit suite and assign its Verify surface to the approval capability'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
