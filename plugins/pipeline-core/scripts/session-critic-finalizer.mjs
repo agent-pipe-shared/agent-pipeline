@@ -109,6 +109,7 @@ const CLI_HELP = [
   "         route {routeId, runner, adapter, provider, modelTier, effortTier}, review {base, candidate, specPath, guardrailPaths[], evidencePaths[],",
   "         priorCriticEvidencePath|null}, verdictPath, event (null or {eventOutPath, featureId});",
   "         schema pipeline.session-critic-finalization-request.v1 (v2 adds review.courseContext, v3 adds review.genericBatchRef)",
+  "         review.courseContext keys: featureId, registrationCommit, acceptedReference, criterionLocator, deltaRequestPath, and optionally successorOf (a feature id)",
   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
@@ -298,13 +299,19 @@ function genericBatchFor(options, preflight) {
 function genericCourseFor(reservation) {
   return { courseSourceSha256: reservation.sourceSha256, courseDecisionSha256: reservation.decisionSha256 };
 }
-function featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256) {
-  const course=preflight.coordinatorOnly.courseAdmission;
+// C30F-G4C: the same feature-id pattern as PACKAGE_FEATURE_ID in critic-dispatch-preflight.mjs (not exported there).
+const SUCCESSOR_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
+export function featureCourseInputFor(options,course,preflight,root) {
   const context=options.preflightInput.courseContext??{featureId:course.featureId,registrationCommit:preflight.candidate.commit,
     acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
-  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:course.courseBase??candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
+  return {repoRoot:root,featureId:context.featureId,baseCommit:course.courseBase??candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
     registrationCommit:context.registrationCommit,requestedMode:context.deltaRequestPath===null?"full":"delta",
-    acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath};
+    acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath,
+    ...(Object.hasOwn(context,"successorOf")?{successorOf:context.successorOf}:{})};
+}
+function featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256) {
+  const course=preflight.coordinatorOnly.courseAdmission;
+  const courseInput=featureCourseInputFor(options,course,preflight,root);
   return reserveFeatureCriticReviewUnitOwnership({repoRoot:root,controlRoot,packetId,preflightSha256,courseInput,
     sourceSha256:course.sourceSha256,decisionSha256:course.decisionSha256});
 }
@@ -329,7 +336,8 @@ function validateCliRequest(value) {
     || !(value.event === null || (exact(value.event, EVENT_KEYS)
       && typeof value.event.eventOutPath === "string"
       && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
-  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+  if (version2 && value.review.courseContext !== null && (!exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath", ...(record(value.review.courseContext) && Object.hasOwn(value.review.courseContext, "successorOf") ? ["successorOf"] : [])])
+    || (Object.hasOwn(value.review.courseContext, "successorOf") && !(typeof value.review.courseContext.successorOf === "string" && SUCCESSOR_FEATURE_ID.test(value.review.courseContext.successorOf))))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
   if (version3 && (!exact(value.review.genericBatchRef, ["batchId", "registrationSha256", "memberSha256"])
     || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
   if (hasSignedImportAnchor) {
