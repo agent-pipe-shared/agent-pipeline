@@ -299,6 +299,17 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const cause = diagnoseResultCloseBinding(root, authority?.result, authority?.prd?.path, authority?.spec?.path);
     return cause === null ? null : stopResult("result-close-block", "ONESHOT-RESULT-CLOSE-BLOCKED", cause.text, `nothing was written. ${cause.repair} Then rerun the identical command: ${rerun(id)}`);
   };
+  // C30G-D2 (AC-108): ONE ordered route for every stop whose repair needs a CLEAN tree (a PO signature, an owned commit, a Verify of the committed candidate).
+  // A person who followed the old text ("commit them or move them") was sent into a hand edit of evidence. Null on a clean tree, so the plain repair stays as it was.
+  const cleanTreeRoute = ({ refuses, sign = null, then }) => {
+    const porcelain = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+    const dirty = porcelain?.status === 0 ? String(porcelain.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)) : [];
+    if (dirty.length === 0) return null;
+    const steps = [`(1) the Pipeline's own outputs go in with node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent (when it refuses with CPO-MANIFEST-EVIDENCE, its result carries the repair to follow), everything else is moved out of the work tree, never deleted`];
+    if (sign !== null) steps.push(`(${steps.length + 1}) ${sign} (the signature is made on the clean tree at the current HEAD: commit nothing between the signature and its command)`);
+    steps.push(`(${steps.length + 1}) ${then}`);
+    return `the work tree has ${dirty.length} uncommitted path(s) (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}) and ${refuses} refuses a dirty tree, so in this order: ${steps.join("; ")}`;
+  };
   const stages = [];
   // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
   const handoverPath = (() => {
@@ -418,7 +429,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         if (verified.verified !== true) return stopResult("sbom", verified.code, `the signed override was refused (${verified.code}): ${blockedText}`, `${verified.code === SBOM_OVERRIDE_CODES.noAnchor || verified.code === SBOM_OVERRIDE_CODES.untrusted ? "the project's trust anchors (project/critical-human-proof.json) do not name the signing key; " : ""}${signText}`, { sbomOverrideRequest: requestPath });
         sbom = closeSbom({ ...sbomInput, override: `The PO accepted the findings listed here by signature (key ${verified.authority.keyReference}).`, authority: verified.authority });
         if (sbom.status === "ready") sbom.files.push({ path: `${evidenceDir}/sbom/override-request.json`, text: `${JSON.stringify(verified.request, null, 2)}\n` }, { path: `${evidenceDir}/sbom/override-proof.json`, text: `${JSON.stringify(proof, null, 2)}\n` });
-        else return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "), `${helps.join(" ")}`);
+        else return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "), `${helps.join(" ")} Then rerun the identical command: ${rerun(again)}`);
       }
       // C24 (Claude greenfield): a round that did not pass used to surface only inside Verify, after the Result bootstrap, with no way out named, and a run took a PO's word in chat for an acceptance.
       let standing = null;
@@ -495,7 +506,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         try { receipt = JSON.parse(String(committed?.stdout ?? "")); } catch { receipt = null; }
         if (committed?.status !== 0 || (receipt?.status !== "committed" && receipt?.status !== "nothing-to-commit")) {
           return stopResult("result-bootstrap", "ONESHOT-RESULT-BOOTSTRAP-COMMIT", `commit-pipeline-owned refused (${receipt?.code ? `${receipt.code}: ${String(receipt.reason ?? "").slice(0, 300)}` : failedText(committed)}), so the applied Result bootstrap is written but not committed.`,
-            `repair what the refusal names, then run ${commitCommand}, then ${rerun(lifecycle ?? again)}`);
+            `${typeof receipt?.repair === "string" && receipt.repair !== "" ? `the refusal carries its own repair, follow it: ${receipt.repair}; then` : "repair what the refusal names, then"} run ${commitCommand}, then ${rerun(lifecycle ?? again)}`);
         }
         const info = Object.freeze({ commit: typeof receipt.commit === "string" ? receipt.commit : null, paths: Object.freeze(Array.isArray(receipt.owned) ? receipt.owned.filter((path) => typeof path === "string") : []), reconciled: reconcile !== null });
         const note = `This call first ran the Result bootstrap and committed it${info.commit === null ? " (nothing was left to commit)" : ` as ${info.commit}`}${info.paths.length === 0 ? "" : ` (${info.paths.join(", ")})`}; every "nothing was written" below counts from that commit on, and the rerun command below does not run the bootstrap again.${humanAcceptance === null ? "" : " The answer given with --human-acceptance was not carried over: it was given before this candidate existed, so the question is asked again for the candidate it names."}`;
@@ -518,19 +529,21 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         if (independence?.status === "acknowledgement-required") acknowledgementGap = String(independence.message ?? "");
       } catch { acknowledgementGap = null; /* the close keeps its own check */ }
       if (acknowledgementGap !== null) {
-        // C21E: the signing command behind this acknowledgement refuses a dirty tree, and the PO should not find that out by entering a passphrase. The raw runner keeps the status column intact; rawGit trims it away.
-        const porcelain = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
-        const dirty = porcelain?.status === 0 ? String(porcelain.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)) : [];
-        const dirtyNote = dirty.length === 0 ? "" : `first commit the ${dirty.length} uncommitted path(s) or move them out of the work tree, because the signing command refuses a dirty tree (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}); `;
-        return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${dirtyNote}record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
+        // C21E: the signing command behind this acknowledgement refuses a dirty tree, and the PO should not find that out by entering a passphrase. C30G-D2: the same ordered route as every other stop that needs a clean tree.
+        const route = cleanTreeRoute({ refuses: "the signing command", sign: "the PO signs the acknowledgement as the reason says", then: `rerun the identical command: ${rerun(again)}` });
+        return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${route ?? `record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`}`);
       }
       // ADR-0096 (Claude test run 3, L4): a gate-definition change without a proof is named before Verify; its PO acknowledgement also needs a clean tree and the current HEAD.
       let gateChanges = null;
       try { gateChanges = command(runner, process.execPath, [COORDINATOR, "gate-changes", "--root", root], "ONESHOT-GATE-CHANGES"); } catch { gateChanges = null; /* the close keeps its own check */ }
       if (gateChanges?.status === "unproven" && Array.isArray(gateChanges.unproven)) {
         const listed = gateChanges.unproven.slice(0, 8).join("; ");
+        const commitOwnedPath = join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs");
+        const repairText = String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER).replaceAll("commit-pipeline-owned.mjs --root <the project root>", `${commitOwnedPath} --root ${root}`);
+        // C30G-D2: on a dirty tree the coordinator's own order sentence is replaced by the route below (it names the dirty paths), so the signing step is the repair up to that sentence.
+        const route = cleanTreeRoute({ refuses: "the signing command", sign: repairText.split(". The signing command refuses a dirty tree")[0], then: `rerun the identical command: ${rerun(again)}` });
         return stopResult("gate-changes", "CLOSE-GATE-CHANGE-UNPROVEN", `${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${listed}${gateChanges.unproven.length > 8 ? "; ..." : ""}.`,
-          `nothing was written; ${String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then rerun the identical command: ${rerun(again)}`);
+          `nothing was written; ${route ?? `${repairText}; then rerun the identical command: ${rerun(again)}`}`);
       }
       // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
       let addenda = null;
@@ -647,7 +660,14 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       if (requalify) stages.push("requalify-candidate");
       stages.push("verify-candidate");
       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
-      if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(again)}`);
+      if (verify?.status !== 0) {
+        // C30G-D2 (AC-108): the producer reports a dirty tree as status "dirty" (exit 1, no red suite). "Without committing" left a half-closed tree with no way on; the same ordered route as the signature stops names it.
+        let reportedDirty = false;
+        try { reportedDirty = JSON.parse(String(verify?.stdout ?? "")).status === "dirty"; } catch { reportedDirty = false; }
+        const route = reportedDirty ? cleanTreeRoute({ refuses: "the candidate Verify", then: `rerun the identical command: ${rerun(again)}` }) : null;
+        if (route !== null) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", "The candidate Verify reported status dirty: it judges only a committed candidate, and the work tree holds uncommitted paths (no suite ran).", route);
+        return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(again)}`);
+      }
       stages.push("register-verify-evidence");
       const register = runner(process.execPath, [REGISTER_PACKAGE, "--root", root, "--add-verify-evidence", verifyPath]);
       if (register?.status !== 0) return stopResult("register-verify-evidence", "ONESHOT-REGISTER-FAILED", failedText(register), `register the evidence by hand to see the typed refusal: node ${REGISTER_PACKAGE} --root ${root} --add-verify-evidence ${verifyPath}`);

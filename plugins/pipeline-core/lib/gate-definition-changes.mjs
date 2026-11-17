@@ -308,7 +308,9 @@ export function describeGateDefinitionChange(change) {
 }
 
 /** The repair the close and inspect name for an unproven list: the PO's one acknowledgement of exactly that list. */
-export function gateChangeAcknowledgementRepair({ stateWriter = "pipeline-state.mjs" } = {}) {
+export function gateChangeAcknowledgementRepair({ stateWriter = "pipeline-state.mjs", commitOwned = "commit-pipeline-owned.mjs" } = {}) {
   return `the PO acknowledges the unproven gate-definition changes once for this range: run node ${stateWriter} approve-gate-change-acknowledgement --by <the label the PO gives for this command>, `
-    + "which prints the PO's signing command for exactly this list (or records it at once in chat mode); history is never rewritten and a revert does not remove a change";
+    + "which prints the PO's signing command for exactly this list (or records it at once in chat mode); history is never rewritten and a revert does not remove a change. "
+    // C30G-D2: the signing command refuses a dirty tree and the signature names the current HEAD, so the order is fixed.
+    + `The signing command refuses a dirty tree: first commit the Pipeline's own outputs with node ${commitOwned} --root <the project root> --agent and move everything else out of the work tree, then the PO signs at the current HEAD and the agent commits nothing between the signature and its command, then rerun the identical close command`;
 }

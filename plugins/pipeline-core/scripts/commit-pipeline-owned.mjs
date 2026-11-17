@@ -17,8 +17,10 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { courseEvidenceGapText } from "../lib/critic-course-admission.mjs";
 import { classifyDirtyTree, porcelainPaths } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { ACKNOWLEDGE_TRAILER, runningGoldfishCommitNotice } from "../lib/running-goldfish-scope.mjs";
@@ -86,7 +88,13 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
     return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
   }
   const evidence = manifestEvidence(root, owned, untracked, git);
-  if (evidence.refusal) return { status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: evidence.refusal, owned, missing: evidence.missing };
+  if (evidence.refusal) {
+    // A refusal that is not about missing evidence (git ls-files failed) carries no groups and keeps its plain reason.
+    const trackedDirty = porcelainPaths(status.stdout.split("\n").filter((line) => line !== "" && !line.startsWith("?? ")).join("\n"));
+    const repair = Array.isArray(evidence.groups) && evidence.groups.length ? manifestEvidenceRepair({ root, groups: evidence.groups, trackedDirty, untracked, git }) : undefined;
+    // The old closing sentence ("restore or re-register that evidence first") named no way a half-closed close could follow; it is replaced by the recovery, and kept only where no recovery could be built.
+    return { status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: repair === undefined ? `${evidence.refusal} Restore or re-register that evidence first (register-feature-package.mjs), then rerun this command.` : `${evidence.refusal} ${repair}`, owned, missing: evidence.missing, ...(repair === undefined ? {} : { repair }) };
+  }
   const carried = evidence.carried;
   const rest = untouched.filter((path) => !carried.includes(path));
   const left = { ...(rest.length ? { untouched: rest } : {}), ...(carried.length ? { carried } : {}) };
@@ -117,9 +125,40 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
 // regular file whose bytes match the listed digest is carried into the same commit; anything else refuses, naming it.
 const FEATURE_MANIFEST = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\/lifecycle\.json$/u;
 
+// C30G-D2 (AC-108): the refusal below used to end in "restore or re-register that evidence", which nobody could follow when a close had stopped half way and a file was gone.
+// The recovery is named from what Git shows: an UNCOMMITTED manifest is brought back to its committed revision (the close builds it and its evidence again), and when the COMMITTED
+// manifest already lists the file, only the original bytes can stand in for it (a new Verify run is refused as FPR-VERIFY-IMMUTABLE), else the damaged course route of the course reader.
+// Only text and the `repair` field: what is committed and when this refuses are unchanged.
+const SELF = fileURLToPath(import.meta.url);
+const bounded = (list) => `${list.slice(0, 8).join(", ")}${list.length > 8 ? ", ..." : ""}`;
+
+function committedEvidencePaths(manifestPath, git) {
+  const shown = git(["show", `HEAD:${manifestPath}`]);
+  if (!isSuccessfulSpawn(shown) || typeof shown.stdout !== "string") return new Set();
+  try { return new Set((JSON.parse(shown.stdout)?.artifacts ?? []).filter((entry) => entry?.class === "candidate-evidence" && typeof entry.path === "string").map((entry) => entry.path)); } catch { return new Set(); }
+}
+
+function manifestEvidenceRepair({ root, groups, trackedDirty, untracked, git }) {
+  return groups.map(({ manifestPath, feature, missing }) => {
+    const dir = `specs/${feature}/`;
+    const restore = [manifestPath, `${dir}acceptance.md`].filter((path) => trackedDirty.includes(path));
+    const away = [...untracked].filter((path) => path.startsWith(dir));
+    const clean = `${restore.length ? `git restore -- ${restore.join(" ")}` : "leave the tracked files as they are"}${away.length ? `; move the ${away.length} untracked file(s) under ${dir} out of the work tree (${bounded(away)}), never delete them` : ""}`;
+    const kept = missing.filter((path) => committedEvidencePaths(manifestPath, git).has(path));
+    if (!kept.length) {
+      return `The manifest ${manifestPath} is not committed (the close stopped half way) and lists evidence that is gone. Bring it back to the committed revision: ${clean}; then rerun the identical close command (finish-feature.mjs --one-shot, with the arguments the stop printed): it builds the manifest and its evidence again.`;
+    }
+    // Read in register-feature-package (lib/feature-package-registration.mjs addVerifyEvidence): a listed path whose bytes differ from the registered digest is FPR-VERIFY-IMMUTABLE, so a new Verify run cannot replace it.
+    return `The committed manifest ${manifestPath} already lists ${bounded(kept)}, so a restore does not remove the entry. Its digest is fixed and registered evidence is never replaced (FPR-VERIFY-IMMUTABLE), so a new Verify run cannot stand in for the file. `
+      + `If you still hold the original file, put it back at its path with exactly the listed bytes and run node ${SELF} --root ${root} --agent again: it commits the file together with the manifest. `
+      + `If the file is gone for good: ${courseEvidenceGapText("CCA-EVIDENCE-READ", null)}`;
+  }).join(" ");
+}
+
 function manifestEvidence(root, owned, untracked, git) {
   const carried = [];
   const missing = [];
+  const groups = [];
   for (const manifestPath of owned) {
     const match = FEATURE_MANIFEST.exec(manifestPath);
     if (!match) continue;
@@ -131,6 +170,8 @@ function manifestEvidence(root, owned, untracked, git) {
     const tracked = git(["ls-files", "-z", "--", `specs/${match[1]}`]);
     if (!isSuccessfulSpawn(tracked) || typeof tracked.stdout !== "string") return { refusal: "git ls-files failed", missing: [], carried: [] };
     const trackedPaths = new Set(tracked.stdout.split("\0").filter(Boolean));
+    const group = { manifestPath, feature: match[1], missing: [] };
+    groups.push(group);
     for (const entry of listed) {
       if (trackedPaths.has(entry.path) || carried.includes(entry.path)) continue;
       let ok = false;
@@ -142,13 +183,12 @@ function manifestEvidence(root, owned, untracked, git) {
             && createHash("sha256").update(readFileSync(file)).digest("hex") === entry.sha256;
         } catch { ok = false; }
       }
-      if (ok) carried.push(entry.path); else missing.push(entry.path);
+      if (ok) carried.push(entry.path); else { missing.push(entry.path); group.missing.push(entry.path); }
     }
   }
   if (missing.length) {
-    return { carried: [], missing, refusal: `the feature manifest lists candidate evidence that is neither committed nor an untracked file with exactly the listed bytes (${missing.join(", ")}). `
-      + "Committing the manifest without it would leave a manifest revision that names a file its own commit does not hold, and the Critic course of that feature could not be read again. "
-      + "Restore or re-register that evidence first (register-feature-package.mjs), then rerun this command." };
+    return { carried: [], missing, groups: groups.filter((group) => group.missing.length), refusal: `the feature manifest lists candidate evidence that is neither committed nor an untracked file with exactly the listed bytes (${missing.join(", ")}). `
+      + "Committing the manifest without it would leave a manifest revision that names a file its own commit does not hold, and the Critic course of that feature could not be read again." };
   }
   return { carried, missing: [] };
 }

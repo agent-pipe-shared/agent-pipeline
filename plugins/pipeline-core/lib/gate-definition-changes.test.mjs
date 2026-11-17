@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, buildGateChangeAcknowledgementSubject, describeGateDefinitionChange,
-  gateChangeAcknowledgementConfirmationLines, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
+  gateChangeAcknowledgementConfirmationLines, gateChangeAcknowledgementRepair, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
 
 const roots = [];
 after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -161,4 +161,13 @@ test("the acknowledgement subject names the unproven changes at the clean HEAD a
   const lines = gateChangeAcknowledgementConfirmationLines(built.subject);
   assert.match(lines.join("\n"), /project\/pipeline\.yaml changed in [a-f0-9]{12}/u);
   assert.match(lines.at(-1), /acknowledged after the fact/u);
+});
+
+test("C30G-D2: the repair of an unproven gate-definition change orders the clean-tree route: the Pipeline's own outputs in, the rest out, the signature at the current HEAD, the rerun", () => {
+  const text = gateChangeAcknowledgementRepair({ stateWriter: "state.mjs", commitOwned: "owned.mjs" });
+  assert.match(text, /run node state\.mjs approve-gate-change-acknowledgement --by <the label the PO gives for this command>/u, "the signing route is unchanged");
+  const order = [/commit the Pipeline's own outputs with node owned\.mjs --root <the project root> --agent/u, /move everything else out of the work tree/u, /signs at the current HEAD/u, /commits? nothing between the signature and its command/u, /rerun the identical close command/u];
+  let from = 0;
+  for (const part of order) { const found = part.exec(text.slice(from)); assert.ok(found, `${part} in order`); from += found.index + found[0].length; }
+  assert.match(gateChangeAcknowledgementRepair(), /commit-pipeline-owned\.mjs --root/u, "the default spelling names the script");
 });

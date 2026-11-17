@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { courseEvidenceGapText, criticCourseRepair, locateCourseEvidenceGap, resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
@@ -138,6 +138,66 @@ test("Codex report: listed evidence with other bytes than the manifest digest re
     assert.deepEqual(result.missing, [evidencePath]);
     assert.match(result.reason, /could not be read again/u);
     assert.equal(run("rev-parse", "HEAD").trim(), head);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// C30G-D2 (AC-108): a close that stopped half way left an uncommitted manifest listing evidence a person deleted. The refusal named no route and nobody could proceed.
+// The recovery must be in the result (`repair`, and the end of `reason`), and a tree that FOLLOWS it must commit or report nothing to commit.
+test("C30G-D2: a manifest that lists deleted evidence refuses with the recovery for an uncommitted manifest, and following that recovery ends in nothing-to-commit", () => {
+  const { root, run, put, evidencePath } = featureRepo("recover");
+  try {
+    rmSync(join(root, evidencePath));
+    put("specs/feat-1/evidence/verify-candidate.json", "{}\n");
+    put("specs/feat-1/acceptance.md", "# Acceptance\n");
+    const head = run("rev-parse", "HEAD").trim();
+    const refused = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(refused.status, "refused");
+    assert.equal(refused.code, "CPO-MANIFEST-EVIDENCE");
+    assert.deepEqual(refused.missing, [evidencePath]);
+    assert.equal(typeof refused.repair, "string", JSON.stringify(refused));
+    assert.ok(refused.reason.endsWith(refused.repair), "the reason ends with the recovery");
+    assert.ok(refused.repair.includes("git restore -- specs/feat-1/lifecycle.json"), refused.repair);
+    assert.ok(refused.repair.includes("specs/feat-1/evidence/verify-candidate.json") && refused.repair.includes("specs/feat-1/acceptance.md"), "the untracked close outputs are named");
+    assert.match(refused.repair, /never delete/u);
+    assert.match(refused.repair, /rerun the identical close command/u);
+    assert.doesNotMatch(refused.repair, /FPR-VERIFY-IMMUTABLE|already lists/u, "the manifest at HEAD does not list it: the other route is not offered");
+    assert.equal(run("rev-parse", "HEAD").trim(), head, "a refusal commits nothing");
+    // Follow the recovery exactly as it is worded: restore the manifest, move the untracked close outputs out of the work tree.
+    run("restore", "--", "specs/feat-1/lifecycle.json");
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), "cpo-moved-")));
+    try {
+      renameSync(join(root, "specs/feat-1/evidence/verify-candidate.json"), join(outside, "verify-candidate.json"));
+      renameSync(join(root, "specs/feat-1/acceptance.md"), join(outside, "acceptance.md"));
+      const after = commitPipelineOwned(["--root", root, "--agent"]);
+      assert.ok(["nothing-to-commit", "committed"].includes(after.status), JSON.stringify(after));
+      assert.equal(run("status", "--porcelain").trim(), "");
+    } finally { rmSync(outside, { recursive: true, force: true }); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C30G-D2: when the manifest at HEAD already lists the missing file a new Verify run cannot replace it: the recovery is the original bytes, else the course reader's damaged-course route", () => {
+  const { root, run, put, evidencePath } = featureRepo("head-lists");
+  try {
+    run("add", "--", "specs/feat-1/lifecycle.json");
+    run("commit", "-q", "-m", "manifest alone", "--", "specs/feat-1/lifecycle.json");
+    rmSync(join(root, evidencePath));
+    put("specs/feat-1/lifecycle.json", `${readFileSync(join(root, "specs/feat-1/lifecycle.json"), "utf8")}\n`);
+    const refused = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(refused.code, "CPO-MANIFEST-EVIDENCE", JSON.stringify(refused));
+    assert.ok(refused.reason.endsWith(refused.repair));
+    assert.doesNotMatch(refused.reason, /Restore or re-register that evidence first/u, "the old closing sentence is replaced, not kept beside the recovery");
+    // Reading register-feature-package (addVerifyEvidence): a registered path with other bytes is FPR-VERIFY-IMMUTABLE, so a new Verify run cannot stand in; no producer or registration is offered.
+    assert.match(refused.repair, /already lists specs\/feat-1\/evidence\/final-candidate-verify\.json, so a restore does not remove the entry/u);
+    assert.match(refused.repair, /registered evidence is never replaced \(FPR-VERIFY-IMMUTABLE\)/u);
+    assert.doesNotMatch(refused.repair, /--add-verify-evidence|verify-evidence-producer/u);
+    assert.match(refused.repair, /put it back at its path with exactly the listed bytes and run node \S+commit-pipeline-owned\.mjs --root \S+ --agent again/u);
+    assert.match(refused.repair, /new feature of rigor 1[\s\S]*discard-feature/u, "the damaged-course way on of the course reader, when the file is gone for good");
+    // Following the first route: the original bytes put back, the same command carries them into the manifest commit.
+    put(evidencePath, `${JSON.stringify({ schema: "example.verify.v1", status: "pass" })}\n`);
+    const after = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(after.status, "committed", JSON.stringify(after));
+    assert.deepEqual(after.carried, [evidencePath]);
+    assert.equal(run("status", "--porcelain").trim(), "");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

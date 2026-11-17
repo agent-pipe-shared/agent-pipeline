@@ -9,6 +9,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { finishFeature, oneShotClose } from "./finish-feature.mjs";
+import { gateChangeAcknowledgementRepair } from "../lib/gate-definition-changes.mjs";
 import { canonical } from "../lib/po-approval-proof.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import { closeSbom } from "../lib/sbom-close.mjs";
@@ -799,11 +800,94 @@ test("C21E: the acknowledgement stop names the uncommitted paths before the PO i
     writeFileSync(join(f.root, STATE_PATH), `${readFileSync(join(f.root, STATE_PATH), "utf8")} \n`);
     const stopped = oneShotClose(f.input, { runCommand: f.runner });
     assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
-    assert.match(stopped.stop.repair, /first commit the 2 uncommitted path\(s\)/u);
+    // C30G-D2 (QG-04, restated in place): the note became the one ordered route shared by every stop whose repair needs a clean tree (the text "first commit ... or move them" is replaced by the three ordered steps).
+    assert.match(stopped.stop.repair, /the work tree has 2 uncommitted path\(s\)/u);
     assert.ok(stopped.stop.repair.includes("untracked-note.md") && stopped.stop.repair.includes(STATE_PATH), stopped.stop.repair);
     assert.match(stopped.stop.repair, /rerun the identical command/u);
     assert.deepEqual(f.calls, [], "the note changes no stage order");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// C30G-D2 (AC-108): the repair of a stop that needs a clean tree is one ordered route: the Pipeline's own outputs in with commit-pipeline-owned, everything else out, the signature on the clean tree at the current HEAD with nothing committed in between, the identical rerun.
+const ORDERED_ROUTE = /\(1\) the Pipeline's own outputs go in with node \S+commit-pipeline-owned\.mjs --root \S+ --agent[\s\S]*everything else is moved out of the work tree[\s\S]*never deleted[\s\S]*\(2\)[\s\S]*clean tree at the current HEAD[\s\S]*nothing between the signature and its command[\s\S]*\(3\)[\s\S]*rerun the identical command/u;
+test("C30G-D2: the gate-change stop on a dirty tree lists the dirty paths (bounded to 8) and orders commit-pipeline-owned, the signature on the clean HEAD, the identical rerun; a clean tree keeps the plain repair", () => {
+  const clean = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    const plain = oneShotClose(clean.input, { runCommand: clean.runner }).stop.repair;
+    assert.doesNotMatch(plain, /uncommitted|\(1\)/u, "a clean tree needs no route");
+    assert.match(plain, /^nothing was written; the PO acknowledges the unproven gate-definition changes once for this range: run node \S+pipeline-state\.mjs approve-gate-change-acknowledgement --by/u);
+  } finally { rmSync(clean.root, { recursive: true, force: true }); }
+  const f = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    for (let index = 1; index <= 10; index += 1) writeFileSync(join(f.root, `leftover-${String(index).padStart(2, "0")}.md`), "x\n");
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stop.code, "CLOSE-GATE-CHANGE-UNPROVEN");
+    assert.match(stopped.stop.repair, /the work tree has 10 uncommitted path\(s\)/u);
+    assert.ok(stopped.stop.repair.includes("leftover-08.md") && !stopped.stop.repair.includes("leftover-09.md"), "bounded to 8 paths");
+    assert.match(stopped.stop.repair, ORDERED_ROUTE);
+    assert.match(stopped.stop.repair, /approve-gate-change-acknowledgement --by/u, "the signature step is the coordinator's own repair");
+    assert.deepEqual(f.calls, [], "the route changes no stage order");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-D2: the real coordinator repair text goes through the gate-change stop with the script paths and the root filled in, and its order sentence is never doubled by the dirty-tree route", () => {
+  const real = (f) => (executable, argv) => (argv[1] === "gate-changes" && argv[0]?.endsWith("close-coordinator.mjs")
+    ? { status: 0, stdout: JSON.stringify({ schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: ["GS-1 pipeline.user.yaml changed in 0123456789ab: no proof"], repair: gateChangeAcknowledgementRepair() }), stderr: "" }
+    : f.runner(executable, argv));
+  const clean = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    const repair = oneShotClose(clean.input, { runCommand: real(clean) }).stop.repair;
+    assert.ok(!repair.includes("<the project root>"), repair);
+    assert.ok(repair.includes(`commit-pipeline-owned.mjs --root ${clean.root} --agent`), "the clean-tree repair carries the order sentence with the real root");
+    assert.ok(repair.includes(`${STATE_WRITER} approve-gate-change-acknowledgement`));
+  } finally { rmSync(clean.root, { recursive: true, force: true }); }
+  const f = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    writeFileSync(join(f.root, "leftover.md"), "x\n");
+    const repair = oneShotClose(f.input, { runCommand: real(f) }).stop.repair;
+    assert.ok(!repair.includes("<the project root>"), repair);
+    assert.equal(repair.split("commit-pipeline-owned.mjs --root").length - 1, 1, "the order is stated once, by the route");
+    assert.doesNotMatch(repair, /The signing command refuses a dirty tree: first commit/u);
+    assert.match(repair, ORDERED_ROUTE);
+    assert.ok(repair.includes(`${STATE_WRITER} approve-gate-change-acknowledgement`));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-D2: a refused bootstrap commit carries the typed repair the commit command printed", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "stuck" });
+  try {
+    const runner = (executable, argv) => (argv[0]?.endsWith("commit-pipeline-owned.mjs")
+      ? { status: 2, stdout: JSON.stringify({ schema: "pipeline.commit-pipeline-owned.v1", status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: "the manifest lists evidence that is gone", repair: "run git restore -- specs/feature-abc/lifecycle.json" }), stderr: "" }
+      : f.runner(executable, argv));
+    const stopped = oneShotClose(f.input, { runCommand: runner });
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-COMMIT", JSON.stringify(stopped).slice(0, 400));
+    assert.match(stopped.stop.repair, /run git restore -- specs\/feature-abc\/lifecycle\.json/u);
+    assert.match(stopped.stop.repair, /commit-pipeline-owned\.mjs --root [^ ]+ --agent/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-D2: a candidate Verify that reports status dirty lists the dirty paths and the ordered route instead of 'without committing'; a real red Verify keeps its text", () => {
+  const f = oneShotFixture();
+  try {
+    writeFileSync(join(f.root, "foreign.txt"), "x\n");
+    const dirtyVerify = (executable, argv) => (argv[0]?.endsWith("verify-evidence-producer.mjs") ? { status: 1, stdout: JSON.stringify({ status: "dirty", exitCode: 1, steps: [{ name: "candidate-preflight", exitCode: 1 }] }), stderr: "" } : f.runner(executable, argv));
+    const stopped = oneShotClose(f.input, { runCommand: dirtyVerify });
+    assert.equal(stopped.stage, "verify-candidate"); assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED");
+    assert.match(stopped.stop.reason, /dirty/u);
+    assert.doesNotMatch(stopped.stop.reason, /candidate-preflight/u, "the raw evidence JSON is not the reason");
+    assert.match(stopped.stop.repair, /the work tree has \d+ uncommitted path\(s\)/u);
+    assert.ok(stopped.stop.repair.includes("foreign.txt"), stopped.stop.repair);
+    assert.match(stopped.stop.repair, /\(1\) the Pipeline's own outputs go in with node \S+commit-pipeline-owned\.mjs --root \S+ --agent[\s\S]*everything else is moved out of the work tree[\s\S]*never deleted/u);
+    assert.match(stopped.stop.repair, /rerun the identical command/u);
+    assert.doesNotMatch(stopped.stop.repair, /without committing/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const red = oneShotFixture({ verifyRed: true });
+  try {
+    const stopped = oneShotClose(red.input, { runCommand: red.runner });
+    assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED");
+    assert.match(stopped.stop.reason, /suite red/u);
+    assert.match(stopped.stop.repair, /^fix what the Verify output names without committing, then rerun the identical command: /u);
+  } finally { rmSync(red.root, { recursive: true, force: true }); }
 });
 
 test("C21E: the close writes the Critic addenda before Verify, asks for their commit, and the rerun goes on to Verify", () => {
@@ -1717,4 +1801,72 @@ test("C22B CGF-12: the handover's technical-close line is read from the recorded
     syncPublicCurrentState(dir, { schema: "pipeline.state.v0", closedFeatures: [bare] }, "docs/state.md", "2026-11-09T10:00:00.000Z");
     assert.match(readFileSync(join(dir, "docs/state.md"), "utf8"), /^\*\*Technical close:\*\* .*not readable/mu, "an entry without a readable close time is named, not papered over");
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// C30G-D2 (AC-108): a stop with no way on is the dead end this test keeps out. It reads the SOURCE of the one-shot, takes the repair argument of every
+// stopResult( call, and requires a runnable command shape or one explicit human-actor phrase in it. A repair written as a name (a helper or a text constant
+// defined in the same file) is read through that one definition, because the stop's text is what the definition holds.
+function skipQuoted(src, from) {
+  const quote = src[from];
+  for (let index = from + 1; index < src.length; index += 1) {
+    if (src[index] === "\\") { index += 1; continue; }
+    if (src[index] === quote) return index + 1;
+    if (quote === "`" && src[index] === "$" && src[index + 1] === "{") index = skipBraces(src, index + 1) - 1;
+  }
+  throw new Error("unterminated string literal");
+}
+function skipBraces(src, from) {
+  let depth = 0;
+  for (let index = from; index < src.length;) {
+    const char = src[index];
+    if (char === "'" || char === "\"" || char === "`") { index = skipQuoted(src, index); continue; }
+    if (char === "{") depth += 1;
+    if (char === "}") { depth -= 1; if (depth === 0) return index + 1; }
+    index += 1;
+  }
+  throw new Error("unbalanced braces");
+}
+function stopResultArguments(src) {
+  const calls = [];
+  for (let at = src.indexOf("stopResult("); at !== -1; at = src.indexOf("stopResult(", at + 1)) {
+    if (src.slice(Math.max(0, at - 9), at) === "function ") continue;
+    const args = []; let depth = 0; let argStart = at + "stopResult(".length;
+    for (let index = argStart; index < src.length;) {
+      const char = src[index];
+      if (char === "'" || char === "\"" || char === "`") { index = skipQuoted(src, index); continue; }
+      if (char === "/" && src[index + 1] === "/") { index = src.indexOf("\n", index); continue; }
+      if (char === "(" || char === "[" || char === "{") depth += 1;
+      else if (char === ")" && depth === 0) { args.push(src.slice(argStart, index)); break; }
+      else if (char === ")" || char === "]" || char === "}") depth -= 1;
+      else if (char === "," && depth === 0) { args.push(src.slice(argStart, index)); argStart = index + 1; }
+      index += 1;
+    }
+    calls.push({ at, line: src.slice(0, at).split("\n").length, args: args.map((arg) => arg.trim()) });
+  }
+  return calls;
+}
+const RUNNABLE_SHAPE = /\bnode |\bgit |\$\{rerun|\brerun\(/u;
+const HUMAN_ACTOR = /\bthe PO\b|\bhand the PO\b/u;
+// A stop that cannot satisfy the contract is listed here with its reason, never skipped silently. The test below proves each entry is still needed.
+const CONTRACT_EXCEPTIONS = Object.freeze({});
+test("C30G-D2: every stop of the one-shot names a way on: a non-empty repair with a runnable command shape or an explicit human actor", () => {
+  const source = readFileSync(new URL("./finish-feature.mjs", import.meta.url), "utf8");
+  const calls = stopResultArguments(source);
+  assert.equal(calls.length, source.split("stopResult(").length - 2, "every call but the definition was read");
+  assert.ok(calls.length >= 30, `only ${calls.length} stops were read`);
+  // A name is read through the definition nearest BEFORE the call (the same name is bound in several scopes of the file).
+  const definition = (name, at) => { const matches = [...source.matchAll(new RegExp(`(?:const|let) ${name.replace(/\$/gu, "\\$")} =`, "gu"))].filter((match) => match.index < at); const match = matches.at(-1); return match === undefined ? "" : source.slice(match.index, source.indexOf(";\n", match.index)); };
+  const reached = new Set(); const failing = [];
+  for (const call of calls) {
+    assert.ok(call.args.length >= 4, `stopResult at line ${call.line} has no repair argument`);
+    const repair = call.args[3];
+    assert.notEqual(repair, "", `the repair at line ${call.line} is empty`); assert.notEqual(repair, "\"\"", `the repair at line ${call.line} is empty`);
+    const text = [repair, ...[...new Set(repair.match(/[A-Za-z_$][\w$]*/gu) ?? [])].map((name) => definition(name, call.at))].join("\n");
+    const code = /^"([A-Z0-9-]+)"$/u.exec(call.args[1])?.[1] ?? `line ${call.line}`;
+    if (RUNNABLE_SHAPE.test(text) || HUMAN_ACTOR.test(text)) continue;
+    failing.push(code);
+    if (Object.hasOwn(CONTRACT_EXCEPTIONS, code)) reached.add(code);
+  }
+  assert.deepEqual(failing.filter((code) => !Object.hasOwn(CONTRACT_EXCEPTIONS, code)), [], "these stops name no runnable command and no human actor: fix their repair text");
+  assert.deepEqual([...reached].sort(), Object.keys(CONTRACT_EXCEPTIONS).sort(), "every listed exception is still a real exception");
 });
