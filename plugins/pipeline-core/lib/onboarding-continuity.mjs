@@ -10463,6 +10463,25 @@ const continuitySharedStateEntries = new Set([
   'state.reopen-design','state.seal-plan-approval','state.set-gate-estimate',
   'state.revoke-plan','state.set-phase-no-calibration',
 ]);
+// The entries below stay refused on purpose (C30F-G1, AC-108). Admission is more than the entry name: the verification
+// (continuityVerifySharedStateWrite) requires the cleanup identity, which carries the continuity object and its revision, to
+// be unchanged by the write, and the admitted writers pass no allowContinuityAdvance. Read from the code, not reproduced:
+//  - state.cancel-submitted-plan, state.cancel-mixed-plan-state: their writers pass allowContinuityAdvance and move
+//    continuity.revision and continuity.resume, so an admitted write would pass this observation and then fail that
+//    verification.
+//  - state.set-feature: replaces the whole continuity object.
+//  - state.set-phase-with-calibration: also writes the calibration companion through the afterValidation route, whose
+//    effects this observation does not model.
+// None of them could be driven to a successful observation by a test, so none is admitted. The reason names a route to run;
+// the route of the first entry is an admitted entry, the other route is the repair this module prints for an owning execution.
+const continuityRefusedStateEntryRoutes = new Map([
+  ['state.cancel-submitted-plan','pipeline-state.mjs reopen-design --by <name> (it voids the submission)'],
+]);
+function continuityStateEntryRefusal(entry) {
+  const admitted = [...continuitySharedStateEntries].map(name=>name.replace(/^state\./u,'').replace(/-no-calibration$/u,'')).join(', ');
+  const route = continuityRefusedStateEntryRoutes.get(entry) ?? 'node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>';
+  return `${entry} is not admitted; nothing written. Repair: ${route}. Admitted: ${admitted}`;
+}
 
 function continuitySharedStateImage(fact) {
   const {sha256,size,identity,semanticSha256} = fact;
@@ -10556,10 +10575,11 @@ function continuityObserveSharedStateWrite(data,port,methods,handle,context) {
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity State witness requires actual source owner');
   continuityAuthorityRepository(data.repository);
   const plan=observeStateAuthorityWrite(handle);
-  if (!continuitySharedStateEntries.has(plan.entry)
-      || plan.repositorySha256!==canonicalSha256({primaryRoot:data.repository.primaryRoot,commonDir:data.repository.commonDir})
+  if (plan.repositorySha256!==canonicalSha256({primaryRoot:data.repository.primaryRoot,commonDir:data.repository.commonDir})
       || !plan.affectedProducerIds.includes('onboarding-continuity'))
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted');
+  if (!continuitySharedStateEntries.has(plan.entry))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted',{reason:continuityStateEntryRefusal(plan.entry)});
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary:context.boundary,producerPort:port});
   if (!continuityAuthorityEqual(producer.record,context.producerRecord))
     fail('SDC-AUTHORITY-CAS','continuity producer record is not current');
