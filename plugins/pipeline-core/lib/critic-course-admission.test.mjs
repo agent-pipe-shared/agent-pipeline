@@ -836,7 +836,9 @@ test("G18B (c) the three existing repairs keep their exact text and non-CCA inpu
   // QG-04 restatement (D204 item 4): the intent (this repair text is pinned byte for byte) stays; only the CCA-DETERMINISTIC-UNAVAILABLE text changed, from the two-commit route to the one evidence-only commit route that evidenceCommitV2 accepts.
   assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "bbf8dace263856677906db60acb2609c9de4690f968349ca7cfee1706be25df1");
   assert.equal(sha(criticCourseRepair("CCA-REVIEW-UNIT-REQUIRED")), "5529bda66d4b0b02095cf06d726b032e7360a4692a00e859cb3801659162a4c4");
-  assert.equal(sha(criticCourseRepair("CCA-MANIFEST-READ")), "4deceb8240578c2c85665690fe09bbac7d3ef571c450e98a84ac597a8d016def");
+  // QG-04 restatement (candidate 30g): the intent (the repair text is pinned byte for byte) stays; the CCA-MANIFEST-READ text grew by the sentence that names --successor-of for a feature that replaces a discarded one (a retest with the 30e distribution never found the flag).
+  assert.equal(sha(criticCourseRepair("CCA-MANIFEST-READ")), "757ba93a64dba64b9c316e0b94ad6cefa313f5bcba139eca76a2995db1aa8394");
+  assert.match(criticCourseRepair("CCA-MANIFEST-READ"), /--successor-of <feature id of the discarded predecessor>/u);
   assert.equal(criticCourseRepair("CDP-COURSE-UNAVAILABLE"), null);
   assert.equal(criticCourseRepair(undefined), null);
 });
