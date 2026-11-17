@@ -263,6 +263,27 @@ for (const [agentType, modelId, effort, maxTurns] of [
   });
 }
 
+test("C30G-M16 a model a live PO exception names prints its model-exception line in the dispatch metadata; without one nothing changes; another provider's model is still refused", async () => {
+  const { runDispatchBriefing } = await lib();
+  const exception = { id: "MX-1", model: "fable", requestedAt: "2026-11-17T12:00:00.000Z", by: "label-from-the-po", dispatchKey: "ALF-T1", dispatchId: "ALF-T1", effort: null, reused: false };
+  const seen = [];
+  const withException = (decision) => (options) => { seen.push(options); return decision; };
+  const fx = makeFixture();
+  const admitted = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep", "--model-id": "fable" }), depsOf(fx, { evaluateModel: withException({ ok: true, exceptionUse: exception }) }));
+  assert.equal(admitted.ok, true, JSON.stringify(admitted));
+  assert.match(admitted.skeleton, /^- model exception: fable, requested by the PO at 2026-11-17T12:00:00\.000Z \(label-from-the-po\)/mu);
+  assert.ok(admitted.warnings.some((entry) => entry.code === "DBG-MODEL-EXCEPTION" && /MX-1/u.test(entry.message)));
+  assert.equal(admitted.warnings.some((entry) => entry.code === "DBG-MODEL-DIFFERS-FROM-AGENT"), false);
+  assert.deepEqual([seen[0].runner, seen[0].model, seen[0].subagentType, seen[0].dispatchId], ["claude", "fable", "pipeline-core:goldfish-deep", seen[0].dispatchId], "the decision is asked for this model and this dispatch id, and never consumes");
+  const plain = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep", "--model-id": "fable" }), depsOf(fx, { evaluateModel: withException({ ok: false, findings: [] }) }));
+  assert.equal(plain.ok, true, JSON.stringify(plain));
+  assert.doesNotMatch(plain.skeleton, /model exception:/u);
+  assert.ok(plain.warnings.some((entry) => entry.code === "DBG-MODEL-DIFFERS-FROM-AGENT"), "without a live exception the existing warning and checks are unchanged");
+  const foreign = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep", "--model-id": "gpt-5.5" }), depsOf(fx, { evaluateModel: withException({ ok: true, exceptionUse: exception }) }));
+  assert.equal(foreign.ok, false);
+  assert.equal(foreign.code, "DBG-MODEL-FAMILY", "an exception never admits another provider's model");
+});
+
 test("the criterion locator validates against the original bytes", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

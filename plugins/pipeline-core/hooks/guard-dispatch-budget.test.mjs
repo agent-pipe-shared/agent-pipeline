@@ -542,6 +542,34 @@ test("evaluateDispatchBudgetGuard: a write failure in the new orchestrator obser
   assert.equal(results[1].exitCode, 0);
 });
 
+test("evaluateDispatchBudgetGuard (C30G-M16): a dispatched agent can neither run the PO model-exception script nor read or write its store; the orchestrator and the lib and test files stay reachable", () => {
+  const CODE = "DISPATCH-MODEL-EXCEPTION-ORCHESTRATOR-ONLY";
+  const subagent = (tool_name, tool_input) => ({ transcript_path: SUBAGENT_TRANSCRIPT, tool_name, tool_input, agent_id: "abc123", agent_type: "pipeline-core:goldfish-deep" });
+  const store = `${COMMON_DIR}/agent-pipeline/dispatch-model-exception/store.json`;
+  const refused = [
+    subagent("Bash", { command: `node ${FAKE_ROOT}/plugins/pipeline-core/scripts/dispatch-model-exception.mjs record --model fable --count 1 --reason r --by someone` }),
+    subagent("Bash", { command: "node dispatch-model-exception.mjs list" }),
+    subagent("Bash", { command: `cat ${store}` }),
+    subagent("Write", { file_path: store, content: "{}" }),
+    subagent("Read", { file_path: store }),
+    subagent("Grep", { path: `${COMMON_DIR}/agent-pipeline/dispatch-model-exception`, pattern: "fable" }),
+    { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "node plugins/pipeline-core/scripts/dispatch-model-exception.mjs list" }, agent_type: "pipeline-core:goldfish-deep" },
+  ];
+  const reachable = [
+    subagent("Bash", { command: "node --test plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs" }),
+    subagent("Read", { file_path: `${FAKE_ROOT}/plugins/pipeline-core/lib/dispatch-model-exception.mjs` }),
+    subagent("Bash", { command: "node --test plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs" }),
+  ];
+  const orchestrator = { transcript_path: ORCHESTRATOR_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "node plugins/pipeline-core/scripts/dispatch-model-exception.mjs list" } };
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(60), steps: [...refused, ...reachable, orchestrator].map((input) => ({ op: "guard", input })) });
+  refused.forEach((_, index) => {
+    assert.equal(results[index].exitCode, 2, `refused case ${index}`);
+    assert.match(results[index].stderr, new RegExp(CODE, "u"), `refused case ${index}`);
+  });
+  reachable.forEach((_, index) => assert.ok(!results[refused.length + index].stderr.includes(CODE), `reachable case ${index}: ${results[refused.length + index].stderr.slice(0, 200)}`));
+  assert.equal(results[refused.length + reachable.length].exitCode, 0, "the orchestrator may run the script");
+});
+
 test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a subagents/-shaped transcript_path with no agent_id is still the orchestrator to this guard -- transcript_path shape is no longer read at all for this guard's own identity step", () => {
   const { results } = run({
     rootDir: FAKE_ROOT, // subagents/-shaped transcript_path, deliberately no agent_id, no meta.json seeded

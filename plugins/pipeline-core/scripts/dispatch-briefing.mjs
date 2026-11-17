@@ -123,7 +123,7 @@ const {
   validateItemDeliveryBriefing,
 } = cliHelp ? {} : await import("../lib/native-goldfish-host-return.mjs");
 const { acceptedFamilyForms, modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
-const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
+const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute, evaluateDispatchModel } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
 const { functionalTaskRoutesForRunner, projectFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
 const {
   BRIEFING_BUILD_SCHEMA,
@@ -1107,6 +1107,7 @@ export function generateDispatchBinding(options, deps = {}) {
   // and no effect on a Codex dispatch beyond that is claimed). Claude: the alias family of the agent definition. Codex: the
   // agent definition's alias is a Claude concept, so the id is checked against the model the Codex route yields for the role.
   let codexRoute = null;
+  let modelExceptionUse = null;
   if (runner === "codex") {
     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
     codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute, root);
@@ -1134,7 +1135,13 @@ export function generateDispatchBinding(options, deps = {}) {
     const accepted = forms === null ? "" : ` (for the ${resolved.model} family: accepted prefixes ${forms.prefixes.map((prefix) => `\`${prefix}\``).join(", ")}; for example \`${forms.example}\`)`;
     refuse("DBG-MODEL-FAMILY", `model id ${modelId} is a model of another provider's family, not a Claude model id or alias, and agent definition ${agentType} declares the ${resolved.model} family; repair: pass a Claude --model-id${accepted} (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}); or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? `; a Gemini id belongs to an Antigravity dispatch: pass --runner antigravity with an alias of its route (${ANTIGRAVITY_NATIVE_MODELS.join(", ")}; the generated briefing is then the packet Prompt of the prepare request, references/antigravity-native-dispatch.md)` : ""}`);
   } else if (!modelBelongsToFamily(modelId, resolved.model)) {
-    warnings.push({ code: "DBG-MODEL-DIFFERS-FROM-AGENT", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares; it is admitted because the configuration names it, and the tool-layer \`model\` parameter of the dispatch call selects it (MP-29)` });
+    // C30G-M16: a model no configured route selects is admitted when a LIVE PO model exception names it (read-only here: the briefing never consumes; the
+    // dispatch guard does, when it admits the dispatch). The generated briefing then says so in its dispatch metadata, so the Goldfish and the audit see it.
+    const exceptionDecision = (deps.evaluateModel ?? evaluateDispatchModel)({ root, runner: "claude", subagentType: `pipeline-core:${agentType}`, model: modelId, dispatchId, dispatchKey: dispatchId, warn: () => {} });
+    modelExceptionUse = exceptionDecision?.ok === true && exceptionDecision.exceptionUse ? exceptionDecision.exceptionUse : null;
+    warnings.push(modelExceptionUse === null
+      ? { code: "DBG-MODEL-DIFFERS-FROM-AGENT", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares; it is admitted because the configuration names it, and the tool-layer \`model\` parameter of the dispatch call selects it (MP-29)` }
+      : { code: "DBG-MODEL-EXCEPTION", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares and no configured route selects it; it is admitted under the PO model exception ${modelExceptionUse.id} (alias ${modelExceptionUse.model}, requested by the PO at ${modelExceptionUse.requestedAt}, ${modelExceptionUse.by}); the tool-layer \`model\` parameter of the dispatch call selects it (MP-29) and the dispatch guard consumes the exception when it admits the dispatch` });
   }
   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
   // Claude (C23): the configured route's effort for the duty is the briefed effort and the dispatch call carries it as the Agent tool's
@@ -1319,6 +1326,7 @@ export function generateDispatchBinding(options, deps = {}) {
       : runner === "antigravity"
         ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType], root) ?? "not registered"}\`).`
         : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
+    ...(modelExceptionUse === null ? [] : [`- model exception: ${modelExceptionUse.model}, requested by the PO at ${modelExceptionUse.requestedAt} (${modelExceptionUse.by}); no configured route selects this model, it changes only the model of this dispatch, and the exception store (\`list\`) is the audit source.`]),
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
     `- Slice: ${dispatchId}`,

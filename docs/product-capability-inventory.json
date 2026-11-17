@@ -444,6 +444,7 @@
         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-model-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-model-exception-script-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-liveness-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",

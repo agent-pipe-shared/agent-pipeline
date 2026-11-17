@@ -709,6 +709,30 @@ function touchesGrantStore(input) {
   return /dispatch-budget-grant\.mjs(?![a-z0-9._-])/u.test(normalized) || normalized.includes("dispatch-budget/grants");
 }
 
+export const MODEL_EXCEPTION_REFUSAL_CODE = "DISPATCH-MODEL-EXCEPTION-ORCHESTRATOR-ONLY";
+
+/**
+ * C30G-M16: does this call run the PO model-exception script or touch its store (any tool: a read of the store is refused too)? Only the
+ * orchestrator may; a dispatched agent that could record an exception would choose its own model. The script pattern is anchored on `scripts/`
+ * (or a bare word), so `lib/dispatch-model-exception.mjs` and the script's test file stay reachable to a Goldfish that works on them.
+ */
+function touchesModelExceptionStore(input) {
+  const toolInput = input?.tool_input;
+  if (toolInput === null || typeof toolInput !== "object") return false;
+  const text = ["command", "CommandLine", "file_path", "path", "pattern", "notebook_path", "glob"].map((key) => (typeof toolInput[key] === "string" ? toolInput[key] : "")).join("\n");
+  const normalized = text.replaceAll("\\", "/").toLowerCase();
+  return /(?:^|[\s"'=]|scripts\/)dispatch-model-exception\.mjs(?![a-z0-9._-])/mu.test(normalized) || /dispatch-model-exception(?:\/|$|[\s"'])/mu.test(normalized);
+}
+
+function modelExceptionRefused({ agentId, agentType }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${MODEL_EXCEPTION_REFUSAL_CODE}: this dispatch (${agentType}, agent ${agentId}) touched the PO model-exception store or its script. `
+      + "Only the orchestrating session may record or read a model exception; a dispatched agent never chooses its own model. End your turn with your interim report and let the dispatcher decide.\n",
+  );
+}
+
 function grantRefused({ agentId, agentType }) {
   return verdict(
     2,
@@ -1795,6 +1819,9 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
   // partial or malformed identity) touching it is refused before anything is counted.
   if (touchesGrantStore(input)) {
     return grantRefused({ agentId: identity.agentId ?? "unresolved", agentType: identity.agentType ?? "unresolved" });
+  }
+  if (touchesModelExceptionStore(input)) {
+    return modelExceptionRefused({ agentId: identity.agentId ?? "unresolved", agentType: identity.agentType ?? "unresolved" });
   }
 
   if (identity.kind === "unresolved") {

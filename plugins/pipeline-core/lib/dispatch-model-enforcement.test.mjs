@@ -2,7 +2,7 @@
 // D84: a dispatch takes its model from the configured routing, never from inheritance or the Elephant's choice.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { configuredRecordRoute, evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
+import { CLAUDE_FAMILY_ALIASES, configuredRecordRoute, evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
 import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 
 const claudeSelectors = {
@@ -293,4 +293,165 @@ test("DME-C23d the effort that really ran is the one the stop reports; absent, i
     assert.equal(unobserved.warning?.code, "DISPATCH-EFFORT-UNOBSERVED");
     assert.match(unobserved.warning.message, /unobserved/iu);
   }
+});
+
+// C30G-M16 (PO 2026-11-17): a PO-requested, recorded, expiring model exception. The store is an in-memory snapshot here; the script and the
+// hook cases exercise the real file store.
+const NOON = "2026-11-17T12:00:00.000Z";
+const at = (minutesAfterNoon) => new Date(Date.parse(NOON) + minutesAfterNoon * 60000).toISOString();
+async function exceptionFixture(specs) {
+  const lib = await import("./dispatch-model-exception.mjs");
+  let store = lib.emptyExceptionStore();
+  for (const spec of specs) {
+    const recorded = lib.recordModelException(store, { by: "label-from-the-po", reason: "design analysis", at: NOON, aliases: CLAUDE_FAMILY_ALIASES, ...spec });
+    assert.equal(recorded.ok, true, JSON.stringify(recorded));
+    store = recorded.store;
+  }
+  return { lib, store, snapshot: () => ({ ok: true, store }) };
+}
+const call = (extra) => ({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "fable", root: "/fixture-root", routeSource: routes(), nowFn: () => at(10), ...extra });
+
+test("DME-X1 a model no route selects is admitted, with a named warning, exactly when a live exception names it", async () => {
+  const { snapshot } = await exceptionFixture([{ model: "fable", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }]);
+  const admitted = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: snapshot() }));
+  assert.equal(admitted.ok, true, JSON.stringify(admitted));
+  const warning = admitted.warnings.find((entry) => entry.code === "DISPATCH-MODEL-EXCEPTION");
+  assert.match(warning.message, /model exception: fable, requested by the PO at 2026-11-17T12:00:00\.000Z \(label-from-the-po\)/u);
+  assert.equal(admitted.exceptionUse.model, "fable");
+  assert.equal(admitted.warnings.some((entry) => entry.code === "DISPATCH-MODEL-DUTY-MISMATCH"), false, "the exception replaces the escalation warning, it does not stack on it");
+  assert.match(dispatchModelWarningText(admitted), /DISPATCH-MODEL-EXCEPTION/u);
+  const without = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: { ok: true, store: (await import("./dispatch-model-exception.mjs")).emptyExceptionStore() } }));
+  assert.equal(without.ok, false);
+  assert.equal(without.exceptionUse, undefined);
+});
+
+test("DME-X2 without a live exception the refusal names the ONE record command, what the PO supplies, and the decline path", async () => {
+  const { lib } = await exceptionFixture([]);
+  const refused = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", effort: "max", exceptionStore: { ok: true, store: lib.emptyExceptionStore() } }));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.findings[0].code, "DISPATCH-MODEL-UNROUTED");
+  const text = refused.findings[0].message;
+  assert.match(text, /dispatch-model-exception\.mjs" record --model fable --effort max --dispatch-id FEATURE-A-1 --reason "<reason the PO gave>" --by "<label the PO gave>" --root "\/fixture-root"/u);
+  assert.match(text, /decline/u);
+  assert.match(text, /sonnet/u, "the decline path re-issues with a configured selector");
+  assert.match(text, /no exception is recorded/u);
+  const noId = evaluateDispatchModel(call({ exceptionStore: { ok: true, store: lib.emptyExceptionStore() } }));
+  assert.match(noId.findings[0].message, /record --model fable --count 1 --reason/u, "a dispatch with no declared id gets the one-dispatch count scope");
+  const other = evaluateDispatchModel(call({ model: "gpt-6", exceptionStore: { ok: true, store: lib.emptyExceptionStore() } }));
+  assert.doesNotMatch(other.findings[0].message, /dispatch-model-exception/u, "only a Claude family alias can be excepted");
+  assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: "fable", routeSource: routes() }).findings[0].message,
+    "the dispatch names model \"fable\", which no available configured route selects. Re-issue it with one of the configured selectors: \"sonnet\", \"haiku\", \"opus\".",
+    "no root and no injected store: the refusal is byte-identical to the one before the exception existed");
+});
+
+test("DME-X3 an expired, consumed, wrong-alias or wrong-dispatch-id exception is refused and said as such, naming list and record", async () => {
+  const noOpus = routes({ test_author: "sonnet", critic_normal: "sonnet", critic_high_risk: "sonnet", advisory: "sonnet" });
+  const cases = [
+    { specs: [{ model: "fable", scope: { kind: "minutes", value: 30 } }], extra: { nowFn: () => at(31) }, cause: "expired" },
+    { specs: [{ model: "fable", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }], extra: { dispatchId: "FEATURE-A-2" }, cause: "wrong-dispatch-id" },
+    { specs: [{ model: "fable", scope: { kind: "count", value: 1 } }], uses: ["FEATURE-A-9"], extra: { dispatchId: "FEATURE-A-2" }, cause: "consumed" },
+    { specs: [{ model: "fable", scope: { kind: "count", value: 2 } }], extra: { model: "opus", routeSource: noOpus }, cause: "wrong-alias" },
+  ];
+  for (const entry of cases) {
+    const { lib, store } = await exceptionFixture(entry.specs);
+    let current = store;
+    for (const key of entry.uses ?? []) current = lib.applyModelExceptionUse(current, { id: "MX-1", dispatchKey: key, dispatchId: key, model: "fable", effort: null, reused: false }, NOON).store;
+    const refused = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", ...entry.extra, exceptionStore: { ok: true, store: current } }));
+    assert.equal(refused.ok, false, entry.cause);
+    assert.equal(refused.exceptionUse, undefined);
+    assert.match(refused.findings[0].message, new RegExp(`MX-1[^.]*${entry.cause}`, "u"), entry.cause);
+    assert.match(refused.findings[0].message, /dispatch-model-exception\.mjs" list /u, entry.cause);
+    assert.match(refused.findings[0].message, /dispatch-model-exception\.mjs" record /u, entry.cause);
+  }
+});
+
+test("DME-X4 an exception for one alias never admits another model", async () => {
+  const noOpus = routes({ test_author: "sonnet", critic_normal: "sonnet", critic_high_risk: "sonnet", advisory: "sonnet" });
+  const { snapshot } = await exceptionFixture([{ model: "fable", scope: { kind: "minutes", value: 60 } }]);
+  assert.equal(evaluateDispatchModel(call({ model: "opus", routeSource: noOpus, exceptionStore: snapshot() })).ok, false);
+  assert.equal(evaluateDispatchModel(call({ model: "claude-fable-5", exceptionStore: snapshot() })).ok, true, "a full Claude id of the excepted family is the same alias");
+  assert.equal(evaluateDispatchModel(call({ model: "fable-extra", exceptionStore: snapshot() })).ok, false, "a prefix of the alias is not the alias");
+});
+
+test("DME-X5 a count exception is consumed once per new dispatch, never by a refusal, never twice by a retry of the same dispatch", async () => {
+  const { lib, store, snapshot } = await exceptionFixture([{ model: "fable", scope: { kind: "count", value: 1 } }]);
+  const first = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: snapshot() }));
+  assert.equal(first.ok, true);
+  assert.equal(first.exceptionUse.reused, false);
+  assert.equal(evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: snapshot() })).exceptionUse.id, "MX-1", "deciding is read-only: the same store admits the same call again");
+  const used = lib.applyModelExceptionUse(store, first.exceptionUse, at(10));
+  assert.equal(used.ok, true);
+  const after = { ok: true, store: used.store };
+  const retry = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", exceptionStore: after }));
+  assert.equal(retry.ok, true, "a retried identical call after a transient failure is still admitted");
+  assert.equal(retry.exceptionUse.reused, true);
+  assert.equal(lib.applyModelExceptionUse(used.store, retry.exceptionUse, at(11)).store.digest, used.store.digest, "the retry appends nothing: the exception is not burnt twice");
+  const next = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-2", exceptionStore: after }));
+  assert.equal(next.ok, false, "the count was one dispatch");
+  assert.match(next.findings[0].message, /consumed/u);
+  // A SendMessage continuation is not a new dispatch: it is no Agent call and never reaches this decision (the hook is registered on Task/Agent only).
+});
+
+test("DME-X6 a window exception expires by time on an injected clock and records each admitted dispatch once", async () => {
+  const { lib, store } = await exceptionFixture([{ model: "fable", scope: { kind: "minutes", value: 30 } }]);
+  const live = (minutes, dispatchId) => evaluateDispatchModel(call({ dispatchId, nowFn: () => at(minutes), exceptionStore: { ok: true, store: current } }));
+  let current = store;
+  assert.equal(live(29, "FEATURE-A-1").ok, true);
+  current = lib.applyModelExceptionUse(current, live(29, "FEATURE-A-1").exceptionUse, at(29)).store;
+  assert.equal(live(29, "FEATURE-A-2").ok, true, "a window is not decremented by a dispatch");
+  assert.equal(live(30, "FEATURE-A-3").ok, false, "the window ends at its stated time");
+  assert.match(live(30, "FEATURE-A-3").findings[0].message, /expired/u);
+});
+
+test("DME-X7 an effort the configuration does not name is admitted under an exception that names it, with the exception warning", async () => {
+  const { snapshot } = await exceptionFixture([{ model: "fable", effort: "max", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }]);
+  const admitted = evaluateDispatchModel(call({ dispatchId: "FEATURE-A-1", effort: "max", exceptionStore: snapshot() }));
+  assert.equal(admitted.ok, true);
+  assert.match(admitted.warnings.find((entry) => entry.code === "DISPATCH-MODEL-EXCEPTION").message, /effort max/u);
+  assert.equal(admitted.warnings.some((entry) => entry.code === "DISPATCH-EFFORT-DUTY-MISMATCH"), false);
+  assert.equal(admitted.exceptionUse.effort, "max");
+  const sonnetOnly = evaluateDispatchModel(call({ model: "sonnet", dispatchId: "FEATURE-A-1", effort: "max", exceptionStore: snapshot() }));
+  assert.equal(sonnetOnly.ok, true, "an exception for fable never touches a sonnet dispatch");
+  assert.equal(sonnetOnly.exceptionUse, undefined);
+});
+
+test("DME-X8 a corrupt or unreadable store grants nothing and the refusal names the repair", async () => {
+  const { lib, store } = await exceptionFixture([{ model: "fable", scope: { kind: "minutes", value: 60 } }]);
+  const tampered = JSON.parse(JSON.stringify(store));
+  tampered.entries[0].reason = "another reason";
+  const verdict = lib.validateExceptionStore(tampered);
+  assert.equal(verdict.ok, false);
+  const refused = evaluateDispatchModel(call({ exceptionStore: { ok: false, code: verdict.code, path: "/fixture-root/.git/agent-pipeline/dispatch-model-exception/store.json" } }));
+  assert.equal(refused.ok, false, "a store that does not verify admits nothing");
+  assert.match(refused.findings[0].message, /does not verify/u);
+  assert.match(refused.findings[0].message, /--move-broken-store-aside/u);
+});
+
+test("DME-X9b the record comparison binds an exception-admitted record to its dispatch and still reports an unexplained mismatch", async () => {
+  const { compareRecordedModel } = await import("./agent-model-registry.mjs");
+  const { lib, store } = await exceptionFixture([{ model: "fable", effort: "max", scope: { kind: "dispatch-id", value: "FEATURE-A-1" } }]);
+  const used = lib.applyModelExceptionUse(store, { id: "MX-1", dispatchKey: "FEATURE-A-1", dispatchId: "FEATURE-A-1", model: "fable", effort: "max", reused: false }, NOON).store;
+  const record = (taskId, model) => ({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, agentType: "goldfish-deep", model, effort: "max" });
+  const configuredRoute = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: true, store: used } });
+  const admitted = compareRecordedModel(record("FEATURE-A-1", "claude-fable-5"), { configuredRoute });
+  assert.equal(admitted.classification, "model-route-configured");
+  assert.match(admitted.reason, /PO model exception/u);
+  assert.equal(compareRecordedModel(record("FEATURE-A-2", "claude-fable-5"), { configuredRoute }).classification, "model-mismatch", "another dispatch's record is an unexplained mismatch");
+  assert.equal(compareRecordedModel(record("FEATURE-A-1", "gpt-6"), { configuredRoute }).classification, "model-mismatch", "a model the exception does not name is an unexplained mismatch");
+  assert.equal(compareRecordedModel(record("FEATURE-A-1", "claude-fable-5")).classification, "model-mismatch", "no reader, no acceptance");
+});
+
+test("DME-X9 the host commit accepts the model and effort of a dispatch admitted under an exception, and still refuses an unexplained mismatch", async () => {
+  const { lib, store } = await exceptionFixture([{ model: "fable", effort: "max", scope: { kind: "count", value: 1 } }]);
+  const used = lib.applyModelExceptionUse(store, { id: "MX-1", dispatchKey: "FEATURE-A-1", dispatchId: "FEATURE-A-1", model: "fable", effort: "max", reused: false }, NOON).store;
+  const v4 = (taskId, model, effort) => ({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, model, effort });
+  const read = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: true, store: used } });
+  assert.deepEqual(read(v4("FEATURE-A-1", "claude-fable-5", "max")), { model: true, effort: true, exception: true });
+  assert.deepEqual(read(v4("FEATURE-A-2", "fable", "max")), { model: false, effort: false }, "another dispatch id was not admitted under it");
+  assert.deepEqual(read(v4("FEATURE-A-1", "opus", "max")), { model: true, effort: true, exception: true }, "opus is configured: the route answers the model half, the exception only the effort half");
+  assert.deepEqual(read(v4("FEATURE-A-1", "gpt-6", "max")), { model: false, effort: true, exception: true }, "the exception names no other model; the effort half is its own");
+  const none = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: true, store: lib.emptyExceptionStore() } });
+  assert.deepEqual(none(v4("FEATURE-A-1", "fable", "max")), { model: false, effort: false }, "no exception, no acceptance");
+  const unreadable = configuredRecordRoute("/fixture-root", { routeSource: routes(), exceptionStore: { ok: false, code: "store-unverifiable" } });
+  assert.deepEqual(unreadable(v4("FEATURE-A-1", "fable", "max")), { model: false, effort: false });
 });

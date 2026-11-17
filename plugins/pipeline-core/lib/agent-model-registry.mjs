@@ -206,7 +206,7 @@ export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR, c
   if (configured && (familyMatches || configured.model === true) && (effortMatches || configured.effort === true)) {
     return {
       classification: "model-route-configured",
-      reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` differs from \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and is named by the project's routing configuration`,
+      reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` differs from \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and is named by the project's routing configuration${configured.exception === true ? " or by a PO model exception that admitted this dispatch (the model-exception store, `list`, is the audit source)" : ""}`,
     };
   }
   return {

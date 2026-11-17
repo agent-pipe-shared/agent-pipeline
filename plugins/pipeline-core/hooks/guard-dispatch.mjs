@@ -99,6 +99,7 @@ const parseAdmissionBriefing = (prompt) => parseNativeGoldfishBriefing(prompt, {
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
 import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
 import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
+import { consumeModelException } from "../lib/dispatch-model-exception.mjs";
 import { enterAntigravityHookSessionOwner, enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -772,6 +773,25 @@ export function dispatchWriteScope(prompt) {
   } catch { return { id: null, scope: null }; }
 }
 
+// C30G-M16: the dispatch id a PO model exception is keyed by. The model check runs before the briefing pointer is expanded, so a pointer prompt is
+// read here through the same verified loader (read-only); a prompt that declares no id gives null and the exception is then keyed by the call itself.
+let modelExceptionIdCache;
+function modelExceptionDispatchId(toolInput, root, subagentType) {
+  if (modelExceptionIdCache !== undefined) return modelExceptionIdCache;
+  let id = null;
+  try {
+    let prompt = typeof toolInput.prompt === "string" ? toolInput.prompt : typeof toolInput.message === "string" ? toolInput.message : "";
+    if (carriesBriefingFilePointer(prompt)) {
+      const loaded = loadReferencedBriefing({ root, prompt, subagentType });
+      if (loaded?.ok) prompt = loaded.text;
+    }
+    const named = dispatchWriteScope(prompt).id;
+    id = typeof named === "string" && named !== "" ? named : null;
+  } catch { id = null; }
+  modelExceptionIdCache = id;
+  return id;
+}
+
 // Gate the entire hook body on being the process entrypoint (matching
 // guard-dispatch-budget.mjs's shape). Importing this module for `extractWorkflowDispatches`
 // must never itself read stdin, parse it, or call `process.exit` -- see `../lib/entrypoint.mjs`'s
@@ -812,7 +832,10 @@ if (isDirectInvocation(import.meta.url)) {
     const modelRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
     const modelCheck = Array.isArray(toolInput.Subagents)
       ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model, root: modelRoot }))
-      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, effort: toolInput.effort, root: modelRoot })];
+      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, effort: toolInput.effort, root: modelRoot,
+        // C30G-M16: the id the briefing declares (read from the pointed-at briefing when the prompt is a pointer) keys a PO model exception; without one the call itself does.
+        dispatchId: () => modelExceptionDispatchId(toolInput, modelRoot, subagentType),
+        dispatchKey: () => modelExceptionDispatchId(toolInput, modelRoot, subagentType) ?? `call-${sha256Hex(JSON.stringify([subagentType, toolInput.model ?? null, toolInput.effort ?? null, toolInput.prompt ?? toolInput.message ?? ""]))}` })];
     for (const check of modelCheck) {
       const modelWarnings = dispatchModelWarningText(check);
       if (modelWarnings !== "") process.stderr.write(modelWarnings);
@@ -820,6 +843,17 @@ if (isDirectInvocation(import.meta.url)) {
         process.stderr.write(dispatchModelRefusalText(check));
         process.exit(2);
       }
+    }
+    // C30G-M16: a dispatch admitted under a PO model exception consumes it now, and puts it back if any later guard refuses the dispatch
+    // (the same undo-on-refusal shape as the briefing route record below), so a refused dispatch never burns an exception.
+    for (const check of modelCheck) {
+      if (!check.exceptionUse) continue;
+      const consumed = consumeModelException({ root: modelRoot, use: check.exceptionUse });
+      if (!consumed.ok) {
+        process.stderr.write(`BLOCKED (guard-dispatch): DISPATCH-MODEL-EXCEPTION-NOT-CONSUMED: the PO model exception ${check.exceptionUse.id} could not be consumed for this dispatch (${consumed.code}), so the dispatch is refused and nothing was consumed. Repair: run \`node "${fileURLToPath(new URL("../scripts/dispatch-model-exception.mjs", import.meta.url))}" list --root "${modelRoot}"\` to see the exception and its state, then re-issue the dispatch.\n`);
+        process.exit(2);
+      }
+      process.once("exit", (code) => { if (code !== 0) consumed.undo(); });
     }
   }
 

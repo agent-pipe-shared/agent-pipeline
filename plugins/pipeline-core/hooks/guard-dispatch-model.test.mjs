@@ -105,7 +105,47 @@ register("K152B check every native Model and preserve explicit model admission",
   }
 });
 
-assert.equal(cases.length, 5,"the dispatch-model hook corpus must register five cases");
+// C30G-M16 (PO 2026-11-17): a PO-requested, recorded, expiring model exception, through the real hook and the real script and store.
+const EXCEPTION_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-model-exception.mjs", import.meta.url));
+const exceptionCli = (...args) => {
+  const res = spawnSync(process.execPath, [EXCEPTION_SCRIPT, ...args, "--root", bindingRepo], { encoding: "utf8" });
+  return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
+};
+const fableCall = (prompt = "find where X is defined") => ({ tool_name: "Agent", tool_input: { subagent_type: "general-purpose", model: "fable", prompt } });
+
+register("C30G-M16 a model no route selects is refused with the one record command, then admitted with a warning once the PO's exception is recorded", () => {
+  const refused = run(fableCall());
+  assert.equal(refused.code, BLOCK);
+  assert.ok(refused.stderr.includes("DISPATCH-MODEL-UNROUTED"), refused.stderr.slice(0, 300));
+  assert.ok(/dispatch-model-exception\.mjs" record --model fable --count 1 --reason/u.test(refused.stderr), refused.stderr.slice(0, 600));
+  const recorded = exceptionCli("record", "--model", "fable", "--count", "1", "--reason", "design analysis on the Fable family", "--by", "label-from-the-po");
+  assert.equal(recorded.code, 0, recorded.stderr);
+  const admitted = run(fableCall());
+  assert.ok(!admitted.stderr.includes("DISPATCH-MODEL-UNROUTED"), admitted.stderr.slice(0, 300));
+  assert.ok(/DISPATCH-MODEL-EXCEPTION: model exception: fable, requested by the PO at \S+ \(label-from-the-po\)/u.test(admitted.stderr), admitted.stderr.slice(0, 400));
+  assert.ok(admitted.stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), "the exception changes only the model: every other guard still judges the dispatch");
+  const listed = exceptionCli("list");
+  assert.equal(listed.code, 0, listed.stderr);
+  assert.ok(/MX-1\b.*\blive\b/u.test(listed.stdout), `a dispatch the hook refused for another reason never consumes the exception: ${listed.stdout}`);
+  assert.equal(exceptionCli("revoke", "--id", "MX-1").code, 0);
+  assert.equal(run(fableCall()).stderr.includes("DISPATCH-MODEL-UNROUTED"), true, "a revoked exception admits nothing");
+});
+
+register("C30G-M16 a dispatch the hook admits consumes a count exception once, and the next new dispatch is refused as consumed", () => {
+  const recorded = exceptionCli("record", "--model", "fable", "--count", "1", "--reason", "design analysis on the Fable family", "--by", "label-from-the-po");
+  assert.equal(recorded.code, 0, recorded.stderr);
+  const carrier = (prompt) => run({ tool_name: "Agent", tool_input: { subagent_type: "Explore", model: "fable", prompt } });
+  const first = carrier("find where X is defined");
+  assert.equal(first.code, ALLOW, first.stderr.slice(0, 400));
+  const listed = exceptionCli("list");
+  assert.ok(/\bconsumed\b/u.test(listed.stdout), listed.stdout);
+  assert.equal(carrier("find where X is defined").code, ALLOW, "an identical call is the retry of the same dispatch: it is admitted and burns nothing more");
+  const second = carrier("find where Y is defined");
+  assert.equal(second.code, BLOCK);
+  assert.ok(/consumed/u.test(second.stderr), second.stderr.slice(0, 400));
+});
+
+assert.equal(cases.length, 7,"the dispatch-model hook corpus must register seven cases");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

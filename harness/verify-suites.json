@@ -3667,6 +3667,12 @@
       "nonOverlapNote": "Unique contract suite for scripts/dispatch-briefing.mjs binding; route-record handling keeps its own suite dispatch-briefing-route-record-tests"
     },
     {
+      "name": "dispatch-model-exception-script-tests",
+      "file": "plugins/pipeline-core/scripts/dispatch-model-exception.test.mjs",
+      "invariantPinned": "The PO model-exception script and store record, list and revoke an attribution record of the PO's request (--by required, no default), expire by time, consume once per new dispatch, and a store that does not verify grants nothing and names the repair",
+      "nonOverlapNote": "Unique suite for scripts/dispatch-model-exception.mjs and lib/dispatch-model-exception.mjs; the admission decision and the host-commit reader keep their cases in dispatch-model-enforcement tests"
+    },
+    {
       "name": "pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
       "file": "plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs",
       "invariantPinned": "The close coordinator cannot reach feature-close-prepared while a delivery-course dispatch record of the same feature requires a Critic and carries no matching Critic evidence; records of other features never block",
