@@ -1,0 +1,154 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+index 0dc95112c..925c13de6 100644
+--- a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+@@ -187,6 +187,20 @@ function briefedWriteScopes(root, parseBriefing) {
+   return scopes;
+ }
+ 
++/**
++ * C30J-J2: the dispatch ids that the reservation rows (`reservations` of session-authority-repair inspect) show as settled integrated
++ * (`integrated` or `integrated-by-commit`). `cancelled` is no proof (a cancelled Goldfish may still write), and one unsettled or
++ * cancelled row of the same dispatch vetoes the id. Pure; derives from the rows, stores nothing.
++ */
++export function settledIntegratedDispatchIds(rows) {
++  const proven = new Set(), vetoed = new Set();
++  for (const row of Array.isArray(rows) ? rows : []) {
++    if (typeof row?.dispatchId !== "string") continue;
++    if (row.settled === "integrated" || row.settled === "integrated-by-commit") proven.add(row.dispatchId); else vetoed.add(row.dispatchId);
++  }
++  return new Set([...proven].filter((id) => !vetoed.has(id)));
++}
++
+ /**
+  * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read. A dispatch
+  * is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably gone (alive, or
+@@ -196,9 +210,16 @@ function briefedWriteScopes(root, parseBriefing) {
+  * `queueRowFn(root, id)` (the governed queue row of an id, or null) is injected by the caller: this module must not import the
+  * governed-queue module (an import cycle through guard-dispatch would initialise modules in a different order).
+  */
+-export function readRunningDispatches(root, { readFn = readDispatchRecordLiveness, queueRowFn = () => null, parseBriefing = () => null } = {}) {
++export function readRunningDispatches(root, { readFn = readDispatchRecordLiveness, queueRowFn = () => null, parseBriefing = () => null, settledIdsFn = () => new Set() } = {}) {
+   let records;
+   try { records = readFn(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
++  // C30J-J2 (finding I5): an unjudgeable record whose dispatch has a reservation settled as integrated is finished, not running. An
++  // alive record always counts; an unreadable settled readback drops nothing (an unjudgeable record is still announced).
++  if (records.some((entry) => entry.verdict === "unjudgeable")) {
++    let settled;
++    try { settled = settledIdsFn(root); } catch { settled = null; }
++    if (settled instanceof Set && settled.size > 0) records = records.filter((entry) => entry.verdict !== "unjudgeable" || !settled.has(entry.taskId));
++  }
+   if (records.length === 0) return [];
+   const briefed = briefedWriteScopes(root, parseBriefing);
+   return records.map((entry) => {
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
+index 72f35ee50..315911866 100644
+--- a/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
+@@ -18,7 +18,7 @@ import test from "node:test";
+ 
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+ import { discoverRepository, startSessionDescriptor } from "./worktree-lifecycle.mjs";
+-import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness } from "./dispatch-record-liveness.mjs";
++import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness, readRunningDispatches, settledIntegratedDispatchIds } from "./dispatch-record-liveness.mjs";
+ import { DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
+ import * as dispatchRecordLane from "./guard/dispatch-record-lane.mjs";
+ import { realpathSync, symlinkSync } from "node:fs";
+@@ -326,3 +326,30 @@ test("D169-DRO-4: syncCreationDirectory skips the directory open and fsync on wi
+   assert.throws(() => dispatchRecordLane.syncCreationDirectory(blind.dir, "linux"), (error) => error.code === "EACCES");
+   chmodSync(blind.dir, 0o700);
+ });
++
++// C30J-J2 (analysis C1, finding I5): a settled dispatch is not a running dispatch.
++const rec = (taskId, verdict) => ({ taskId, verdict, record: `dispatch-record-${taskId}.json` });
++const runningIds = (records, settled) => readRunningDispatches("/nonexistent-root", { readFn: () => ({ records }), settledIdsFn: () => settled }).map((entry) => entry.dispatchId);
++
++test("C30J-J2-1 an unjudgeable record whose dispatch has a settled integrated reservation is not listed as running", () => {
++  assert.deepEqual(runningIds([rec("A", "unjudgeable"), rec("B", "unjudgeable")], new Set(["A"])), ["B"]);
++});
++
++test("C30J-J2-2 an alive record always counts as running, whatever its reservation says", () => {
++  assert.deepEqual(runningIds([rec("A", "alive")], new Set(["A"])), ["A"]);
++});
++
++test("C30J-J2-3 an unjudgeable record with no settled reservation (or an unreadable settled readback) is still listed, never a silent pass", () => {
++  assert.deepEqual(runningIds([rec("A", "unjudgeable")], new Set()), ["A"]);
++  const throwing = readRunningDispatches("/nonexistent-root", { readFn: () => ({ records: [rec("A", "unjudgeable")] }), settledIdsFn: () => { throw new Error("no inspect"); } });
++  assert.deepEqual(throwing.map((entry) => entry.dispatchId), ["A"]);
++});
++
++test("C30J-J2-4 a cancelled or unsettled reservation is not proof; only integrated and integrated-by-commit settle, and one open row of the same dispatch vetoes", () => {
++  const rows = [
++    { dispatchId: "A", settled: "integrated" }, { dispatchId: "B", settled: "integrated-by-commit" }, { dispatchId: "C", settled: "cancelled" },
++    { dispatchId: "D", settled: null }, { dispatchId: "E", settled: "integrated" }, { dispatchId: "E", settled: null }, { pending: "x", status: "unreadable" },
++  ];
++  assert.deepEqual([...settledIntegratedDispatchIds(rows)].sort(), ["A", "B"]);
++  assert.deepEqual([...settledIntegratedDispatchIds(null)], []);
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 2bcf2973b..307addd08 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -148,7 +148,7 @@ const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue, stale
+ const { observeCurrentPlanApprovalForCalibration } = cliHelp ? {} : await import("./pipeline-state.mjs");
+ // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
+ const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
+-const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
++const { readRunningDispatches, settledIntegratedDispatchIds } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+ const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
+ const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
+ const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
+@@ -370,7 +370,14 @@ function defaultQueueRow(root, sliceId) {
+   } catch { return null; }
+ }
+ 
+-const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
++// C30J-J2: the reservation rows `session-authority-repair inspect` already derives (read-only, nothing stored). Any failure throws and
++// the reader then drops nothing, so an unjudgeable record is still announced.
++function defaultSettledDispatchIds(root) {
++  const out = execFileSync(process.execPath, [fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url)), "inspect", "--root", root], { encoding: "utf8", timeout: 30000, stdio: ["ignore", "pipe", "ignore"] });
++  return settledIntegratedDispatchIds(JSON.parse(out.trim().split("\n").filter(Boolean).pop()).reservations);
++}
++
++const defaultRunningDispatches = (root, deps = {}) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing, settledIdsFn: deps.settledDispatchIds ?? defaultSettledDispatchIds });
+ 
+ const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+ // D180b: the diagnostic lives outside the inventoried native Goldfish namespace; the legacy directory is still read.
+@@ -1054,7 +1061,7 @@ export function generateDispatchBinding(options, deps = {}) {
+ 
+   // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
+   // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
+-  const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
++  const others = (deps.runningDispatches ?? ((dir) => defaultRunningDispatches(dir, deps)))(root).filter((entry) => entry.dispatchId !== dispatchId);
+   const unreadable = others.filter((entry) => !Array.isArray(entry.writeScope) || entry.writeScope.length === 0);
+   for (const entry of others) {
+     if (unreadable.includes(entry)) continue;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 9ab11d721..f9465e36f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1067,6 +1067,24 @@ test("D76 the default reader finds a running dispatch from its open record and i
+   assert.equal(runDispatchBriefing(argvOf(fx), deps).ok, true, "a terminal record is not a running dispatch");
+ });
+ 
++test("C30J-J2 the default reader does not list an unjudgeable open record whose reservation is settled integrated, and still lists it otherwise", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
++  assert.equal(spawnSync("git", ["-C", fx.root, "init", "-q"], { encoding: "utf8", env }).status, 0);
++  const other = runDispatchBriefing(argvOf(fx, { "--dispatch-id": "ALF-RUN", "--check": "plugins/x/other.test.mjs", "--path": PATH_A }), depsOf(fx));
++  mkdirSync(join(fx.root, "scratch"), { recursive: true });
++  mkdirSync(join(fx.root, "evidence"), { recursive: true });
++  writeFileSync(join(fx.root, "scratch", "briefing-ALF-RUN.md"), other.skeleton);
++  writeFileSync(join(fx.root, "evidence", "dispatch-record-ALF-RUN.json"), JSON.stringify({ taskId: "ALF-RUN", outcome: "in-progress" }));
++  const deps = depsOf(fx);
++  delete deps.queueRow;
++  assert.equal(runDispatchBriefing(argvOf(fx), { ...deps, settledDispatchIds: () => new Set() }).code, "DBG-SCOPE-OVERLAP", "no settled reservation: still announced");
++  const settled = runDispatchBriefing(argvOf(fx), { ...deps, settledDispatchIds: () => new Set(["ALF-RUN"]) });
++  assert.equal(settled.ok, true, JSON.stringify(settled).slice(0, 300));
++  assert.equal(settled.warnings.some((entry) => entry.code === "DBG-RUNNING-SCOPE-UNKNOWN"), false);
++});
++
+ // --- D75 (A): a re-dispatch after a wrong-premise stop needs a recon reference ---
+ 
+ const SLICE_ITEM = "pipeline.sample-slug";
