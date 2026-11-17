@@ -404,6 +404,31 @@ check("requires a typed invalidation for every later broad review", () => {
   assert.equal(broad.invalidation.reason, "explicit-broad-review");
 });
 
+// PO decision 2026-11-17 (AC-108): trustBoundaryChanged leaves the diff rounds. A new attempt may omit it, a supplied value has no effect, and an OLD record that holds the
+// reason it once produced is still read with its digest unchanged; impactAmbiguous keeps its full-round invalidation.
+check("trustBoundaryChanged no longer steers a delta attempt and an old trust-boundary-change record still reads", () => {
+  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen] });
+  const later = (attempt, invalidation) => compile({
+    packet: packet2, reviewId: "review-2", parent: first, coverage: completeCoverage(packet2), verdict: findingsVerdict,
+    findings: [{ ...findingOpen, priorFindingId: findingOpen.id }], correction: correction(), invalidation, reviewAttempt: attempt,
+  });
+  const { trustBoundaryChanged: _omitted, ...withoutKey } = deltaAttempt(2, 1);
+  const absent = later(withoutKey, none);
+  const supplied = later({ ...deltaAttempt(2, 1), trustBoundaryChanged: true }, none);
+  const old = later(deltaAttempt(2, 1), none);
+  assert.equal(absent.request.mode, "delta");
+  assert.equal(supplied.request.mode, "delta");
+  assert.equal(supplied.invalidation.kind, "none");
+  assert.equal(supplied.recordSha256, old.recordSha256, "a supplied value changes no byte of the record");
+  assert.equal(absent.recordSha256, old.recordSha256, "an absent key changes no byte of the record");
+  assert.throws(() => later({ ...deltaAttempt(2, 1), trustBoundaryChanged: true }, { kind: "full-review-required", reason: "trust-boundary-change", evidenceSha256: H("d") }), /CRL-INVALIDATION/u);
+  const oldBroad = historicalBroad(old, { kind: "full-review-required", reason: "trust-boundary-change", evidenceSha256: H("d") });
+  assert.equal(validateCriticReviewLineage(oldBroad).ok, true, "a record written before this decision still validates");
+  assert.equal(criticReviewLineageDigest(oldBroad), oldBroad.recordSha256, "and its digest is unchanged");
+  const ambiguous = later({ ...deltaAttempt(2, 1), impactAmbiguous: true }, { kind: "full-review-required", reason: "impact-ambiguous", evidenceSha256: H("d") });
+  assert.equal(ambiguous.invalidation.reason, "impact-ambiguous");
+});
+
 check("genesis pending cannot invent findings while later failed/pending records retain them exactly", () => {
   assert.throws(() => compile({ findings: [findingOpen] }), /CRL-GENESIS-FINDINGS/u);
   const first = compile({
@@ -890,8 +915,8 @@ check("a full round over more than 256 changed paths compiles, validates and adm
   assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: over }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
 });
 
-assert.equal(passed, 20);
-console.log(`${passed}/20 checks passed.`);
+assert.equal(passed, 21); // PO decision 2026-11-17 (AC-108) added one check
+console.log(`${passed}/21 checks passed.`);
 
 // N20 (consumer finding 2026-10-30, decision D206): every round of one session-mode course ran in the SAME hosting session, so
 // laneId and contextSha256 (both read from result.session) were equal for every round and no follow-up round could register.

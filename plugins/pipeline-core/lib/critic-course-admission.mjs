@@ -29,6 +29,10 @@ const object = (value) => value !== null && typeof value === "object" && !Array.
 const exact = (value, keys) => object(value)
   && Object.keys(value).length === keys.length
   && keys.every((key) => Object.hasOwn(value, key));
+// PO decision 2026-11-17 (AC-108): trustBoundaryChanged no longer steers a diff round and a new request does not supply it. Requests and attempts already registered in a running
+// course carry it (digest-bound), so a closed key list accepts it when present and when absent; its value is ignored everywhere.
+const exactOptionalTrust = (value, keys) => exact(value, keys) || exact(value, keys.filter((key) => key !== "trustBoundaryChanged"));
+const withTrust = (source) => (object(source) && Object.hasOwn(source, "trustBoundaryChanged") ? { trustBoundaryChanged: source.trustBoundaryChanged } : {});
 
 export class CriticCourseAdmissionError extends Error {
   constructor(code, detail = null) {
@@ -136,7 +140,7 @@ export function criticCourseParentRepair({ detail, candidate, specPath }) {
     steps: Object.freeze([
       Object.freeze({ step: 1, command: `node ${scripts}/session-critic-finalizer.mjs inspect-course-takeover --root <root> --request scratch/takeover-inspect.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-inspect-request.v1\",\"featureId\":\"<feature>\"} (the verb's --help prints the shape). Copy the printed digestSha256. If it reports CGB-TAKEOVER-COURSE there is no unregistered round: skip step 2." }),
       Object.freeze({ step: 2, command: `node ${scripts}/session-critic-finalizer.mjs supersede-course-takeover --root <root> --request scratch/takeover-supersede.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-supersede-request.v1\",\"featureId\":\"<feature>\",\"digestSha256\":\"<digest from step 1>\",\"reason\":\"<short reason>\"}. It retires only the rounds above the registered lineage." }),
-      Object.freeze({ step: 3, command: `node ${scripts}/register-feature-package.mjs --root <root> --add-delta-request <input.json>`, note: "Prints deltaRequestPath and commitPaths: commit both, the commit is the registration commit. The input file lists changedBehaviorClaims, pathInvariantMap, coordinatorImpactConfirmed, trustBoundaryChanged and impactAmbiguous; run it once to read the changed paths a map must cover." }),
+      Object.freeze({ step: 3, command: `node ${scripts}/register-feature-package.mjs --root <root> --add-delta-request <input.json>`, note: "Prints deltaRequestPath and commitPaths: commit both, the commit is the registration commit. The input file lists changedBehaviorClaims, pathInvariantMap, coordinatorImpactConfirmed and impactAmbiguous; run it once to read the changed paths a map must cover." }),
       Object.freeze({ step: 4, command: `node ${scripts}/critic-dispatch-preflight.mjs --root <root> --base ${detail.expectedBase} --candidate ${candidate} --spec ${specPath} --evidence <evidence> --registration-commit <registration commit of step 3> --delta-request <delta request path printed by step 3> --correction-input-bindings <bindings file>`, note: "<bindings file>: node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-correction-input-bindings.mjs derive --root <root> --base <expectedBase> --head <candidate> --out <file under scratch/>." }),
     ]),
   });
@@ -737,7 +741,7 @@ export function deriveCriticCourseAdmission(input) {
   } else if (input.correctionCommitsInRange < 1) {
     fail("CCA-CORRECTION-RANGE");
   }
-  if (input.requestedMode === "delta" ? !exact(input.delta, DELTA_KEYS)
+  if (input.requestedMode === "delta" ? !exactOptionalTrust(input.delta, DELTA_KEYS)
     : Object.keys(input.delta).length !== 0) fail("CCA-DELTA-SHAPE");
 
   const round = genesis ? 1 : parent.course.reviewRound + 1;
@@ -991,7 +995,7 @@ function parentProjection(row){return row?{reviewId:row.record.reviewId,recordSh
 function requestRead(input,resolved,history,source,evidence){const id=resolved.courseIdentity.originalFeatureId;
  const registered=registeredArtifact(resolved.resolvedRepository.repoRoot,input.registrationCommit,id,input.deltaRequestPath);
  let request;try{request=JSON.parse(registered.blob.bytes);}catch{fail('CCA-DELTA-SHAPE');}
- if(!exact(request,V2_DELTA_KEYS)||request.schema!=='pipeline.critic-delta-request.v1'||canonicalJson(request)!==registered.blob.bytes.toString('utf8')||input.deltaRequestPath!==`specs/${id}/evidence/critic-delta-request-${registered.blob.sha256}.json`)fail('CCA-DELTA-SHAPE');
+ if(!exactOptionalTrust(request,V2_DELTA_KEYS)||request.schema!=='pipeline.critic-delta-request.v1'||canonicalJson(request)!==registered.blob.bytes.toString('utf8')||input.deltaRequestPath!==`specs/${id}/evidence/critic-delta-request-${registered.blob.sha256}.json`)fail('CCA-DELTA-SHAPE');
  const identity=resolved.courseIdentity;
  if(request.featureId!==id||request.manifestPath!==identity.manifestPath||request.courseKey!==identity.courseKey||request.acceptedEnvelopeSha256!==identity.envelopeSha256||request.genesisRecordSha256!==identity.genesisRecordSha256||request.historySha256!==source.historySha256||!equal(request.parent,parentProjection(history.at(-1)))||!equal(request.candidate,source.candidate)||!exactSet(request.changedPaths,source.changedPaths)||!equal(request.deterministicEvidence,evidence.entries))fail('CCA-DELTA-BINDING');
  if(!exactSet(Object.keys(request.pathInvariantMap??{}),source.changedPaths))fail('CCA-DELTA-MAP');
@@ -1002,7 +1006,7 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
  const acceptance=acceptedCriterion?.ok?{basis:acceptedCriterion.acceptance.authorityBasis,cryptographicallyAuthenticated:acceptedCriterion.acceptance.cryptographicallyAuthenticated,envelopeSha256:acceptedCriterion.acceptance.envelopeSha256,criterionSourcePath:acceptedCriterion.source.path,criterionSourceSha256:acceptedCriterion.source.sha256,criterionId:acceptedCriterion.locator.criterionId,criterionExcerptSha256:acceptedCriterion.locator.excerptSha256,criterionParserVersion:acceptedCriterion.criterion.parserVersion??'pipeline.critic-criterion-parser.v1',sourceBindingsSha256:acceptedCriterion.acceptance.bindingSha256}:null;
  const projection={schema:'pipeline.critic-course-admission.v2',courseIdentity:identity,source,parent,acceptance,deltaRequestSha256:deltaRequest?.requestSha256??null,deterministicEvidenceSha256:evidence?.sha256??null,budgets,decision:{status:'refused',mode:null,code:'RE-COURSE-INCOMPLETE',affectedInvariantIds:[]}};
  const last=history.at(-1);if(!deltaRequest && last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
- const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
+ const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,...withTrust(d),impactAmbiguous:d.impactAmbiguous}:{})};
  const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,...(admission.reason?{reason:admission.reason}:{}),affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
 // PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
 // otherwise the first commit of base..candidate whose manifest lists it (a manifest read error counts as not listing it).
@@ -1085,9 +1089,9 @@ export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCom
  }catch{return none;}}
 function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
 export function prepareRegisteredCriticDeltaRequest(input){try{
- if(!exact(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
+ if(!exactOptionalTrust(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
  const request={...input.courseRequest,deltaRequestPath:null},c=runtimeCompose(request,{preparing:true,evidencePaths:input.deterministicEvidencePaths});if(!c.history.length)fail('CCA-DELTA-PARENT');
- const i=c.resolved.courseIdentity,descriptor={schema:'pipeline.critic-delta-request.v1',featureId:i.originalFeatureId,manifestPath:i.manifestPath,courseKey:i.courseKey,acceptedEnvelopeSha256:i.envelopeSha256,genesisRecordSha256:i.genesisRecordSha256,historySha256:c.source.historySha256,parent:parentProjection(c.history.at(-1)),candidate:c.source.candidate,changedPaths:c.source.changedPaths,changedBehaviorClaims:input.changedBehaviorClaims,pathInvariantMap:input.pathInvariantMap,pathInvariantMapSha256:sha256Canonical(input.pathInvariantMap),coordinatorImpactConfirmed:input.coordinatorImpactConfirmed,trustBoundaryChanged:input.trustBoundaryChanged,impactAmbiguous:input.impactAmbiguous,deterministicEvidence:c.evidence.entries};
+ const i=c.resolved.courseIdentity,descriptor={schema:'pipeline.critic-delta-request.v1',featureId:i.originalFeatureId,manifestPath:i.manifestPath,courseKey:i.courseKey,acceptedEnvelopeSha256:i.envelopeSha256,genesisRecordSha256:i.genesisRecordSha256,historySha256:c.source.historySha256,parent:parentProjection(c.history.at(-1)),candidate:c.source.candidate,changedPaths:c.source.changedPaths,changedBehaviorClaims:input.changedBehaviorClaims,pathInvariantMap:input.pathInvariantMap,pathInvariantMapSha256:sha256Canonical(input.pathInvariantMap),coordinatorImpactConfirmed:input.coordinatorImpactConfirmed,...withTrust(input),impactAmbiguous:input.impactAmbiguous,deterministicEvidence:c.evidence.entries};
  return ok({descriptor,artifact:artifact(`specs/${i.originalFeatureId}/evidence/critic-delta-request-<digest>.json`,descriptor)});
  }catch(error){return refused(error);}}
 export function prepareRegisteredCriticCourseAlias(input){try{

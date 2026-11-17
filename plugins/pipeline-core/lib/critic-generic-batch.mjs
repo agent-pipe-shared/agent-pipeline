@@ -27,7 +27,9 @@ const SHA = /^[a-f0-9]{64}$/u;
 const ID = /^[a-f0-9]{32}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const DECLARATION = ["taskId", "baseCommit", "candidateCommit", "logicalWorkIds", "specPath", "guardrailPaths", "signedQualityImportAnchor"];
-const CORRECTION = [...DECLARATION, "changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous", "evidencePaths"];
+const CORRECTION = [...DECLARATION, "changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "impactAmbiguous", "evidencePaths"];
+// PO decision 2026-11-17 (AC-108): a correction request no longer supplies trustBoundaryChanged; a request that still carries it (an old one) is accepted and the value is ignored.
+const LEGACY_CORRECTION_KEY = "trustBoundaryChanged";
 const MEMBER = ["schema", "batchId", "registrationSha256", "kind", "logicalWorkIds", "target", "parent", "range", "delta", "recordSha256"];
 const REGISTRATION = ["schema", "batchId", "repositoryFingerprint", "declaredScope", "originTargets", "registrationSha256"];
 const RESERVATION = ["schema", "batchId", "registrationSha256", "ordinal", "mode", "packetId", "packetDigest", "claimSha256", "preflightSha256", "memberSha256", "parent", "candidate", "range", "deltaEvidenceSha256", "sourceSha256", "decisionSha256"];
@@ -280,7 +282,7 @@ function sourceTarget(root, declaration) {
   return { kind: "signed-quality-import", intentSha256: anchor.intentSha256, integrationCommit: anchor.integrationCommit };
 }
 function declarationSource(root, d, correction = false) {
-  const keys = correction ? CORRECTION : DECLARATION;
+  const keys = correction ? [...CORRECTION, ...(Object.hasOwn(d ?? {}, LEGACY_CORRECTION_KEY) ? [LEGACY_CORRECTION_KEY] : [])] : DECLARATION;
   if (!Object.hasOwn(d ?? {}, "reviewUnitPath")) fail("CGB-REVIEW-UNIT-REQUIRED");
   shape(d, [...keys, "reviewUnitPath"]);
   if (!isSafeTaskId(d.taskId) || !OID.test(d.baseCommit) || !OID.test(d.candidateCommit)) fail("CGB-SHAPE");
@@ -486,7 +488,7 @@ function deltaSource(root, s, correction, parent, round) {
   const attempt = { round, correctionCommits: commits.length, requestedMode: "delta", base: s.range.base, head: s.range.commit, tree: s.range.tree,
     changedPaths, changedBehaviorClaims: correction.changedBehaviorClaims, priorReceipt: { id: `critic-${parent.parent.packetId}`, sha256: parent.parent.receiptSha256 },
     pathInvariantMap: correction.pathInvariantMap, pathInvariantMapSha256: sha256Canonical(correction.pathInvariantMap),
-    coordinatorImpactConfirmed: correction.coordinatorImpactConfirmed, trustBoundaryChanged: correction.trustBoundaryChanged, impactAmbiguous: correction.impactAmbiguous };
+    coordinatorImpactConfirmed: correction.coordinatorImpactConfirmed, ...(Object.hasOwn(correction, LEGACY_CORRECTION_KEY) ? { [LEGACY_CORRECTION_KEY]: correction[LEGACY_CORRECTION_KEY] } : {}), impactAmbiguous: correction.impactAmbiguous };
   const admitted = admitReviewAttempt(attempt);
   if (!admitted.ok || admitted.mode !== "delta") fail("CGB-DELTA");
   const diagnosticBundle = createDiagnosticBundle({ root, candidate: { commit: s.range.commit, tree: s.range.tree }, evidencePaths: correction.evidencePaths,

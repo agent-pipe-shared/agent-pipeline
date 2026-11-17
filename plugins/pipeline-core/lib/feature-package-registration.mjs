@@ -814,8 +814,8 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
     packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
     coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
     correction: round === 1 ? null : { commit: packet.candidate.commit, deltaSha256: packet.diff.sha256, impactSha256: sha256Canonical(edges) },
-    invalidation: deltaRequestRecord !== null && (deltaRequestRecord.trustBoundaryChanged === true || deltaRequestRecord.impactAmbiguous === true)
-      ? { kind: "full-review-required", reason: deltaRequestRecord.trustBoundaryChanged === true ? "trust-boundary-change" : "impact-ambiguous", evidenceSha256: null }
+    invalidation: deltaRequestRecord !== null && deltaRequestRecord.impactAmbiguous === true
+      ? { kind: "full-review-required", reason: "impact-ambiguous", evidenceSha256: null }
       : { kind: "none", reason: null, evidenceSha256: null },
   });
   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
@@ -934,10 +934,13 @@ export function checkCriticLineageBeforeCommit({ root: rootInput } = {}) {
  * is not evidence-only, registrationCommit = HEAD. The request is compiled by prepareRegisteredCriticDeltaRequest, written as the
  * immutable `critic-delta-request-<sha>.json` and added to the manifest as non-authority candidate-evidence. Nothing is committed.
  */
-const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
-const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"trustBoundaryChanged":false,"impactAmbiguous":false}';
-// The four fields (and the invariant lists) below are the Coordinator's judgment: no tool fills, defaults or infers them (PO decision D223).
-const DELTA_JUDGMENT_FIELDS = ["changedBehaviorClaims", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
+const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "impactAmbiguous"];
+const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"impactAmbiguous":false}';
+// PO decision 2026-11-17 (AC-108): trustBoundaryChanged left the diff rounds. An input file that still carries it (written by an older build) is accepted, the value is carried into
+// the registered request unchanged and has no effect: it never makes a round full and never needs --confirm-full-round.
+const LEGACY_DELTA_INPUT_KEY = "trustBoundaryChanged";
+// The three fields (and the invariant lists) below are the Coordinator's judgment: no tool fills, defaults or infers them (PO decision D223).
+const DELTA_JUDGMENT_FIELDS = ["changedBehaviorClaims", "coordinatorImpactConfirmed", "impactAmbiguous"];
 /** Writes the path skeleton ({"pathInvariantMap": {"<changed path>": []}}) at the missing input path and refuses; wx: never overwrites. */
 function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
   const names = gitOut(root, ["diff", "--name-only", "-z", baseCommit, candidate, "--"]);
@@ -949,7 +952,7 @@ function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
     if (realpathSync(dirname(target)) !== join(realpathSync(root), dirname(inputPath))) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath });
     writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
   } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
-  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Mind the cost: trustBoundaryChanged or impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
+  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Mind the cost: impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
 }
 /** The manifest core of a commit: the manifest minus its candidate-evidence artifacts (the transport check's own definition), as a canonical digest; null when unreadable. */
 function manifestCoreSha256(root, commit, manifestPath) {
@@ -966,7 +969,7 @@ function manifestCoreUnchanged(root, parent, commit, manifestPath) {
   return before !== null && after !== null && before === after;
 }
 /** When `true` is factually right, and when it is not (shown with the refusal, the skeleton and the help text). */
-const FULL_ROUND_GUIDANCE = "trustBoundaryChanged is true only when the correction itself changes who or what is trusted or what an actor may do (authentication, authorization, a permission check, an input or origin check, a secret or key handling), not for every correction in a security-relevant feature; impactAmbiguous is true only when the changed paths' effect cannot be told even after reading them. A large or risky-looking diff is neither: the diff round exists for it.";
+const FULL_ROUND_GUIDANCE = "impactAmbiguous is true only when the changed paths' effect cannot be told even after reading them. A large or risky-looking diff is neither: the diff round exists for it.";
 export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract, confirmFullRound = false } = {}) {
   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
   let root;
@@ -985,17 +988,18 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   if (!absent) {
     try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
     if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
-    const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
+    const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key) && key !== LEGACY_DELTA_INPUT_KEY);
     if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
     const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
     if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
     if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
-    for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
-    // C30d (PO report on Claude Code, 2026-11-16): `true` in either field turns the next round into a FULL round over the whole feature range (RE-DELTA-FALLBACK-FULL),
+    for (const key of ["coordinatorImpactConfirmed", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
+    if (Object.hasOwn(input, LEGACY_DELTA_INPUT_KEY) && typeof input[LEGACY_DELTA_INPUT_KEY] !== "boolean") return shapeRepair(`${LEGACY_DELTA_INPUT_KEY} is no longer supplied; if it is present it must be true or false and it is ignored`);
+    // C30d (PO report on Claude Code, 2026-11-16): `true` in impactAmbiguous turns the next round into a FULL round over the whole feature range (RE-DELTA-FALLBACK-FULL),
     // several times the size and cost of the diff round, and a registered value cannot be taken back. The consequence is therefore stated BEFORE anything is written, and the
     // verb registers it only on the Coordinator's explicit flag. No tool changes the judgment itself (D223).
-    if ((input.trustBoundaryChanged === true || input.impactAmbiguous === true) && confirmFullRound !== true) {
-      const field = input.trustBoundaryChanged === true ? "trustBoundaryChanged" : "impactAmbiguous";
+    if (input.impactAmbiguous === true && confirmFullRound !== true) {
+      const field = "impactAmbiguous";
       return refused("FPR-DELTA-FULL-ROUND-UNCONFIRMED", `${field} is true: registering it makes the next Critic round an effective FULL round (RE-DELTA-FALLBACK-FULL) over the whole feature range from the course genesis base, not the diff of this correction, and the registered value cannot be taken back. Nothing was written. ${FULL_ROUND_GUIDANCE} If the full round is meant, rerun the same command with --confirm-full-round; otherwise set ${field} to false in ${inputPath} and rerun.`, { inputPath, field, consequence: "full-round" });
     }
   }
@@ -1039,7 +1043,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
   if (absent) return writeDeltaInputSkeleton({ root, inputPath, baseCommit: tail.commit, candidate });
   const courseRequest = { repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null };
-  const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, trustBoundaryChanged: input.trustBoundaryChanged, impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
+  const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, ...(Object.hasOwn(input, LEGACY_DELTA_INPUT_KEY) ? { [LEGACY_DELTA_INPUT_KEY]: input[LEGACY_DELTA_INPUT_KEY] } : {}), impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
   if (!compiled.ok) {
     const code = String(compiled.code);
     const extra2 = { compileCode: code, manifestPath };
@@ -1078,10 +1082,10 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
     registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
     commitMessageHint: `chore(evidence): register the Critic delta request of round ${tail.round + 1} of ${featureId}`,
-    // D204: a request that moves a trust boundary or is impact-ambiguous is admitted as an effective FULL round of the same course.
-    nextRoundMode: input.trustBoundaryChanged === true || input.impactAmbiguous === true ? "full" : "delta",
-    nextRoundReason: input.trustBoundaryChanged === true ? "trust-boundary-change" : input.impactAmbiguous === true ? "impact-ambiguous" : null,
-    ...(input.trustBoundaryChanged === true || input.impactAmbiguous === true ? { nextRoundNote: "the next round is an effective FULL round (RE-DELTA-FALLBACK-FULL): it reviews the whole feature range from the course genesis base, because a diff cannot honestly cover this change; run the preflight with --delta-request as usual" } : {}),
+    // D204: a request that is impact-ambiguous is admitted as an effective FULL round of the same course.
+    nextRoundMode: input.impactAmbiguous === true ? "full" : "delta",
+    nextRoundReason: input.impactAmbiguous === true ? "impact-ambiguous" : null,
+    ...(input.impactAmbiguous === true ? { nextRoundNote: "the next round is an effective FULL round (RE-DELTA-FALLBACK-FULL): it reviews the whole feature range from the course genesis base, because a diff cannot honestly cover this change; run the preflight with --delta-request as usual" } : {}),
     preflight,
     next: "commit commitPaths in one evidence-only commit (never the input file), then run critic-dispatch-preflight.mjs with the preflight arguments, replacing the registration commit by that commit",
   };

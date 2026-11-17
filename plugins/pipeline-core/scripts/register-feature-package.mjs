@@ -107,12 +107,11 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "     changedBehaviorClaims   list of claim ids the correction changes",
   "     pathInvariantMap        object: every changed path maps to its list of invariant ids",
   "     coordinatorImpactConfirmed  true when the Coordinator confirmed the impact",
-  "     trustBoundaryChanged    true when the correction moves a trust boundary",
   "     impactAmbiguous         true when the impact cannot be told",
-  "     COST: true in trustBoundaryChanged or impactAmbiguous makes the next round a FULL round over the whole feature range (several times the files and reviewers of a diff round)",
-  "     and the registered value cannot be taken back. trustBoundaryChanged is true only when the correction itself changes who or what is trusted or what an actor may do",
-  "     (authentication, authorization, a permission or origin check, secret or key handling), not for every correction in a security-relevant feature; impactAmbiguous only when",
-  "     the effect cannot be told after reading the paths. A cautious true is the expensive choice. The verb refuses a true value (FPR-DELTA-FULL-ROUND-UNCONFIRMED, nothing written)",
+  "     trustBoundaryChanged is no longer part of the input: a diff round is never made a full round by it. An input that still carries it is accepted and the value is ignored.",
+  "     COST: true in impactAmbiguous makes the next round a FULL round over the whole feature range (several times the files and reviewers of a diff round)",
+  "     and the registered value cannot be taken back. impactAmbiguous is true only when the effect cannot be told after reading the paths.",
+  "     A cautious true is the expensive choice. The verb refuses a true value (FPR-DELTA-FULL-ROUND-UNCONFIRMED, nothing written)",
   "     until you rerun it with --confirm-full-round.",
   "     pathInvariantMap must have exactly the changed paths as keys; a wrong map is refused (FPR-DELTA-MAP) with the changed paths printed.",
   "     If <input.json> does not exist yet, step 5 writes a PATH SKELETON there (the changed paths, an empty list each; never the four judgment fields) and refuses (FPR-DELTA-INPUT-PATH); complete it and rerun.",
@@ -166,7 +165,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   // PF-94: `--add-review-lineage --packet <packetId>` registers the lineage record of a consumed course round.
   const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
   // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
-  // C30d: the optional `--confirm-full-round` is the Coordinator's explicit yes to a delta request whose trustBoundaryChanged or impactAmbiguous is true (the next round is then a FULL round).
+  // C30d: the optional `--confirm-full-round` is the Coordinator's explicit yes to a delta request whose impactAmbiguous is true (the next round is then a FULL round).
   const addDelta = (argv.length === 4 || (argv.length === 5 && argv[4] === "--confirm-full-round")) && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
   // ADR-0095: `--add-spec-addendum <approval record>` registers a PO-approved Spec addendum and its approval record.
   const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");

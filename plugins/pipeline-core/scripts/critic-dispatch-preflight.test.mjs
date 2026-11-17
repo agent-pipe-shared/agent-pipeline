@@ -1815,8 +1815,8 @@ function parentRegisterDiagnostic(root, featureId, candidate, tag) {
 function parentDeltaRequest(root, changedBehaviorClaims = ["fix-one"], flags = {}) {
   const base = { changedBehaviorClaims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
   writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
-  // C30d: a true trustBoundaryChanged or impactAmbiguous (the effective full round) is registered only with the Coordinator's explicit confirmation.
-  const confirmFullRound = base.trustBoundaryChanged === true || base.impactAmbiguous === true;
+  // C30d: a true impactAmbiguous (the effective full round) is registered only with the Coordinator's explicit confirmation (trustBoundaryChanged no longer asks for one, AC-108).
+  const confirmFullRound = base.impactAmbiguous === true;
   const first = parentAddDelta({ root, inputPath: "delta-input.json", confirmFullRound });
   assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
   writeFileSync(join(root, "delta-input.json"), JSON.stringify({ ...base, pathInvariantMap: Object.fromEntries(first.changedPaths.map((path) => [path, ["inv-one"]])) }));
@@ -2028,7 +2028,7 @@ test("D204 an effective FULL round judges the correction-input bindings over the
   try {
     const c3 = fx.correct("fix3");
     const d3 = parentRegisterDiagnostic(fx.root, fx.featureId, c3, "r3");
-    const fallback = parentDeltaRequest(fx.root, ["fix-three"], { trustBoundaryChanged: true });
+    const fallback = parentDeltaRequest(fx.root, ["fix-three"], { impactAmbiguous: true }); // AC-108 (PO decision 2026-11-17): only impactAmbiguous requests the full round
     const request = (delta, bindingsBase) => ({ root: fx.root, base: fx.c2, candidate: c3, specPath: fx.specPath, guardrailPaths: [], evidencePaths: [d3.diagnosticPath], priorCriticEvidencePath: null,
       courseContext: { featureId: fx.featureId, registrationCommit: delta.registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.added.deltaRequestPath },
       correctionInputBindings: parentBindings(fx.root, bindingsBase, c3) });
@@ -2041,7 +2041,7 @@ test("D204 an effective FULL round judges the correction-input bindings over the
     assert.equal(admitted.coordinatorOnly.courseAdmission.fallbackFull, true);
     const derived = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.genesis, head: c3, projectStateOptional: true });
     assert.equal(admitted.correctionInputBindings.digestSha256, derived.digestSha256, "the echoed bindings are the genesis-range ones");
-    // Control: an ordinary delta (no trust-boundary change, no ambiguity) keeps the correction-range rule.
+    // Control: an ordinary delta (no ambiguity) keeps the correction-range rule.
     const ordinary = parentDeltaRequest(fx.root, ["fix-three-ordinary"]);
     const ordinaryStale = cdpRefusal(() => preflightCriticDispatch(request(ordinary, fx.genesis)), "CDP-CORRECTION-INPUT-STALE");
     assert.ok(!/effective FULL round/u.test(ordinaryStale.message), ordinaryStale.message);

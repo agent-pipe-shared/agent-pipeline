@@ -201,8 +201,8 @@ export function admitReviewAttempt(input) {
   if (input.requestedMode !== "delta") {
     return { ok: false, mode: null, code: "RE-FOLLOWUP-DELTA-REQUIRED", affectedInvariantIds: [] };
   }
-  // D204: the structural bindings are checked one by one so a refusal names the first one that failed. A moved trust boundary or an
-  // ambiguous impact is not a malformed request, it is a request a diff cannot honestly cover: it is admitted as an effective FULL round.
+  // D204: the structural bindings are checked one by one so a refusal names the first one that failed. An ambiguous impact
+  // is not a malformed request, it is a request a diff cannot honestly cover: it is admitted as an effective FULL round.
   const structural = [
     ["base", () => SHA40.test(input.base ?? "")],
     ["head", () => SHA40.test(input.head ?? "")],
@@ -215,13 +215,15 @@ export function admitReviewAttempt(input) {
     ["pathInvariantMap", () => validPathInvariantMap(input.pathInvariantMap)],
     ["pathInvariantMapSha256", () => SHA256.test(input.pathInvariantMapSha256 ?? "") && sha256Canonical(input.pathInvariantMap) === input.pathInvariantMapSha256],
     ["coordinatorImpactConfirmed", () => input.coordinatorImpactConfirmed === true],
-    ["trustBoundaryChanged", () => typeof input.trustBoundaryChanged === "boolean"],
+    // PO decision 2026-11-17 (AC-108): trustBoundaryChanged no longer steers a diff round. Records written before it still carry the key, so a supplied value is
+    // accepted (it must still be a boolean) and ignored, and a request without it is complete.
+    ["trustBoundaryChanged", () => input.trustBoundaryChanged === undefined || typeof input.trustBoundaryChanged === "boolean"],
     ["impactAmbiguous", () => typeof input.impactAmbiguous === "boolean"],
   ];
   const failed = structural.find(([, valid]) => !valid());
   if (failed) return { ok: false, mode: null, code: "RE-DELTA-BINDINGS-INVALID", binding: failed[0], affectedInvariantIds: [] };
-  if (input.trustBoundaryChanged === true || input.impactAmbiguous === true) {
-    return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-FULL", reason: input.trustBoundaryChanged === true ? "trust-boundary-change" : "impact-ambiguous", affectedInvariantIds: [] };
+  if (input.impactAmbiguous === true) {
+    return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-FULL", reason: "impact-ambiguous", affectedInvariantIds: [] };
   }
   const unknown = input.changedPaths.filter((path) => !Object.hasOwn(input.pathInvariantMap, path));
   if (unknown.length > 0) return { ok: false, mode: null, code: "RE-DELTA-UNKNOWN-PATH", affectedInvariantIds: [] };

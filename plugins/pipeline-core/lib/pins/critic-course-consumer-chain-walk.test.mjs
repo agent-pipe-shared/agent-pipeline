@@ -156,7 +156,7 @@ function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
   assert.equal(first.status, "refused", JSON.stringify(first));
   assert.equal(first.code, "FPR-DELTA-INPUT-PATH", JSON.stringify(first));
   assert.ok(first.reason.includes(inputPath), "the refusal names the skeleton file");
-  for (const field of ["changedBehaviorClaims", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) assert.ok(first.reason.includes(field), `the refusal says ${field} stays a Coordinator judgment: ${first.reason}`);
+  for (const field of ["changedBehaviorClaims", "coordinatorImpactConfirmed", "impactAmbiguous"]) assert.ok(first.reason.includes(field), `the refusal says ${field} stays a Coordinator judgment: ${first.reason}`);
   const skeletonBytes = readFileSync(join(root, inputPath));
   const skeleton = JSON.parse(skeletonBytes.toString("utf8"));
   assert.deepEqual(Object.keys(skeleton), ["pathInvariantMap"], "the skeleton carries the path map only; no judgment field is filled, defaulted or inferred");
@@ -166,17 +166,17 @@ function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
   assert.equal(again.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(again));
   assert.deepEqual(readFileSync(join(root, inputPath)), skeletonBytes, "the existing input file is not overwritten");
   // The Coordinator's judgment: the four fields and the invariant lists.
-  put(root, inputPath, JSON.stringify({ changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags,
+  put(root, inputPath, JSON.stringify({ changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, impactAmbiguous: false, ...flags,
     pathInvariantMap: Object.fromEntries(Object.keys(skeleton.pathInvariantMap).map((path) => [path, ["inv-one"]])) }));
-  const added = addCriticDeltaRequest({ root, inputPath, confirmFullRound: flags?.trustBoundaryChanged === true || flags?.impactAmbiguous === true });
+  const added = addCriticDeltaRequest({ root, inputPath, confirmFullRound: flags?.impactAmbiguous === true });
   assert.equal(added.status, "delta-request-added", JSON.stringify(added));
   (observed.skeletons ??= {})[inputPath] = Object.keys(skeleton.pathInvariantMap).sort();
   return { added, registration: commitPaths(root, added.commitPaths, "register the delta request"), skeleton: inputPath };
 }
 
 function deltaRequest(root, claims, flags) {
-  const base = { changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags };
-  const confirmFullRound = base.trustBoundaryChanged === true || base.impactAmbiguous === true; // C30d: a true value is registered only with the explicit confirmation
+  const base = { changedBehaviorClaims: claims, coordinatorImpactConfirmed: true, impactAmbiguous: false, ...flags };
+  const confirmFullRound = base.impactAmbiguous === true; // C30d: a true value is registered only with the explicit confirmation
   put(root, "scratch/delta-input.json", JSON.stringify({ ...base, pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
   const first = addCriticDeltaRequest({ root, inputPath: "scratch/delta-input.json", confirmFullRound });
   assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
@@ -318,7 +318,7 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
     registrationCommit = diag.registration;
     if (duplicateDiagAtRound === n) registerExtraEvidence(root, tag); // a second evidence-only registration commit after the first one
     if (n > 1) {
-      delta = (skeletonDelta ? deltaRequestViaSkeleton : deltaRequest)(root, [`fix-${n}`], round.kind === "fallback" ? { trustBoundaryChanged: true } : {}, observed);
+      delta = (skeletonDelta ? deltaRequestViaSkeleton : deltaRequest)(root, [`fix-${n}`], round.kind === "fallback" ? { impactAmbiguous: true } : {}, observed); // AC-108 (PO decision 2026-11-17): the effective full round is requested by impactAmbiguous only
       registrationCommit = delta.registration; deltaRequestPath = delta.added.deltaRequestPath;
     }
     const base = n === 1 ? genesis : previousCandidate;
@@ -1074,20 +1074,35 @@ test("C30d: a true trustBoundaryChanged or impactAmbiguous is refused with the c
     const candidate = commitPaths(fx.root, ["src/fix2.mjs"], "fix: a correction");
     registerDiagnostic(fx.root, candidate, "r2");
     const input = (flags) => JSON.stringify({ changedBehaviorClaims: ["fix-two"], coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false, ...flags, pathInvariantMap: { "src/fix2.mjs": ["inv-one"] } });
-    for (const flag of ["trustBoundaryChanged", "impactAmbiguous"]) {
+    // QG-04 restatement (PO decision 2026-11-17, AC-108): trustBoundaryChanged no longer asks for a confirmation (pinned below); impactAmbiguous keeps it.
+    for (const flag of ["impactAmbiguous"]) {
       put(fx.root, "scratch/delta-cost.json", input({ [flag]: true }));
       const before = git(fx.root, ["status", "--porcelain"]); // with the input file in place; the verb must add nothing to it
       const refused = addCriticDeltaRequest({ root: fx.root, inputPath: "scratch/delta-cost.json" });
       assert.equal(refused.status, "refused", JSON.stringify(refused));
       assert.equal(refused.code, "FPR-DELTA-FULL-ROUND-UNCONFIRMED", JSON.stringify(refused));
       assert.equal(refused.field, flag);
-      for (const needle of ["FULL round", "RE-DELTA-FALLBACK-FULL", "cannot be taken back", "Nothing was written", "--confirm-full-round", "authentication, authorization"]) assert.ok(refused.reason.includes(needle), `the refusal says "${needle}": ${refused.reason}`);
+      for (const needle of ["FULL round", "RE-DELTA-FALLBACK-FULL", "cannot be taken back", "Nothing was written", "--confirm-full-round", "cannot be told"]) assert.ok(refused.reason.includes(needle), `the refusal says "${needle}": ${refused.reason}`);
       assert.equal(git(fx.root, ["status", "--porcelain"]), before, "no manifest or request file was written");
     }
     // The helper confirms exactly when a flag is true: the confirmed registration then reports the full round.
-    const confirmed = deltaRequest(fx.root, ["fix-two"], { trustBoundaryChanged: true }).added;
+    const confirmed = deltaRequest(fx.root, ["fix-two"], { impactAmbiguous: true }).added;
     assert.equal(confirmed.nextRoundMode, "full");
-    assert.equal(confirmed.nextRoundReason, "trust-boundary-change");
+    assert.equal(confirmed.nextRoundReason, "impact-ambiguous");
+  } finally { cleanup(fx); }
+});
+
+// AC-108 (PO decision 2026-11-17): a true trustBoundaryChanged (an input written by an older build) registers WITHOUT --confirm-full-round and the next round stays a diff round.
+test("AC-108: a true trustBoundaryChanged registers without any confirmation and the next round stays a diff round", () => {
+  const fx = walkCourse({ label: "ac108-tb", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
+  try {
+    put(fx.root, "src/fix2.mjs", "export const fix2 = 2;\n");
+    const candidate = commitPaths(fx.root, ["src/fix2.mjs"], "fix: a correction");
+    registerDiagnostic(fx.root, candidate, "r2");
+    const added = deltaRequest(fx.root, ["fix-two"], { trustBoundaryChanged: true }).added; // no confirmation passed
+    assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+    assert.equal(added.nextRoundMode, "delta");
+    assert.equal(added.nextRoundReason, null);
   } finally { cleanup(fx); }
 });
 

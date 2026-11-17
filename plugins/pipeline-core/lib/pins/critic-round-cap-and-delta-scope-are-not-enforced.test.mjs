@@ -82,11 +82,15 @@ test("AC2 follow-up wider than the delta is refused (unmapped path, boundary cha
   const wide = delta({ changedPaths: [p, "src/other.mjs"] });
   assert.equal(admitReviewAttempt(wide).code, "RE-DELTA-UNKNOWN-PATH");
   // QG-04 restatement (D204): the intent (never a DIFF round for a moved boundary or ambiguous impact) stays; the outcome is an effective FULL round.
-  for (const flag of ["trustBoundaryChanged", "impactAmbiguous"]) {
+  // AC-108 (PO decision 2026-11-17): trustBoundaryChanged no longer widens a follow-up; only ambiguity does.
+  for (const flag of ["impactAmbiguous"]) {
     const r = admitReviewAttempt(delta({ [flag]: true }));
     assert.equal(r.code, "RE-DELTA-FALLBACK-FULL", flag);
     assert.equal(r.mode, "full", flag);
   }
+  assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true })).code, "RE-DELTA-ADMITTED");
+  const { trustBoundaryChanged: _absent, ...withoutKey } = delta();
+  assert.equal(admitReviewAttempt(withoutKey).code, "RE-DELTA-ADMITTED");
   assert.equal(admitReviewAttempt(delta({ pathInvariantMapSha256: H("9") })).code, "RE-DELTA-BINDINGS-INVALID");
   assert.equal(admitReviewAttempt(delta({ trustBoundaryChanged: true, priorReceipt: { id: "x", sha256: "bad" } })).code, "RE-DELTA-BINDINGS-INVALID");
 });

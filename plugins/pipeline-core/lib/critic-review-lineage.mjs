@@ -87,9 +87,6 @@ function expectedInvalidation(parent, attempt, admission) {
   if (attempt.requestedMode !== "delta") {
     return { kind: "full-review-required", reason: "explicit-broad-review" };
   }
-  if (attempt.trustBoundaryChanged === true) {
-    return { kind: "full-review-required", reason: "trust-boundary-change" };
-  }
   if (attempt.impactAmbiguous === true) {
     return { kind: "full-review-required", reason: "impact-ambiguous" };
   }

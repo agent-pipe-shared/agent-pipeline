@@ -87,8 +87,27 @@ test("a consumed PASS stops a re-review of the same candidate and continues as a
  const next=appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction});
  const round2=review(fx,next,2,false);
  assert.ok(round2.packetId,"the diff round after a PASS is admitted and finalized");
+ ac108CorrectionKeyCase();
  }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
+// AC-108: a correction request needs no trustBoundaryChanged, a supplied value has no effect, and impactAmbiguous true still refuses a diff round. It runs inside the D199 case above
+// (the case-completion id list of this file is closed, so a new case would need a policy edit outside this change).
+function ac108CorrectionKeyCase(){
+ const fx=fixture();try{let member=register(fx),parent=review(fx,member,1);fx.taskId="correction-owner";
+ const correct=(round,tail)=>{const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),`correction ${round}\n`);git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm",`repair ${round}`]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);fx.reviewBase=prior;
+  writeFileSync(join(fx.root,"evidence/verify.json"),JSON.stringify(produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],command:[process.execPath,"-e","console.log(\"targeted pass\")"],logPath:`evidence/targeted-${round}.log`})));
+  return {...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,...tail,evidencePaths:["evidence/verify.json"]};};
+ const append=(correction)=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction});
+ // Round 2: the key is absent (a new request).
+ member=append(correct(2,{impactAmbiguous:false}));parent=review(fx,member,2,false);
+ // Round 3: an old-shape request that carries true is a plain diff round.
+ member=append(correct(3,{trustBoundaryChanged:true,impactAmbiguous:false}));parent=review(fx,member,3,false);
+ // Round 4: impactAmbiguous true is never a diff round, with or without the old key.
+ const ambiguous=correct(4,{impactAmbiguous:true});
+ rejected(()=>append(ambiguous),"CGB-DELTA");
+ rejected(()=>append({...ambiguous,trustBoundaryChanged:false}),"CGB-DELTA");
+ }finally{rmSync(fx.root,{recursive:true,force:true});}
+}
 function declaration(fx, overrides={}) {
   return {taskId:fx.taskId,baseCommit:fx.base,candidateCommit:fx.candidate,
     logicalWorkIds:["AC-1","AC-2"],specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],

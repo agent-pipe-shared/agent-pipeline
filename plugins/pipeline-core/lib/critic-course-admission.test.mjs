@@ -1332,7 +1332,9 @@ const d204Round = (fx, { n, base, candidate, diagnostic, delta, registration, bi
   pf94CommitPaths(fx.root, lineageAdded.commitPaths, `register the lineage of round ${n}`);
   return { preflight, lineage };
 };
-for (const [flag, reason] of [["trustBoundaryChanged", "trust-boundary-change"], ["impactAmbiguous", "impact-ambiguous"]]) {
+// QG-04 restatement (PO decision 2026-11-17, AC-108): trustBoundaryChanged no longer turns a diff round into an effective full round, so this end-to-end anchor now runs for
+// impactAmbiguous only; the trustBoundaryChanged behaviour is pinned by the AC-108 cases below.
+for (const [flag, reason] of [["impactAmbiguous", "impact-ambiguous"]]) {
   test(`D204 ANCHOR ${flag}: two consumed rounds, then an effective full round 3 end to end, then an ordinary diff round 4`, () => {
     const fx = pf94DeltaFixture();
     const genesisBase = fx.courseRequest.baseCommit, c1 = fx.correctionCommit;
@@ -1372,6 +1374,52 @@ for (const [flag, reason] of [["trustBoundaryChanged", "trust-boundary-change"],
     assert.equal(next.budgets.correctionCommitCount, 3, "stage d: three corrections, none recounted from the genesis base of the full round");
   });
 }
+// AC-108 (PO decision 2026-11-17): trustBoundaryChanged leaves the diff rounds. Whatever an input or an old registered request carries in it, the round stays a delta round and needs no
+// --confirm-full-round; a request without the key is complete; impactAmbiguous keeps the full round and its confirmation.
+const ac108Round2 = (fx, mutate, { confirm = false } = {}) => {
+  pf94WriteInput(fx);
+  const path = join(fx.root, "delta-input.json"), input = mutate(JSON.parse(readFileSync(path, "utf8")));
+  writeFileSync(path, JSON.stringify(input));
+  const added = pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath: "delta-input.json", confirmFullRound: confirm });
+  if (added.status !== "delta-request-added") return { added };
+  const registration = pf94CommitPaths(fx.root, added.commitPaths, "register the delta request");
+  const admission = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration, requestedMode: "delta", deltaRequestPath: added.deltaRequestPath });
+  return { added, admission, descriptor: JSON.parse(readFileSync(join(fx.root, added.deltaRequestPath), "utf8")) };
+};
+test("AC-108 (1) a delta input with trustBoundaryChanged true is a delta round and registers without --confirm-full-round", () => {
+  const fx = pf94DeltaFixture();
+  const { added, admission, descriptor } = ac108Round2(fx, (input) => ({ ...input, trustBoundaryChanged: true }));
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  assert.deepEqual([added.nextRoundMode, added.nextRoundReason, added.nextRoundNote], ["delta", null, undefined]);
+  assert.deepEqual([admission.decision.status, admission.decision.mode, admission.decision.code, admission.decision.reason], ["admitted", "delta", "RE-DELTA-ADMITTED", undefined], JSON.stringify(admission.decision));
+  assert.equal(descriptor.trustBoundaryChanged, true, "a supplied value is carried in the immutable request, with no effect");
+});
+test("AC-108 (2) a delta input WITHOUT trustBoundaryChanged is complete, registers as a delta round, and the request holds no such key", () => {
+  const fx = pf94DeltaFixture();
+  const { added, admission, descriptor } = ac108Round2(fx, ({ trustBoundaryChanged: _dropped, ...input }) => input);
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  assert.equal(added.nextRoundMode, "delta");
+  assert.deepEqual([admission.decision.status, admission.decision.mode, admission.decision.code], ["admitted", "delta", "RE-DELTA-ADMITTED"], JSON.stringify(admission.decision));
+  assert.equal(Object.hasOwn(descriptor, "trustBoundaryChanged"), false);
+});
+test("AC-108 (3) an old registered request that carries trustBoundaryChanged false is still read as a delta round with its digest unchanged", () => {
+  const fx = pf94DeltaFixture();
+  const { added, admission, descriptor } = ac108Round2(fx, (input) => ({ ...input, trustBoundaryChanged: false }));
+  assert.equal(descriptor.trustBoundaryChanged, false);
+  assert.deepEqual([admission.decision.status, admission.decision.mode, admission.decision.code], ["admitted", "delta", "RE-DELTA-ADMITTED"], JSON.stringify(admission.decision));
+  assert.equal(added.registered[0].sha256, hash(readFileSync(join(fx.root, added.deltaRequestPath))), "the registered digest is the digest of the bytes");
+  assert.equal(added.deltaRequestPath, `specs/${fx.featureId}/evidence/critic-delta-request-${added.registered[0].sha256}.json`);
+});
+test("AC-108 (4) impactAmbiguous true still needs --confirm-full-round and still makes the next round an effective full round, whatever trustBoundaryChanged says", () => {
+  const fx = pf94DeltaFixture();
+  const refused = ac108Round2(fx, (input) => ({ ...input, impactAmbiguous: true, trustBoundaryChanged: false }));
+  assert.equal(refused.added.code, "FPR-DELTA-FULL-ROUND-UNCONFIRMED", JSON.stringify(refused.added));
+  assert.equal(refused.added.field, "impactAmbiguous");
+  const fx2 = pf94DeltaFixture();
+  const { added, admission } = ac108Round2(fx2, ({ trustBoundaryChanged: _dropped, ...input }) => ({ ...input, impactAmbiguous: true }), { confirm: true });
+  assert.deepEqual([added.nextRoundMode, added.nextRoundReason], ["full", "impact-ambiguous"]);
+  assert.deepEqual([admission.decision.mode, admission.decision.code, admission.decision.reason], ["full", "RE-DELTA-FALLBACK-FULL", "impact-ambiguous"], JSON.stringify(admission.decision));
+});
 test("D204 the CCA-REQUESTED-MODE text states the fallback and the help texts describe the one-commit evidence route", () => {
   const admissionSource = pf94Read("./critic-course-admission.mjs");
   assert.ok(/RE-DELTA-FALLBACK-FULL/u.test(admissionSource) || /effective full/u.test(admissionSource), "the requested-mode text names the fallback");
