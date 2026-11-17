@@ -48,10 +48,12 @@ function baseRepo() {
 }
 
 test("ECF1: the evidence set is closed by record class, everything else is product-bound", () => {
-  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
+  // Candidate 30e: the repository-root audit-bundles/<feature>/<commit>/... location the bundle writer really uses is an evidence path too.
+  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "audit-bundles/f/0123456789abcdef0123456789abcdef01234567/proofs/002-push.json",
+    "audit-bundles/f/manifest.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
     assert.equal(isEvidencePath(path), true, path);
   }
-  for (const path of ["specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",
+  for (const path of ["audit-bundles", "audit-bundles/f", "audit-bundles/f/../../src/app.mjs", "src/audit-bundles/f/x.json", "specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",
     "specs/f/evidenceX/a.json", "specs/f/lifecycle.json.bak", "specs/evidence/x.json", "scripts/evidence/x.json", "", "/specs/f/evidence/x.json", "specs/f/evidence/../plan.md"]) {
     assert.equal(isEvidencePath(path), false, path);
   }

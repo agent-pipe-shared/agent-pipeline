@@ -46,14 +46,16 @@ test("ROP3: membership and normalisation behave as before", () => {
   }
 });
 
-test("ROP4: the two extension classes are separate from the record-only set and accepted by the extension predicate only", () => {
-  assert.equal(AUTHORITY_CARRY_EXTENSION_PATTERNS.length, 2);
+test("ROP4: the extension classes are separate from the record-only set and accepted by the extension predicate only", () => {
+  // Candidate 30e: three patterns now, the repository-root audit-bundles/<feature>/ location the writer really uses joined the specs/<feature>/ form.
+  assert.equal(AUTHORITY_CARRY_EXTENSION_PATTERNS.length, 3);
   assert.ok(Object.isFrozen(AUTHORITY_CARRY_EXTENSION_PATTERNS));
-  for (const path of ["specs/f/audit-bundles/b.json", "specs/f/audit-bundles/deep/c.json", "project/push-threat-model.md", "./project/push-threat-model.md"]) {
+  for (const path of ["specs/f/audit-bundles/b.json", "specs/f/audit-bundles/deep/c.json", "audit-bundles/f/0123456789abcdef0123456789abcdef01234567/proofs/002-push.json",
+    "audit-bundles/f/README.md", "project/push-threat-model.md", "./project/push-threat-model.md"]) {
     assert.equal(isAuthorityCarryExtensionPath(path), true, path);
     assert.equal(isRecordOnlyPath(path), false, `${path} must not be record-only`);
   }
-  for (const path of ["specs/f/evidence/a.json", "docs/state.md", "specs/f/audit-bundles", "project/other.md", "", undefined]) {
+  for (const path of ["specs/f/evidence/a.json", "docs/state.md", "specs/f/audit-bundles", "audit-bundles", "audit-bundles/f", "audit-bundles/f/", "project/other.md", "", undefined]) {
     assert.equal(isAuthorityCarryExtensionPath(path), false, String(path));
   }
 });

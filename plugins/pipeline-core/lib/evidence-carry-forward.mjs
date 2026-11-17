@@ -22,6 +22,9 @@ export const CARRY_FORWARD_SCHEMA = "pipeline.evidence-carry-forward.v1";
 export const EVIDENCE_PATH_PATTERNS = Object.freeze([
   /^specs\/[^/]+\/evidence\/.+$/u,
   /^specs\/[^/]+\/audit-bundles\/.+$/u,
+  // The writer, the close-commit split and the administration paths all use the repository-root location audit-bundles/<feature>/...;
+  // the specs/<feature>/audit-bundles/ form above stays for compatibility (candidate 30e, first Antigravity greenfield report).
+  /^audit-bundles\/[^/]+\/.+$/u,
   /^specs\/[^/]+\/lifecycle\.json$/u,
   /^specs\/[^/]+\/result\.md$/u,
   /^project\/push-threat-model\.md$/u,

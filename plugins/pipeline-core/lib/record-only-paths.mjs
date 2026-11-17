@@ -30,6 +30,8 @@ export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
 
 export const AUTHORITY_CARRY_EXTENSION_PATTERNS = Object.freeze([
   /^specs\/[^/]+\/audit-bundles\/.+$/u,
+  // The repository-root location the bundle writer actually uses (candidate 30e); the specs/<feature>/ form above is kept.
+  /^audit-bundles\/[^/]+\/.+$/u,
   /^project\/push-threat-model\.md$/u,
 ]);
 
