@@ -96,11 +96,12 @@ export function acceptanceYesAnswersText(form) {
 }
 
 /** The one sentence the agent asks the human in the chat, in the project's language (the form's language); it names the clear yes answers. */
-export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
+export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en, verifyPassed = false }) {
+  // C30G-E1: the question is asked after the candidate Verify, and says so (verifyPassed); a caller that did not run the Verify keeps the text as it was.
   if (formLanguage(form) === "de") {
-    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; steht eine dieser Formen als erster Satz, darf danach Ihr nächster Auftrag folgen (er wird festgehalten, nicht als Teil der Abnahme gelesen); jede andere Antwort ist keine Abnahme.`;
+    return `Nehmen Sie das Feature-Paket ${featureId} beim Kandidaten ${candidate} ab? ${verifyPassed ? "Der Kandidaten-Verify für diesen Kandidaten ist bestanden. " : ""}Der durchgeführte Close gilt als menschliche Abnahme dieses Feature-Pakets. Noch offene Prüfungen: ${openChecks.join("; ")}. Zur Abnahme antworten Sie mit einer dieser Formen: ${acceptanceYesAnswersText(form)}; steht eine dieser Formen als erster Satz, darf danach Ihr nächster Auftrag folgen (er wird festgehalten, nicht als Teil der Abnahme gelesen); jede andere Antwort ist keine Abnahme.`;
   }
-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; when one of them is the first sentence, your next request may follow it (it is recorded, not read as part of the acceptance); any other answer is not an acceptance.`;
+  return `Do you accept the feature package ${featureId} at candidate ${candidate}? ${verifyPassed ? "The candidate Verify has passed for this candidate. " : ""}The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer with one of these forms: ${acceptanceYesAnswersText(form)}; when one of them is the first sentence, your next request may follow it (it is recorded, not read as part of the acceptance); any other answer is not an acceptance.`;
 }
 
 export const DECLINE_BEGIN = "<!-- close-decline:begin -->";

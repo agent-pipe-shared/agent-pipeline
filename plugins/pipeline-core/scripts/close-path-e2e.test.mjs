@@ -456,7 +456,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         assert.ok(bound.result.resultBootstrap?.commit, `the close reports the bootstrap it ran: ${JSON.stringify(bound.result).slice(0, 600)}`);
         assert.notEqual(git(log, fx.root, ["rev-parse", "HEAD"]), headBefore, "the bootstrap commit moved HEAD before the question was asked");
         // the owned commit (commit-pipeline-owned --agent, the same step 4 of the old repair chain) takes every pipeline-owned path that was waiting, so the tree is clean, not just unchanged
-        assert.equal(porcelain(), "", `${identity.runner}: the bootstrap is committed and the question wrote nothing more (before: ${JSON.stringify(treeBefore)})`);
+        // C30G-E1 (QG-04, restated in place): the question now follows the candidate Verify, so the tree holds the close's own uncommitted Verify outputs under specs/<feature> and nothing else (the bootstrap itself is committed).
+        const ownDirty = porcelain().split("\n").filter((line) => line.trim() !== "").map((line) => line.replace(/^\s*\S+\s+/u, "")); // the helper trims its output, so the status column is not at a fixed offset
+        assert.ok(ownDirty.length > 0 && ownDirty.every((path) => path.startsWith(`specs/${FEATURE_ID}/`)), `${identity.runner}: the bootstrap is committed and the question left only the Verify's own outputs under specs/${FEATURE_ID} (before: ${JSON.stringify(treeBefore)}; now: ${JSON.stringify(ownDirty)})`);
         assert.notEqual(JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result, null, "the Result is bound");
         // C30G-D1 (Part D, root cause): the committed Result file carries exactly the digest the State binds and the package validates, so the normal flow does not leave the state in which a bound Result cannot close.
         boundAtBootstrap = JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result.sha256;
@@ -527,8 +529,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
           assert.equal(declined.status, 0, JSON.stringify(declined.result).slice(0, 1200)); assert.equal(declined.code, "declined", JSON.stringify(declined.result).slice(0, 1200));
           const after = stateJson();
           assert.equal(after.continuity.authority.result, null, "the bound Result is retired");
-          // C28 (PO decision 2026-11-11, measured here): on the real chain the acceptance question comes BEFORE the package moves to verifying/completed, so the record already says
-          // implementing at the decline and nothing is written (packageBack null). The exit completed -> implementing is the safety net for a package that is further along (see feature-package-topology.test.mjs).
+          // C28 (PO decision 2026-11-11, measured here) and C30G-E1: the acceptance question now comes AFTER the package moved to verifying/completed (uncommitted), but the decline first discards those
+          // uncommitted outputs of the asking call (discard-own-leftovers), so the record says implementing again at the decline and nothing is moved back (packageBack null). The exit completed -> implementing
+          // stays the safety net for a package that is further along (see feature-package-topology.test.mjs).
           assert.equal(JSON.parse(readFileSync(join(fx.root, MANIFEST), "utf8")).state, "implementing", "the package record says implementing during the correction round");
           assert.equal(declined.result.packageBack, null, JSON.stringify(declined.result.packageBack));
           assert.equal(after.continuity.revision, JSON.parse(stateBeforeAnswer).continuity.revision + 1, "one revision step");
@@ -562,7 +565,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
           assert.ok(again.result.resultBootstrap?.commit, JSON.stringify(again.result).slice(0, 800));
           assert.notEqual(stateJson().continuity.authority.result.sha256, undefined, "a freshly bound Result");
         }
-        // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once and writes nothing; the answer is recorded for exactly the HEAD it was
+        // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once, after the candidate Verify (C30G-E1: the Verify's own uncommitted outputs are in the tree, no acceptance is recorded); the answer is recorded for exactly the HEAD it was
         // given at; every commit the close asks for is made from the paths it names (so the close's own evidence commits are part of the walk); a resume never asks again and never lands in
         // FCA-PACKAGE or in a second commit request for the same outputs. The final gates (freeze, Verify, scan) are read from the typed codes the CLI ends on.
         const stateOf = () => JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8"));
@@ -570,7 +573,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         const asked = oneShotCli();
         assert.equal(asked.status, 2, JSON.stringify(asked.result).slice(0, 600));
         assert.equal(asked.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(asked.result).slice(0, 600));
-        assert.equal(porcelain(), treeBefore, `${identity.runner}: the acceptance question wrote nothing`);
+        // C30G-E1 (QG-04, restated in place): the question follows the candidate Verify; what it left in the tree is only the close's own uncommitted Verify outputs under specs/<feature>, and no acceptance was recorded.
+        const askedDirty = porcelain().split("\n").filter((line) => line.trim() !== "").map((line) => line.replace(/^\s*\S+\s+/u, ""));
+        assert.ok(askedDirty.length > 0 && askedDirty.every((path) => path.startsWith(`specs/${FEATURE_ID}/`)), `${identity.runner}: the question left only the Verify's own outputs (before: ${JSON.stringify(treeBefore)}; now: ${JSON.stringify(askedDirty)})`);
         assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
         assert.deepEqual(stateOf().closedFeatures ?? [], [], "the close has not started");
         const candidateAsked = git(log, fx.root, ["rev-parse", "HEAD"]);

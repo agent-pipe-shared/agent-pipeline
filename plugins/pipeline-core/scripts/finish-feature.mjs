@@ -555,15 +555,39 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           commit: { paths: addenda.commitPaths, excluded: [], capability: null, message: addenda.subject, steps }, next: rerun(again),
           message: "The close derived the Critic addenda from the passed review and wrote them; Verify has not run yet. Run the commit, then the next command. Do not build addenda by hand." });
       }
-      // C22 (CGR-06): the human acceptance. The stop belongs here because nothing has been written yet (a stop costs no Verify and no cleanup), HEAD is final (the addenda commit above moved it) and the
-      // irreversible State close is still ahead. A resumed close (past the prepared stages) never enters this branch, so it never asks twice and a close already running is not broken. An acceptance recorded for
-      // this very candidate (committed or still uncommitted) is kept; a changed candidate asks again. Nothing is signed: the answer is an attribution record in the feature's acceptance.md.
+      // C22 (CGR-06): the human acceptance. HEAD is final here (the addenda commit above moved it) and the irreversible State close is still ahead. C30G-E1 (PO decision 2026-11-17): the QUESTION is asked after the
+      // candidate Verify (see the stop before `acceptance-record` below), so the human sees the Verify result; the decline and a recorded answer are handled here. A resumed close (past the prepared stages) never enters
+      // this branch, so it never asks twice and a close already running is not broken. An acceptance recorded for this very candidate (committed or still uncommitted) is kept; a changed candidate asks again.
+      // Nothing is signed: the answer is an attribution record in the feature's acceptance.md.
       const candidateHead = rawGit(["rev-parse", "HEAD"]);
       if (candidateHead === null) return stopResult("acceptance", "ONESHOT-HEAD-UNREADABLE", "The candidate commit (HEAD) could not be read, so the acceptance cannot be bound to it.", `repair the repository, then rerun the identical command: ${rerun(again)}`);
       // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form. An answer that is not exactly that form is never an acceptance and no keyword is searched in it; the way out is the decline.
       const yesForm = acceptanceYesForm(state.continuity?.runtime?.humanFacingLanguage);
       const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
       const bothWays = `if the human answered with one of the clear yes forms (${acceptanceYesAnswersText(yesForm)}), rerun the identical command: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
+      // C30G-E1 (PO decision 2026-11-17): the answer is checked here, a pure check of the words given (this call writes nothing for it); the QUESTION itself is asked only after the candidate Verify has passed (below).
+      if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is none of the clear yes forms ${acceptanceYesAnswersText(yesForm)} (case, commas, spaces and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
+          `nothing was written by this call; what the asking call's Verify left in the tree (its evidence, the package move) stays uncommitted, do not commit it: the next rerun discards it. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
+      }
+      const recorded = readAcceptanceRecord(root, featureId);
+      // C29 (L1): an earlier major the PO accepted as uncorrectable stays uncorrected; the question names it, so the human accepts knowing it.
+      const earlierAccepted = (Array.isArray(standing?.settled) ? standing.settled : []).map((finding) => `earlier Critic ${finding.severity} ${finding.findingId}${finding.originPacketId ? ` (round ${finding.originPacketId})` : ""} is not corrected; the PO accepted it as uncorrectable`);
+      const askedChecks = openChecksOf([...earlierAccepted, ...(openChecks ?? [])]);
+      // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
+      // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
+      // C22: the acceptance record is such an output too (the answer is already held in `recorded` / `accepted`, and written again after the package moves below).
+      // C30G-E1: the call that asked the question stopped after its Verify, so its Verify evidence and package move are exactly such leftovers; the rollback runs before the decline as well, so a decline never commits them.
+      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`, `${evidenceDir}/dispatch-projection.json`, ...SBOM_OUTPUTS.map((name) => `${evidenceDir}/sbom/${name}`)]);
+      const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+      const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
+      // A decline discards exactly the own outputs even beside a foreign dirty path (never that path): its commit sweeps specs/<feature>, and the asking call's Verify evidence and package move must not travel in it.
+      if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && (humanDecline !== null || dirtyOutputs.every(({ path }) => ownOutputs.has(path)))) {
+        stages.push("discard-own-leftovers");
+        for (const { tracked, path } of dirtyOutputs.filter(({ path }) => ownOutputs.has(path))) {
+          if (tracked) runner("git", ["checkout", "--", path]); else rmSync(resolve(root, path), { force: true });
+        }
+      }
       if (humanDecline !== null) {
         const declineRepair = (error) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command with --human-decline "<the human's literal answer>": ${rerun(again)}${named}`;
         stages.push("decline-record");
@@ -629,34 +653,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           `then run the identical close command with the new packet: ${rerunBase} --critic-packet-id <new-packet-id>; it runs the Result bootstrap again and asks the acceptance question again for the new candidate`,
         ];
         return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, packageBack, commit, next,
-          message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
+          message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was closed, signed or pushed, and this call ran no Verify; any uncommitted outputs of an earlier call's Verify were discarded, and the next close verifies the new candidate again. Follow `next` in order." });
       }
-      if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is none of the clear yes forms ${acceptanceYesAnswersText(yesForm)} (case, commas, spaces and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
-          `nothing was written. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
-      }
-      const recorded = readAcceptanceRecord(root, featureId);
-      // C29 (L1): an earlier major the PO accepted as uncorrectable stays uncorrected; the question names it, so the human accepts knowing it.
-      const earlierAccepted = (Array.isArray(standing?.settled) ? standing.settled : []).map((finding) => `earlier Critic ${finding.severity} ${finding.findingId}${finding.originPacketId ? ` (round ${finding.originPacketId})` : ""} is not corrected; the PO accepted it as uncorrectable`);
-      const askedChecks = openChecksOf([...earlierAccepted, ...(openChecks ?? [])]);
+      // C30G-E1: the answer given on this call, or an acceptance recorded for this very candidate (read above, before the rollback removed its uncommitted file). The QUESTION is asked below, after the Verify.
       if (recorded !== null && recorded.candidate === candidateHead) accepted = { candidate: candidateHead, answer: recorded.answer, openChecks: recorded.openChecks };
       else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: askedChecks };
-      else {
-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: askedChecks, form: yesForm }),
-          `nothing was written. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then ${bothWays} If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
-      }
-      // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
-      // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
-      // C22: the acceptance record is such an output too (the answer is already held in `accepted`, and written again after the package moves below).
-      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`, `${evidenceDir}/dispatch-projection.json`, ...SBOM_OUTPUTS.map((name) => `${evidenceDir}/sbom/${name}`)]);
-      const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
-      const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
-      if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
-        stages.push("discard-own-leftovers");
-        for (const { tracked, path } of dirtyOutputs) {
-          if (tracked) runner("git", ["checkout", "--", path]); else rmSync(resolve(root, path), { force: true });
-        }
-      }
       if (requalify) stages.push("requalify-candidate");
       stages.push("verify-candidate");
       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
@@ -694,6 +695,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       criticVerifyLifecycle = lifecycleFile.slice(0, -5);
       let coreVersion = "0.0.0";
       try { coreVersion = String(JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")).version).split(/[+-]/u)[0]; } catch { /* the request is refused by the coordinator with its typed code */ }
+      // C30G-E1 (PO decision 2026-11-17): the question is asked here, after the candidate Verify passed and its evidence and the package moves are written, so the human sees the Verify result before accepting and a red or dirty
+      // Verify never reaches the human. This stop is AFTER writes and says so: the rerun with the answer discards those uncommitted outputs (discard-own-leftovers) and runs the Verify again on the same candidate.
+      if (accepted === null) {
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: askedChecks, form: yesForm, verifyPassed: true }),
+          `the candidate Verify passed and its evidence is written but not committed (${verifyPath}; the feature package manifest moved to completed): do not commit it. The rerun below discards those uncommitted outputs (stage discard-own-leftovers) and runs the Verify again on the same candidate (the producer may reuse the suite receipts of this candidate), so leave the tree as it is. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then ${bothWays} If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
+      }
       // C22 (CGR-06): after the Verify and the package moves, so the Verify ran on the tree the candidate names; the record then travels in the one close commit (specs/<feature>).
       stages.push("acceptance-record");
       writeAcceptanceRecord({ root, featureId, record: accepted, ...(deps.nowFn === undefined ? {} : { now: deps.nowFn }) });
@@ -950,7 +957,7 @@ function parseOneShot(argvWithStage) {
   const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks", "--sbom-override-proof"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override-proof scratch/sbom-override-proof-<16 hex>.json] [--stage] (the first call stops once with the acceptance question for the human; a SBOM finding that blocks the close is named with its repair, and only the PO's signed override, written by the signing command next to the request the stop prints, passes it; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
+    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override-proof scratch/sbom-override-proof-<16 hex>.json] [--stage] (the first call runs the candidate Verify and, only when it passed, stops once with the acceptance question for the human; a SBOM finding that blocks the close is named with its repair, and only the PO's signed override, written by the signing command next to the request the stop prints, passes it; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
     value[flag] = next;
   }
   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), sbomOverrideProof: value["--sbom-override-proof"] ?? null, stage };

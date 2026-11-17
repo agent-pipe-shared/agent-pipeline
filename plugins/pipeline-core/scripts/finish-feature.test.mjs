@@ -509,6 +509,9 @@ test("C21B: a Continuity feature with no bound Result stops before Verify with t
 const BOOTSTRAP_PLAN = "pipeline-state continuity-result-bootstrap-plan";
 const BOOTSTRAP_APPLY = "pipeline-state continuity-result-bootstrap-apply";
 const countOf = (calls, name) => calls.filter((call) => call === name).length;
+// C30G-E1 (QG-04, restated in place): the acceptance question now comes after the candidate Verify, its registration and the two package moves, so these calls precede every question stop.
+const VERIFY_PATH = "specs/feature-abc/evidence/verify-candidate.json";
+const BEFORE_THE_QUESTION = ["verify-evidence-producer.mjs", "register-feature-package.mjs", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply"];
 
 test("C30D-G1: a close that only lacks the Result bootstrap needs no detour: the first call plans, applies, commits and asks the question at the new HEAD, the second reaches the commit step on that HEAD", () => {
   const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent", acceptance: false });
@@ -519,7 +522,7 @@ test("C30D-G1: a close that only lacks the Result bootstrap needs no detour: the
     assert.notEqual(head, before, "the bootstrap's own commit moved HEAD");
     assert.equal(asked.status, "stopped", JSON.stringify(asked).slice(0, 500)); assert.equal(asked.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
     assert.ok(asked.stop.reason.includes(`candidate ${head}`), "the question names the post-bootstrap HEAD, never the one before it");
-    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs"], "the bootstrap is settled and nothing else ran before the question");
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "commit-pipeline-owned.mjs", ...BEFORE_THE_QUESTION], "the bootstrap is settled and the candidate Verify of the post-bootstrap HEAD ran before the question");
     assert.equal(asked.resultBootstrap.commit, head);
     // the human's answer comes with the second call, for the candidate the question named
     const result = oneShotClose({ ...f.input, humanAcceptance: "yes, I accept" }, { runCommand: f.runner });
@@ -542,7 +545,7 @@ test("C30D-G1: an answer given before the candidate existed is not carried over 
     assert.equal(asked.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(asked).slice(0, 500));
     assert.match(asked.stop.repair, /answer given with --human-acceptance[\s\S]*not carried/u);
     assert.equal(readAcceptanceRecord(f.root, "feature-abc"), null, "no acceptance was recorded for a HEAD the human never saw");
-    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false);
+    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), true, "the Verify of the new HEAD ran before the question (C30G-E1)");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
   const g = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "agent" });
   try {
@@ -559,7 +562,7 @@ test("C30D-G1: a reconcile the agent may run (no proof inputs) is run before the
   try {
     const result = oneShotClose(f.input, { runCommand: f.runner });
     assert.equal(result.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(result).slice(0, 500));
-    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "pipeline-state feature-package-reconcile", "commit-pipeline-owned.mjs"]);
+    assert.deepEqual(f.calls, [BOOTSTRAP_PLAN, BOOTSTRAP_APPLY, "pipeline-state feature-package-reconcile", "commit-pipeline-owned.mjs", ...BEFORE_THE_QUESTION]);
     assert.equal(result.resultBootstrap.reconciled, true);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
   const g = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "reconcile-refused" });
@@ -1147,7 +1150,7 @@ function packageFixture(f, { acceptanceAuthority = false } = {}) {
   return { manifestPath: "specs/feature-abc/lifecycle.json", pointerSha: sha256Of(SPEC_POINTER) };
 }
 
-test("C22 CGR-06: the one-shot stops once, before anything is written, with the one sentence to ask the human; the sentence says the close counts as the acceptance and names the open checks", () => {
+test("C22 CGR-06: the one-shot stops once, after the candidate Verify (C30G-E1), with the one sentence to ask the human; the sentence says the close counts as the acceptance and names the open checks", () => {
   const f = oneShotFixture({ acceptance: false });
   try {
     const stopped = oneShotClose({ ...f.input, openChecks: ["real device check"] }, { runCommand: f.runner });
@@ -1156,7 +1159,8 @@ test("C22 CGR-06: the one-shot stops once, before anything is written, with the 
     assert.match(stopped.stop.reason, /counts as the human acceptance of this feature package/u); assert.match(stopped.stop.reason, /real device check/u); assert.ok(stopped.stop.reason.includes("feature-abc"));
     assert.match(stopped.stop.repair, /--human-acceptance/u); assert.match(stopped.stop.repair, /--open-checks/u);
     assert.match(stopped.stop.repair, /how you really started or opened the delivered result[\s\S]*or say plainly that you could not and why/u, "the human decides knowing whether the result was really run");
-    assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "");
+    assert.deepEqual(f.calls, BEFORE_THE_QUESTION, "the Verify, its registration and the package moves ran; no close stage did"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false);
+    assert.equal(f.git("status", "--porcelain", "--untracked-files=all").trim(), `?? ${VERIFY_PATH}`, "only the Verify evidence is on disk (the fixture's package stand-ins write nothing)");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
@@ -1206,7 +1210,99 @@ test("C28: the acceptance question states the one fixed yes form and the stop na
     assert.ok(stopped.stop.reason.includes("\"yes, I accept\""), `the question states the fixed form: ${stopped.stop.reason}`);
     assert.match(stopped.stop.repair, /"yes, I accept", "yes", "yes, accepted", "accepted", "I accept"/u); // C29 (C8, PO tile 2026-11-13): the closed list of clear yes forms replaces the one fixed form.
     assert.match(stopped.stop.repair, /--human-acceptance "<the human's literal answer>"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
-    assert.deepEqual(f.calls, []); assert.equal(f.git("status", "--porcelain").trim(), "");
+    assert.deepEqual(f.calls, BEFORE_THE_QUESTION); assert.equal(f.git("status", "--porcelain", "--untracked-files=all").trim(), `?? ${VERIFY_PATH}`); // C30G-E1 (QG-04, restated in place): the question comes after the Verify.
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ---- C30G-E1 (AC-108, PO decision 2026-11-17): the human acceptance question is asked AFTER the candidate Verify, so the human sees the Verify result before accepting ----
+const QUESTION = /Do you accept|counts as the human acceptance/u;
+test("C30G-E1: a red or dirty candidate Verify stops the close with ONESHOT-VERIFY-RED and the human is never asked", () => {
+  const f = oneShotFixture({ acceptance: false, verifyRed: true });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400)); assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED");
+    assert.doesNotMatch(JSON.stringify(stopped), QUESTION, "no question was put to the human");
+    assert.ok(f.calls.includes("verify-evidence-producer.mjs"), "the Verify ran first");
+    assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const dirty = oneShotFixture({ acceptance: false });
+  try {
+    writeFileSync(join(dirty.root, "foreign.txt"), "x\n");
+    const dirtyVerify = (executable, argv) => (argv[0]?.endsWith("verify-evidence-producer.mjs") ? { status: 1, stdout: JSON.stringify({ status: "dirty", exitCode: 1 }), stderr: "" } : dirty.runner(executable, argv));
+    const stopped = oneShotClose(dirty.input, { runCommand: dirtyVerify });
+    assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED"); assert.doesNotMatch(JSON.stringify(stopped), QUESTION);
+  } finally { rmSync(dirty.root, { recursive: true, force: true }); }
+});
+
+test("C30G-E1: a green Verify then stops with ONESHOT-ACCEPTANCE-REQUIRED, the question says the Verify passed, and the repair says what is written and uncommitted and what the rerun does", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const head = headOf(f);
+    const stopped = oneShotClose({ ...f.input, openChecks: ["real device check"] }, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400)); assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    assert.deepEqual(f.calls.slice(0, 2), ["verify-evidence-producer.mjs", "register-feature-package.mjs"], "Verify and its registration ran before the question");
+    assert.match(stopped.stop.reason, /candidate Verify has passed/u); assert.ok(stopped.stop.reason.includes(head)); assert.match(stopped.stop.reason, /counts as the human acceptance of this feature package/u);
+    assert.equal(existsSync(join(f.root, VERIFY_PATH)), true, "the passing Verify evidence is on disk"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false, "no acceptance was recorded");
+    assert.doesNotMatch(stopped.stop.repair, /nothing was written/u, "the stop is after writes and must not say otherwise");
+    assert.match(stopped.stop.repair, /written but not committed[\s\S]*do not commit[\s\S]*Verify again/u);
+    assert.match(stopped.stop.repair, /--human-acceptance "<the human's literal answer>"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
+    const german = oneShotFixture({ acceptance: false, language: "de", continuity: true });
+    try { assert.match(oneShotClose(german.input, { runCommand: german.runner }).stop.reason, /Verify[\s\S]*bestanden/u); } finally { rmSync(german.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-E1: the rerun with the yes form completes to the close commit step; it discards the uncommitted outputs of the asking call and the acceptance names the candidate", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const head = headOf(f);
+    assert.equal(oneShotClose(f.input, { runCommand: f.runner }).stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    const result = oneShotClose({ ...f.input, humanAcceptance: "yes, I accept" }, { runCommand: f.runner });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 500));
+    assert.ok(result.stages.includes("discard-own-leftovers"), "the asking call's uncommitted outputs were rolled back, not refused as a dirty tree");
+    assert.equal(countOf(f.calls, "verify-evidence-producer.mjs"), 2, "the rerun repeats the Verify");
+    assert.equal(readAcceptanceRecord(f.root, "feature-abc").candidate, head); assert.deepEqual(forbidden(f.calls), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-E1: a decline after a green Verify retires the Result, commits none of the Verify leftovers and ends in a state the next close is not refused in", () => {
+  const f = oneShotFixture({ acceptance: false, continuity: true });
+  try {
+    assert.equal(oneShotClose(f.input, { runCommand: f.runner }).stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    assert.ok(f.calls.includes("verify-evidence-producer.mjs"), "the Verify had run when the human was asked");
+    const declined = oneShotClose({ ...f.input, humanDecline: GERMAN_BUG_REPORT }, { runCommand: f.runner });
+    assert.equal(declined.status, "declined", JSON.stringify(declined).slice(0, 500));
+    assert.equal(JSON.parse(readFileSync(join(f.root, STATE_PATH), "utf8")).continuity.authority.result, null, "the Result is retired");
+    assert.ok(!declined.commit.paths.includes(VERIFY_PATH), `the asking call's Verify evidence does not travel in the decline commit: ${declined.commit.paths}`);
+    assert.equal(existsSync(join(f.root, VERIFY_PATH)), false, "the old Verify evidence is not left behind for a candidate that no longer exists");
+    f.git("add", "--", ...declined.commit.paths); f.git("commit", "-q", "-m", "decline outputs");
+    assert.equal(f.git("status", "--porcelain").trim(), "", "after the decline commit the tree is clean");
+    const next = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
+    assert.equal(next.stop?.code, "ONESHOT-RESULT-NOT-BOUND", `the next close goes to the Result bootstrap, not into a dirty-tree refusal: ${JSON.stringify(next).slice(0, 300)}`);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-E1: a decline after a green Verify with a foreign dirty path in the tree still commits none of the Verify leftovers and leaves the foreign path alone", () => {
+  const f = oneShotFixture({ acceptance: false, continuity: true });
+  try {
+    assert.equal(oneShotClose(f.input, { runCommand: f.runner }).stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    writeFileSync(join(f.root, "foreign.txt"), "x\n"); // the rollback of the asking call's outputs needs a tree of only those outputs, so it would be skipped here
+    const declined = oneShotClose({ ...f.input, humanDecline: GERMAN_BUG_REPORT }, { runCommand: f.runner });
+    assert.equal(declined.status, "declined", JSON.stringify(declined).slice(0, 500));
+    assert.ok(!declined.commit.paths.includes(VERIFY_PATH), `the Verify evidence of a candidate that no longer stands is not committed: ${declined.commit.paths}`);
+    assert.equal(existsSync(join(f.root, VERIFY_PATH)), false); assert.equal(existsSync(join(f.root, "foreign.txt")), true, "a foreign path is never touched");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30G-E1: an acceptance recorded for the same candidate is not asked again after the Verify, and the recorded answer survives the leftover rollback", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes, I accept" }, { runCommand: f.runner }).status, "commit-required");
+    f.git("checkout", "--", STATE_PATH);
+    const before = countOf(f.calls, "verify-evidence-producer.mjs");
+    const again = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(again.status, "commit-required", JSON.stringify(again).slice(0, 400)); assert.doesNotMatch(JSON.stringify(again), QUESTION);
+    assert.equal(countOf(f.calls, "verify-evidence-producer.mjs"), before + 1, "the Verify ran before the (skipped) question");
+    assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes("yes, I accept"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
@@ -1249,12 +1345,17 @@ test("C30d: a first sentence on the closed yes list accepts, the rest of the ans
       assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
     } finally { rmSync(f.root, { recursive: true, force: true }); }
   }
-  const asked = oneShotClose(oneShotFixture({ acceptance: false }).input, { runCommand: oneShotFixture({ acceptance: false }).runner });
-  assert.match(asked.stop.reason, /when one of them is the first sentence, your next request may follow it/u, "the question says so");
+  const askedFixture = oneShotFixture({ acceptance: false }); // C30G-E1 (QG-04, restated in place): one fixture for input and runner, the question now needs the Verify's lifecycle receipt in the same repository
+  try {
+    const asked = oneShotClose(askedFixture.input, { runCommand: askedFixture.runner });
+    assert.match(asked.stop.reason, /when one of them is the first sentence, your next request may follow it/u, "the question says so");
+  } finally { rmSync(askedFixture.root, { recursive: true, force: true }); }
   const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
   try {
     assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere! Bitte jetzt pushen." }, { runCommand: de.runner }).status, "commit-required");
-    assert.match(oneShotClose({ ...oneShotFixture({ acceptance: false, continuity: true, language: "de" }).input }, { runCommand: de.runner }).stop.reason ?? "", /darf danach Ihr nächster Auftrag folgen/u);
+    // C30G-E1 (QG-04, restated in place): the question needs the Verify's receipt in the SAME repository, so the second call uses a second answerless fixture for both input and runner.
+    const deAsk = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+    try { assert.match(oneShotClose(deAsk.input, { runCommand: deAsk.runner }).stop.reason ?? "", /darf danach Ihr nächster Auftrag folgen/u); } finally { rmSync(deAsk.root, { recursive: true, force: true }); }
   } finally { rmSync(de.root, { recursive: true, force: true }); }
 });
 
