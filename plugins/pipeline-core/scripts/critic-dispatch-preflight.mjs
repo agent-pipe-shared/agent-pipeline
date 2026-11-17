@@ -38,7 +38,7 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { COURSE_EVIDENCE_GAP_CODES, criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, locateCourseEvidenceGap, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import { COURSE_EVIDENCE_GAP_CODES, criticCourseDeclaresPredecessor, criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, locateCourseEvidenceGap, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
 import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
 import { criticRunnerFromEnv, describeCriticRouteAssurance } from "../lib/critic-route-assurance.mjs";
 
@@ -462,8 +462,11 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     if (admission?.decision?.status !== "admitted") {
       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
       const gapCode = COURSE_EVIDENCE_GAP_CODES.includes(admission?.decision?.code);
+      // C30F-G4: a CCA-MANIFEST-READ refusal of a manifest that declares a predecessor also names the successor route (one added sentence, no feature name).
+      const manifestReadDetail = admission?.decision?.code === "CCA-MANIFEST-READ"
+        ? { declaresPredecessor: criticCourseDeclaresPredecessor({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) } : null;
       let repair = criticCourseRepair(admission?.decision?.code,
-        gapCode ? locateCourseEvidenceGap({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) : null);
+        gapCode ? locateCourseEvidenceGap({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) : manifestReadDetail);
       // CCA-PARENT: name the last registered round and the base this preflight accepts, and the route that admits from here.
       const parentDetail = admission?.decision?.code === "CCA-PARENT"
         ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;

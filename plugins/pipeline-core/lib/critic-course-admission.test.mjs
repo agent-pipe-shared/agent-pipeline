@@ -5,13 +5,13 @@ const completionCases = [];
 function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
 import { runRegisterFeaturePackage } from "../scripts/register-feature-package.mjs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
-import { transitionCode as lineageTransitionCode } from "./critic-review-lineage-core.mjs";
+import { transitionCode as lineageTransitionCode, compiledRequest, recordCore, validateCriticReviewLineage } from "./critic-review-lineage-core.mjs";
 import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 
@@ -448,7 +448,7 @@ test("CCA18 dropping retained registration cannot create new genesis in the runt
 
 test("CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle", diagnosticCarryCase);
 // D165-PF75B: the review unit is read at the commit that introduced it, not only at the genesis base.
-function unitFixture({late, unit = true, bulk = 0}) {
+function unitFixture({late, unit = true, bulk = 0, supersedes = null}) {
   const root = mkdtempSync(join(tmpdir(), "critic-unit-intro-"));
   const featureId = "unit-feature", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, specPath = `${dir}/spec.md`, unitPath = `${dir}/design/critic-review-unit.json`;
   mkdirSync(join(root, dir, "design"), {recursive: true}); mkdirSync(join(root, "src"), {recursive: true});
@@ -458,7 +458,7 @@ function unitFixture({late, unit = true, bulk = 0}) {
   const pre = commit("pre-manifest");
   writeFileSync(join(root, specPath), "# Spec\nAC-1 behavior\n");
   const artifacts = [{class: "spec", path: specPath, sha256: hash(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active"}];
-  const write = () => writeFileSync(join(root, manifestPath), `${JSON.stringify({schema: "pipeline.feature-package.v1", feature: {id: featureId, rigor: 1}, state: "approved", artifacts})}\n`);
+  const write = () => writeFileSync(join(root, manifestPath), `${JSON.stringify({schema: "pipeline.feature-package.v1", feature: {id: featureId, rigor: 1}, state: "approved", artifacts, ...(supersedes === null ? {} : {supersedes})})}\n`);
   const unitBody = (purpose) => JSON.stringify({schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose, specPath, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: {mainRef: git(root, ["symbolic-ref", "HEAD"])}, singletonRationale: null});
   const addUnit = (purpose) => { writeFileSync(join(root, unitPath), unitBody(purpose)); const entry = {class: "design", path: unitPath, sha256: hash(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain"}; const at = artifacts.findIndex(e => e.path === unitPath); if (at >= 0) artifacts[at] = entry; else artifacts.push(entry); write(); };
   const out = {root, featureId, manifestPath, unitPath, pre, addUnit, commit, write, git: (...a) => git(root, a)};
@@ -530,6 +530,105 @@ test("D165-PF75B (g) the missing-unit repair no longer says the unit commit is t
   assert.doesNotMatch(repair, /start the course's first review from it/u);
   assert.match(repair, /any base on the candidate history that already lists the feature manifest/u);
   assert.match(repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
+});
+// C30F-G4 (Codex greenfield 2026-11-16): the successor of a DISCARDED feature is reviewed in full over the inherited implementation. Its manifest
+// declares the predecessor through `supersedes`, the predecessor is recorded in the State's discardedFeatures, and the first review's base is a
+// strict ancestor of the commit that first added the successor manifest. Neutral ids only.
+const PREDECESSOR = "feature-a";
+function recordDiscarded(fx, ids = [PREDECESSOR]) {
+  mkdirSync(join(fx.root, ".claude"), {recursive: true});
+  writeFileSync(join(fx.root, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(fx.root, ".claude/pipeline-state.json"), JSON.stringify({schema: "pipeline.state.v0", discardedFeatures: ids.map((id) => ({id, planPath: `specs/${id}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null}))}));
+  appendFileSync(join(fx.root, ".git/info/exclude"), ".claude/\n");
+}
+const successorIdentity = (fx, base) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: base, candidateCommit: fx.candidate, registrationCommit: fx.candidate, acceptedReference: null});
+test("C30F-G4 (a) the successor of a discarded feature is admitted over the inherited range and the identity binds the introducing commit, the range and the predecessor", () => {
+  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx);
+  assert.equal(fx.git("rev-list", "--count", `${fx.pre}..${fx.candidate}`), "4", "the inherited range holds the manifest, the delivered code, the unit and the candidate");
+  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
+  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+  const identity = successorIdentity(fx, fx.pre);
+  assert.equal(identity.ok, true, JSON.stringify(identity));
+  const course = identity.value.courseIdentity, introduced = hash(`${git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])}\n`);
+  assert.equal(course.originalFeatureId, fx.featureId);
+  assert.equal(course.originalManifestSha256, introduced, "the manifest as first added takes the place of the missing manifest at the base");
+  assert.equal(course.genesisCandidate.base, fx.pre);
+  assert.deepEqual(course.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
+  const {courseKey, submissionSha256, envelopeSha256, genesisRecordSha256, ...rest} = course;
+  assert.equal(courseKey, sha256Canonical({repositoryFingerprint: course.repositoryFingerprint, originalFeatureId: fx.featureId, manifestPath: fx.manifestPath, originalManifestSha256: introduced, genesisCandidate: course.genesisCandidate, successor: course.successor}));
+  assert.deepEqual(identity.value.aliases, []);
+});
+test("C30F-G4 (b) a feature without a predecessor relation keeps CCA-MANIFEST-READ, also when the State records a discarded feature", () => {
+  const fx = unitFixture({late: true}); recordDiscarded(fx);
+  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
+  assert.equal(actual.decision.code, "CCA-MANIFEST-READ", JSON.stringify(actual.decision));
+  assert.equal(successorIdentity(fx, fx.pre).code, "CCA-MANIFEST-READ");
+});
+test("C30F-G4 (c) a predecessor that is not recorded discarded keeps the refusal with a typed reason", () => {
+  for (const state of [null, ["feature-other"]]) {
+    const fx = unitFixture({late: true, supersedes: PREDECESSOR}); if (state) recordDiscarded(fx, state);
+    const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
+    assert.notEqual(actual.decision.status, "admitted", JSON.stringify(actual.decision));
+    assert.equal(actual.decision.code, "CCA-ALIAS-MAPPING-UNAVAILABLE", JSON.stringify(actual.decision));
+  }
+});
+test("C30F-G4 (d) a base that is not an ancestor of the commit that first added the manifest is refused CCA-MANIFEST-READ, a later base keeps the ordinary identity", () => {
+  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx);
+  const sibling = git(fx.root, ["commit-tree", `${fx.pre}^{tree}`, "-p", fx.pre, "-m", "sibling"]);
+  assert.equal(readCriticCourseAdmission(unitRequest(fx, {baseCommit: sibling})).decision.code, "CCA-MANIFEST-READ");
+  assert.equal(successorIdentity(fx, sibling).code, "CCA-MANIFEST-READ");
+  const later = successorIdentity(fx, fx.code);
+  assert.equal(later.ok, true, JSON.stringify(later));
+  assert.equal(later.value.courseIdentity.successor, undefined, "a base that holds the manifest never takes the successor route");
+  assert.equal(later.value.courseIdentity.originalManifestSha256, hash(`${git(fx.root, ["show", `${fx.code}:${fx.manifestPath}`])}\n`));
+});
+test("C30F-G4 (e) a retained round 1 binds the successor course: a later round resolves the SAME course, a different base opens no second one, a changed predecessor fails the genesis binding", () => {
+  // The finalizer cannot consume round 1 of a successor yet (critic-generic-batch.mjs reads the review unit at the genesis base), so the round-1 record is a real
+  // consumed v2 record of another fixture, re-bound to this repository's course identity and re-sealed with the lineage's own seal functions.
+  const template = consumedCourseRoundFixture();
+  const record = JSON.parse(readFileSync(join(template.root, template.finalizedLineage.lineagePath), "utf8"));
+  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx);
+  const round1 = successorIdentity(fx, fx.pre);
+  assert.equal(round1.ok, true, JSON.stringify(round1));
+  const course = round1.value.courseIdentity;
+  record.candidate = {commit: fx.candidate, tree: git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`])};
+  record.diff.base = fx.pre;
+  record.courseBinding = {...record.courseBinding, courseKey: course.courseKey, originalFeatureId: fx.featureId, originalManifestSha256: course.originalManifestSha256, genesisCandidate: course.genesisCandidate};
+  record.request.compiledSha256 = sha256Canonical(compiledRequest(record));
+  record.recordSha256 = sha256Canonical(recordCore(record));
+  assert.equal(validateCriticReviewLineage(record).ok, true, JSON.stringify(validateCriticReviewLineage(record)));
+  const evidencePath = `specs/${fx.featureId}/evidence/critic-review-lineage-1.json`, bytes = `${JSON.stringify(record)}\n`;
+  mkdirSync(join(fx.root, `specs/${fx.featureId}/evidence`), {recursive: true});
+  writeFileSync(join(fx.root, evidencePath), bytes);
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  manifest.artifacts.push({class: "candidate-evidence", path: evidencePath, sha256: hash(bytes), authority: false, mutability: "immutable", retention: "retain"});
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest)}\n`);
+  const registration = fx.commit("register the lineage of round 1");
+  const later = (overrides = {}) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.candidate, candidateCommit: fx.candidate, registrationCommit: registration, acceptedReference: null, ...overrides});
+  const again = later();
+  assert.equal(again.ok, true, JSON.stringify(again));
+  assert.equal(again.value.courseIdentity.courseKey, course.courseKey, "the same course, not a second one");
+  assert.deepEqual(again.value.courseIdentity.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
+  assert.deepEqual(again.value.courseIdentity.genesisCandidate, course.genesisCandidate);
+  assert.equal(again.value.courseIdentity.genesisRecordSha256, record.recordSha256);
+  assert.equal(later({baseCommit: fx.code}).value.courseIdentity.courseKey, course.courseKey, "another request base never derives another genesis");
+  // A predecessor named differently after round 1 recomputes another course key: the existing genesis binding refuses it instead of opening a second course.
+  manifest.supersedes = "feature-b";
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest)}\n`);
+  recordDiscarded(fx, [PREDECESSOR, "feature-b"]);
+  const renamed = fx.commit("name another predecessor");
+  const drift = later({candidateCommit: renamed, registrationCommit: renamed});
+  assert.equal(drift.ok, false);
+  assert.equal(drift.code, "CCA-GENESIS-BINDING", JSON.stringify(drift));
+});
+test("C30F-G4 (g) the repair text of CCA-MANIFEST-READ is unchanged and gains one sentence only when the manifest declares a predecessor, naming no feature", () => {
+  const plain = criticCourseRepair("CCA-MANIFEST-READ");
+  assert.equal(criticCourseRepair("CCA-MANIFEST-READ", {declaresPredecessor: false}), plain);
+  const extended = criticCourseRepair("CCA-MANIFEST-READ", {declaresPredecessor: true});
+  assert.ok(extended.startsWith(plain) && extended.length > plain.length);
+  assert.equal(extended.slice(plain.length).split(/(?<=\.)\s/u).filter(Boolean).length, 1, "exactly one added sentence");
+  assert.match(extended, /discarded/u);
+  assert.doesNotMatch(extended, new RegExp(PREDECESSOR, "u"));
 });
 // D165-CDR: a sanctioned command registers Critic diagnostic evidence in the feature manifest.
 function diagFixture() {

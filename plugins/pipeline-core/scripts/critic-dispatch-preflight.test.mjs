@@ -28,6 +28,7 @@ import { dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
+import { criticCourseRepair } from "../lib/critic-course-admission.mjs";
 import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
 
 function verifyValue(commit, tree, exitCode = 0) {
@@ -529,6 +530,78 @@ test("C30F-G2 the preflight and the course admission accept a registered diagnos
     assert.equal(result.coordinatorOnly.courseAdmission.featureId, featureId);
     assert.equal(result.evidence[0].candidate.commit, candidate);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+// C30F-G4 (Codex greenfield 2026-11-16): the first full review of the successor of a DISCARDED feature starts before the inherited implementation, i.e. before
+// the successor manifest exists. Neutral ids only; the State records the predecessor as discarded in the working tree, like a real project.
+function c30fG4Fixture({ supersedes = null, discarded = true, supersedesLate = false } = {}) {
+  const fx = fixture();
+  const featureId = "feature-a-successor", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, unitPath = `${dir}/design/critic-review-unit.json`;
+  const pre = git(fx.root, ["rev-parse", "HEAD"]);
+  mkdirSync(join(fx.root, "src"), { recursive: true });
+  writeFileSync(join(fx.root, "src", "inherited.mjs"), "export const inherited = 1;\n");
+  git(fx.root, ["add", "src"]);
+  git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "inherited implementation of the discarded feature"]);
+  mkdirSync(join(fx.root, dir, "evidence"), { recursive: true }); mkdirSync(join(fx.root, dir, "design"), { recursive: true });
+  writeFileSync(join(fx.root, `${dir}/spec.md`), "# Successor feature\nAC-1: behavior boundary\n");
+  writeFileSync(join(fx.root, unitPath), JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior boundary", specPath: `${dir}/spec.md`, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(fx.root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", artifacts: [
+    { class: "spec", path: `${dir}/spec.md`, sha256: sha256(readFileSync(join(fx.root, `${dir}/spec.md`))), authority: true, mutability: "mutable", retention: "active" },
+    { class: "design", path: unitPath, sha256: sha256(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }], ...(supersedes === null || supersedesLate ? {} : { supersedes }) };
+  const write = () => writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
+  const save = (message) => { git(fx.root, ["add", dir]); git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(fx.root, ["rev-parse", "HEAD"]); };
+  write(); const introduced = save("successor feature genesis");
+  writeFileSync(join(fx.root, `${dir}/spec.md`), "# Successor feature\nchanged\n");
+  const candidate = save("successor candidate");
+  const value = produceCriticDiagnostic({ root: fx.root, candidate, specPath: `${dir}/spec.md`, guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/successor-targeted.log" });
+  const diagnosticPath = `${dir}/evidence/diagnostic.json`, logPath = `${dir}/evidence/targeted.log`;
+  writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, "evidence/successor-targeted.log")));
+  writeFileSync(join(fx.root, diagnosticPath), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, path: logPath } } }));
+  for (const path of [diagnosticPath, logPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
+  if (supersedesLate) manifest.supersedes = supersedes;
+  write(); const registrationCommit = save("register the candidate-bound diagnostic");
+  if (discarded) {
+    writeFileSync(join(fx.root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", discardedFeatures: [{ id: "feature-a", planPath: "specs/feature-a/prd.md", phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null }] }));
+  }
+  const request = (base) => input(fx, { base, candidate, specPath: `${dir}/spec.md`, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
+  return { fx, featureId, pre, introduced, candidate, registrationCommit, request };
+}
+test("C30F-G4 (f) the preflight of the successor of a discarded feature reaches packet-ready over the whole inherited range, bound to the successor manifest", () => {
+  const s = c30fG4Fixture({ supersedes: "feature-a" });
+  try {
+    const result = preflightCriticDispatch(s.request(s.pre));
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
+    assert.equal(result.coordinatorOnly.courseAdmission.featureId, "feature-a-successor");
+    assert.equal(result.coordinatorOnly.courseAdmission.round, 1);
+    assert.equal(result.base.commit, s.pre, "the reviewed range starts before the inherited implementation");
+    assert.ok(git(s.fx.root, ["diff", "--name-only", result.base.commit, result.candidate.commit]).split("\n").includes("src/inherited.mjs"), "the inherited implementation is inside the reviewed diff");
+  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
+});
+test("C30F-G4 (f2) without the predecessor relation the refusal text is the plain one, and with it a sibling base adds exactly one sentence and names no feature", () => {
+  const plain = c30fG4Fixture();
+  try {
+    const refused = preflightCriticDispatch(plain.request(plain.pre));
+    assert.equal(refused.code, "CCA-MANIFEST-READ", JSON.stringify(refused));
+    assert.equal(refused.repair, criticCourseRepair("CCA-MANIFEST-READ"));
+  } finally { rmSync(plain.fx.root, { recursive: true, force: true }); }
+  // A predecessor declared only AFTER the candidate (the registration commit) is not read at the candidate: the plain refusal stands and the repair names the route.
+  const declared = c30fG4Fixture({ supersedes: "feature-a", supersedesLate: true });
+  try {
+    const refused = preflightCriticDispatch(declared.request(declared.pre));
+    assert.equal(refused.code, "CCA-MANIFEST-READ", JSON.stringify(refused));
+    const plainText = criticCourseRepair("CCA-MANIFEST-READ");
+    assert.ok(refused.repair.startsWith(plainText) && refused.repair.length > plainText.length);
+    assert.equal(refused.repair, criticCourseRepair("CCA-MANIFEST-READ", { declaresPredecessor: true }));
+    assert.doesNotMatch(refused.repair, /feature-a/u);
+  } finally { rmSync(declared.fx.root, { recursive: true, force: true }); }
+});
+test("C30F-G4 (f3) a predecessor that the State does not record as discarded is not admitted", () => {
+  const s = c30fG4Fixture({ supersedes: "feature-a", discarded: false });
+  try {
+    const refused = preflightCriticDispatch(s.request(s.pre));
+    assert.notEqual(refused.status, "packet-ready", JSON.stringify(refused));
+    assert.equal(refused.code, "CCA-ALIAS-MAPPING-UNAVAILABLE", JSON.stringify(refused));
+  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
 });
 
 test("failed canonical Verify admits review without satisfying final qualification", () => {
