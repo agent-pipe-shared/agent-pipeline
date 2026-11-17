@@ -1,0 +1,308 @@
+diff --git a/plugins/pipeline-core/lib/hook-currentness.mjs b/plugins/pipeline-core/lib/hook-currentness.mjs
+index 513860875..5ab6847d6 100644
+--- a/plugins/pipeline-core/lib/hook-currentness.mjs
++++ b/plugins/pipeline-core/lib/hook-currentness.mjs
+@@ -86,7 +86,7 @@ async function snapshotIsStale() {
+     const { assessHookCurrentness } = await import(toFileUrl(resolvePath(PLUGIN_LIB_DIR, "hook-currentness.mjs")).href);
+     if (assessHookCurrentness({ recordedPluginLibDir: PLUGIN_LIB_DIR, pluginLibDir: SOURCE_PLUGIN_LIB_DIR }).current === true) return false;
+   } catch { /* an unassessable comparison against an existing source is stale */ }
+-  block(["HOOK-SNAPSHOT-STALE: this hook's runtime snapshot no longer matches the loaded plugin; refresh it with: " + SNAPSHOT_REFRESH_COMMAND + " (bypassing this hook, e.g. git commit --no-verify, is forbidden: refresh it, never bypass it)"]);
++  block(["HOOK-SNAPSHOT-STALE: this hook's runtime snapshot no longer matches the loaded plugin; refresh it with: " + SNAPSHOT_REFRESH_COMMAND + " (run it once, then repeat the refused command; bypassing this hook, e.g. git commit --no-verify, is forbidden: refresh it, never bypass it)"]);
+   return true;
+ }
+ `;
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index db075cf42..3d2de2e4b 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -96,7 +96,8 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const digest=value=>hash(canonical(value));
+ const equal=(a,b)=>canonical(a)===canonical(b);
+ const freeze=value=>{if(value&&typeof value==='object'){for(const v of Object.values(value))freeze(v);Object.freeze(value);}return value;};
+-const fail=(code,reason)=>{const error=new Error(reason);error.name='SessionAuthorityError';error.code=code;error.reason=reason;throw error;};
++const fail=(code,reason)=>{const error=new Error(reason);error.name='SessionAuthorityError';error.code=code;error.reason=reason;const repair=sessionAuthorityRefusalRepair(code,reason,refusalRoot());if(repair!==null)error.repair=repair;throw error;};
++function refusalRoot(){try{return boundaryContext.getStore()?.repository?.primaryRoot??legacyControlContext.getStore()?.repo?.primaryRoot;}catch{return undefined;}}
+ const unavailable=(producer,reason)=>freeze({status:'unavailable',code:'SDC-AUTHORITY-UNAVAILABLE',producer,reason});
+ function exact(value,keys,label){if(!value||typeof value!=='object'||Array.isArray(value)||![Object.prototype,null].includes(Object.getPrototypeOf(value))||!equal(Object.keys(value).sort(),[...keys].sort()))fail('SDC-AUTHORITY-UNAVAILABLE',`${label}:closed-shape`);return value;}
+ function sha(value){if(typeof value!=='string'||!SHA.test(value))fail('SDC-AUTHORITY-UNAVAILABLE','invalid-digest');return value;}
+@@ -343,6 +344,24 @@ export function registryLockRepairText(observed,root){
+     :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
+   return `${head}. If it stays held although its owner has finished (for example the repair run that was just started): node ${REPAIR_SCRIPT} inspect --root ${root}, then node ${routine} run heal --root ${root} --reason "<why>", and as the last resort when no Goldfish runs node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root ${root} --reason "<why>"`;
+ }
++/** C30G-D3: the one recovery a registry refusal names, so a reload never leaves a dead end. Covered: the two reasons heal repairs
++ * (`windows-native-identity-drift`, and `catalogue-source-closure`, a catalogue another plugin version wrote) and the HELD refusals.
++ * Any other reason keeps no repair here: the namespace-drift refusal and the lock refusal carry their own (`driftRepair`,
++ * `registryLockRepairText`) and an integrity fault is not healed away. A reason is named for a command only where that command really repairs it: heal re-enters the registry
++ * once with fresh readings (the identity witnesses live per boundary), and move-aside is the route for a registry that holds records
++ * but no catalogue (heal returns `absent` there). Every other HELD reason is a contract refusal, so it gets the read-only `inspect`. */
++export function sessionAuthorityRefusalRepair(code,reason,root){
++  const at=typeof root==='string'&&root!==''?root:'<repository root>';
++  const verb=name=>`node ${REPAIR_SCRIPT} ${name} --root ${at}`;
++  if(code==='SDC-AUTHORITY-CAS'&&reason==='windows-native-identity-drift')
++    return `a registry record changed while this operation was reading it (another process, or the previous plugin version still running after a reload, replaced it). Once no Goldfish or other authority operation runs, run ${verb('heal')}: it re-enters the registry once with fresh readings and heals only a producer that has no armed or running member; then repeat the refused command. If it refuses again, ${verb('inspect')} names the exact next command`;
++  if(code==='SDC-AUTHORITY-UNAVAILABLE'&&reason==='catalogue-source-closure')
++    return `the registry catalogue was written by another plugin version (typical right after a plugin reload or update). Once no Goldfish or other authority operation runs, run ${verb('heal')}: it migrates the catalogue and retains the previous registry aside; then repeat the refused command. If it refuses again, ${verb('inspect')} names the exact next command`;
++  if(code!=='SDC-AUTHORITY-HELD')return null;
++  if(reason==='legacy-partial-registry'||reason==='legacy-retained-registry')
++    return `the registry directory holds records but no catalogue (an interrupted or deleted registry). Read it with ${verb('inspect')}; once no Goldfish or other authority operation runs, put the registry aside (it is retained, never deleted, and the next governed dispatch starts it fresh): ${verb('move-aside')} --no-goldfish-running --reason "<why>"`;
++  return `the registry refused this operation in its current state. Read the state with ${verb('inspect')}: it names the exact next command for every finding, or none when nothing blocks; when it names none, the refusal is a rule of the operation and not a stale state, so report the refusal code and reason`;
++}
+ function lockHeldFault(repo,observed,reason){
+   const root=repo.primaryRoot;
+   const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-LOCK-HELD';error.reason=reason;
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 79d57b4d6..cf2a20bcb 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -394,6 +394,34 @@ export function installedPipelineIdentity(
+     : installedPipelineIdentityCodex(payload);
+ }
+ 
++/**
++ * C30G-D3: advice for a person when a Claude session has loaded a version of pipeline-core that the host plugin registry does
++ * not list for this root (typically right after a plugin reload or update). It states the loaded version, the pipeline-core
++ * versions the SAME plugin-list snapshot holds (`none` when it holds none or cannot be read) and the recovery. It is bounded text
++ * only: no path from the list or the environment is printed, nextAction stays null (the Pipeline never guesses a source path or
++ * treats a marketplace copy as its own provenance), and no attestation check is relaxed.
++ */
++export function describeClaudeRegistryBindingRepair({ version, pluginListSnapshot } = {}) {
++  let listed = [];
++  try {
++    const entries = typeof pluginListSnapshot === "string" ? JSON.parse(pluginListSnapshot) : null;
++    if (Array.isArray(entries)) {
++      listed = [...new Set(entries
++        .filter((entry) => [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.id) && typeof entry?.version === "string")
++        .map((entry) => entry.version.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 60))
++        .filter((entry) => entry !== ""))];
++    }
++  } catch { /* an unreadable snapshot lists none */ }
++  const shown = listed.length === 0 ? "none" : `${listed.slice(0, 5).join(", ")}${listed.length > 5 ? ` (+${listed.length - 5} more)` : ""}`;
++  const loaded = String(version ?? "unknown").replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 60);
++  // The binding is null for more than a version gap (a second or disabled entry, a registration that is not a directory
++  // source, an install path that is not the loaded root), so a listed loaded version gets its own wording.
++  const recovery = listed.includes(loaded)
++    ? `The registry lists the loaded version, but no single enabled entry binds to this loaded root through a directory marketplace registration. A person repairs or reinstalls the host registration for this marketplace so that exactly one enabled entry names this loaded root, restarts the session, and reruns the same preflight`
++    : `The registry must list the loaded version before it can be attested. A person completes the host install or update for this marketplace so that the registry lists ${loaded}, restarts the session, and reruns the same preflight`;
++  return `the loaded pipeline-core is ${loaded}, and the host plugin registry lists: ${shown}. ${recovery}; nothing here guesses a source path. See references/local-plugin-attestation.md, section "After a plugin reload or update".`;
++}
++
+ export function installedPipelineVersion(pluginList = () => readInstalledPluginList("codex"), runner = "codex") {
+   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
+ }
+@@ -1335,7 +1363,10 @@ export function observePipelineStartPreflight({
+     ? runner === "codex" && registrySourcePluginRoot === null
+       ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-SOURCE-UNAVAILABLE"] }
+       : runner === "claude" && claudeRegistryBinding === null
+-        ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] }
++        ? {
++            schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"],
++            repair: describeClaudeRegistryBindingRepair({ version, pluginListSnapshot }),
++          }
+       : runner === "antigravity" && registryInstalledPluginRoot === null
+         ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] }
+       : verifyLocalInstalledPluginReceiptFn({
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 96c4ee0b4..49e4d3ddf 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -1798,6 +1798,77 @@ test("a Gitless Codex local-development install is ready only with its installer
+   assert.equal(mismatch.nextAction, null, "an unresolved registry source cannot produce a host writer action");
+ });
+ 
++// C30G-D3 (AC-108, fresh bounded attempt): after a plugin reload the readback must say what differs and what to do. The
++// registry stays authoritative; the text is advice for a person, never an action, and carries no path.
++test("C30G-D3: a Claude registry that lists another pipeline-core version says so, with both versions and the one recovery, and still has no nextAction", (t) => {
++  const base = mkdtempSync(join(tmpdir(), "preflight-claude-reload-"));
++  t.after(() => rmSync(base, { recursive: true, force: true }));
++  const installedRoot = join(base, "cache", "pipeline-core", "loaded");
++  mkdirSync(join(installedRoot, "scripts"), { recursive: true });
++  const scriptUrl = pathToFileURL(join(installedRoot, "scripts", "pipeline-start-preflight.mjs")).href;
++  const result = preflight({
++    env: { CLAUDECODE: "1" }, pluginList: claudePluginList("0.5.2+claude.previous"),
++    knownMarketplaces: claudeKnownMarketplaces(), read: () => claudeManifest, scriptUrl,
++    verifyLocalInstalledPluginReceiptFn: () => { throw new Error("no binding means no receipt verification"); },
++  });
++  assert.equal(result.status, "plugin-attestation-required");
++  assert.deepEqual(result.installedPluginAttestation.reasonCodes, ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"]);
++  assert.equal(result.nextAction, null, "the deliberate null stays: no source path is guessed");
++  const repair = result.installedPluginAttestation.repair;
++  assert.equal(typeof repair, "string", "a deliberate null still tells the person what to do");
++  assert.match(repair, /0\.5\.2\+claude\.test/u, "the loaded version");
++  assert.match(repair, /0\.5\.2\+claude\.previous/u, "the version the host registry lists");
++  assert.match(repair, /restart/iu);
++  assert.match(repair, /references\/local-plugin-attestation\.md/u);
++  assert.doesNotMatch(repair, /\/cache\/claude|installPath|projectPath/u, "no path is printed");
++  assert.deepEqual(executableActionPaths(result.installedPluginAttestation), [], "nothing executable");
++  const scoped = preflight({
++    env: { CLAUDECODE: "1" }, pluginList: claudePluginList("0.5.2+claude.previous"),
++    knownMarketplaces: claudeKnownMarketplaces(), read: () => claudeManifest, scriptUrl, role: "goldfish",
++  });
++  assert.equal(scoped.installedPluginAttestation.repair, repair, "advice is not withheld from a Goldfish");
++});
++
++test("C30G-D3: the registry-binding repair text prints 'none' when the snapshot lists no pipeline-core entry, and survives an unreadable snapshot", () => {
++  const describe = preflightModule.describeClaudeRegistryBindingRepair;
++  assert.equal(typeof describe, "function");
++  for (const snapshot of [JSON.stringify([]), null, "{", JSON.stringify([{ id: "other-plugin@market", version: "9.9.9" }])]) {
++    const text = describe({ version: "1.2.3+claude.x", pluginListSnapshot: snapshot });
++    assert.match(text, /1\.2\.3\+claude\.x/u, String(snapshot));
++    assert.match(text, /registry lists: none/u, String(snapshot));
++    assert.doesNotMatch(text, /9\.9\.9/u, "another plugin's version is not printed");
++  }
++  // The binding is also null when the registry lists the loaded version but no single enabled entry binds to this root:
++  // the text must not ask for an update to a version the registry already lists.
++  const sameVersion = describe({ version: "1.2.3+claude.x", pluginListSnapshot: JSON.stringify([{ id: "pipeline-core@agent-pipeline-local", version: "1.2.3+claude.x" }]) });
++  assert.match(sameVersion, /registry lists: 1\.2\.3\+claude\.x\./u);
++  assert.match(sameVersion, /no single enabled entry binds to this loaded root/u);
++  assert.doesNotMatch(sameVersion, /so that the registry lists/u, "no version gap is claimed");
++  const bounded = describe({
++    version: "1.0.0",
++    pluginListSnapshot: JSON.stringify(Array.from({ length: 20 }, (_, index) => ({ id: "pipeline-core@agent-pipeline-local", version: `0.${index}.0\u0007${"x".repeat(200)}` }))),
++  });
++  assert.ok(bounded.length < 1200, "the text is bounded");
++  assert.doesNotMatch(bounded, /[\u0000-\u001f]/u, "control characters are stripped");
++});
++
++test("C30G-D3: local-plugin-attestation.md has one 'After a plugin reload or update' section: happy path first, then each recovery by code with its command", () => {
++  const doc = readFileSync(fileURLToPath(new URL("../skills/pipeline-start/references/local-plugin-attestation.md", import.meta.url)), "utf8");
++  const heading = doc.indexOf("## After a plugin reload or update");
++  assert.ok(heading >= 0, "the section exists");
++  const next = doc.indexOf("\n## ", heading + 5);
++  const section = doc.slice(heading, next === -1 ? undefined : next);
++  assert.ok(section.length < 3500, "the section is short");
++  const order = ["restart", "IPA-HOST-REGISTRY-BINDING-UNAVAILABLE", "HOOK-SNAPSHOT-STALE", "SDC-AUTHORITY-CAS", "SDC-AUTHORITY-HELD", "SDC-LOCK-HELD"].map((word) => section.indexOf(word));
++  assert.ok(order.every((index) => index >= 0), `every step is named: ${order}`);
++  assert.deepEqual([...order].sort((a, b) => a - b), order, "happy path first, then the recoveries in this order");
++  assert.match(section, /refresh-mandatory-hooks\.mjs --root/u);
++  assert.match(section, /session-authority-repair\.mjs heal --root/u);
++  assert.match(section, /session-authority-repair\.mjs release-lock --root <root> --no-pipeline-running --reason/u);
++  assert.match(section, /session-authority-repair\.mjs move-aside --root <root> --no-goldfish-running --reason/u);
++  assert.doesNotMatch(section, /\/home\/|[A-Z]:\\/u, "no machine path");
++});
++
+ test("Agy managed copy missing a receipt has an exact host recovery action from a Git source", () => {
+   const installedRoot = mkdtempSync(join(tmpdir(), "agy-managed-copy-"));
+   const sourceRoot = fileURLToPath(new URL("../", import.meta.url));
+diff --git a/plugins/pipeline-core/scripts/repair-map.test.mjs b/plugins/pipeline-core/scripts/repair-map.test.mjs
+index 7910dc296..977929f44 100644
+--- a/plugins/pipeline-core/scripts/repair-map.test.mjs
++++ b/plugins/pipeline-core/scripts/repair-map.test.mjs
+@@ -196,3 +196,78 @@ test("AC-8: the emitted map validates against its own schema's required/enum sha
+     assert.ok(rowSchema.properties.by.enum.includes(row.by), `row ${row.code} has an unrecognized by value`);
+   }
+ });
++
++// C30G-D3 (AC-108, fresh bounded attempt): a refusal after a plugin reload names the ONE recovery, spelled as the repair
++// script spells it. The proofs of the registry and the hook renderer live here because this is the test file of the
++// refusal-teaching surface that this dispatch may edit; the production code is in lib/session-authority-registry.mjs
++// and lib/hook-currentness.mjs.
++const D3_ROOT = "/work/<root>";
++const D3_HEAL_OR_RELEASE = /\bheal\b|\brelease-lock\b|\bmove-aside\b/u;
++
++test("C30G-D3 A: SDC-AUTHORITY-CAS windows-native-identity-drift names heal in the script's own spelling, with when it applies", async () => {
++  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
++  const { sessionAuthorityRepairCommand } = await import("./session-authority-repair.mjs");
++  assert.equal(typeof sessionAuthorityRefusalRepair, "function");
++  const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-CAS", "windows-native-identity-drift", D3_ROOT);
++  assert.equal(typeof text, "string");
++  assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "heal")), "heal is spelled as sessionAuthorityRepairCommand spells it");
++  assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "inspect")), "the read-only inspect is the fallback");
++  assert.match(text, /no Goldfish/u, "the precondition is stated");
++  assert.doesNotMatch(text, /release-lock|move-aside/u, "a repair this reason does not need is not named");
++});
++
++test("C30G-D3 A: a catalogue another plugin version wrote (SDC-AUTHORITY-UNAVAILABLE catalogue-source-closure, the reload case) names heal, which the repair script's own inspect also treats as healable", async () => {
++  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
++  const { sessionAuthorityRepairCommand } = await import("./session-authority-repair.mjs");
++  const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-UNAVAILABLE", "catalogue-source-closure", D3_ROOT);
++  assert.equal(typeof text, "string");
++  assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "heal")));
++  assert.match(text, /no Goldfish/u);
++  const repair = readFileSync(join(PLUGIN_ROOT, "scripts", "session-authority-repair.mjs"), "utf8");
++  assert.match(repair, /reason === "catalogue-source-closure" \|\| drifted/u, "inspect lists this reason among the ones heal clears");
++  assert.equal(sessionAuthorityRefusalRepair("SDC-AUTHORITY-UNAVAILABLE", "producer-record-bound", D3_ROOT), null, "another UNAVAILABLE reason keeps no repair");
++});
++
++test("C30G-D3 A: SDC-AUTHORITY-HELD names move-aside only for a registry left without its catalogue, and inspect (never heal or release) for every other reason", async () => {
++  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
++  const { sessionAuthorityRepairCommand } = await import("./session-authority-repair.mjs");
++  for (const reason of ["legacy-partial-registry", "legacy-retained-registry"]) {
++    const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-HELD", reason, D3_ROOT);
++    assert.ok(text.includes(`${sessionAuthorityRepairCommand(D3_ROOT, "move-aside")} --no-goldfish-running --reason "<why>"`), reason);
++    assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "inspect")), reason);
++    assert.doesNotMatch(text, /\bheal\b|release-lock/u, `${reason}: heal does not repair a registry without a catalogue`);
++  }
++  for (const reason of ["retired-terminal-entry-only", "domain-transition-foreign-or-lost-mutable-owner", "terminal-not-observed", "legacy-full-catalogue-missing"]) {
++    const text = sessionAuthorityRefusalRepair("SDC-AUTHORITY-HELD", reason, D3_ROOT);
++    assert.equal(typeof text, "string", reason);
++    assert.ok(text.includes(sessionAuthorityRepairCommand(D3_ROOT, "inspect")), reason);
++    assert.doesNotMatch(text.replace(sessionAuthorityRepairCommand(D3_ROOT, "inspect"), ""), D3_HEAL_OR_RELEASE, `${reason}: only inspect is named`);
++  }
++});
++
++test("C30G-D3 A: a reason this table does not know and every other code get no invented repair; an unknown root is a placeholder, never a guess", async () => {
++  const { sessionAuthorityRefusalRepair } = await import("../lib/session-authority-registry.mjs");
++  assert.equal(typeof sessionAuthorityRefusalRepair, "function");
++  assert.equal(sessionAuthorityRefusalRepair("SDC-AUTHORITY-CAS", "producer-source-binding", D3_ROOT), null, "an integrity fault is not healed away");
++  assert.equal(sessionAuthorityRefusalRepair("SDC-AUTHORITY-UNAVAILABLE", "invalid-digest", D3_ROOT), null);
++  assert.equal(sessionAuthorityRefusalRepair("SDC-LOCK-HELD", "registry-lock-held", D3_ROOT), null, "the lock refusal keeps its own, richer repair");
++  assert.match(sessionAuthorityRefusalRepair("SDC-AUTHORITY-CAS", "windows-native-identity-drift", undefined), /--root <repository root>/u);
++});
++
++test("C30G-D3 A: the registry's fail helper routes through the repair table and never overwrites a repair already set", () => {
++  const source = readFileSync(join(PLUGIN_ROOT, "lib", "session-authority-registry.mjs"), "utf8");
++  const failLine = source.split("\n").find((line) => line.startsWith("const fail="));
++  assert.ok(failLine, "the shared failure helper exists");
++  assert.match(failLine, /sessionAuthorityRefusalRepair\(code,reason,/u);
++  assert.match(failLine, /error\.code=code;error\.reason=reason;/u, "code and reason are unchanged: other code matches on them");
++});
++
++test("C30G-D3 A: HOOK-SNAPSHOT-STALE names the one refresh command in refresh-mandatory-hooks.mjs's own spelling and says what happens next", async () => {
++  const { renderSnapshotStaleCheck } = await import("../lib/hook-currentness.mjs");
++  const rendered = renderSnapshotStaleCheck({ sourcePluginLibDir: join(PLUGIN_ROOT, "lib"), installerName: "commit-msg-hook-install.mjs", rootDir: D3_ROOT });
++  const command = JSON.parse(rendered.match(/const SNAPSHOT_REFRESH_COMMAND = (".*");/u)[1]);
++  assert.equal(command, `node "${join(PLUGIN_ROOT, "scripts", "refresh-mandatory-hooks.mjs")}" --root "${D3_ROOT}"`);
++  const script = readFileSync(join(PLUGIN_ROOT, "scripts", "refresh-mandatory-hooks.mjs"), "utf8");
++  assert.ok(script.includes("usage: refresh-mandatory-hooks.mjs --root <repo>"), "the command is spelled as the script's usage prints it");
++  assert.match(rendered, /HOOK-SNAPSHOT-STALE: [^\n]*then repeat the refused command/u, "the refusal says what to do once the refresh ran");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/local-plugin-attestation.md b/plugins/pipeline-core/skills/pipeline-start/references/local-plugin-attestation.md
+index 821701418..1827042dd 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/local-plugin-attestation.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/local-plugin-attestation.md
+@@ -34,3 +34,35 @@ source per scope. Refresh with `install-agy.mjs --refresh` (plan printed first,
+ confirmation required, `--yes` only together with `--refresh`), then restart
+ and read the session lock. `agy plugin list` and `plugins.json` are not proof
+ of what is loaded.
++
++## After a plugin reload or update
++
++Happy path: the person installs or updates the plugin for the marketplace, the
++session is restarted (after a reload alone the host registry can still list
++the previous version), and the same preflight reports `status: "ready"`. When a
++step refuses instead, each refusal names its recovery; `<plugin-root>` is the
++plugin root the bootstrap printed and `<root>` the repository root:
++
++- `IPA-HOST-REGISTRY-BINDING-UNAVAILABLE` (`plugin-attestation-required`,
++  `nextAction: null`): `installedPluginAttestation.repair` prints the loaded
++  version and the versions the host registry lists (`none` when it lists none).
++  A person completes the host install or update so the registry lists the
++  loaded version, restarts the session and reruns the same preflight. Nothing
++  is guessed and nothing is attested by hand.
++- `HOOK-SNAPSHOT-STALE`: `node <plugin-root>/scripts/refresh-mandatory-hooks.mjs --root <root>`
++  rebinds every mandatory git hook to the loaded plugin; run it once, then
++  repeat the refused command. Never bypass the hook.
++- `SDC-AUTHORITY-CAS` with reason `windows-native-identity-drift` (a record
++  changed while it was read), or `SDC-AUTHORITY-UNAVAILABLE` with reason
++  `catalogue-source-closure` (a catalogue another plugin version wrote): once no
++  Goldfish or other authority operation runs,
++  `node <plugin-root>/scripts/session-authority-repair.mjs heal --root <root>`,
++  then repeat the refused command. For any other reason,
++  `... session-authority-repair.mjs inspect --root <root>` names the next command.
++- `SDC-AUTHORITY-HELD`: `... session-authority-repair.mjs inspect --root <root>`
++  names the exact next command or none; when the registry holds records but no
++  catalogue (`legacy-partial-registry`, `legacy-retained-registry`), once no
++  Goldfish runs: `... session-authority-repair.mjs move-aside --root <root> --no-goldfish-running --reason "<why>"`.
++- `SDC-LOCK-HELD`: wait with `... session-authority-repair.mjs wait --root <root> --timeout 120`; when the owner
++  cannot be confirmed alive and no Pipeline process runs for this repository,
++  `... session-authority-repair.mjs release-lock --root <root> --no-pipeline-running --reason "<why>"`.
