@@ -6202,6 +6202,8 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["./evidence-freshness-codes.mjs", ["plugins", "pipeline-core", "lib", "evidence-freshness-codes.mjs"]],
       // QG-04 restatement (C20 G20-25): the completeness gate and security-scan.mjs read the four close states from this module (no local imports of its own).
       ["./security-close-status.mjs", ["plugins", "pipeline-core", "lib", "security-close-status.mjs"]],
+      // QG-04 restatement (candidate 30f, G3B): the plan-gate scanner refusal names the install route through the toolchain registry, so the close-status module's import closure grew by it (no local imports of its own).
+      ["./toolchain-registry.mjs", ["plugins", "pipeline-core", "lib", "toolchain-registry.mjs"]],
       ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
       ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],
       ["./security-policy-resolver.mjs", ["plugins", "pipeline-core", "lib", "security-policy-resolver.mjs"]],
