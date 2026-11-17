@@ -523,6 +523,12 @@ export function isBootstrapReadCommand(value, {
   catch { return false; }
 }
 
+/** True when a native read names the pipeline-start skill of the plugin copy this hook belongs to (same file the shell spellings read). */
+export function isBootstrapSkillReadTarget(value, { pipelineStartSkill = PIPELINE_START_SKILL } = {}) {
+  if (typeof value !== "string" || value.trim() === "") return false;
+  try { return resolve(value) === resolve(pipelineStartSkill); } catch { return false; }
+}
+
 /** The one command the session bootstrap barrier admits, spelled so that
  * `isBootstrapReadCommand` accepts it: a `cat` of the quoted pipeline-start
  * SKILL path, with forward slashes on Windows. Returns null when no copy-safe
@@ -724,6 +730,13 @@ export async function runAntigravityPreToolGuard(rawInput) {
         // missing project file) instead of a fixed credential-root label that read as a credential block for every refused native read.
         const innerCode = /\bGUARD-[A-Z0-9]+(?:-[A-Z0-9]+)*\b/u.exec(refusal)?.[0];
         if (refusal !== null) deny(refusal, { code: innerCode ?? "native-read-refused", fields: { tool: normalized.toolName, kind: target.kind } });
+      }
+      // Candidate 30e (first Antigravity greenfield report): the session bootstrap barrier is consumed by the read of the pipeline-start
+      // skill. The shell spelling (`cat`, `sed -n`) always consumed it; the host's own native read of the same file did not, so a Critic
+      // or Goldfish that read the skill natively was denied on its first shell call. The same read, the same file, the same authority.
+      if (normalized.toolName === "Read" && readTargets.some((target) => isBootstrapSkillReadTarget(target.value))) {
+        const marker = join(readRoot, ".git", "agent-pipeline", "run", `session-${nativeHookSessionId(input, {})}`, "requires-bootstrap.pending");
+        try { rmSync(marker, { force: true }); } catch { /* an absent marker is the normal case */ }
       }
     }
     allow();

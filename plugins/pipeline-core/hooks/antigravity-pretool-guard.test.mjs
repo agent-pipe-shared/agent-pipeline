@@ -1760,6 +1760,28 @@ check("Antigravity pretool guard writes no handoff for another conversation, ano
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+// C30E-BAR1 (first Antigravity greenfield report): the host's native read of the pipeline-start skill consumes the bootstrap barrier like the
+// shell spellings do; a native read of any other file does not.
+check("Antigravity pretool guard: a native read of the pipeline-start skill consumes the session bootstrap barrier (C30E-BAR1)", () => {
+  const f = agyHandoffFixture();
+  try {
+    const marker = join(f.root, ".git", "agent-pipeline", "run", `session-${AGY_HANDOFF_CONVERSATION}`, "requires-bootstrap.pending");
+    const skill = fileURLToPath(new URL("../skills/pipeline-start/SKILL.md", import.meta.url));
+    const arm = () => { mkdirSync(join(marker, ".."), { recursive: true }); writeFileSync(marker, "pending\n"); };
+    const nativeRead = (path) => run({ ...f.host, toolCall: { name: "read_file", args: { Path: path } } }, f.root);
+    arm();
+    assert.equal(decision(run(f.hostEnvelope("node verify.mjs"), f.root)).decision, "deny", "the armed barrier refuses a shell call");
+    writeFileSync(join(f.root, "notes.txt"), "x\n");
+    assert.equal(decision(nativeRead(join(f.root, "notes.txt"))).decision, "allow");
+    assert.equal(existsSync(marker), true, "a native read of another file leaves the barrier armed");
+    assert.equal(decision(nativeRead(skill)).decision, "allow");
+    assert.equal(existsSync(marker), false, "a native read of the pipeline-start skill consumes the barrier");
+    arm();
+    nativeRead(`${skill}.other`);
+    assert.equal(existsSync(marker), true, "a different file next to the skill does not consume it");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 // AC-175D: a conversation that names another conversation's id in the export would be served that conversation's
 // unconsumed handoff by the CLI, so the hook refuses such an export before it runs.
 check("Antigravity pretool guard refuses an Antigravity export naming another conversation and leaves that conversation's handoff untouched (AC-175D)", () => {
