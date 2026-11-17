@@ -17,6 +17,7 @@ import { loadMapBundle, resolveModuleForPath } from "./module-inventory.mjs";
 import { compareRemedies, isMisleadingTinyModuleOptimization } from "./architecture-remedy.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { adoptionSnapshot } from "../lib/architecture-adoption-authority.mjs";
+import { isAuthorityCarryExtensionPath, isRecordOnlyPath } from "../lib/record-only-paths.mjs";
 import { resolveAdoptionState } from "./architecture-adoption.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -207,6 +208,9 @@ export function evaluateModuleIdentityOwnership({ rootDir, inventory, candidateP
 
   for (const p of candidatePaths) {
     if (p.startsWith("scratch/") || p.startsWith(".git/") || p.endsWith(".md")) continue;
+    // Candidate 30e (first Antigravity greenfield report, class 1 `finding` on Pipeline metadata): the Pipeline's own records (evidence, lifecycle
+    // and result files, the pipeline state files, audit bundles) are no module's source; they are never a governed-module path.
+    if (isRecordOnlyPath(p) || isAuthorityCarryExtensionPath(p)) continue;
     checked.push(p);
     const mod = resolveModuleForPath(p, inventory) ?? moduleDeclaringSurface(p, inventory);
     if (!mod) {

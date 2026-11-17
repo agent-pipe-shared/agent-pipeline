@@ -232,6 +232,18 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(invalid.violations[0].ruleId, "unresolved-module-path");
     });
 
+    it("Class 1: the Pipeline's own records are no governed-module path; a source path outside every module still is a finding (C30E)", () => {
+      const declared = [{ id: "app", ownedPaths: ["src/**"], verificationEntryPoints: [], publicContracts: [] }];
+      const records = ["audit-bundles/f/0123456789abcdef0123456789abcdef01234567/proofs/002-push.json", "specs/f/lifecycle.json", "specs/f/result.md",
+        "specs/f/evidence/verify-latest.json", ".claude/pipeline-state.json", "project/pipeline-state.json", "src/a.js"];
+      const records_only = evaluateModuleIdentityOwnership({ rootDir: REPO_ROOT, inventory: declared, candidatePaths: records });
+      assert.equal(records_only.outcome, OUTCOME_PASS, JSON.stringify(records_only.violations));
+      assert.deepEqual(records_only.evidence.candidatePaths, ["src/a.js"]);
+      const mixed = evaluateModuleIdentityOwnership({ rootDir: REPO_ROOT, inventory: declared, candidatePaths: [...records, "unregistered-root/mystery.js", "specs/f/plan.json"] });
+      assert.equal(mixed.outcome, OUTCOME_FINDING);
+      assert.deepEqual(mixed.violations.map((v) => v.target), ["unregistered-root/mystery.js", "specs/f/plan.json"]);
+    });
+
     it("Class 1: a module's own declared entry point or contract resolves to it outside its ownedPaths; several declarers do not (Glossover K-23)", () => {
       const declared = [
         { id: "assistant", ownedPaths: ["tests/unit/assistant/**"], verificationEntryPoints: ["tests/integration/assistant-routes.test.ts", "./tests/e2e-browser/assistant.spec.ts"], publicContracts: [] },
