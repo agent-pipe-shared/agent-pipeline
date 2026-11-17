@@ -71,8 +71,10 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
 let counter = 0;
 // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
 // mode: "chat" | "signature"; reopen: run reopen-design and approve a second time before implementation.
-// toolchainReport: the toolchain preflight's answer at the entry gate; criticalEntry: try set-phase once under a critical calibration first.
-function fixture({ mode = "chat", reopen = false, toolchainReport = null, criticalEntry = null } = {}) {
+// toolchainReport: the toolchain preflight's answer at the entry gate; criticalEntry: try set-phase once under a critical calibration first;
+// standardEntry: try set-phase once under the unset (standard) calibration with no deferral recorded; deferredTools: the tools the machine-local
+// deferral file names for the entry that finally succeeds.
+function fixture({ mode = "chat", reopen = false, toolchainReport = null, criticalEntry = null, standardEntry = null, deferredTools = [] } = {}) {
   const parent = join(WORK, `fx-${counter += 1}`);
   mkdirSync(parent, { recursive: true });
   const root = join(parent, "repo");
@@ -210,7 +212,9 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(round.request.approvalIntent.value.candidate), supersedes: null });
   const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
   assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
-  const entryDeps = toolchainReport === null ? undefined : { toolchainPreflight: () => toolchainReport };
+  // The machine-local deferral file is injected too, so no result depends on the machine the suite runs on.
+  const depsFor = (deferred) => (toolchainReport === null ? undefined : { toolchainPreflight: () => toolchainReport, readToolDeferral: (tool) => (deferred.includes(tool) ? { deferredAt: AT, answer: "later" } : null) });
+  const entryDeps = depsFor(deferredTools);
   let entered = false;
   if (criticalEntry !== null) {
     for (const twin of TWINS) writeJson(twin, { ...baseline, stakes: "critical" });
@@ -218,6 +222,11 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
     entered = result.status === 0;
     criticalEntry(result, derivePlanLifecycle(readCurrent()).status);
     for (const twin of TWINS) writeJson(twin, baseline);
+  }
+  if (standardEntry !== null) {
+    // The baseline calibration states no stakes: unset reads as standard.
+    const result = attempt(["set-phase", "--phase", "implementation"], depsFor([]));
+    standardEntry(result, derivePlanLifecycle(readCurrent()).status);
   }
   const entryLogs = entered ? [] : lifecycle(["set-phase", "--phase", "implementation"], entryDeps);
   assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
@@ -227,14 +236,29 @@ function fixture({ mode = "chat", reopen = false, toolchainReport = null, critic
   return { root, git, gitOk, env, write, read, observed, statePath: stateRelative, entryLogs };
 }
 
-test("candidate 22: the real set-phase names a missing scanner: a critical project is stopped with the install route, any other gets a notice and enters", () => {
+// Restated 2026-11-16 (C30F-G3B, QG-04, AC-108): the old case said a non-critical project "gets a notice and enters". The plan gate now refuses
+// a missing required scanner in every project that has not opted the security gate out (a standard or unset-stakes project too, the case's
+// fixture unchanged); a project enters with the notice once a machine-local deferral records it, or once it opted the gate out.
+test("C30F-G3B (was candidate 22): the real set-phase names a missing scanner: critical and standard projects are stopped with the install route, a recorded deferral or an opt-out enters with a notice", () => {
   const toolchainReport = { results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] };
   let refused = null;
-  const ctx = fixture({ toolchainReport, criticalEntry: (result, phase) => { refused = { ...result, phase }; } });
+  let standardRefused = null;
+  const ctx = fixture({ toolchainReport, deferredTools: ["gitleaks"], criticalEntry: (result, phase) => { refused = { ...result, phase }; }, standardEntry: (result, phase) => { standardRefused = { ...result, phase }; } });
   assert.equal(refused.status, 2, refused.logs.join("\n"));
-  assert.ok(refused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /security-scanner-exceptions\.json/u.test(line)), refused.logs.join("\n"));
+  assert.ok(refused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /security-scanner-exceptions\.json/u.test(line) && /calibrated critical/u.test(line)), `a deferral does not answer a critical project: ${refused.logs.join("\n")}`);
   assert.notEqual(refused.phase, "implementing", "nothing was written before the gate cleared");
+  assert.equal(standardRefused.status, 2, standardRefused.logs.join("\n"));
+  const standardText = standardRefused.logs.join("\n");
+  assert.ok(standardRefused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /docs\/toolchain\.md#gitleaks/u.test(line) && /toolchain-defer\.mjs --tool gitleaks --answer/u.test(line)), standardText);
+  assert.ok(!/calibrated critical/u.test(standardText), standardText);
+  assert.notEqual(standardRefused.phase, "implementing", "nothing was written before the gate cleared");
+  assert.ok(ctx.entryLogs.some((line) => /^Notice: gitleaks is not ready \(binary_missing\)/u.test(line)), `a recorded deferral enters and still gets its notice: ${ctx.entryLogs.join("\n")}`);
+});
+
+test("C30F-G3B: a project that opted the security gate out enters the real set-phase with a notice, a missing scanner does not stop it", () => {
+  const ctx = fixture({ toolchainReport: { securityGate: "off", results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] } });
   assert.ok(ctx.entryLogs.some((line) => /^Notice: gitleaks is not ready \(binary_missing\)/u.test(line)), ctx.entryLogs.join("\n"));
+  assert.ok(!ctx.entryLogs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line)), ctx.entryLogs.join("\n"));
 });
 
 test("candidate 22: a toolchain check that could not look never stops the real set-phase, even in a critical project", () => {

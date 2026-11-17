@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { toolchainDocPointer } from "./toolchain-registry.mjs";
 
 export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
 // C29e (ADR-0103): trivy is the fifth element; it reads "not applicable" for a candidate without infrastructure or container files.
@@ -378,22 +379,42 @@ export function securityGateNotConfiguredRefusal(root, where = "this check") {
 const SCANNER_PROVISION_STATES = new Set(["binary_missing", "incompatible_version", "incompatible_capability", "input_missing", "untrusted_path"]);
 
 /**
- * PO 2026-11-09: a scanner the close will need is reported before the signature and before implementation, so it is installed then and not found
- * missing at the close. `report` is a toolchain preflight result. A critical calibration gets one refusal per scanner, the same one the close
- * would give; any other calibration gets notices only. A valid named exception answers it here as it does at the close.
+ * PO 2026-11-09 / 2026-11-16: a scanner the close will need is reported before the signature and before implementation, so it is installed then
+ * and not found missing at the close. `report` is a toolchain preflight result. A critical calibration gets one refusal per scanner, the same one
+ * the close would give. Every other calibration (standard, or stakes unset) is refused for a missing scanner too (gitleaks, osv-scanner, semgrep and
+ * an applicable Trivy; a Trivy the preflight reports not_required is not here at all) unless the project opted the security gate out
+ * (`report.securityGate` is exactly "off"; an absent key reads blocking). A valid named exception answers it here as it does at the close; for a
+ * non-critical project so does a deferral the person recorded on this machine (`deferred(tool)`), which a critical calibration never honours.
+ * A scanner a record answers, an opted-out project and a license-check finding get a notice, not a refusal.
  * @returns {{refusals: {code: string, text: string}[], notices: string[]}}
  */
-export function scannerEntryReadiness(report, { critical = false, exceptions = null } = {}) {
+export function scannerEntryReadiness(report, { critical = false, exceptions = null, deferred = () => false } = {}) {
   const refusals = [];
   const notices = [];
+  const optedOut = report?.securityGate === "off";
   for (const entry of Array.isArray(report?.results) ? report.results : []) {
     if (!SECURITY_ELEMENTS.includes(entry?.tool) || !SCANNER_PROVISION_STATES.has(entry.status)) continue;
     if (critical && exceptions?.valid?.some((e) => e.scanner === entry.tool)) continue;
     const guidance = typeof entry.guidance === "string" && entry.guidance !== "" ? ` ${entry.guidance}` : "";
     if (critical) refusals.push({ code: SCANNER_NOT_EXECUTED_CODE, text: `${scannerNotExecutedRefusal(entry.tool, `toolchain check: ${entry.status}`, { rejected: exceptions?.rejected ?? [] })}${guidance}` });
-    else notices.push(`Notice: ${entry.tool} is not ready (${entry.status}); install it now if this project's security gate needs it at the close.${guidance}`);
+    else if (!optedOut && entry.tool !== "license-check" && !exceptions?.valid?.some((e) => e.scanner === entry.tool) && !deferred(entry.tool)) {
+      refusals.push({ code: SCANNER_NOT_EXECUTED_CODE, text: `${scannerMissingAtPlanGateRefusal(entry.tool, entry.status, { rejected: exceptions?.rejected ?? [] })}${guidance}` });
+    } else notices.push(`Notice: ${entry.tool} is not ready (${entry.status}); install it now if this project's security gate needs it at the close.${guidance}`);
   }
   return { refusals, notices };
+}
+
+/**
+ * The plan-gate refusal of a project that is not calibrated critical and has not opted the security gate out: a required scanner is missing. Same
+ * code as the critical one; names the install route, the one command that records a deferral on this machine and the committed exception route,
+ * and states that nothing was written (the refusal leaves no state behind).
+ */
+export function scannerMissingAtPlanGateRefusal(tool, status, { rejected = [] } = {}) {
+  const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";
+  return `${SCANNER_NOT_EXECUTED_CODE}: ${tool} is not ready (toolchain check: ${status}) and this project has not opted the security gate out, so the plan does not go on without it. Nothing was written. `
+    + `Install ${tool} (${toolchainDocPointer(tool) ?? `${tool} install routes: docs/toolchain.md`}; platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run this step again. `
+    + `If you install it later, record that on this machine, word for word as the person said it, with: node <plugin-root>/scripts/toolchain-defer.mjs --tool ${tool} --answer "<the person's answer>"; `
+    + `or record a named exception in ${SCANNER_EXCEPTIONS_PATH} (schema ${SCANNER_EXCEPTIONS_SCHEMA}) and commit it. The close still needs ${tool}.${ignored}`;
 }
 
 /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */

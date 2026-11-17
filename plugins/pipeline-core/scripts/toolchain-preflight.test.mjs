@@ -181,6 +181,22 @@ check("execution environment outranks missing, timeout, probe and compatibility 
     assert.match(gitleaks.guidance, /do not reinstall gitleaks/u);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
+// C30F-G3B (AC-108): the plan gate (lib/security-close-status.mjs scannerEntryReadiness) reads this report. Opted out is exactly securityGate "off";
+// an absent gate key, warn and blocking are not; Trivy without tracked infrastructure or container files stays not_required, so it never refuses.
+check("the report states the security gate the plan gate reads: off only when the manifest says off, an absent key reads blocking, Trivy without infrastructure files is not required", () => {
+  const repo = root();
+  try {
+    const base = { probeNodeFn: nodeReady, probeGitFn: gitReady, resolveExecutableFn: (name) => `/tools/${name}`, scannerProbes: { trivy: () => ({ ok: false, status: "binary_missing" }) }, trivyTriggerFilesFn: () => ({ container: [], terraform: [], kubernetes: [] }) };
+    const run = (manifestResult, extra = {}) => runToolchainPreflight({ rootDir: repo, manifestResult }, { ...base, ...extra });
+    assert.equal(run(manifest({ trivy: { enabled: true } }, "off")).securityGate, "off");
+    assert.equal(run(manifest({ trivy: { enabled: true } }, "warn")).securityGate, "warn");
+    assert.equal(run(manifest({ trivy: { enabled: true } })).securityGate, "blocking");
+    assert.equal(run({ status: "ok", manifest: { security: { scanners: { trivy: { enabled: true } } } } }).securityGate, "blocking", "an absent gates.security key counts as blocking, not as opted out");
+    assert.equal(run(manifest({ trivy: { enabled: true } })).results.find(({ tool }) => tool === "trivy").status, "not_required", "no infrastructure or container files: Trivy is not required");
+    const applicable = run(manifest({ trivy: { enabled: true } }), { trivyTriggerFilesFn: () => ({ container: ["Dockerfile"], terraform: [], kubernetes: [] }) });
+    assert.equal(applicable.results.find(({ tool }) => tool === "trivy").status, "binary_missing", "with a Dockerfile Trivy is required");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
 check("Git accepts only the documented status-zero EPERM false-positive, while ordinary probes retain EPERM failure", () => {
   const epermSuccess = () => ({ status: 0, error: Object.assign(new Error("sandbox false-positive"), { code: "EPERM" }), stdout: "git version 2.50.1\n", stderr: "" });
   assert.equal(runProbe("git", ["--version"], { cwd: "/tmp", tempDir: "/tmp", spawnFn: epermSuccess }).status, "execution_environment");

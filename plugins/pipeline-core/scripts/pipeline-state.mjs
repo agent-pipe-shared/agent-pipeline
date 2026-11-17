@@ -399,6 +399,7 @@ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft,
 import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
 import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerEntryReadiness } from "../lib/security-close-status.mjs";
 import { runToolchainPreflight } from "./toolchain-preflight.mjs";
+import { readToolDeferral } from "../lib/toolchain-deferrals.mjs";
 import { tmpdir as hostTmpdir } from "node:os";
 import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
 import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
@@ -4132,15 +4133,21 @@ function validProfileChangeBinding(binding) {
 
 /**
  * One entry-gate check, the same before the signature and at set-phase implementation (PO 2026-11-09): a scanner the close will need is named now,
- * so it is installed now. Only a critical calibration can be refused, and only for a tool a person can provide. If the check itself cannot run it
- * stays silent: a sandboxed session that cannot look must not be stopped by not looking.
+ * so it is installed now. Every project that has not opted the security gate out can be refused (PO 2026-11-16; unset stakes read as standard),
+ * only for a tool a person can provide; a committed exception or, outside a critical calibration, a deferral recorded on this machine answers it.
+ * The start itself is never blocked: only the two callers below run this. If the check itself cannot run it stays silent: a sandboxed session
+ * that cannot look must not be stopped by not looking.
  */
 function securityScannerEntryCheck(dir, deps) {
   let readiness;
   try {
     const critical = isCriticalStakes(readCalibrationStakes(dir));
     const report = (deps.toolchainPreflight ?? runToolchainPreflight)({ rootDir: dir, tempDir: hostTmpdir() });
-    readiness = scannerEntryReadiness(report, { critical, exceptions: critical ? readScannerExceptions(dir) : null });
+    readiness = scannerEntryReadiness(report, {
+      critical,
+      exceptions: readScannerExceptions(dir),
+      deferred: (tool) => (deps.readToolDeferral ?? readToolDeferral)(tool, deps.deferralDependencies ?? {}) !== null,
+    });
   } catch {
     return null;
   }

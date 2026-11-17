@@ -79,6 +79,13 @@ test("docs/toolchain.md is the registry's rendering, in the repository and in th
   }
 });
 
+// C30F-G3B (AC-108): the document states the plan-gate rule as it now is, not only critical.
+test("docs/toolchain.md says the plan gate refuses a missing scanner in every project that has not opted the security gate out", () => {
+  const text = renderToolchainDoc();
+  assert.match(text, /any project that has not opted the security gate out refuses a missing scanner at plan approval and at the close/u);
+  assert.doesNotMatch(text, /any other project gets a notice/u, "the old rule is gone from the document");
+});
+
 test("the version floors the preflight checks come from the registry", () => {
   assert.equal(meetsVersionFloor("node", [24, 0, 0]), true);
   assert.equal(meetsVersionFloor("node", [22, 9, 0]), false);

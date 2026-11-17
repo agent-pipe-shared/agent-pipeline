@@ -1337,6 +1337,35 @@ function assertPresentRetired(root, deps) {
   assert.equal(readFileSync(statePath(root), "utf8"), before, "a retired-route refusal must not mutate state");
 }
 
+// C30F-G3B (AC-108, PO 2026-11-16): the plan gate before the signature (present-plan) refuses a missing required scanner in a standard project
+// (no stakes stated) that has not opted the security gate out, names the repair, and writes nothing; a recorded deferral or exception answers it.
+{
+  const featureId = "c30f-g3b-plan-gate";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
+  const missing = { results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] };
+  const before = readFileSync(statePath(root), "utf8");
+  const present = (extra) => capturedStderr(() => run(["present-plan", "--by", "coordinator"], { ...deps, toolchainPreflight: () => missing, readToolDeferral: () => null, ...extra }));
+  const refused = present({});
+  const refusedText = refused.lines.join("\n");
+  assert.equal(refused.result, 2, refusedText);
+  assert.ok(refusedText.includes("SEC-CLOSE-SCANNER-NOT-EXECUTED") && refusedText.includes("gitleaks") && refusedText.includes("Install gitleaks."), `the plan gate names the missing scanner: ${refusedText}`);
+  assert.ok(refusedText.includes("docs/toolchain.md#gitleaks") && refusedText.includes("toolchain-defer.mjs --tool gitleaks --answer"), `and the install route and the deferral command: ${refusedText}`);
+  assert.ok(!refusedText.includes("calibrated critical"), `a standard project is not told it is calibrated critical: ${refusedText}`);
+  assert.equal(readFileSync(statePath(root), "utf8"), before, "the refusal writes nothing");
+  // A machine-local deferral passes the scanner point and still gets its notice (the other points of the gate may still be open here).
+  const deferred = present({ readToolDeferral: (tool) => (tool === "gitleaks" ? { deferredAt: "2026-11-16T10:00:00.000Z", answer: "later" } : null) });
+  const deferredText = deferred.lines.join("\n");
+  assert.ok(!deferredText.includes("SEC-CLOSE-SCANNER-NOT-EXECUTED"), `a recorded deferral passes the plan gate: ${deferredText}`);
+  assert.ok(deferredText.includes("Notice: gitleaks is not ready (binary_missing)"), `and gets its notice: ${deferredText}`);
+  // An opted-out project is not refused for the scanner either.
+  const optedOut = present({ toolchainPreflight: () => ({ ...missing, securityGate: "off" }) });
+  assert.ok(!optedOut.lines.join("\n").includes("SEC-CLOSE-SCANNER-NOT-EXECUTED"), optedOut.lines.join("\n"));
+  assert.ok(optedOut.lines.join("\n").includes("Notice: gitleaks is not ready (binary_missing)"), optedOut.lines.join("\n"));
+}
+
 // Claude greenfield 2026-11-08: a second reopen of a NEW submission records its own time, not the first reopen's.
 {
   const featureId = "reopen-own-time";

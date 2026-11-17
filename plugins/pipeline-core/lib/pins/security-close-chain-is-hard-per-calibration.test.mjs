@@ -597,11 +597,71 @@ test("C21 a missing scanner is named before the signature: critical refuses, oth
   }
   const excepted = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: true, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] } });
   assert.deepEqual(excepted.refusals, []);
+  // Restated 2026-11-16 (C30F-G3B, QG-04, AC-108): a standard project that has not opted the security gate out is refused here too; it
+  // gets only a notice once it has opted out (see the plan-gate cases below).
   const standard = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: false });
-  assert.deepEqual(standard.refusals, []);
-  assert.equal(standard.notices.length, 1);
-  assert.match(standard.notices[0], /gitleaks.*binary_missing/u);
+  assert.equal(standard.refusals.length, 1);
+  assert.deepEqual(standard.notices, []);
   assert.deepEqual(scannerEntryReadiness(null, { critical: true }), { refusals: [], notices: [] });
+});
+
+// C30F-G3B (PO 2026-11-16, AC-108): the plan gate refuses a missing required scanner for every project that has not opted the security gate out.
+test("C30F-G3B the plan gate refuses a missing scanner in a standard or unset-stakes project, with its own wording, unless a record or the opt-out answers it", async () => {
+  const { scannerEntryReadiness } = await import("../security-close-status.mjs");
+  const row = (tool, status) => ({ tool, status, guidance: `install ${tool}` });
+  const report = (rows, extra = {}) => ({ results: [{ tool: "node", status: "binary_missing" }, ...rows], ...extra });
+  const missing = report([row("gitleaks", "binary_missing")]);
+  // Standard (critical false covers stakes standard and unset: isCriticalStakes is false for both).
+  const refused = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [], rejected: [] }, deferred: () => false });
+  assert.deepEqual(refused.notices, []);
+  assert.equal(refused.refusals.length, 1);
+  assert.equal(refused.refusals[0].code, "SEC-CLOSE-SCANNER-NOT-EXECUTED");
+  const text = refused.refusals[0].text;
+  assert.match(text, /gitleaks/u);
+  assert.match(text, /install gitleaks/u, "the platform guidance of the report is in the refusal");
+  assert.match(text, /docs\/toolchain\.md#gitleaks/u, "the install route of the toolchain document");
+  assert.ok(text.includes('toolchain-defer.mjs --tool gitleaks --answer "'), `the exact deferral command with the tool filled: ${text}`);
+  assert.match(text, /nothing was written/iu);
+  assert.ok(!/calibrated critical/u.test(text), `a standard project is not told it is calibrated critical: ${text}`);
+  // The critical wording stays what it was.
+  const critical = scannerEntryReadiness(missing, { critical: true, exceptions: { valid: [], rejected: [] }, deferred: () => true });
+  assert.equal(critical.refusals.length, 1, "a machine-local deferral never answers a critical calibration");
+  assert.match(critical.refusals[0].text, /calibrated critical/u);
+  // A record answers it, and the scanner still gets its notice: the machine-local deferral ...
+  const deferred = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [], rejected: [] }, deferred: (tool) => tool === "gitleaks" });
+  assert.deepEqual(deferred.refusals, []);
+  assert.equal(deferred.notices.length, 1);
+  assert.match(deferred.notices[0], /gitleaks.*binary_missing/u);
+  // ... and the committed exception (of another scanner it admits nothing).
+  const excepted = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] }, deferred: () => false });
+  assert.deepEqual(excepted.refusals, []);
+  assert.equal(excepted.notices.length, 1);
+  const otherScanner = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [exception({ scanner: "semgrep" })], rejected: [] }, deferred: () => false });
+  assert.equal(otherScanner.refusals.length, 1);
+  // A rejected exception entry is named, as at the close.
+  const ignored = scannerEntryReadiness(missing, { critical: false, exceptions: { valid: [], rejected: [{ ref: "entry 0 (gitleaks)", why: "expired (2020-01-01)" }] }, deferred: () => false });
+  assert.match(ignored.refusals[0].text, /expired \(2020-01-01\)/u);
+  // Opted out (the report's securityGate is off): today's notice, no refusal. Absent, warn and blocking are not opted out.
+  const optedOut = scannerEntryReadiness({ ...missing, securityGate: "off" }, { critical: false, exceptions: { valid: [], rejected: [] }, deferred: () => false });
+  assert.deepEqual(optedOut.refusals, []);
+  assert.equal(optedOut.notices.length, 1);
+  assert.match(optedOut.notices[0], /^Notice: gitleaks is not ready \(binary_missing\)/u);
+  for (const gate of [undefined, "warn", "blocking"]) {
+    assert.equal(scannerEntryReadiness({ ...missing, securityGate: gate }, { critical: false }).refusals.length, 1, `securityGate ${gate} is not opted out`);
+  }
+  // The opt-out does not lift a critical calibration.
+  assert.equal(scannerEntryReadiness({ ...missing, securityGate: "off" }, { critical: true }).refusals.length, 1);
+  // A license-check finding stays a notice; a not-applicable Trivy (not_required) and a ready scanner say nothing; a check that could not look stops nothing.
+  const mixed = scannerEntryReadiness(report([row("license-check", "input_missing"), row("trivy", "not_required"), row("semgrep", "ready")]), { critical: false });
+  assert.deepEqual(mixed.refusals, []);
+  assert.equal(mixed.notices.length, 1);
+  assert.match(mixed.notices[0], /license-check/u);
+  for (const status of ["execution_environment", "probe_timeout", "probe_error"]) {
+    assert.deepEqual(scannerEntryReadiness(report([row("gitleaks", status)]), { critical: false }), { refusals: [], notices: [] }, `${status}: a check that could not look stops nothing`);
+  }
+  // An applicable Trivy that is missing is refused like the others.
+  assert.equal(scannerEntryReadiness(report([row("trivy", "binary_missing")]), { critical: false }).refusals.length, 1);
+  assert.deepEqual(scannerEntryReadiness(null, { critical: false }), { refusals: [], notices: [] });
 });
 
 test("C19 the close quality readback names an applied exception in its security evidence", async () => {

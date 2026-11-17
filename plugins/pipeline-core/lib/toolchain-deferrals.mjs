@@ -2,8 +2,9 @@
 /**
  * C28e (PO tile 2026-11-12): when a required tool is missing at onboarding, the person may say "later". That answer is recorded on THIS machine,
  * so the agent does not ask again in every session, and it stays visible: the readiness finding of the tool still reads `attended` and names the
- * deferral. A deferral is never a pass: it changes no finding to ok, and the plan and close checks (lib/security-close-status.mjs) never read it,
- * so a critical calibration still refuses a scanner that did not run.
+ * deferral. A deferral is never a pass: it changes no finding to ok, and the close never reads it. The plan gate (lib/security-close-status.mjs
+ * scannerEntryReadiness, run by pipeline-state.mjs) reads it for a project that is not calibrated critical: a scanner recorded here lets such a
+ * project go on with a notice (C30F-G3B); a critical calibration never honours it and still refuses a scanner that did not run.
  *
  * Stored in its own file next to the machine plane (`<home>/.agent-pipeline/toolchain-deferrals.json`), not in machine.json: that file has an
  * exact key set, and a new key would make it invalid for every plugin copy that does not know the key yet. The directory is derived from

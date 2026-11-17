@@ -501,8 +501,9 @@ const scannerProbe = (tool) => (context) => {
     return { status: "unknown", cause: `${tool} could not be observed at this execution boundary (${status})`, repair: attendedPrerequisite(`${tool}-observable`, `re-run the readiness report in your own terminal, outside any sandbox; do not reinstall ${tool} from this result.`) };
   }
   // C28e (PO tiles 2026-11-12): the repair names the tool's class in the one registry and its section of docs/toolchain.md, and a deferral the
-  // person recorded on this machine (lib/toolchain-deferrals.mjs). A deferral never makes the finding ok and never reaches the plan or close
-  // check (lib/security-close-status.mjs scannerEntryReadiness reads the preflight result, not this report).
+  // person recorded on this machine (lib/toolchain-deferrals.mjs). A deferral never makes the finding ok and never reaches the close; the plan
+  // gate (lib/security-close-status.mjs scannerEntryReadiness reads the preflight result, not this report) refuses a missing scanner in every
+  // project that has not opted the security gate out, and a deferral answers that refusal only outside a critical calibration.
   const deferral = (context.deps.readToolDeferral ?? readToolDeferral)(tool, context.deps.deferralDependencies ?? {});
   return {
     status: "attended",

@@ -8,7 +8,7 @@ Check the state of this machine with `node <plugin root>/scripts/toolchain-prefl
 
 ## Required on every machine
 
-The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.
+The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check at the close. At plan approval it answers the refusal only outside a project calibrated critical: any project that has not opted the security gate out refuses a missing scanner at plan approval and at the close, a project that has opted it out gets a notice, and a deferral recorded on this machine (or a committed named exception) lets a project that is not calibrated critical go on with a notice.
 
 ### node
 
