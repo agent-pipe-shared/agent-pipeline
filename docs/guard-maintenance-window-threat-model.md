@@ -167,7 +167,11 @@ below assumes it holds and is written to catch a change that would break it.
   dynamic `import()` edges, resolved via a declared table rather than the
   static scanner, plus two unrelated pre-existing gaps GMWKC01 found already
   open) added: `hooks/guard-dispatch-budget.mjs`,
-  followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh;
+  followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh and
+  `lib/dispatch-model-exception.mjs` (2026-11-17: the PO-recorded model exception
+  store, imported by `hooks/guard-dispatch.mjs` and `lib/dispatch-model-enforcement.mjs`,
+  so a window covering it would let one edit decide which model a dispatch is
+  admitted on);
   the original group continues with `lib/plan-authority-staging-guard.mjs`,
   `lib/security-completeness-gate.mjs`,
   `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,

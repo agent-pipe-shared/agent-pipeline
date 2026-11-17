@@ -319,6 +319,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // non-decomposable closure assertion, not by the dynamic-import fix.
   "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
   "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
+  // 2026-11-17: dispatch-model-exception.mjs holds the PO-recorded model exception store and the
+  // consumption rule; guard-dispatch.mjs and dispatch-model-enforcement.mjs import it, so it is
+  // kernel by construction: a window covering it would let one edit decide which model a
+  // dispatch is admitted on.
+  "plugins/pipeline-core/lib/dispatch-model-exception.mjs",
   "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
   "plugins/pipeline-core/lib/security-completeness-gate.mjs",
   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
