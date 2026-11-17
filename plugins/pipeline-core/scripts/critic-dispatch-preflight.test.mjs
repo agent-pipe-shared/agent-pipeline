@@ -563,7 +563,8 @@ function c30fG4Fixture({ supersedes = null, discarded = true, supersedesLate = f
   if (discarded) {
     writeFileSync(join(fx.root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", discardedFeatures: [{ id: "feature-a", planPath: "specs/feature-a/prd.md", phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null }] }));
   }
-  const request = (base) => input(fx, { base, candidate, specPath: `${dir}/spec.md`, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
+  // C30F-G4B: `successorOf` is the optional sixth key of the course context (the explicit predecessor input).
+  const request = (base, successorOf = null) => input(fx, { base, candidate, specPath: `${dir}/spec.md`, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null, ...(successorOf === null ? {} : { successorOf }) } });
   return { fx, featureId, pre, introduced, candidate, registrationCommit, request };
 }
 test("C30F-G4 (f) the preflight of the successor of a discarded feature reaches packet-ready over the whole inherited range, bound to the successor manifest", () => {
@@ -601,6 +602,51 @@ test("C30F-G4 (f3) a predecessor that the State does not record as discarded is 
     const refused = preflightCriticDispatch(s.request(s.pre));
     assert.notEqual(refused.status, "packet-ready", JSON.stringify(refused));
     assert.equal(refused.code, "CCA-ALIAS-MAPPING-UNAVAILABLE", JSON.stringify(refused));
+  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
+});
+// C30F-G4B: an already registered successor holds supersedes:null (no writer sets it); the operator names the discarded predecessor with --successor-of.
+test("C30F-G4B (f4) the preflight of a registered successor with supersedes:null reaches packet-ready over the inherited range when the predecessor is named, and only then", () => {
+  const s = c30fG4Fixture();
+  try {
+    const refused = preflightCriticDispatch(s.request(s.pre));
+    assert.equal(refused.code, "CCA-MANIFEST-READ", JSON.stringify(refused));
+    const result = preflightCriticDispatch(s.request(s.pre, "feature-a"));
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
+    assert.equal(result.base.commit, s.pre, "the reviewed range starts before the inherited implementation");
+    assert.ok(git(s.fx.root, ["diff", "--name-only", result.base.commit, result.candidate.commit]).split("\n").includes("src/inherited.mjs"));
+    assert.equal(result.coordinatorOnly.courseAdmission.round, 1);
+  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
+});
+test("C30F-G4B (f5) a predecessor the State does not record as discarded, or one that contradicts the manifest, is refused with the typed repair", () => {
+  const s = c30fG4Fixture({ discarded: false });
+  try {
+    const refused = preflightCriticDispatch(s.request(s.pre, "feature-a"));
+    assert.equal(refused.code, "CCA-SUCCESSOR-OF", JSON.stringify(refused));
+    assert.notEqual(refused.status, "packet-ready");
+    assert.equal(refused.repair, criticCourseRepair("CCA-SUCCESSOR-OF"));
+  } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
+  const declared = c30fG4Fixture({ supersedes: "feature-a" });
+  try {
+    assert.equal(preflightCriticDispatch(declared.request(declared.pre, "feature-b")).code, "CCA-SUCCESSOR-OF");
+    assert.equal(preflightCriticDispatch(declared.request(declared.pre, "feature-a")).status, "packet-ready");
+  } finally { rmSync(declared.fx.root, { recursive: true, force: true }); }
+});
+test("C30F-G4B (f6) the course context takes successorOf only as a safe feature id, and --successor-of is a course selector read once", () => {
+  const s = c30fG4Fixture();
+  try {
+    for (const bad of ["Not A Feature", "", 7, "../x"]) {
+      assert.throws(() => preflightCriticDispatch(s.request(s.pre, bad)), (error) => error.code === "CDP-COURSE-CONTEXT", String(bad));
+    }
+    const base = ["--root", s.fx.root, "--base", s.pre, "--candidate", s.candidate, "--spec", "specs/feature-a-successor/spec.md", "--registration-commit", s.registrationCommit];
+    assert.equal(parseCriticDispatchPreflightArgs([...base, "--successor-of", "feature-a"]).courseContext.successorOf, "feature-a");
+    assert.equal(Object.hasOwn(parseCriticDispatchPreflightArgs(base).courseContext, "successorOf"), false, "absent without the flag: the context keeps its five keys");
+    assert.throws(() => parseCriticDispatchPreflightArgs([...base, "--successor-of", "feature-a", "--successor-of", "feature-a"]), (error) => error.code === "CDP-ARGUMENT");
+    assert.throws(() => parseCriticDispatchPreflightArgs([...base, "--successor-of", "Not A Feature"]), (error) => error.code === "CDP-ARGUMENT");
+    assert.throws(() => parseCriticDispatchPreflightArgs([...base, "--successor-of"]), (error) => error.code === "CDP-ARGUMENT");
+    // The registration commit is derived by the same admission, which must know the predecessor: without the flag nothing qualifies for a successor holding supersedes:null.
+    const derived = ["--root", s.fx.root, "--base", s.pre, "--candidate", s.candidate, "--spec", "specs/feature-a-successor/spec.md"];
+    assert.equal(parseCriticDispatchPreflightArgs([...derived, "--successor-of", "feature-a"]).courseContext.registrationCommit, s.registrationCommit);
+    assert.equal(parseCriticDispatchPreflightArgs(derived).courseContext, undefined);
   } finally { rmSync(s.fx.root, { recursive: true, force: true }); }
 });
 

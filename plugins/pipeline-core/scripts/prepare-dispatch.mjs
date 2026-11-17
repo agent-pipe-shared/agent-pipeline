@@ -28,7 +28,7 @@ const ADMIT_REQUEST_FILE = "scratch/session-critic-finalization-request.json";
 export const PREPARE_DISPATCH_HELP = `Usage:
   node <plugin-root>/scripts/prepare-dispatch.mjs goldfish --root <root> --package <package.json> [--out scratch/<briefing>.md] [--no-goldfish-running]
   node <plugin-root>/scripts/prepare-dispatch.mjs critic --root <root> --spec <path> --base <ref> --candidate <full commit id> [--guardrail <path>]... [--evidence <path>]...
-       [--task-id <id>] [--prior-critic <path>] [--delta-request <path>] [--correction-input-bindings <file>] [--registration-commit <full commit id>] [--label <name> -- <check command> <args>]
+       [--task-id <id>] [--prior-critic <path>] [--delta-request <path>] [--correction-input-bindings <file>] [--registration-commit <full commit id>] [--successor-of <feature-id>] [--label <name> -- <check command> <args>]
   node <plugin-root>/scripts/prepare-dispatch.mjs critic-fill --root <root> --briefing <path> --fill NAME=value [--fill NAME=value]...
   node <plugin-root>/scripts/prepare-dispatch.mjs --help | -h
 
@@ -44,6 +44,7 @@ critic: with --label, runs the check command as Critic diagnostic evidence under
   It then runs the preflight and writes ${ADMIT_REQUEST_FILE}; "next.placeholders" names the values only you can fill before "next.admitCommand".
   A request you had already filled is kept and named in "previousRequest": if that Critic still runs, finalize it with that file. A --label that recorded another candidate is refused.
   --candidate must be the full commit id, because the evidence commit moves HEAD. The preflight derives the registration commit itself; pass --registration-commit only when it reports several candidates.
+  --successor-of <feature-id> names the DISCARDED predecessor of a feature whose registered manifest does not declare it (supersedes is null): the first full review may then start from the commit before the inherited implementation, a strict ancestor of the commit that first added the feature manifest. The predecessor must be recorded as discarded in the State and, when the manifest declares supersedes, must equal it. It is needed for the first round only; a later round recovers the predecessor from the retained course.
 critic-fill: the Claude route to hand a Critic its briefing as a verified pointer instead of retyping the ~12k-token file. --briefing is a draft the critic verb wrote
   (scratch/critic-briefing/<folder>/critic[-<part>].briefing.md); every <FILL ...> slot needs one --fill NAME=value: MODEL_ID takes the concrete model id (one token, never
   inherit) and EFFORT one of low, medium, high, xhigh, max. A value for no slot, an open slot, a value outside that vocabulary and a draft with a Codex or Antigravity slot are
@@ -138,7 +139,7 @@ function setAsideFilledRequest(target, deps) {
 
 export function prepareCriticDispatch(input, deps = {}) {
   const verb = "critic";
-  const { root, spec, base, candidate, guardrails = [], evidence = [], taskId = null, priorCritic = null, deltaRequest = null, correctionInputBindings = null, registrationCommit = null, label = null, command = [] } = input;
+  const { root, spec, base, candidate, guardrails = [], evidence = [], taskId = null, priorCritic = null, deltaRequest = null, correctionInputBindings = null, registrationCommit = null, successorOf = null, label = null, command = [] } = input;
   for (const [flag, value] of [["--spec", spec], ["--base", base], ["--candidate", candidate]]) {
     if (typeof value !== "string" || value === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: `${flag} is required`, repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
   }
@@ -170,7 +171,7 @@ export function prepareCriticDispatch(input, deps = {}) {
   }
   const preflight = step("critic-dispatch-preflight.mjs", ["--root", root, "--base", base, "--candidate", candidate, "--spec", spec,
     ...guardrails.flatMap((path) => ["--guardrail", path]), ...evidencePaths.flatMap((path) => ["--evidence", path]),
-    ...(registrationCommit === null ? [] : ["--registration-commit", registrationCommit]), ...(taskId === null ? [] : ["--task-id", taskId]),
+    ...(registrationCommit === null ? [] : ["--registration-commit", registrationCommit]), ...(successorOf === null ? [] : ["--successor-of", successorOf]), ...(taskId === null ? [] : ["--task-id", taskId]),
     ...(priorCritic === null ? [] : ["--prior-critic", priorCritic]), ...(deltaRequest === null ? [] : ["--delta-request", deltaRequest]),
     ...(correctionInputBindings === null ? [] : ["--correction-input-bindings", correctionInputBindings])]);
   if (preflight.value?.status !== "packet-ready") return stopped(verb, "preflight", asReason(preflight), "PREP-PREFLIGHT-FAILED");
@@ -281,13 +282,13 @@ function criticArgv(input) {
   return ["critic", "--root", input.root, "--spec", input.spec, "--base", input.base, "--candidate", input.candidate,
     ...(input.guardrails ?? []).flatMap((path) => ["--guardrail", path]), ...(input.evidence ?? []).flatMap((path) => ["--evidence", path]),
     ...pair("--task-id", input.taskId), ...pair("--prior-critic", input.priorCritic), ...pair("--delta-request", input.deltaRequest),
-    ...pair("--correction-input-bindings", input.correctionInputBindings), ...pair("--registration-commit", input.registrationCommit), ...pair("--label", input.label),
+    ...pair("--correction-input-bindings", input.correctionInputBindings), ...pair("--registration-commit", input.registrationCommit), ...pair("--successor-of", input.successorOf), ...pair("--label", input.label),
     ...((input.command ?? []).length === 0 ? [] : ["--", ...input.command])];
 }
 
 const SINGLE_FLAGS = { goldfish: { "--root": "root", "--package": "packagePath", "--out": "out" },
   "critic-fill": { "--root": "root", "--briefing": "briefing" },
-  critic: { "--root": "root", "--spec": "spec", "--base": "base", "--candidate": "candidate", "--task-id": "taskId", "--prior-critic": "priorCritic", "--delta-request": "deltaRequest", "--correction-input-bindings": "correctionInputBindings", "--registration-commit": "registrationCommit", "--label": "label" } };
+  critic: { "--root": "root", "--spec": "spec", "--base": "base", "--candidate": "candidate", "--task-id": "taskId", "--prior-critic": "priorCritic", "--delta-request": "deltaRequest", "--correction-input-bindings": "correctionInputBindings", "--registration-commit": "registrationCommit", "--successor-of": "successorOf", "--label": "label" } };
 
 export function parsePrepareDispatchArgv(argv) {
   const verb = argv[0];

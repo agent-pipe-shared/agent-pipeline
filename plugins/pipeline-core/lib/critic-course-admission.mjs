@@ -77,6 +77,7 @@ Object.assign(REPAIRS_EXTRA, {
   "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it WITHOUT committing first (--add-diagnostic-evidence), commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun critic-dispatch-preflight.mjs with --registration-commit naming it.",
   "CCA-DETERMINISTIC-SELECTION": "The delta request names a different set of diagnostic evidence than the one registered. Regenerate the delta request from the currently registered diagnostic evidence paths, then rerun critic-dispatch-preflight.mjs.",
   "CCA-DELTA-REQUIRED": "A retained review exists, so the next review must be a delta. Prepare and register a delta request for the candidate, then rerun critic-dispatch-preflight.mjs with its path.",
+  "CCA-SUCCESSOR-OF": "The predecessor named with --successor-of must be a feature the State records as discarded (record it with discard-feature before the review) and, when the feature manifest declares supersedes, must be the same feature. Rerun critic-dispatch-preflight.mjs (or prepare-dispatch.mjs critic) with --successor-of <the discarded predecessor feature id>, or without the flag to review the feature as an ordinary course. The flag only names the predecessor: the review base must still be a strict ancestor of the commit that first added the feature manifest.",
   "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is requested as a delta. A delta request that moves a trust boundary or is impact-ambiguous is admitted by the admission itself as an effective full round of the same course (RE-DELTA-FALLBACK-FULL): register it with register-feature-package.mjs --add-delta-request and pass --delta-request, never a full request. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
 });
 const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
@@ -821,9 +822,11 @@ function acceptedRead(root,featureId,reference){
  if(!value.ok){if(value.code?.includes('UNAVAILABLE'))unavailable(value.code);fail(value.code??'CCA-ACCEPTANCE');}
  if(value.featureId!==featureId || value.envelopeSha256!==reference.sha256)fail('CCA-ACCEPTANCE-BINDING');return value;
 }
-function aliasRead(root,commit,featureId){
+function aliasRead(root,commit,featureId,successorOf=null){
  const current=manifestAt(root,commit,`specs/${featureId}/lifecycle.json`);
  const isAlias=current.value.supersedes!==null&&current.value.supersedes!==undefined;
+ // C30F-G4B: an explicit predecessor input never replaces what the manifest declares: the two must name the same feature.
+ if(successorOf!==null&&isAlias&&current.value.supersedes!==successorOf)fail('CCA-SUCCESSOR-OF');
  const original=isAlias?current.value.supersedes:featureId;if(!FEATURE_ID.test(original)||(isAlias&&original===featureId))fail('CCA-ALIAS-RELATION');
  const candidates=[];
  for(const e of current.value.artifacts.filter(e=>goodEvidence(e))){
@@ -842,37 +845,60 @@ function aliasRead(root,commit,featureId){
   candidates.push({registration:r.registration,descriptor});
  }
  // C30F-G4: `supersedes` without any registered alias descriptor, naming a feature the State records as discarded, is the successor of a discarded feature, not a rename or split.
+ // C30F-G4B: the explicit input names the predecessor of a registered successor whose manifest holds supersedes:null (no writer sets it). It must name a feature the State
+ // records as discarded and cannot turn a rename or split (a registered alias descriptor) into a successor.
+ if(successorOf!==null){if(successorOf===featureId||candidates.length>0||!recordedDiscarded(root,successorOf))fail('CCA-SUCCESSOR-OF');return {original:featureId,aliases:[],successorOf,explicit:true};}
  if(isAlias&&candidates.length===0&&recordedDiscarded(root,original))return {original:featureId,aliases:[],successorOf:original};
  if((isAlias&&candidates.length!==1)||new Set(candidates.map(row=>row.descriptor.aliasFeatureId)).size!==candidates.length)unavailable('CCA-ALIAS-MAPPING-UNAVAILABLE');return {original,aliases:candidates};
 }
 // The State's own record of a discarded feature, read through the project authority resolver (neutral tier first, legacy compatibility), never from a path of this module's choosing.
-function recordedDiscarded(root,featureId){
+function discardedFeatureIds(root){
  try{
-  const paths=resolveProjectAuthorityPaths({rootDir:root});if(paths.status!=='ready'||typeof paths.state!=='string')return false;
-  const raw=projectAuthorityBytes(root,paths.state);if(raw===null)return false;
+  const paths=resolveProjectAuthorityPaths({rootDir:root});if(paths.status!=='ready'||typeof paths.state!=='string')return [];
+  const raw=projectAuthorityBytes(root,paths.state);if(raw===null)return [];
   const state=JSON.parse(raw.toString('utf8'));
-  return Array.isArray(state?.discardedFeatures)&&state.discardedFeatures.some(e=>object(e)&&e.id===featureId&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0);
- }catch{return false;}}
+  return Array.isArray(state?.discardedFeatures)?[...new Set(state.discardedFeatures.filter(e=>object(e)&&typeof e.id==='string'&&FEATURE_ID.test(e.id)&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0).map(e=>e.id))]:[];
+ }catch{return [];}}
+function recordedDiscarded(root,featureId){return discardedFeatureIds(root).includes(featureId);}
 /** True when the feature manifest at the commit declares a predecessor feature (read-only; only decides which repair sentence a CCA-MANIFEST-READ refusal prints). */
 export function criticCourseDeclaresPredecessor({repoRoot,featureId,commit}){
  try{if(!FEATURE_ID.test(featureId??'')||!OID.test(commit??''))return false;const m=manifestAt(realpathSync(repoRoot),commit,`specs/${featureId}/lifecycle.json`).value;return typeof m.supersedes==='string'&&FEATURE_ID.test(m.supersedes);}catch{return false;}}
 // C30F-G4: the sanctioned first review of the successor of a discarded feature starts BEFORE the manifest exists. The base must be a strict ancestor of the commit that
 // first added the manifest (the last `--diff-filter=A` commit) and that commit an ancestor of the candidate, so base..candidate is the whole inherited range. Every unmet
 // condition keeps the plain refusal CCA-MANIFEST-READ.
-function successorGenesis(root,predecessor,base,candidate,manifestPath){
+function successorGenesis(root,predecessor,base,candidate,manifestPath,explicit=false){
  const added=gitBytes(root,['log','--diff-filter=A','--format=%H',candidate,'--',manifestPath],'CCA-MANIFEST-READ').toString('utf8').trim().split('\n').filter(Boolean);
  const introducingCommit=added.at(-1);
  if(!introducingCommit||added.length>512||!OID.test(introducingCommit)||introducingCommit===base)fail('CCA-MANIFEST-READ');
  gitBytes(root,['merge-base','--is-ancestor',base,introducingCommit],'CCA-MANIFEST-READ');
  gitBytes(root,['merge-base','--is-ancestor',introducingCommit,candidate],'CCA-MANIFEST-READ');
- if(manifestAt(root,candidate,manifestPath).value.supersedes!==predecessor)fail('CCA-MANIFEST-READ');
+ // The candidate's manifest declares the same predecessor; with the explicit input (C30F-G4B) it may declare none (supersedes:null), never another one.
+ const declared=manifestAt(root,candidate,manifestPath).value.supersedes;
+ if(declared!==predecessor&&!(explicit&&(declared===null||declared===undefined)))fail('CCA-MANIFEST-READ');
  return {predecessorFeatureId:predecessor,introducingCommit,manifestSha256:manifestAt(root,introducingCommit,manifestPath).sha256};
 }
+// C30F-G4B: a later round carries neither the input nor a manifest relation, and the retained record stores only the course KEY. Recompute the key for each feature the State
+// records as discarded (a small finite set) and accept exactly the one that reproduces the retained key; more than one is refused, none leaves the ordinary derivation (whose
+// key check then refuses a mismatch as CCA-GENESIS-BINDING).
+function recoverSuccessor(root,base,candidate,manifestPath,binding,keySubject){
+ const matches=[];
+ for(const id of discardedFeatureIds(root)){
+  let found;try{found=successorGenesis(root,id,base,candidate,manifestPath,true);}catch{continue;}
+  if(found.manifestSha256!==binding.originalManifestSha256)continue;
+  if(sha256Canonical({...keySubject,originalManifestSha256:found.manifestSha256,successor:{predecessorFeatureId:id,introducingCommit:found.introducingCommit}})===binding.courseKey)matches.push(found);
+ }
+ if(matches.length>1)fail('CCA-GENESIS-BINDING');
+ return matches[0]??null;
+}
+// C30F-G4B: `successorOf` (the predecessor feature id) is an OPTIONAL key of the course request: absent for every ordinary course, a safe feature id when present.
+const withSuccessorOf=(keys,input)=>object(input)&&Object.hasOwn(input,'successorOf')?[...keys,'successorOf']:keys;
+const successorOfShape=(input)=>!Object.hasOwn(input,'successorOf')||(typeof input.successorOf==='string'&&FEATURE_ID.test(input.successorOf));
 function manifestReadable(root,commit,path){try{manifestAt(root,commit,path);return true;}catch(error){if(error?.code==='CCA-MANIFEST-READ')return false;throw error;}}
+
 function repository(root){const repo=discoverRepository(root);return {repoRoot:realpathSync(root),gitCommonDir:repo.commonDir,controlRoot:join(repo.commonDir,'agent-pipeline','critic-packets'),repositoryFingerprint:derivePoGateRepositoryFingerprint({gitCommonDir:repo.commonDir,primaryRoot:repo.primaryRoot})};}
 export function resolveRegisteredCriticCourseIdentity(input){try{
- if(!exact(input,['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'])||!FEATURE_ID.test(input.featureId??'')||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??'')))fail('CCA-IDENTITY-SHAPE');
- const repo=repository(input.repoRoot),root=repo.repoRoot,alias=aliasRead(root,input.registrationCommit,input.featureId);
+ if(!exact(input,withSuccessorOf(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'],input))||!FEATURE_ID.test(input.featureId??'')||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??''))||!successorOfShape(input))fail('CCA-IDENTITY-SHAPE');
+ const repo=repository(input.repoRoot),root=repo.repoRoot,alias=aliasRead(root,input.registrationCommit,input.featureId,input.successorOf??null);
  const retained=retainedV2(root,alias.original,input.registrationCommit),combined=new Map(retained.rows.map(row=>[row.record.reviewId,row]));
  for(const aliasRow of alias.aliases){for(const row of retainedV2(root,aliasRow.descriptor.aliasFeatureId,input.registrationCommit).rows){const prior=combined.get(row.record.reviewId);if(prior && !equal(prior.record,row.record))fail('CCA-ALIAS-HISTORY-CONFLICT');if(!prior)combined.set(row.record.reviewId,row);}}
  const history=[];let previous=null;while(combined.size){const next=[...combined.values()].filter(row=>row.record.parentReviewId===previous);if(next.length!==1)fail('CCA-ALIAS-HISTORY-FORK');history.push(next[0]);combined.delete(next[0].record.reviewId);previous=next[0].record.reviewId;}
@@ -883,7 +909,9 @@ export function resolveRegisteredCriticCourseIdentity(input){try{
  const manifestPath=`specs/${alias.original}/lifecycle.json`;
  // C30F-G4: a successor of a discarded feature whose genesis base predates its manifest takes the manifest as first added in the place of the missing manifest at the base,
  // and binds that introducing commit and the predecessor into the course key, on every round (the binding of a later round is checked against this recomputation).
- const successor=alias.successorOf&&!manifestReadable(root,genesisCandidate.base,manifestPath)?successorGenesis(root,alias.successorOf,genesisCandidate.base,input.candidateCommit,manifestPath):null;
+ // Probed only when a predecessor is supplied or a course is retained: every other course reads the base manifest exactly as before.
+ const successor=!(alias.successorOf||binding)||manifestReadable(root,genesisCandidate.base,manifestPath)?null:alias.successorOf?successorGenesis(root,alias.successorOf,genesisCandidate.base,input.candidateCommit,manifestPath,alias.explicit===true)
+  :binding?recoverSuccessor(root,genesisCandidate.base,input.candidateCommit,manifestPath,binding,{repositoryFingerprint:repo.repositoryFingerprint,originalFeatureId:alias.original,manifestPath,genesisCandidate}):null;
  if(successor&&binding&&binding.originalManifestSha256!==successor.manifestSha256)fail('CCA-GENESIS-BINDING');
  const originalManifestSha256=binding?.originalManifestSha256??successor?.manifestSha256??manifestAt(root,genesisCandidate.base,manifestPath).sha256;
  const successorSubject=successor?{successor:{predecessorFeatureId:successor.predecessorFeatureId,introducingCommit:successor.introducingCommit}}:{};
@@ -1005,8 +1033,8 @@ function featureReviewUnit(input,resolved){
  return {...observed.reference,specPath:observed.declaration.specPath};
 }
 function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
- if(!exact(input,V2_REQUEST_KEYS)||!MODES.has(input.requestedMode)||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??'')))fail('CCA-RUNTIME-SHAPE');
- const resolvedResult=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'].map(k=>[k,input[k]])));if(!resolvedResult.ok){if(resolvedResult.status==='unavailable')unavailable(resolvedResult.code);fail(resolvedResult.code);}const resolved=resolvedResult.value,history=consumedHistory(resolved),source=runtimeSource(input,resolved);
+ if(!exact(input,withSuccessorOf(V2_REQUEST_KEYS,input))||!MODES.has(input.requestedMode)||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??''))||!successorOfShape(input))fail('CCA-RUNTIME-SHAPE');
+ const resolvedResult=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference',...(Object.hasOwn(input,'successorOf')?['successorOf']:[])].map(k=>[k,input[k]])));if(!resolvedResult.ok){if(resolvedResult.status==='unavailable')unavailable(resolvedResult.code);fail(resolvedResult.code);}const resolved=resolvedResult.value,history=consumedHistory(resolved),source=runtimeSource(input,resolved);
  const last=history.at(-1),pass=last?.consumed.receipt.reviewPass===true&&last.record.coverage.complete&&last.record.findings.every(f=>f.status!=='open');
  // D199 (Glossover CCA-PARENT): real commits after a consumed PASS continue the course as a diff round whose parent is the passed
  // record; the base must be that record's candidate. Without such commits (same candidate, evidence-only range) the PASS still ends the course.
@@ -1041,7 +1069,7 @@ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(inpu
 // registered by evidence-only commits that follow it (transport() requires exactly that), so the commits after the candidate on the way to
 // HEAD are the only possible registration commits; one qualifies when this module's own admission, asked with that commit as the
 // registration commit, ADMITS the request. Exactly one -> derived; none or more than one -> never guessed, never the latest.
-export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCommit,candidateCommit,deltaRequestPath=null,limit=32}){
+export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCommit,candidateCommit,deltaRequestPath=null,limit=32,successorOf=null}){
  const none={status:'none',commits:[]};
  try{
   if(!FEATURE_ID.test(featureId??'')||![baseCommit,candidateCommit].every(v=>OID.test(v??'')))return none;
@@ -1050,7 +1078,7 @@ export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCom
   if(chain.length===0||chain.length>limit)return none;
   const admitted=[];
   for(const registrationCommit of chain){
-   const admission=readCriticCourseAdmission({repoRoot:root,featureId,baseCommit,candidateCommit,registrationCommit,requestedMode:deltaRequestPath===null?'full':'delta',acceptedReference:null,criterionLocator:null,deltaRequestPath});
+   const admission=readCriticCourseAdmission({repoRoot:root,featureId,baseCommit,candidateCommit,registrationCommit,requestedMode:deltaRequestPath===null?'full':'delta',acceptedReference:null,criterionLocator:null,deltaRequestPath,...(successorOf===null?{}:{successorOf})});
    if(admission?.decision?.status==='admitted')admitted.push(registrationCommit);
   }
   return admitted.length===1?{status:'derived',commit:admitted[0],commits:admitted}:{status:admitted.length===0?'none':'ambiguous',commits:admitted};

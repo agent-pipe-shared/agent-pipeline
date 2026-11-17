@@ -18,7 +18,7 @@ import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
 import {releaseCriticPacket} from "./critic-packet-release.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038", "CGB039", "CGB040"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038", "CGB039", "CGB040", "CGB041"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -176,7 +176,8 @@ function commit(root, message) {
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
   return git(root, ["rev-parse", "HEAD"]);
 }
-function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", unitOverride = {}, feature = false } = {}) {
+// C30F-G4B: featureLate writes the whole feature package (manifest, Spec, review unit) in a commit AFTER the base, like the successor of a discarded feature whose review starts before its manifest exists.
+function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", unitOverride = {}, feature = false, featureLate = false, featureSupersedes = null } = {}) {
   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
   git(root, ["init", "-q", "-b", "main"]);
   mkdirSync(join(root, ".claude"));
@@ -185,7 +186,7 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
   writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify(unit(unitOverride)));
-  if(feature){
+  const writeFeature=()=>{
     const directory=join(root,"specs/course-feature");
     mkdirSync(join(directory,"design"),{recursive:true}); mkdirSync(join(directory,"evidence"));
     writeFileSync(join(directory,"spec.md"),"# Feature spec\nAC-1 AC-2\n");
@@ -193,12 +194,14 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
     writeFileSync(join(directory,"design/critic-review-unit.json"),reviewUnit);
     const artifacts=[{class:"spec",path:"specs/course-feature/spec.md",authority:true},
       {class:"design",path:"specs/course-feature/design/critic-review-unit.json",sha256:sha256(reviewUnit),authority:false,mutability:"immutable",retention:"retain"}];
-    writeFileSync(join(directory,"lifecycle.json"),`${JSON.stringify({schema:"pipeline.feature-package.v1",feature:{id:"course-feature"},state:"approved",artifacts})}\n`);
+    writeFileSync(join(directory,"lifecycle.json"),`${JSON.stringify({schema:"pipeline.feature-package.v1",feature:{id:"course-feature"},state:"approved",artifacts,...(featureSupersedes===null?{}:{supersedes:featureSupersedes})})}\n`);
     writeFileSync(join(root,".claude/pipeline.json"),JSON.stringify({project:"fixture",verify:"node verify.mjs"}));
     writeFileSync(join(root,".claude/settings.json"),JSON.stringify({fixture:true}));
-  }
+  };
+  if(feature&&!featureLate)writeFeature();
   const emptyTree = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
   const base = rootCandidate ? emptyTree : commit(root, "base");
+  if(feature&&featureLate){writeFeature();commit(root,"introduce the feature package");}
   if (!rootCandidate) writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\nSource candidate.\n");
   if(feature)writeFileSync(join(root,"specs/course-feature/spec.md"),"# Feature spec\nAC-1 AC-2\nSource candidate.\n");
   const historicalCandidate = commit(root, rootCandidate ? "root source candidate" : "source candidate");
@@ -823,4 +826,45 @@ function cgr02Inspect(){
     assert.equal(cleared.refusalCode,null);assert.deepEqual(cleared.releaseActions,[]);
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 }
+// C30F-G4B (Codex greenfield 2026-11-16): the finalizer read the review unit at the course's genesis base, so a review unit introduced AFTER that base (here the whole feature package of
+// the successor of a discarded feature) failed CGB-TARGET at round 1. The admission already resolves the introducing commit; the finalizer now declares from it.
+test("C30F-G4B finalizer round 1 of a successor with the inherited base is consumed: the review unit is declared at its introducing commit, not at the genesis base",()=>{
+  const fx=fixture({feature:true,featureLate:true,featureSupersedes:"feature-a"});try{
+    const logPath="specs/course-feature/evidence/targeted.log",jsonPath="specs/course-feature/evidence/diagnostic.json";
+    const diagnostic=produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/course-feature/spec.md",command:[process.execPath,"-e","console.log('successor fixture pass')"],logPath:"evidence/successor-targeted.log"});
+    const log=readFileSync(join(fx.root,"evidence/successor-targeted.log"));
+    writeFileSync(join(fx.root,logPath),log);diagnostic.targeted.log.path=logPath;
+    const bytes=`${JSON.stringify(diagnostic)}\n`;writeFileSync(join(fx.root,jsonPath),bytes);
+    // The successor declares its discarded predecessor in the manifest (the relation C30F-G4 reads); the courseInput below is exactly the shape the finalizer builds from a request.
+    const manifestPath=join(fx.root,"specs/course-feature/lifecycle.json"),manifest=JSON.parse(readFileSync(manifestPath));
+    for(const [path,content] of [[logPath,log],[jsonPath,bytes]])manifest.artifacts.push({class:"candidate-evidence",path,sha256:sha256(content),authority:false,mutability:"immutable",retention:"retain"});
+    writeFileSync(manifestPath,`${JSON.stringify(manifest)}\n`);
+    git(fx.root,["add","specs/course-feature/lifecycle.json",logPath,jsonPath]);
+    git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","register feature diagnostic"]);
+    const registrationCommit=git(fx.root,["rev-parse","HEAD"]);
+    writeFileSync(join(fx.root,".claude/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",discardedFeatures:[{id:"feature-a",planPath:"specs/feature-a/prd.md",phaseAtDiscard:"implementation",discardedAt:"2026-11-16T10:00:00.000Z",discardedBy:"Operator",reason:"abandoned",forCommit:null}]}));
+    const courseInput={repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,registrationCommit,requestedMode:"full",
+      acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+    assert.equal(git(fx.root,["ls-tree","--name-only",fx.base,"--","specs/course-feature"]),"","the manifest and the review unit do not exist at the genesis base");
+    const projection=readCriticCourseAdmission(courseInput);
+    assert.equal(projection.decision.status,"admitted",JSON.stringify(projection.decision));
+    assert.notEqual(projection.source.reviewUnit.commit,fx.base,"the admission resolved the introducing commit of the review unit");
+    const {decision,...subject}=projection;
+    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
+    mkdirSync(controlRoot,{recursive:true,mode:0o700});chmodSync(join(fx.root,".git/agent-pipeline"),0o700);chmodSync(controlRoot,0o700);
+    const route={routeId:"feature-fixture",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh",assurance:"functional-equivalent-read-only; OS isolation not asserted",projectionDigest:"a".repeat(64)};
+    const preflightSha256="b".repeat(64);
+    const sessionBinding={schema:"pipeline.session-critic-packet-binding.v1",sessionId:"feature-fixture",preflightSha256,assurance:route.assurance,freshContext:true,historyInherited:false,mayDelegate:false};
+    const packetId="e".repeat(32);
+    prepareCandidatePacket({repoRoot:fx.root,controlRoot,packetId,taskId:fx.taskId,projectId:"pipeline",baseCommit:fx.base,candidateCommit:fx.candidate,rulesetOid:fx.base,route,sessionBinding,
+      references:[{kind:"spec",path:"specs/course-feature/spec.md"},{kind:"guardrail",path:".claude/pipeline.json"}]});
+    claimCandidatePacket({controlRoot,packetId,adapter:route.adapter,claimantNonce:"c".repeat(64)});
+    const reserved=reserveFeatureCriticReviewUnitOwnership({repoRoot:fx.root,controlRoot,packetId,preflightSha256,courseInput,sourceSha256:sha256Canonical(subject),decisionSha256:sha256Canonical(decision)});
+    assert.ok(reserved.reservation,"round 1 is reserved, not refused CGB-TARGET");
+    const batchId=readdirSync(join(controlRoot,"generic-batches")).find(name=>/^[a-f0-9]{32}$/u.test(name));
+    assert.ok(batchId,"one registered batch");
+    const registration=JSON.parse(readFileSync(join(controlRoot,"generic-batches",batchId,"registration.json")));
+    assert.equal(registration.declaredScope.reviewUnit.reference.commit,projection.source.reviewUnit.commit,"the registered review unit carries the declaration commit");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
+import { PREPARE_DISPATCH_HELP, parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
 import * as prepareFill from "./prepare-dispatch.mjs";
 import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
@@ -198,6 +198,26 @@ test("an explicit registration commit passes through, and a step with a code but
   const result = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: silent.runCommand });
   assert.equal(result.stop.code, "CDP-GIT");
   assert.match(result.stop.reason, /CDP-GIT/u);
+});
+
+test("C30F-G4B --successor-of passes through to the preflight and into the rerun command, and is absent without the flag", () => {
+  const steps = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });
+  prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"], successorOf: "feature-a" }, { ...noFiles, runCommand: steps.runCommand });
+  const argv = steps.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv;
+  assert.equal(argv[argv.indexOf("--successor-of") + 1], "feature-a");
+  const plain = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });
+  prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: plain.runCommand });
+  assert.equal(plain.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv.includes("--successor-of"), false);
+  const parsed = parsePrepareDispatchArgv(["critic", "--root", ROOT, "--spec", "s", "--base", "b", "--candidate", CANDIDATE, "--successor-of", "feature-a"]);
+  assert.equal(parsed.options.successorOf, "feature-a");
+  assert.match(parsePrepareDispatchArgv(["critic", "--root", ROOT, "--successor-of", "a", "--successor-of", "b"]).error, /twice/u);
+  assert.match(parsePrepareDispatchArgv(["goldfish", "--root", ROOT, "--successor-of", "a"]).error, /unknown flag/u);
+  const commit = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({}), "register-feature-package.mjs": ok({ commitPaths: [] }) });
+  const stopped = prepareCriticDispatch({ ...CRITIC, successorOf: "feature-a" }, { ...noFiles, runCommand: commit.runCommand });
+  assert.ok(stopped.rerun.argv.includes("--successor-of") && stopped.rerun.argv[stopped.rerun.argv.indexOf("--successor-of") + 1] === "feature-a", "the identical rerun keeps the flag");
+});
+test("C30F-G4B the preparation help names --successor-of", () => {
+  assert.match(PREPARE_DISPATCH_HELP, /--successor-of <feature-id>/u);
 });
 
 test("a symbolic candidate is refused before any step, because the evidence commit moves HEAD", () => {

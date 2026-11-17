@@ -448,7 +448,9 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     stage = "critic-course";
     if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
     if (courseContext !== null && (!isObject(courseContext)
-      || Object.keys(courseContext).sort().join() !== ["acceptedReference", "criterionLocator", "deltaRequestPath", "featureId", "registrationCommit"].join()
+      // C30F-G4B: `successorOf` (the discarded predecessor, from --successor-of) is the one optional sixth key.
+      || Object.keys(courseContext).sort().join() !== ["acceptedReference", "criterionLocator", "deltaRequestPath", "featureId", "registrationCommit", ...(Object.hasOwn(courseContext, "successorOf") ? ["successorOf"] : [])].join()
+      || (Object.hasOwn(courseContext, "successorOf") && !(typeof courseContext.successorOf === "string" && PACKAGE_FEATURE_ID.test(courseContext.successorOf)))
       || typeof courseContext.featureId !== "string" || !OID.test(courseContext.registrationCommit ?? ""))) {
       fail("CDP-COURSE-CONTEXT", "Critic course context must be closed.");
     }
@@ -458,7 +460,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       baseCommit: baseCommit ?? baseTree, candidateCommit, registrationCommit: context.registrationCommit,
       requestedMode: context.deltaRequestPath === null ? "full" : "delta",
       acceptedReference: context.acceptedReference, criterionLocator: context.criterionLocator,
-      deltaRequestPath: context.deltaRequestPath });
+      deltaRequestPath: context.deltaRequestPath, ...(Object.hasOwn(context, "successorOf") ? { successorOf: context.successorOf } : {}) });
     if (admission?.decision?.status !== "admitted") {
       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
       const gapCode = COURSE_EVIDENCE_GAP_CODES.includes(admission?.decision?.code);
@@ -906,7 +908,7 @@ export function parseCriticDispatchPreflightArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings", "--task-id"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings", "--task-id", "--successor-of"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
     if (flag === "--correction-input-bindings") values.correctionInputBindings = value;
     else if (flag === "--task-id") {
       if (Object.hasOwn(values, "taskId")) fail("CDP-ARGUMENT", "Duplicate --task-id.");
@@ -921,11 +923,13 @@ export function parseCriticDispatchPreflightArgs(argv) {
     else if (flag === "--evidence") values.evidencePaths.push(value);
     else if (flag === "--prior-critic") values.priorCriticEvidencePath = value;
     else if (flag === "--sweep-evidence") values.sweepEvidenceTaskId = value;
-    else if (["--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request"].includes(flag)) {
+    else if (["--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--successor-of"].includes(flag)) {
       if (Object.hasOwn(selectors, flag)) fail("CDP-ARGUMENT", "Duplicate course selector.");
+      // C30F-G4B: the discarded predecessor of a registered successor whose manifest holds supersedes:null; a safe feature id, checked against the State by the admission.
+      if (flag === "--successor-of" && !PACKAGE_FEATURE_ID.test(value)) fail("CDP-ARGUMENT", "--successor-of takes the feature id of the discarded predecessor.");
       selectors[flag] = value;
     }
-    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}; the preflight takes --root, --base, --candidate, --spec, --guardrail, --evidence, --prior-critic, --sweep-evidence, --task-id, --registration-commit, --accepted-contract, --criterion-locator, --delta-request and --correction-input-bindings, each with a value${flag === "--range" ? "; there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>" : ""}.`);
+    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}; the preflight takes --root, --base, --candidate, --spec, --guardrail, --evidence, --prior-critic, --sweep-evidence, --task-id, --registration-commit, --accepted-contract, --criterion-locator, --delta-request, --successor-of and --correction-input-bindings, each with a value${flag === "--range" ? "; there is no --range: pass the exact range as --base <base commit> --candidate <candidate commit>" : ""}.`);
     index += 1;
   }
   // D223 (slice 3): no --registration-commit given. The registration commit is the ONE commit after the candidate (an evidence-only chain, as
@@ -939,7 +943,8 @@ export function parseCriticDispatchPreflightArgs(argv) {
     const candidateCommit = baseCommit === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]);
     if (candidateCommit !== null) {
       const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: packageFeatureIdForSpec(values.root, candidateCommit, values.specPath), baseCommit, candidateCommit,
-        deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") });
+        deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request"),
+        ...(selectors["--successor-of"] === undefined ? {} : { successorOf: selectors["--successor-of"] }) });
       if (derivation.status === "derived") selectors["--registration-commit"] = derivation.commit;
       else if (derivation.status === "ambiguous") {
         const reason = `An exact registration commit is required: ${derivation.commits.length} commits qualify (${derivation.commits.join(", ")}); the preflight never picks one. Pass --registration-commit with the commit that registered the evidence of this round.`;
@@ -967,7 +972,8 @@ export function parseCriticDispatchPreflightArgs(argv) {
     values.courseContext = { featureId: courseCandidate === null ? match[1] : packageFeatureIdForSpec(values.root, courseCandidate, values.specPath), registrationCommit: selectors["--registration-commit"],
       acceptedReference: acceptedPath === null ? null : { schema: "pipeline.accepted-delivery-contract-reference.v1", path: acceptedPath,
         sha256: sha256(candidateBytes(values.root, selectors["--registration-commit"], acceptedPath)) },
-      criterionLocator, deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") };
+      criterionLocator, deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request"),
+      ...(selectors["--successor-of"] === undefined ? {} : { successorOf: selectors["--successor-of"] }) };
   }
   return values;
 }

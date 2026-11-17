@@ -958,10 +958,13 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
     if (projection.decision?.status !== "admitted" || sha256Canonical(subject) !== input.sourceSha256
       || sha256Canonical(decision) !== input.decisionSha256 || realpathSync(input.courseInput.repoRoot) !== realpathSync(input.repoRoot)) fail("CGB-FEATURE-COURSE");
     const identity = projection.courseIdentity, unitRef = projection.source.reviewUnit;
-    const declared = JSON.parse(git(input.repoRoot, ["show", `${identity.genesisCandidate.base}:${normalizePacketPath(unitRef.path)}`]));
+    // C30F-G4B: the admission resolved the commit that introduced the review unit (`unitRef.commit`, the genesis base itself when it already lists the unit). A unit introduced after the base,
+    // like the whole feature package of the successor of a discarded feature, does not exist at the base: declare it from its introducing commit.
+    const declarationCommit = unitRef.commit, declaredLater = declarationCommit !== identity.genesisCandidate.base;
+    const declared = JSON.parse(git(input.repoRoot, ["show", `${declarationCommit}:${normalizePacketPath(unitRef.path)}`]));
     const work = logical(declared.logicalWorkIds);
     const unit = readCriticReviewUnit({repoRoot:input.repoRoot,baseCommit:identity.genesisCandidate.base,candidateCommit:input.courseInput.candidateCommit,
-      specPath:unitRef.specPath,logicalWorkIds:work,reviewUnitPath:unitRef.path});
+      specPath:unitRef.specPath,logicalWorkIds:work,reviewUnitPath:unitRef.path,...(declaredLater?{declarationCommit}:{})});
     if (unit.reference.sha256 !== unitRef.sha256) fail("CGB-REVIEW-UNIT-BINDING");
     const c = context(input.repoRoot,input.controlRoot,true);
     return transaction(c, () => {

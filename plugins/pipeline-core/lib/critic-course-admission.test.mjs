@@ -1644,4 +1644,87 @@ test("N38 (PO decision 2026-11-01) a manifest-only commit that changes the manif
   assert.ok(actual.reason.includes(reconcile), `the reconcile commit is the chosen candidate and the refusal names it: ${actual.reason}`);
   assert.ok(!actual.reason.includes(fx.correctionCommit), actual.reason);
 });
+// C30F-G4B (Codex greenfield 2026-11-16): no writer sets `supersedes`, so the relation of an already registered successor is supplied as an explicit, validated input
+// `successorOf` (the predecessor feature id). It only names the predecessor: everything C30F-G4 checks still applies. Neutral ids only.
+const successorOfIdentity = (fx, extra = {}, base = fx.pre) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: base, candidateCommit: fx.candidate, registrationCommit: fx.candidate, acceptedReference: null, ...extra});
+test("C30F-G4B (a) a registered successor whose manifest holds supersedes:null is admitted over the inherited range when the operator names the discarded predecessor", () => {
+  const fx = unitFixture({late: true}); recordDiscarded(fx);
+  assert.equal(readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre})).decision.code, "CCA-MANIFEST-READ", "without the input the refusal stands");
+  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre, successorOf: PREDECESSOR}));
+  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+  const identity = successorOfIdentity(fx, {successorOf: PREDECESSOR});
+  assert.equal(identity.ok, true, JSON.stringify(identity));
+  const course = identity.value.courseIdentity, introduced = hash(`${git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])}\n`);
+  assert.deepEqual(course.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
+  assert.equal(course.genesisCandidate.base, fx.pre);
+  assert.equal(course.originalManifestSha256, introduced);
+  assert.equal(course.courseKey, sha256Canonical({repositoryFingerprint: course.repositoryFingerprint, originalFeatureId: fx.featureId, manifestPath: fx.manifestPath, originalManifestSha256: introduced, genesisCandidate: course.genesisCandidate, successor: course.successor}));
+  // The manifest relation and the input name the same predecessor: admitted exactly the same.
+  const both = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(both);
+  assert.equal(readCriticCourseAdmission(unitRequest(both, {baseCommit: both.pre, successorOf: PREDECESSOR})).decision.code, "CCA-DETERMINISTIC-UNAVAILABLE");
+});
+test("C30F-G4B (b) no input and no manifest relation keeps CCA-MANIFEST-READ, and a base that holds the manifest never takes the route", () => {
+  const fx = unitFixture({late: true}); recordDiscarded(fx);
+  assert.equal(successorOfIdentity(fx).code, "CCA-MANIFEST-READ");
+  const later = successorOfIdentity(fx, {successorOf: PREDECESSOR}, fx.code);
+  assert.equal(later.ok, true, JSON.stringify(later));
+  assert.equal(later.value.courseIdentity.successor, undefined, "the input never widens an ordinary course");
+});
+test("C30F-G4B (c) an input that names a feature the State does not record as discarded, or is no feature id, is refused with a typed reason", () => {
+  for (const state of [null, ["feature-other"]]) {
+    const fx = unitFixture({late: true}); if (state) recordDiscarded(fx, state);
+    const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre, successorOf: PREDECESSOR}));
+    assert.equal(actual.decision.status, "refused", JSON.stringify(actual.decision));
+    assert.equal(actual.decision.code, "CCA-SUCCESSOR-OF", JSON.stringify(actual.decision));
+    const repair = criticCourseRepair("CCA-SUCCESSOR-OF");
+    assert.equal(typeof repair, "string");
+    assert.match(repair, /discard-feature/u);
+    assert.match(repair, /--successor-of/u);
+  }
+  const fx = unitFixture({late: true}); recordDiscarded(fx);
+  for (const bad of ["Not A Feature", "", 7, null]) assert.equal(readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre, successorOf: bad})).decision.code, "CCA-RUNTIME-SHAPE", String(bad));
+});
+test("C30F-G4B (d) an input that disagrees with the supersedes of the manifest is refused, never silently preferred", () => {
+  const fx = unitFixture({late: true, supersedes: PREDECESSOR}); recordDiscarded(fx, [PREDECESSOR, "feature-b"]);
+  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre, successorOf: "feature-b"}));
+  assert.equal(actual.decision.code, "CCA-SUCCESSOR-OF", JSON.stringify(actual.decision));
+  assert.equal(successorOfIdentity(fx, {successorOf: "feature-b"}).code, "CCA-SUCCESSOR-OF");
+  assert.equal(successorOfIdentity(fx, {successorOf: PREDECESSOR}).ok, true);
+});
+function retainSuccessorRound1(fx, course) {
+  const template = consumedCourseRoundFixture();
+  const record = JSON.parse(readFileSync(join(template.root, template.finalizedLineage.lineagePath), "utf8"));
+  record.candidate = {commit: fx.candidate, tree: git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`])};
+  record.diff.base = fx.pre;
+  record.courseBinding = {...record.courseBinding, courseKey: course.courseKey, originalFeatureId: fx.featureId, originalManifestSha256: course.originalManifestSha256, genesisCandidate: course.genesisCandidate};
+  record.request.compiledSha256 = sha256Canonical(compiledRequest(record));
+  record.recordSha256 = sha256Canonical(recordCore(record));
+  assert.equal(validateCriticReviewLineage(record).ok, true);
+  const evidencePath = `specs/${fx.featureId}/evidence/critic-review-lineage-1.json`, bytes = `${JSON.stringify(record)}\n`;
+  mkdirSync(join(fx.root, `specs/${fx.featureId}/evidence`), {recursive: true});
+  writeFileSync(join(fx.root, evidencePath), bytes);
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  manifest.artifacts.push({class: "candidate-evidence", path: evidencePath, sha256: hash(bytes), authority: false, mutability: "immutable", retention: "retain"});
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest)}\n`);
+  return fx.commit("register the lineage of round 1");
+}
+test("C30F-G4B (e) a later round WITHOUT the input recovers the predecessor from the retained course key; no or a wrong candidate is CCA-GENESIS-BINDING", () => {
+  const fx = unitFixture({late: true}); recordDiscarded(fx);
+  const round1 = successorOfIdentity(fx, {successorOf: PREDECESSOR});
+  assert.equal(round1.ok, true, JSON.stringify(round1));
+  const course = round1.value.courseIdentity, registration = retainSuccessorRound1(fx, course);
+  const later = (extra = {}) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.candidate, candidateCommit: fx.candidate, registrationCommit: registration, acceptedReference: null, ...extra});
+  const again = later();
+  assert.equal(again.ok, true, JSON.stringify(again));
+  assert.equal(again.value.courseIdentity.courseKey, course.courseKey, "the same course, not a second one");
+  assert.deepEqual(again.value.courseIdentity.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
+  assert.equal(later({successorOf: PREDECESSOR}).value.courseIdentity.courseKey, course.courseKey, "the input of round 1 repeated later changes nothing");
+  recordDiscarded(fx, [PREDECESSOR, "feature-b", "feature-c"]);
+  assert.equal(later().value.courseIdentity.courseKey, course.courseKey, "exactly one recorded candidate reproduces the retained key");
+  assert.equal(later({successorOf: "feature-b"}).code, "CCA-GENESIS-BINDING", "a different predecessor named later fails the existing binding");
+  recordDiscarded(fx, ["feature-b", "feature-c"]);
+  assert.equal(later().code, "CCA-GENESIS-BINDING", "no recorded candidate reproduces the retained key");
+  rmSync(join(fx.root, ".claude"), {recursive: true, force: true});
+  assert.equal(later().code, "CCA-GENESIS-BINDING", "no State at all");
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
