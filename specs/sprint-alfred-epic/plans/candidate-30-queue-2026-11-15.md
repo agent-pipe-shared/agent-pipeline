@@ -443,3 +443,40 @@ than on the other two runners and seem to find nothing, yet something is found a
 `READY` in round 1; Critic 40 planner steps, 39 tool calls, 6 min 18 s, about 180,000 tokens, pass with zero findings in its first round, with write tools available
 (receipt: `functional-equivalent-read-only; OS isolation not asserted`). Compare per runner: steps and tool calls, which files each Critic really read, wall time,
 tokens, findings per round, and whether a later round found what the first missed. No conclusion before the three reports are compared.
+
+## C30-12: the full review of the successor of a discarded feature is refused `CCA-MANIFEST-READ` (Codex greenfield, 2026-11-16, blocker; built in the 30f wave)
+
+The original feature was discarded while its implementation stayed in Git history; a successor feature got a NEW manifest. The approved successor Spec requires an
+independent review of the complete inherited implementation, but course admission needs the successor manifest at the diff base, and the only admissible base
+(the commit that first added the manifest) omits the inherited work: a silently narrowed review. The handoff text lives in the Codex project, not in this repository.
+Built (clone chain, held patches `w30f4`, `w30f4b`, `w30f4c`): when the manifest is unreadable at the base AND the predecessor is recorded discarded in the State
+AND the base is a strict ancestor of the commit that first added the successor manifest, the base is admitted and the course identity binds the first-added
+manifest, the introducing commit and the predecessor. The relation comes from the manifest's own `supersedes` or, for an already registered successor
+(registration writes `supersedes:null` and an approved manifest cannot be edited), from the new explicit input `--successor-of <feature-id>` of
+`prepare-dispatch.mjs critic` / `critic-dispatch-preflight.mjs`, validated against the State. A later round without the flag recovers the predecessor from the
+retained course key; the finalizer reads a review unit at its declaration commit and forwards `successorOf`. Not covered: the finalizer command end to end for a
+flag-only successor (round 1 consumed through `admit`), a merge history for the first-added lookup. Open: no writer sets `supersedes` at successor creation
+(feature-package-registration.mjs line about 354), the State is a working-tree file, so a later round on another machine without the discarded record is refused
+`CCA-ALIAS-MAPPING-UNAVAILABLE`.
+
+## C30-13: candidate 30f, the Codex and Claude fixes (PO 2026-11-16: "baue die abc sachen ein"; no Critic, no Full Verify)
+
+Built as Goldfish slices on the 30e chain, held patches under `evidence/held-patches/w30f*`:
+- `w30f1`, `w30f1b` (C30-10b): the continuity authority refuses a State entry it does not admit with a typed repair, and admits `state.cancel-submitted-plan` and
+  `state.cancel-mixed-plan-state` through a second closed set that accepts exactly the continuity revision advance of +1 their writers make. A session with a BOUND
+  session-cleanup binding, an orphan binding or a live member is still refused BEFORE the write with a typed reason: the bound session's legacy lifetime key
+  (`continuitySharedStateLogicalLegacyKey`) digests the whole cleanup identity including the revision, so the registry's `state-legacy-operation-effects` check
+  would fail after the write. Open (queue as the next item): make that key or the registry check stable across a +1 advance; restore the `reopen-design` route
+  in the bound-session refusal text (it names `plan-recovery` there, G1 alone named `reopen-design`). Unknown whether the Codex session was bound.
+- `w30f2`, `w30f2c` (Claude order trap): the Critic diagnostic is accepted when HEAD is the candidate plus evidence-only follower commits (registration, consumed-review
+  export, disposition addendum), still bound to the candidate; the packet consumers install the classifier explicitly and revalidate a follower diagnostic against
+  the host repository instead of the disposable checkout. A static import of course admission from the packet module is NOT possible (a measured load-order cycle).
+  Open: the export-follower producer case (the motivating one) has no end-to-end case; the packet preflight assumes the canonical packet layout (common dir four
+  levels above the checkout), any other layout fails closed.
+- `w30f3b` (C30-7): a missing required scanner is refused at the plan gate (`present-plan` before the signature, and `set-phase implementation`) for every project
+  that has not opted the security gate out; a recorded machine-local deferral or committed exception passes with a notice; unset stakes count as standard; the
+  generated toolchain document was regenerated. Open: other suites outside the slice whose fixtures enable scanners without injecting `toolchainPreflight` now depend
+  on the host's scanner binaries (the affected run decides).
+- `w30f4`, `w30f4b`, `w30f4c`: C30-12 above.
+Not run for any of these: Full Verify and the Critic (both suspended by the PO). Derived files (inventory, ledger, positional case ids) need the refresh after the
+apply. The 30e affected run listed `lib/administration-documentation-paths.test.mjs`, which does not exist: a spurious red of the list generator, not a defect.
