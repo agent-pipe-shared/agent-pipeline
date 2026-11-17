@@ -10463,24 +10463,42 @@ const continuitySharedStateEntries = new Set([
   'state.reopen-design','state.seal-plan-approval','state.set-gate-estimate',
   'state.revoke-plan','state.set-phase-no-calibration',
 ]);
-// The entries below stay refused on purpose (C30F-G1, AC-108). Admission is more than the entry name: the verification
-// (continuityVerifySharedStateWrite) requires the cleanup identity, which carries the continuity object and its revision, to
-// be unchanged by the write, and the admitted writers pass no allowContinuityAdvance. Read from the code, not reproduced:
-//  - state.cancel-submitted-plan, state.cancel-mixed-plan-state: their writers pass allowContinuityAdvance and move
-//    continuity.revision and continuity.resume, so an admitted write would pass this observation and then fail that
-//    verification.
+// The two State writes that advance the continuity revision by exactly one (C30F-G1B, AC-108): their writers pass
+// allowContinuityAdvance and move continuity.revision to revision + 1, null continuity.nativeContinuation and rewrite
+// continuity.resume (plan-spec-state-v2.mjs cancelSubmittedPlan / cancelMixedPlanState). They are admitted, but the
+// verification (continuityVerifySharedStateWrite) accepts exactly that advance for them and nothing else; the entries above
+// keep the exact identity equality.
+const continuityAdvancingStateEntries = new Set(['state.cancel-submitted-plan','state.cancel-mixed-plan-state']);
+// The entries that stay refused on purpose (C30F-G1, AC-108), read from the code, not reproduced:
 //  - state.set-feature: replaces the whole continuity object.
 //  - state.set-phase-with-calibration: also writes the calibration companion through the afterValidation route, whose
 //    effects this observation does not model.
-// None of them could be driven to a successful observation by a test, so none is admitted. The reason names a route to run;
-// the route of the first entry is an admitted entry, the other route is the repair this module prints for an owning execution.
-const continuityRefusedStateEntryRoutes = new Map([
-  ['state.cancel-submitted-plan','pipeline-state.mjs reopen-design --by <name> (it voids the submission)'],
-]);
-function continuityStateEntryRefusal(entry) {
-  const admitted = [...continuitySharedStateEntries].map(name=>name.replace(/^state\./u,'').replace(/-no-calibration$/u,'')).join(', ');
-  const route = continuityRefusedStateEntryRoutes.get(entry) ?? 'node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>';
-  return `${entry} is not admitted; nothing written. Repair: ${route}. Admitted: ${admitted}`;
+// The reason names the repair this module prints for an owning execution. The text stays inside the 240 characters
+// describeStateAuthorityRefusal prints; the entry list is not repeated (seven admitted names do not fit).
+// Returns null for an admitted entry, otherwise the typed reason. Exported: the two refused entries cannot be driven through the
+// CLI (set-feature refuses on an active continuity before its writer, set-phase with a calibration refuses on the calibration tiers).
+export function continuityStateEntryRefusalReason(entry) {
+  return continuitySharedStateEntries.has(entry) || continuityAdvancingStateEntries.has(entry) ? null
+    : `${entry} is not admitted; nothing written. Repair: node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>`;
+}
+// The cleanup identity a State write of an advancing entry may leave behind: the prepared identity with the revision
+// advanced by one and the continuity fields those writers rewrite. Everything else stays byte-equal to the prepared one.
+function continuityAdvancedIdentity(identity) {
+  const {continuity} = identity;
+  if (!continuity || typeof continuity!=='object' || !Number.isSafeInteger(continuity.revision)
+      || continuity.revision>=Number.MAX_SAFE_INTEGER || identity.revision!==continuity.revision) return null;
+  const revision=continuity.revision+1;
+  return {...identity,revision,continuity:{...continuity,revision,nativeContinuation:null,
+    resume:{mode:'immediate',sourceRevision:revision,reasonCode:'active-turn'}}};
+}
+// The one decision of the verification about the cleanup identity: equal to the prepared one (a zero-write replay leaves it
+// unchanged), except that an advancing entry may also leave the advanced identity. Exported so the refusal of every other
+// change is exercised without a writer.
+export function continuityAssertStateWriteIdentity(entry,prepared,current) {
+  if (continuityAuthorityEqual(current,prepared)) return;
+  const advanced=continuityAdvancingStateEntries.has(entry) ? continuityAdvancedIdentity(prepared) : null;
+  if (advanced===null || !continuityAuthorityEqual(current,advanced))
+    fail('SDC-AUTHORITY-CAS','continuity cleanup authority or producer identity changed');
 }
 
 function continuitySharedStateImage(fact) {
@@ -10578,8 +10596,8 @@ function continuityObserveSharedStateWrite(data,port,methods,handle,context) {
   if (plan.repositorySha256!==canonicalSha256({primaryRoot:data.repository.primaryRoot,commonDir:data.repository.commonDir})
       || !plan.affectedProducerIds.includes('onboarding-continuity'))
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted');
-  if (!continuitySharedStateEntries.has(plan.entry))
-    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted',{reason:continuityStateEntryRefusal(plan.entry)});
+  const entryRefusal=continuityStateEntryRefusalReason(plan.entry);
+  if (entryRefusal!==null) fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted',{reason:entryRefusal});
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary:context.boundary,producerPort:port});
   if (!continuityAuthorityEqual(producer.record,context.producerRecord))
     fail('SDC-AUTHORITY-CAS','continuity producer record is not current');
@@ -10595,6 +10613,13 @@ function continuityObserveSharedStateWrite(data,port,methods,handle,context) {
       || snapshot.observed.orphanBinding || snapshot.release.status!=='absent'
       || members.some(value=>value.record.phase==='released'||value.record.phase==='terminal-observed'))
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity historical authority requires owning lifecycle transition');
+  // C30F-G1B: an advancing write moves the identity that keys a bound session's legacy lifetime, so the registry's legacy-operation
+  // effects check (pre and post digest equal) refuses it AFTER the State was written. Observed with a bound session; refuse it before
+  // the write instead, cleanly. Only a State with no session cleanup binding and no live member is admitted for an advancing entry.
+  if (continuityAdvancingStateEntries.has(plan.entry)
+      && ((snapshot.observed.sessionCleanup ?? null)!==null || (snapshot.observed.orphanBinding ?? null)!==null || members.length>0))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted while a session is bound',{reason:
+      `${plan.entry} is not admitted while a session cleanup binding is held; nothing written. Repair: node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>`});
   if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
     fail('SDC-AUTHORITY-CAS','continuity preexisting baseline drift');
   // Populate only genuine source-created legacy handles, then identify each
@@ -10630,8 +10655,8 @@ function continuityVerifySharedStateWrite(data,port,methods,handle,witness) {
   const snapshot=continuityAuthoritySnapshot(data.repository);
   continuitySharedStateSelected(snapshot,owned.plan.selectedPathSha256,terminal.postimage);
   continuitySharedStateNonselected(owned.memberships,snapshot.memberships,owned.plan.selectedPathSha256);
-  if (!continuityAuthorityEqual(continuitySharedStateCleanupIdentity(snapshot),owned.identity)
-      || !continuityAuthorityEqual(continuitySharedStateRecord(data,owned.producer.producerRef),owned.producer.record))
+  continuityAssertStateWriteIdentity(owned.plan.entry,owned.identity,continuitySharedStateCleanupIdentity(snapshot));
+  if (!continuityAuthorityEqual(continuitySharedStateRecord(data,owned.producer.producerRef),owned.producer.record))
     fail('SDC-AUTHORITY-CAS','continuity cleanup authority or producer identity changed');
   const memberObservations=owned.live.map(item=>{
     if (!continuityAuthorityEqual(item.operation.expectedMemberRef,item.memberRef)
