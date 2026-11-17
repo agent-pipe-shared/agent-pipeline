@@ -1064,7 +1064,7 @@ test("C28: the acceptance question states the one fixed yes form and the stop na
 });
 
 test("C28: an answer that is not on the closed yes list is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
-  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?", "yes yes", "not accepted", "ja"]) { // C29 (C8): a bare "yes" is on the closed list now; "ja" is not an English project's form.
+  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "no", "yes, I accept, but fix level 2", "yes, I accept?", "yes yes", "not accepted", "ja", "not good", "maybe ok later"]) { // C29 (C8): a bare "yes" is on the closed list now; "ja" is not an English project's form. C30g (PO 2026-11-17): a bare "ok" is a plainly positive answer on the list now (QG-04 restatement: it left this refusal list); "not good" is no positive form.
     const f = oneShotFixture({ acceptance: false });
     try {
       const stopped = oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner });
@@ -1095,7 +1095,7 @@ test("C30d: a first sentence on the closed yes list accepts, the rest of the ans
       assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the whole literal answer is recorded");
     } finally { rmSync(f.root, { recursive: true, force: true }); }
   }
-  for (const answer of ["yes, but level 2 is stuck. Then push", "Yes? Then push", "No. Yes, I accept.", "good! Then please push", "Now push it. Yes, I accept."]) {
+  for (const answer of ["yes, but level 2 is stuck. Then push", "Yes? Then push", "No. Yes, I accept.", "mostly fine! Then please push", "Now push it. Yes, I accept."]) { // C30g (QG-04 restatement): "good!" is a plainly positive first sentence on the list now; "mostly fine!" is not.
     const f = oneShotFixture({ acceptance: false });
     try {
       assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
@@ -1109,6 +1109,33 @@ test("C30d: a first sentence on the closed yes list accepts, the rest of the ans
     assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere! Bitte jetzt pushen." }, { runCommand: de.runner }).status, "commit-required");
     assert.match(oneShotClose({ ...oneShotFixture({ acceptance: false, continuity: true, language: "de" }).input }, { runCommand: de.runner }).stop.reason ?? "", /darf danach Ihr nächster Auftrag folgen/u);
   } finally { rmSync(de.root, { recursive: true, force: true }); }
+});
+
+// C30g (PO decision 2026-11-17: "gut" and every plainly positive answer count as the acceptance; the signature before a push stays the final gate): the closed list grew by positive forms in both languages.
+// It is still a closed list: a doubt, a "but", a negation or a free sentence is no acceptance, and the question names only the core forms plus a few examples.
+test("C30g: a plainly positive answer on the closed list accepts in the project's language, a negation or a 'but' never does, and the question names examples of the positive forms", () => {
+  for (const answer of ["good", "Great!", "ok", "Looks good.", "approved", "yes, perfect", "good! Now please push."]) {
+    const f = oneShotFixture({ acceptance: false });
+    try { assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer); } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+  for (const answer of ["Gut!", "passt", "Super.", "ja, gut", "Okay", "einverstanden", "sieht gut aus", "gut. Bitte jetzt pushen."]) {
+    const f = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+    try { assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer); } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+  for (const answer of ["good, but fix level 2", "nicht gut", "gut, aber Level 2 klemmt", "nicht ok", "gut?", "not approved"]) {
+    for (const language of ["en", "de"]) {
+      const f = oneShotFixture({ acceptance: false, continuity: language === "de", language });
+      try {
+        assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).stop?.code, "ONESHOT-ACCEPTANCE-NOT-YES", `${language}: ${answer}`);
+        assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
+      } finally { rmSync(f.root, { recursive: true, force: true }); }
+    }
+  }
+  const asked = oneShotFixture({ acceptance: false }), askedDe = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+  try {
+    assert.match(oneShotClose(asked.input, { runCommand: asked.runner }).stop.repair, /, or another plainly positive answer such as "good", "ok", "approved"/u);
+    assert.match(oneShotClose(askedDe.input, { runCommand: askedDe.runner }).stop.repair, / oder eine andere eindeutig zustimmende Antwort wie "gut", "passt", "ok"/u);
+  } finally { rmSync(asked.root, { recursive: true, force: true }); rmSync(askedDe.root, { recursive: true, force: true }); }
 });
 
 test("C28: the fixed form follows the project's human-facing language so a German-speaking human answers in German, and falls back to English for any other language", () => {

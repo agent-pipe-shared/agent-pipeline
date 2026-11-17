@@ -41,10 +41,27 @@ export const ACCEPTANCE_YES_FORMS = Object.freeze({ en: "yes, I accept", de: "ja
  * list of the project's own language counts, a comma and repeated spaces do not matter (see yesKey), and nothing outside the list is a
  * yes: no keyword is searched in free text, so "ja, aber ..." or "yes, but ..." stays a decline.
  */
-export const ACCEPTANCE_YES_ANSWERS = Object.freeze({
+const ACCEPTANCE_YES_CORE = Object.freeze({
   en: Object.freeze(["yes, I accept", "yes", "yes, accepted", "accepted", "I accept"]),
   de: Object.freeze(["ja, ich akzeptiere", "ja", "ja, akzeptiert", "akzeptiert", "ich akzeptiere"]),
 });
+/**
+ * PO decision 2026-11-17 ("gut" bzw. alles Positive soll als Abnahme gelten; the signature before a push remains the final gate): the closed list
+ * grows by plainly positive answers. It is still a closed list, never a keyword search: "good, but ..." and "nicht gut" stay declines, and only the
+ * core forms above are printed in the question (plus a few examples of the rest).
+ */
+const ACCEPTANCE_YES_POSITIVE = Object.freeze({
+  en: Object.freeze(["good", "very good", "great", "fine", "ok", "okay", "perfect", "excellent", "nice", "sounds good", "looks good", "all good", "lgtm",
+    "approved", "I approve", "agreed", "I agree", "sure", "yep", "yeah", "yes please", "go ahead", "confirmed", "yes, good", "yes, ok", "yes, okay", "yes, great", "yes, perfect"]),
+  de: Object.freeze(["gut", "sehr gut", "super", "prima", "perfekt", "passt", "ok", "okay", "top", "toll", "klar", "gerne", "einverstanden", "in ordnung", "alles gut",
+    "sieht gut aus", "genehmigt", "freigegeben", "abgenommen", "bestätigt", "stimmt", "genau", "korrekt", "richtig", "sauber", "ja gerne", "ja bitte", "ja, gut", "ja, passt",
+    "ja, ok", "ja, okay", "ja, super", "ja, perfekt", "ja, klar", "ja, einverstanden"]),
+});
+export const ACCEPTANCE_YES_ANSWERS = Object.freeze({
+  en: Object.freeze([...ACCEPTANCE_YES_CORE.en, ...ACCEPTANCE_YES_POSITIVE.en]),
+  de: Object.freeze([...ACCEPTANCE_YES_CORE.de, ...ACCEPTANCE_YES_POSITIVE.de]),
+});
+const ACCEPTANCE_YES_EXAMPLES = Object.freeze({ en: ["good", "ok", "approved"], de: ["gut", "passt", "ok"] });
 const languageKey = (language) => {
   const key = typeof language === "string" ? language.trim().toLowerCase().split(/[-_]/u)[0] : "";
   return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? key : "en";
@@ -73,7 +90,9 @@ export function isAcceptanceYes(answer, form) {
 /** The clear yes answers of the form's language, quoted for a sentence. */
 export function acceptanceYesAnswersText(form) {
   const language = formLanguage(form);
-  return (language === null ? [form] : ACCEPTANCE_YES_ANSWERS[language]).map((entry) => `"${entry}"`).join(", ");
+  if (language === null) return `"${form}"`;
+  const quote = (entries) => entries.map((entry) => `"${entry}"`).join(", ");
+  return `${quote(ACCEPTANCE_YES_CORE[language])}${language === "de" ? " oder eine andere eindeutig zustimmende Antwort wie " : ", or another plainly positive answer such as "}${quote(ACCEPTANCE_YES_EXAMPLES[language])}`;
 }
 
 /** The one sentence the agent asks the human in the chat, in the project's language (the form's language); it names the clear yes answers. */
