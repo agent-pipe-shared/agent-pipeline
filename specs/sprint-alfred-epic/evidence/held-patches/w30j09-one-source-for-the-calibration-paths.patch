@@ -1,0 +1,305 @@
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+index 12236a821..8298c5484 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+@@ -20,7 +20,7 @@ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+ import { readPrivateApprovals } from "./critical-action-authorization.mjs";
+ import { VERIFY_REPLACEMENT_KIND } from "./critical-action-approval-request.mjs";
+ 
+-const PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
++import { CALIBRATION_PATHS as PATHS } from "./project-authority-read.mjs";
+ const SCHEMA = "pipeline.calibration-verify-commit-transition.v1";
+ const MAX_BYTES = 1_048_576;
+ const HELD = new WeakMap();
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+index 561725634..a6286109b 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+@@ -5,14 +5,19 @@
+ // used to compare the two verbatim and refused every win32 repository with CVCT-COMMON-DIR.
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+-import { join } from "node:path";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
+ import { after, test } from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+ // Same import order as production: the State writer owns the module graph that imports this module.
+ import "../scripts/pipeline-state.mjs";
+ import { inspectCommittedCalibrationVerifyLayout } from "./calibration-verify-commit-transition.mjs";
++import * as authorityRead from "./project-authority-read.mjs";
++import * as authorityFacade from "./project-authority.mjs";
++import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority.mjs";
++import { readCalibrationStakes } from "./security-close-status.mjs";
++import { closeQualityReadback } from "./close-quality-readback.mjs";
+ 
+ const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+ const SCRATCH = join(REPO_ROOT, "scratch");
+@@ -67,6 +72,62 @@ test("identical configured twins read as configured with the command", () => {
+     { status: "configured", command: "node --test fixture.test.mjs", paths: ["project/pipeline.json", ".claude/pipeline.json"] });
+ });
+ 
++test("the committed layout lists the twins in the order of the one exported calibration path list (C30J-J9)", () => {
++  const { root } = repository({ verify: BASELINE });
++  assert.deepEqual(authorityRead.CALIBRATION_PATHS, ["project/pipeline.json", ".claude/pipeline.json"], "SETUP: the shared list is neutral first");
++  assert.deepEqual(inspectCommittedCalibrationVerifyLayout({ rootDir: root }).paths, [...authorityRead.CALIBRATION_PATHS]);
++});
++
++// C30J-J9 (analysis C8, SM-6, AC-112): one source for the two calibration file paths. These cases live here, not in the registered
++// project-authority corpus, because that corpus pins its case ids in a protected policy file.
++const CALIBRATION_LIST_MODULES = [
++  "calibration-verify-commit-transition.mjs", "close-quality-readback.mjs", "governance-scope.mjs", "onboarding-continuity.mjs",
++  "project-calibration-identity.mjs", "project-pipeline-footprint.mjs", "runtime-projection-v3.mjs", "security-close-status.mjs",
++];
++
++test("the two calibration paths are exported once, neutral first, from the read half and the facade", () => {
++  assert.deepEqual(authorityRead.CALIBRATION_PATHS, [authorityRead.NEUTRAL_CALIBRATION, authorityRead.LEGACY_CALIBRATION]);
++  assert.equal(Object.isFrozen(authorityRead.CALIBRATION_PATHS), true);
++  assert.deepEqual(authorityRead.CALIBRATION_PATHS, [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]);
++  assert.equal(authorityFacade.CALIBRATION_PATHS, authorityRead.CALIBRATION_PATHS, "the facade re-exports the very same list");
++});
++
++test("no module that used a private calibration path list names either calibration file as a quoted literal any more", () => {
++  const here = dirname(fileURLToPath(import.meta.url));
++  const literal = /["'`](?:project|\.claude)\/pipeline\.json(?::[^"'`]*)?["'`]/u;
++  const offenders = CALIBRATION_LIST_MODULES.filter((name) => readFileSync(join(here, name), "utf8").split("\n")
++    .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/u.test(line)).some((line) => literal.test(line)));
++  assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import the constants of project-authority-read.mjs");
++});
++
++test("the calibration read orders stay what each reader did: neutral first, and the file resolver is not the same rule", () => {
++  const put = (base, rel, text) => { mkdirSync(dirname(join(base, rel)), { recursive: true }); writeFileSync(join(base, rel), text); };
++  const fresh = () => { const dir = join(WORK, `order-${counter += 1}`); mkdirSync(dir, { recursive: true }); return dir; };
++  // A legacy manifest, no neutral manifest, both calibration files present with different `stakes`.
++  const base = fresh();
++  put(base, authorityRead.LEGACY_MANIFEST, "schema: pipeline.manifest.v0\n");
++  put(base, authorityRead.NEUTRAL_CALIBRATION, "{\"stakes\":\"critical\"}\n");
++  put(base, authorityRead.LEGACY_CALIBRATION, "{\"stakes\":\"low\"}\n");
++  assert.equal(readCalibrationStakes(base), "critical", "the stakes reader takes the first file that exists: neutral");
++  assert.equal(resolveAuthorityArtifactPath("calibration", { rootDir: base }).relPath, authorityRead.LEGACY_CALIBRATION,
++    "the artifact resolver follows the manifest tier here; routing the stakes reader through it would change a security reading");
++  // The stakes reader stops at the first file that exists; the close readback takes the first file that carries a string `stakes`.
++  const bare = fresh();
++  put(bare, authorityRead.NEUTRAL_CALIBRATION, "{\"project\":\"x\"}\n");
++  put(bare, authorityRead.LEGACY_CALIBRATION, "{\"stakes\":\"critical\"}\n");
++  assert.equal(readCalibrationStakes(bare), null, "no fall-through to the second file");
++  const readback = (dir) => closeQualityReadback({ featureId: "f", readers: {
++    exists: () => true,
++    readBytes: (rel) => {
++      if (rel === "evidence/security-latest.json") return Buffer.from(JSON.stringify({ scanners: [{ tool: "license-check", status: "SKIPPED", classification: "success" }] }));
++      if (rel === "evidence/security-latest.v2.verdict.json") return Buffer.from("{}");
++      return readFileSync(join(dir, rel));
++    },
++  } }).find((row) => row.id === "security-scan").evidence;
++  assert.match(readback(bare), /license-check: not executed/u, "the readback falls through to the second file when the first has no string stakes");
++  assert.match(readback(base), /license-check: not executed/u, "both present: the neutral file is read first");
++});
++
+ test("an absent legacy peer leaves exactly the neutral tier", () => {
+   const { root } = repository({ verify: BASELINE, legacyPeer: false });
+   assert.deepEqual(inspectCommittedCalibrationVerifyLayout({ rootDir: root }), { status: "baseline-only", paths: ["project/pipeline.json"] });
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index 2ed486d9e..eba383096 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -18,6 +18,7 @@
+ 
+ import { createHash } from "node:crypto";
+ import { SCANNER_EXCEPTIONS_PATH, closeSecurityScopeNote, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
++import { LEGACY_CALIBRATION, NEUTRAL_CALIBRATION } from "./project-authority-read.mjs";
+ import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
+ import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
+ 
+@@ -57,7 +58,7 @@ function securityRow(readers) {
+       // cannot supply the calibration or the exception file leaves the non-critical reading, which the readback never claims beyond).
+       const text = (rel) => { const read = call(readers.readBytes, rel); return read.ok ? Buffer.from(read.value).toString("utf8") : null; };
+       const stakesOf = (rel) => { try { const stakes = JSON.parse(text(rel))?.stakes; return typeof stakes === "string" ? stakes : null; } catch { return null; } };
+-      const critical = isCriticalStakes(stakesOf("project/pipeline.json") ?? stakesOf(".claude/pipeline.json"));
++      const critical = isCriticalStakes(stakesOf(NEUTRAL_CALIBRATION) ?? stakesOf(LEGACY_CALIBRATION));
+       const exceptions = critical ? parseScannerExceptions(text(SCANNER_EXCEPTIONS_PATH)) : null;
+       const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners, { critical, exceptions })).map((line) => line.split(" -- ")[0]);
+       // C29 (Codex run 3, C3): an empty or unreadable v2 capability plan travels beside the scanner states, so "present" never reads like every control passed.
+diff --git a/plugins/pipeline-core/lib/governance-scope.mjs b/plugins/pipeline-core/lib/governance-scope.mjs
+index 6aacf6510..d17adc3a9 100644
+--- a/plugins/pipeline-core/lib/governance-scope.mjs
++++ b/plugins/pipeline-core/lib/governance-scope.mjs
+@@ -14,6 +14,7 @@ import {parseYaml} from './yaml-lite.mjs';
+ import {validatePipelineUserV3} from './runner-profiles-v3.mjs';
+ import {codexCustomAgentSeed,planRuntimeProjectionV3} from './runtime-projection-v3.mjs';
+ import {loadSchema} from './manifest.mjs';
++import {LEGACY_CALIBRATION} from './project-authority-read.mjs';
+ import {validateAgainstSchema} from './schema-lite.mjs';
+ import {assessWindowsPrivatePath,hardenWindowsPrivateDirectory} from './windows-private-state.mjs';
+ 
+@@ -170,7 +171,7 @@ function legacyObservation(ctx,budget){
+   refs.push({path:manifestPath,sha256:manifest.sha256});
+   // Only the manifest's owned projection is being observed. Other renderer
+   // inputs are inert canonical seeds, not observed agent/runtime assertions.
+-  const baselines={'.claude/pipeline.yaml':{status:'present',bytes:manifest.text},'.claude/settings.json':{status:'present',bytes:'{}\n'},'.claude/pipeline.json':{status:'present',bytes:'{}\n'},'.codex/config.toml':{status:'present',bytes:''},'.codex/agents/implementor.toml':{status:'present',bytes:codexCustomAgentSeed('implementor')},'.codex/agents/critic.toml':{status:'present',bytes:codexCustomAgentSeed('critic')},'.codex/agents/critic-high-risk.toml':{status:'present',bytes:codexCustomAgentSeed('critic-high-risk')},'.codex/agents/consult-advisor.toml':{status:'present',bytes:''}};
++  const baselines={'.claude/pipeline.yaml':{status:'present',bytes:manifest.text},'.claude/settings.json':{status:'present',bytes:'{}\n'},[LEGACY_CALIBRATION]:{status:'present',bytes:'{}\n'},'.codex/config.toml':{status:'present',bytes:''},'.codex/agents/implementor.toml':{status:'present',bytes:codexCustomAgentSeed('implementor')},'.codex/agents/critic.toml':{status:'present',bytes:codexCustomAgentSeed('critic')},'.codex/agents/critic-high-risk.toml':{status:'present',bytes:codexCustomAgentSeed('critic-high-risk')},'.codex/agents/consult-advisor.toml':{status:'present',bytes:''}};
+   const plan=planRuntimeProjectionV3(intent,{source:'pipeline.user.yaml',baselines});
+   const expected=plan.status==='ready'?plan.targets.find(t=>t.path==='.claude/pipeline.yaml')?.after?.bytes:null;
+   return {state:typeof expected==='string'&&expected===manifest.text?'active':'unverifiable-active',kind:'legacy-v3-owned-projection',refs};
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 489f5ac54..23491b6d8 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -76,6 +76,7 @@ import { parseArchitectureDesign } from "./architecture-design.mjs";
+ import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder } from "./design-authoring.mjs";
+ import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
+ import {
++  CALIBRATION_PATHS,
+   LEGACY_CALIBRATION,
+   LEGACY_MANIFEST,
+   LEGACY_STATE,
+@@ -6864,7 +6865,7 @@ export function readOnboardingIntakeCheckpoint({
+ /** Read-only first-enrollment boundary; missing history never creates a retirement generation. */
+ export function observeOnboardingEnrollmentHistory({rootDir,repositoryCapability="local",spawn=defaultGitSpawn}={}) {
+   const root=physicalRoot(rootDir),paths=[];
+-  for(const path of [NEUTRAL_STATE,LEGACY_STATE,"pipeline.user.yaml",NEUTRAL_MANIFEST,".claude/pipeline.yaml",".claude/pipeline.json",".agent-pipeline/onboarding-consent.json",".agent-pipeline/enrollment-git-creation-barrier.json",".agent-pipeline/enrollment-git-creation.json",".claude/.runtime/agent-pipeline/onboarding"]){
++  for(const path of [NEUTRAL_STATE,LEGACY_STATE,"pipeline.user.yaml",NEUTRAL_MANIFEST,".claude/pipeline.yaml",LEGACY_CALIBRATION,".agent-pipeline/onboarding-consent.json",".agent-pipeline/enrollment-git-creation-barrier.json",".agent-pipeline/enrollment-git-creation.json",".claude/.runtime/agent-pipeline/onboarding"]){
+     const full=absoluteProjectPath(root,path,"enrollment history");assertPhysicalChain(root,full);
+     if(existsSync(full)){const info=lstatSync(full);if(info.isSymbolicLink()||(!info.isFile()&&!info.isDirectory()))fail("ER-HISTORY-UNSAFE","retained enrollment history is not physical");paths.push(path);}
+   }
+@@ -11806,7 +11807,7 @@ export function prepareControlledMethodContinuityArtifacts({rootDir,fixtureRoot,
+   continuityMethodGit(repository,['add','-f','--',accepted.path]);
+   continuityMethodGit(repository,['-c','user.name=AUTH Unit','-c','user.email=auth@example.invalid','commit','-q','-m',"test(pipeline): register controlled continuity package\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true"]);
+   // Bind only the existing calibration tiers the sanctioned transition writes.
+-  const calibrationInputs=['project/pipeline.json','.claude/pipeline.json']
++  const calibrationInputs=CALIBRATION_PATHS
+     .filter(path=>existsSync(join(repository.primaryRoot,path))).map(path=>{
+       const ref=continuityMethodPublicRef(repository.primaryRoot,path);
+       const value=JSON.parse(readFileSync(continuityMethodPhysicalSource(repository.primaryRoot,path)));
+diff --git a/plugins/pipeline-core/lib/project-authority-read.mjs b/plugins/pipeline-core/lib/project-authority-read.mjs
+index bb2380e7a..d2971b3e5 100644
+--- a/plugins/pipeline-core/lib/project-authority-read.mjs
++++ b/plugins/pipeline-core/lib/project-authority-read.mjs
+@@ -17,6 +17,10 @@ export const LEGACY_STATE = ".claude/pipeline-state.json";
+ export const LEGACY_CALIBRATION = ".claude/pipeline.json";
+ export const LEGACY_GUARD_CONFIG = ".claude/guard-config.json";
+ export const LEGACY_GUARD_AUDIT = ".claude/guard-override.log.jsonl";
++// The two calibration files (byte-identical twins), neutral first. A module that must look at both files imports this list instead of keeping a
++// private copy of the pair, so no two lists can come to disagree about which file comes first. It is only the list: whether a reader stops at
++// the first file that exists, at the first one that carries a field, or follows the manifest tier stays that reader's own rule.
++export const CALIBRATION_PATHS = Object.freeze([NEUTRAL_CALIBRATION, LEGACY_CALIBRATION]);
+ // A fresh Claude-runner project onboarded by project-onboarding-v3.mjs
+ // legitimately WRITES exactly two of these five legacy paths on day one --
+ // LEGACY_MANIFEST and LEGACY_CALIBRATION, byte-identical to their NEUTRAL_*
+diff --git a/plugins/pipeline-core/lib/project-authority.mjs b/plugins/pipeline-core/lib/project-authority.mjs
+index f52490a59..b9beb0880 100644
+--- a/plugins/pipeline-core/lib/project-authority.mjs
++++ b/plugins/pipeline-core/lib/project-authority.mjs
+@@ -18,7 +18,7 @@ import { inspectSessionClosure, listActiveSessionDescriptors } from "./worktree-
+ import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+ import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+ import { NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, sha, absent, present, realRoot, projectPath, image, bytes, readLayer, authority, validatePortablePipelineState } from "./project-authority-read.mjs";
+-export { NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, validatePortablePipelineState, readProjectAuthority, resolveProjectAuthorityPaths, AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
++export { NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, CALIBRATION_PATHS, validatePortablePipelineState, readProjectAuthority, resolveProjectAuthorityPaths, AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
+ 
+ export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
+ export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
+diff --git a/plugins/pipeline-core/lib/project-calibration-identity.mjs b/plugins/pipeline-core/lib/project-calibration-identity.mjs
+index 03eed4a2f..76fed666c 100644
+--- a/plugins/pipeline-core/lib/project-calibration-identity.mjs
++++ b/plugins/pipeline-core/lib/project-calibration-identity.mjs
+@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
+ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+ import { basename, dirname, join, resolve } from "node:path";
+ import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority.mjs";
++import { LEGACY_CALIBRATION } from "./project-authority-read.mjs";
+ import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
+ import { resolvePoGateRepositoryTopology } from "./po-gate-authority.mjs";
+ 
+@@ -104,7 +105,7 @@ function aliasRefused(stored, current, source) {
+ // whose name and owner.name are "agent-pipeline" with exactly one plugin "pipeline-core" at
+ // ./plugins/pipeline-core. It never reads the directory name and no calibration field can select it.
+ const SOURCE_PROJECT = "agent-pipeline";
+-const SOURCE_CALIBRATION_PATH = ".claude/pipeline.json";
++const SOURCE_CALIBRATION_PATH = LEGACY_CALIBRATION; // the source-checkout probe reads the legacy twin alone, on purpose
+ const SOURCE_MARKETPLACE_PATH = ".claude-plugin/marketplace.json";
+ const SOURCE_PLUGIN_NAME = "pipeline-core";
+ const SOURCE_PLUGIN_SOURCE = "./plugins/pipeline-core";
+diff --git a/plugins/pipeline-core/lib/project-pipeline-footprint.mjs b/plugins/pipeline-core/lib/project-pipeline-footprint.mjs
+index a95ade723..06909a04a 100644
+--- a/plugins/pipeline-core/lib/project-pipeline-footprint.mjs
++++ b/plugins/pipeline-core/lib/project-pipeline-footprint.mjs
+@@ -6,12 +6,13 @@ import {validatePipelineUserV3} from './runner-profiles-v3.mjs';
+ import {codexCustomAgentSeed,loadRuntimeProjectionV3OwnedKeys,planRuntimeProjectionV3} from './runtime-projection-v3.mjs';
+ import {planRuntimeProjectionOwnedRemoval} from './runtime-projection-removal.mjs';
+ import {derivePlanLifecycle} from './plan-spec-state-v2.mjs';
++import {LEGACY_CALIBRATION} from './project-authority-read.mjs';
+ import {footprintSha256,readPhysicalFootprint} from './git-hook-footprint.mjs';
+ const strictUtf8=row=>new TextDecoder('utf-8',{fatal:true}).decode(row.bytes);
+ export function deriveContentPreservingPipelineFootprint({rootDir}){
+  const budget={used:0,max:33554432},source=readPhysicalFootprint(join(rootDir,'pipeline.user.yaml'),{budget}),owned=loadRuntimeProjectionV3OwnedKeys(),observations=[],actions=[],conflicts=[],preserve=['AGENTS.md','CLAUDE.md','architecture/','docs/','specs/','backlog/','Git history','user-scope stores'];let intent=null;
+  if(source)try{const v=parseYaml(strictUtf8(source));if(validatePipelineUserV3(v).ok)intent=v;}catch{}
+- const defaultBytes={'.claude/settings.json':'{}\n','.claude/pipeline.json':'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/critic-high-risk.toml':codexCustomAgentSeed('critic-high-risk'),'.codex/agents/consult-advisor.toml':''};
++ const defaultBytes={'.claude/settings.json':'{}\n',[LEGACY_CALIBRATION]:'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/critic-high-risk.toml':codexCustomAgentSeed('critic-high-risk'),'.codex/agents/consult-advisor.toml':''};
+  const baselines={},rows=new Map();for(const target of owned.targets){const row=readPhysicalFootprint(join(rootDir,target.path),{budget});rows.set(target.path,row);baselines[target.path]={status:'present',bytes:row?strictUtf8(row):defaultBytes[target.path]??'schema: pipeline.manifest.v0\n'};}
+  const neutralManifest=readPhysicalFootprint(join(rootDir,'project','pipeline.yaml'),{budget});if(!rows.get('.claude/pipeline.yaml')&&neutralManifest)baselines['.claude/pipeline.yaml']={status:'present',bytes:strictUtf8(neutralManifest)};
+  const projected=intent?planRuntimeProjectionV3(intent,{source:'pipeline.user.yaml',baselines}):null;
+diff --git a/plugins/pipeline-core/lib/runtime-projection-v3.mjs b/plugins/pipeline-core/lib/runtime-projection-v3.mjs
+index 92ef7375a..b53e0b406 100644
+--- a/plugins/pipeline-core/lib/runtime-projection-v3.mjs
++++ b/plugins/pipeline-core/lib/runtime-projection-v3.mjs
+@@ -27,6 +27,7 @@ import {
+   validatePipelineUserV3Json,
+ } from "./runner-profiles-v3.mjs";
+ import { criticExportPolicyDigest } from "./critic-export-policy.mjs";
++import { LEGACY_CALIBRATION } from "./project-authority-read.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const OWNED_KEYS_PATH = join(HERE, "..", "config", "runtime-projection-v3-owned-keys.json");
+@@ -800,9 +801,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
+       targets.push(replaceAddedCodexAgentTarget(manifestTarget, intent, baselines?.[manifestTarget.path]));
+     }
+     targets.push(replaceHumanRoleCalibrationTarget(
+-      manifestTargets[".claude/pipeline.json"],
++      manifestTargets[LEGACY_CALIBRATION],
+       intent,
+-      baselineBytes(baselines?.[".claude/pipeline.json"]),
++      baselineBytes(baselines?.[LEGACY_CALIBRATION]),
+     ));
+     // ADR-0054 step 3: keep the neutral authority tier (`project/*`) in sync
+     // with whatever the compiler already owns at the legacy tier, but ONLY
+@@ -836,7 +837,7 @@ function projectValidatedIntent(intent, { source, baselines }) {
+     }
+   } catch (error) {
+     return emptyPlan("invalid-baseline", source, [{
+-      path: ".claude/pipeline.json:humanRoles.po.displayLabel",
++      path: `${LEGACY_CALIBRATION}:humanRoles.po.displayLabel`,
+       code: "v3_projection_error",
+       message: error.message,
+       repair: "repair the baseline or committed V3 projection boundary before activation planning",
+@@ -919,7 +920,7 @@ export function planRuntimeProjectionV3Json(text, options = {}) {
+ export function readRuntimeProjectionV3Baselines(rootDir) {
+   const baselines = readRuntimeProjectionV2Baselines(rootDir);
+   const ownedTargets = frozenOwnedKeys().manifest.targets;
+-  const target = ownedTargets.find((entry) => entry.path === ".claude/pipeline.json");
++  const target = ownedTargets.find((entry) => entry.path === LEGACY_CALIBRATION);
+   const advisor = ownedTargets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
+   const criticHighRisk = ownedTargets.find((entry) => entry.path === ".codex/agents/critic-high-risk.toml");
+   if (!target || !advisor || !criticHighRisk) throw new Error("V3 owned target is missing");
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index c927f5746..6081c1f4f 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -16,6 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { toolchainDocPointer } from "./toolchain-registry.mjs";
++import { CALIBRATION_PATHS } from "./project-authority-read.mjs";
+ 
+ export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
+ // C29e (ADR-0103): trivy is the fifth element; it reads "not applicable" for a candidate without infrastructure or container files.
+@@ -73,7 +74,7 @@ export function isCriticalStakes(stakes) {
+ 
+ /** The raw `stakes` of the project calibration under `projectDir`, or null when it is absent, unreadable or not a string. */
+ export function readCalibrationStakes(projectDir) {
+-  for (const rel of ["project/pipeline.json", ".claude/pipeline.json"]) {
++  for (const rel of CALIBRATION_PATHS) {
+     const path = join(projectDir, rel);
+     if (!existsSync(path)) continue;
+     try {
