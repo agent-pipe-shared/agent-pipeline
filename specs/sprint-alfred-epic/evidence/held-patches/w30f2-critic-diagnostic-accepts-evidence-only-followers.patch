@@ -1,0 +1,461 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index df4fef2b7..047004970 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -12,7 +12,7 @@ import { readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
+ import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
+ import { discoverRepository } from "./worktree-lifecycle.mjs";
+ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+-import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
++import { installEvidenceOnlyFollowerClassifier, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+ import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
+ import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+ import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+@@ -571,7 +571,9 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+         if (!object(ref) || addedByPath.get(ref.path)?.sha256 !== ref.sha256) return false;
+         requiredLogs.add(ref.path);
+       }
+-      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree},
++      // C30F-G2: this classifier decides what "evidence-only" is, and `classifyEvidenceOnlyFollowers` is built on it, so its own check of a registered
++      // diagnostic keeps the exact capture head: it must not admit a log made at a later head, which would let the classifier call itself.
++      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree}, exactCaptureHead: true,
+         readArtifact: path => {
+           if (!addedByPath.has(path)) throw new Error("unregistered diagnostic member");
+           return gitBytes(root, ["show", `${commit}:${path}`], "CCA-EVIDENCE-READ");
+@@ -582,6 +584,36 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+   } catch { return false; }
+ }
+ 
++/** The per-commit decision of the classifier below, shared with `classifyEvidenceOnlyFollowers` so that there is one rule for "evidence-only". */
++function registeredEvidenceOnlyCommit(root, commit, manifestPath, featureId, admitCriticExports, readReceipt, admitClose = admitCriticExports) {
++  return evidenceOnlyCommit(root, commit, manifestPath, featureId)
++    || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readReceipt)
++      || criticAddendumOnlyCommit(root, commit) || (admitClose === true && criticCloseCommit(root, commit, featureId, readReceipt))));
++}
++
++/**
++ * C30F-G2: are all commits between a candidate and a later HEAD evidence-only, by the same per-commit rule the Critic carry-forward uses
++ * (manifest registration, consumed-review export, disposition addendum)? The carry's close commit (it may change the Spec and documents under
++ * specs/<feature>/ and docs/) and its administration/documentation pass-over are NOT admitted here: such a commit changes non-evidence content. `ok` is true for HEAD == candidate (no follower) and for
++ * a descendant whose every commit is evidence-only; `reason` is "not-a-descendant", "not-evidence-only" (with `offending`) or "unreadable". Never throws.
++ */
++export function classifyEvidenceOnlyFollowers({ repoRoot, featureId, candidateCommit, headCommit, readConsumedCandidateReceiptFn = readConsumedCandidateReceipt }) {
++  const result = (ok, reason, offending, commits) => Object.freeze({ ok, reason, offending, commits: Object.freeze(commits) });
++  try {
++    if (!OID.test(candidateCommit) || !OID.test(headCommit) || !FEATURE_ID.test(featureId ?? "")) return result(false, "unreadable", null, []);
++    if (candidateCommit === headCommit) return result(true, null, null, []);
++    const root = realpathSync(repoRoot);
++    try { gitBytes(root, ["merge-base", "--is-ancestor", candidateCommit, headCommit], "CCA-RANGE-ANCESTRY"); } catch { return result(false, "not-a-descendant", null, []); }
++    const commits = gitBytes(root, ["rev-list", "--reverse", `${candidateCommit}..${headCommit}`], "CCA-RANGE-READ").toString("utf8").trim().split("\n").filter(Boolean);
++    if (commits.length === 0 || commits.length > 512 || commits.some((oid) => !OID.test(oid))) return result(false, "unreadable", null, []);
++    const manifestPath = `specs/${featureId}/lifecycle.json`;
++    for (const commit of commits) if (!registeredEvidenceOnlyCommit(root, commit, manifestPath, featureId, true, readConsumedCandidateReceiptFn, false)) return result(false, "not-evidence-only", commit, []);
++    return result(true, null, null, commits);
++  } catch { return result(false, "unreadable", null, []); }
++}
++// The diagnostic validator is a leaf this module imports, so it cannot import this classifier back; it takes it from here.
++installEvidenceOnlyFollowerClassifier(classifyEvidenceOnlyFollowers);
++
+ /**
+  * Classify only exact manifest-registration commits as budget-neutral. `admitCriticExports` also admits commits that
+  * only add exports of consumed Critic reviews; the Critic carry-forward passes it, course counters keep the default.
+@@ -594,9 +626,7 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
+   const correction = [];
+   const administration = [];
+   for (const commit of source.rangeCommits) {
+-    const registered = evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
+-      || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
+-        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId, readConsumedCandidateReceiptFn)));
++    const registered = registeredEvidenceOnlyCommit(root, commit, source.manifestPath, featureId, admitCriticExports, readConsumedCandidateReceiptFn);
+     // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
+     const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
+     if (passedOver && !registered) administration.push(commit);
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 0b70eb6f1..22a115a21 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -673,6 +673,39 @@ test("D167-PF78 (2,3) produce into specs/<id>/evidence with a copied full-verify
+   const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", registrationCommit}));
+   assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+ });
++// C30F-G2: the diagnostic is produced while an evidence-only commit already follows the candidate; it binds the candidate, registers, and the admission accepts it with no carry.
++test("C30F-G2 a diagnostic produced behind an evidence-only follower is registered and admitted for the candidate, with the exact-commit digest and no carry", () => {
++  const fx = unitFixture({late: false});
++  writeFileSync(join(fx.root, ".git/info/exclude"), "/evidence/\n");
++  const dir = `specs/${fx.featureId}/evidence`, specPath = `specs/${fx.featureId}/spec.md`;
++  // The candidate under review: the feature topology (a manifest change and its documents).
++  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"]].map(([klass, rel, authority, mutability, retention]) => {
++    const path = `specs/${fx.featureId}/${rel}`; writeFileSync(join(fx.root, path), `${klass}\n`);
++    return {class: klass, path, sha256: hash(readFileSync(join(fx.root, path))), authority, mutability, retention};
++  });
++  const readManifest = () => JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  const writeManifest = (value) => writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...value, candidate: null, supersedes: null})}\n`);
++  writeManifest({...readManifest(), artifacts: [...readManifest().artifacts, ...topo]});
++  const candidate = fx.commit("topology candidate");
++  // The follower: one exact manifest registration of an earlier round's evidence file, made BEFORE this candidate's diagnostic exists.
++  mkdirSync(join(fx.root, dir), {recursive: true});
++  const earlier = `${dir}/earlier-round.json`, earlierBody = "{\"note\":\"earlier round\"}\n";
++  writeFileSync(join(fx.root, earlier), earlierBody);
++  writeManifest({...readManifest(), artifacts: [...readManifest().artifacts, {class: "candidate-evidence", path: earlier, sha256: hash(earlierBody), authority: false, mutability: "immutable", retention: "retain"}]});
++  const follower = fx.commit("evidence registered after the candidate");
++  assert.notEqual(follower, candidate);
++  const jsonPath = `${dir}/diagnostic.json`, logPath = `${dir}/targeted.log`;
++  const value = produceCriticDiagnostic({root: fx.root, candidate, specPath, command: [process.execPath, "-e", "console.log('ok')"], logPath});
++  assert.equal(value.candidate.commit, candidate, "the diagnostic binds the candidate, not the follower HEAD");
++  assert.match(readFileSync(join(fx.root, logPath), "utf8"), new RegExp(`head: ${follower}`, "u"), "the capture names the follower HEAD");
++  writeFileSync(join(fx.root, jsonPath), `${JSON.stringify(value, null, 2)}\n`);
++  const result = addCriticDiagnosticEvidence({root: fx.root, state: {activeFeature: {id: fx.featureId}}, path: jsonPath});
++  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
++  const registrationCommit = fx.commit("register the candidate-bound diagnostic");
++  const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: candidate}, {requestedMode: "full", registrationCommit}));
++  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++  assert.equal(actual.deterministicEvidenceSha256, sha256Canonical([{path: jsonPath, sha256: hash(readFileSync(join(fx.root, jsonPath)))}]), "exact-commit digest, no carry entry");
++});
+ test("D167-PF78 (3) a diagnostic whose full-verify member is the fixed evidence/verify-latest.json is refused FPR-DIAG-PATH naming the copy-then-produce route", () => {
+   const fx = chainFixture({verifyAt: "evidence/verify-latest.json"});
+   const before = readFileSync(join(fx.root, fx.manifestPath));
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+index eaf4282eb..20d5106ba 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+@@ -74,13 +74,29 @@ function validateReference(value) {
+   if (!exact(value, ["path", "sha256"]) || !SHA.test(value.sha256)) fail("CDI-REFERENCE");
+   diagnosticPath(value.path);
+ }
+-function validateCaptureHeader(text, label, exitCode, candidate) {
++/**
++ * C30F-G2: a capture made at a HEAD AFTER the candidate is admitted only when that HEAD's tree is the one the header names and every commit between the
++ * candidate and it is evidence-only by the course classifier (the feature is named by the diagnostic's own spec path); anything else stays refused.
++ * This leaf cannot import the classifier (critic-course-admission.mjs imports this file, and the graph behind it is order-sensitive), so that module
++ * installs it when it loads. Where it is not loaded, or for an exact-head caller, no follower is admitted: the capture must name the candidate, as before.
++ */
++let followerClassifier = null;
++export function installEvidenceOnlyFollowerClassifier(classify) { followerClassifier = typeof classify === "function" ? classify : null; }
++function evidenceOnlyFollowerIdentity(identity, candidate, { root, specPath, exactCaptureHead }) {
++  const featureId = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\//u.exec(specPath ?? "")?.[1];
++  if (exactCaptureHead === true || followerClassifier === null || typeof root !== "string" || featureId === undefined) return false;
++  try {
++    if (git(root, ["rev-parse", `${identity[1]}^{tree}`]).trim() !== identity[2]) return false;
++  } catch { return false; }
++  return followerClassifier({ repoRoot: root, featureId, candidateCommit: candidate.commit, headCommit: identity[1] }).ok === true;
++}
++function validateCaptureHeader(text, label, exitCode, candidate, followerContext) {
+   const prefix = /^command: ([^\r\n]+)\nlabel: ([a-z0-9][a-z0-9-]{0,63})\nexitCode: (0|[1-9][0-9]*)\n/u.exec(text);
+   if (!prefix || prefix[2] !== label || Number(prefix[3]) !== exitCode) return false;
+   let body = text.slice(prefix[0].length);
+   if (!body.startsWith("--- stdout ---\n")) {
+     const identity = /^head: ([a-f0-9]{40})\ntree: ([a-f0-9]{40})\ndirty: (true|false)\n/u.exec(body);
+-    if (!identity || identity[1] !== candidate.commit || identity[2] !== candidate.tree) return false;
++    if (!identity || (identity[1] !== candidate.commit || identity[2] !== candidate.tree) && !evidenceOnlyFollowerIdentity(identity, candidate, followerContext)) return false;
+     body = body.slice(identity[0].length);
+   }
+   if (!body.startsWith("--- stdout ---\n")) return false;
+@@ -88,7 +104,7 @@ function validateCaptureHeader(text, label, exitCode, candidate) {
+   const separator = body.indexOf(stderrMarker, "--- stdout ---\n".length);
+   return separator >= 0;
+ }
+-export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path) } = {}) {
++export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path), exactCaptureHead = false } = {}) {
+   if (!exact(value, ["schema", "producer", "assurance", "candidate", "spec", "guardrails", "fullVerify", "targeted", "pending"]) || value.schema !== CRITIC_DIAGNOSTIC_SCHEMA || value.producer !== "critic-diagnostic-evidence" || value.assurance !== "captured-process-output-not-host-attested" || !exact(value.candidate, ["commit", "tree"]) || !OID.test(value.candidate.commit) || !OID.test(value.candidate.tree) || value.candidate.commit !== candidate.commit || value.candidate.tree !== candidate.tree) fail("CDI-BINDING");
+   validateReference(value.spec);
+   if (!Array.isArray(value.guardrails) || value.guardrails.length > 128 || new Set(value.guardrails.map(row => row?.path)).size !== value.guardrails.length) fail("CDI-GUARDRAILS");
+@@ -111,7 +127,7 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null,
+   validateReference(t.log);
+   const log = readArtifact(t.log.path);
+   const logText = log.toString("utf8");
+-  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate)) fail("CDI-DIGEST");
++  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate, { root, specPath: value.spec.path, exactCaptureHead })) fail("CDI-DIGEST");
+   if (!Array.isArray(value.pending) || value.pending.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id)) || new Set(value.pending).size !== value.pending.length || (value.fullVerify.status === "not-run" && !value.pending.includes("full-verify"))) fail("CDI-PENDING");
+   return { kind: "critic-diagnostic", fullVerify: value.fullVerify.status, targeted: { status: t.status, exitCode: t.exitCode, log: t.log }, pending: value.pending };
+ }
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index b897efd4e..66831f887 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -83,7 +83,9 @@ test("C30d: a candidate behind HEAD is refused CDI-DIRTY-CANDIDATE with the orde
+     let behind = null;
+     try { produceCriticDiagnostic({ ...options(f), candidate: f.candidate.commit }); } catch (error) { behind = error; }
+     assert.equal(behind?.code, "CDI-DIRTY-CANDIDATE");
+-    for (const needle of ["is not the candidate", "1 commit(s) follow the candidate", "BEFORE any evidence, export or lineage commit", "clean checkout of exactly the candidate", "Nothing was written"]) assert.ok(behind.message.includes(needle), `the refusal says "${needle}": ${behind.message}`);
++    // QG-04 restatement (C30F-G2): the intent (the refusal names the order trap and its repair) stays; only the needle "BEFORE any evidence, export or lineage commit" changed, because an evidence-only commit after
++    // the candidate no longer refuses when the spec lies under specs/<feature-id>/. This fixture's later.md is a non-evidence commit and its spec is spec.md, so the order trap still applies and says why.
++    for (const needle of ["is not the candidate", "1 commit(s) follow the candidate", "BEFORE any commit that is not evidence-only", "does not lie under specs/<feature-id>/", "clean checkout of exactly the candidate", "Nothing was written"]) assert.ok(behind.message.includes(needle), `the refusal says "${needle}": ${behind.message}`);
+     assert.equal(existsSync(join(f.root, "evidence/targeted.log")), false, "no capture log was written");
+     writeFileSync(join(f.root, "spec.md"), "dirty");
+     let dirty = null;
+@@ -372,3 +374,95 @@ test("N40 (d) the CLI prints the cause and the repair on stderr, not only the co
+ });
+ import { createHash as n40CreateHash } from "node:crypto";
+ const diagnosticDigestOf = (text) => n40CreateHash("sha256").update(text).digest("hex");
++// C30F-G2: the diagnostic is produced while HEAD is the candidate OR while every commit after it is an evidence-only commit (the classifier of critic-course-admission.mjs decides) and the tracked tree is clean.
++const FEATURE = "feat-a";
++function followerFixture() {
++  const root = mkdtempSync(join(tmpdir(), "critic-follower-"));
++  git(root, ["init", "-q"]);
++  mkdirSync(join(root, "specs", FEATURE), { recursive: true }); mkdirSync(join(root, "src"));
++  writeFileSync(join(root, "specs", FEATURE, "spec.md"), "Frozen specification\n");
++  writeFileSync(join(root, "guard.md"), "Frozen guardrail\n");
++  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 1;\n");
++  writeFileSync(join(root, "specs", FEATURE, "lifecycle.json"), `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 1 }, state: "approved", artifacts: [] })}\n`);
++  commitAll(root, "candidate");
++  return { root, candidate: { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) } };
++}
++// An exact manifest-registration commit: one new candidate-evidence json file and its manifest entry (the form evidenceOnlyCommit classifies).
++function evidenceFollower(f, name) {
++  const path = `specs/${FEATURE}/evidence/${name}.json`, manifestPath = `specs/${FEATURE}/lifecycle.json`;
++  mkdirSync(join(f.root, "specs", FEATURE, "evidence"), { recursive: true });
++  const body = `{"note":"${name}"}\n`;
++  writeFileSync(join(f.root, path), body);
++  const manifest = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8"));
++  manifest.artifacts.push({ class: "candidate-evidence", path, sha256: n40CreateHash("sha256").update(body).digest("hex"), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest)}\n`);
++  return commitAll(f.root, `evidence ${name}`);
++}
++const followerOptions = f => ({ root: f.root, candidate: f.candidate.commit, specPath: `specs/${FEATURE}/spec.md`, guardrailPaths: ["guard.md"], command: [process.execPath, "-e", "console.log('follower targeted run')"], logPath: `specs/${FEATURE}/evidence/targeted.log` });
++const refusal = (run) => { try { run(); } catch (error) { return error; } return null; };
++test("C30F-G2 (a) HEAD is the candidate plus evidence-only followers: the diagnostic is produced, binds the CANDIDATE, and validates", () => {
++  const f = followerFixture();
++  try {
++    const first = evidenceFollower(f, "one"), second = evidenceFollower(f, "two");
++    assert.notEqual(first, second);
++    assert.equal(git(f.root, ["rev-parse", "HEAD"]), second);
++    const value = produceCriticDiagnostic(followerOptions(f));
++    assert.deepEqual(value.candidate, f.candidate, "the candidate, not HEAD, stays the bound identity");
++    assert.equal(value.targeted.status, "passed");
++    assert.match(readFileSync(join(f.root, value.targeted.log.path), "utf8"), /follower targeted run/u);
++    assert.equal(validateCriticDiagnostic(value, { root: f.root, candidate: f.candidate }).targeted.status, "passed");
++    assert.deepEqual(Object.keys(value).sort(), ["assurance", "candidate", "fullVerify", "guardrails", "pending", "producer", "schema", "spec", "targeted"]);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("C30F-G2 (b) a follower that changes a source path, a spec text, a protected path or a guardrail is refused CDI-DIRTY-CANDIDATE, also behind an evidence-only follower, and nothing is written", () => {
++  const changes = [
++    ["source path", f => writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 2;\n")],
++    ["spec text", f => writeFileSync(join(f.root, "specs", FEATURE, "spec.md"), "Changed specification\n")],
++    ["protected path", f => { mkdirSync(join(f.root, ".claude")); writeFileSync(join(f.root, ".claude/settings.json"), "{}\n"); }],
++    ["guardrail", f => writeFileSync(join(f.root, "guard.md"), "Weakened guardrail\n")],
++  ];
++  for (const [name, change] of changes) {
++    const f = followerFixture();
++    try {
++      evidenceFollower(f, "one");
++      change(f); commitAll(f.root, `not evidence-only: ${name}`);
++      const error = refusal(() => produceCriticDiagnostic(followerOptions(f)));
++      assert.equal(error?.code, "CDI-DIRTY-CANDIDATE", name);
++      assert.ok(error.message.includes("Nothing was written") && error.message.includes("is not an evidence-only commit"), error.message);
++      assert.equal(existsSync(join(f.root, "specs", FEATURE, "evidence/targeted.log")), false, name);
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++});
++test("C30F-G2 (c) a rewritten history (HEAD is not a descendant of the candidate) and a dirty tree behind an evidence-only follower stay refused", () => {
++  const f = followerFixture();
++  try {
++    git(f.root, ["checkout", "-q", "--detach", "HEAD"]);
++    writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 3;\n"); commitAll(f.root, "the candidate");
++    const candidate = git(f.root, ["rev-parse", "HEAD"]);
++    git(f.root, ["checkout", "-q", "--detach", f.candidate.commit]);
++    evidenceFollower(f, "side");
++    const sibling = refusal(() => produceCriticDiagnostic({ ...followerOptions(f), candidate }));
++    assert.equal(sibling?.code, "CDI-DIRTY-CANDIDATE");
++    assert.ok(sibling.message.includes("not a descendant"), sibling.message);
++    writeFileSync(join(f.root, "specs", FEATURE, "spec.md"), "dirty");
++    const dirty = refusal(() => produceCriticDiagnostic(followerOptions(f)));
++    assert.equal(dirty?.code, "CDI-DIRTY-CANDIDATE");
++    assert.ok(dirty.message.includes("the working tree differs"), dirty.message);
++    assert.equal(existsSync(join(f.root, "specs", FEATURE, "evidence/targeted.log")), false);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("C30F-G2 (d) a capture header naming a commit that is no evidence-only follower of the candidate is still refused by the validator", () => {
++  const f = followerFixture();
++  try {
++    evidenceFollower(f, "one");
++    const value = produceCriticDiagnostic(followerOptions(f));
++    const logPath = join(f.root, value.targeted.log.path), good = readFileSync(logPath, "utf8");
++    const head = git(f.root, ["rev-parse", "HEAD"]);
++    assert.ok(good.includes(`head: ${head}`), "the capture log names HEAD, the evidence-only follower");
++    const forged = (text) => { writeFileSync(logPath, text); return { ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, sha256: diagnosticDigestOf(text) } } }; };
++    assert.throws(() => validateCriticDiagnostic(forged(good.replace(`head: ${head}`, `head: ${"a".repeat(40)}`)), { root: f.root, candidate: f.candidate }), /CDI-DIGEST/);
++    writeFileSync(join(f.root, "src/code.mjs"), "export const delivered = 9;\n"); const code = commitAll(f.root, "source change");
++    assert.throws(() => validateCriticDiagnostic(forged(good.replace(`head: ${head}`, `head: ${code}`)), { root: f.root, candidate: f.candidate }), /CDI-DIGEST/);
++    assert.equal(validateCriticDiagnostic(forged(good), { root: f.root, candidate: f.candidate }).targeted.status, "passed", "the log as produced stays accepted: the commits between the candidate and its head are evidence-only");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+index 58b32e392..563ca918e 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+@@ -13,6 +13,7 @@ import {
+   validateCriticDiagnostic,
+ } from "./critic-diagnostic-evidence.mjs";
+ import { deriveRequiredCriticGuardrails } from "./critic-required-guardrails.mjs";
++import { classifyEvidenceOnlyFollowers } from "./critic-course-admission.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
+@@ -36,21 +37,43 @@ function source(root, candidate, path) {
+ }
+ 
+ /**
+- * C30d (PO report on Claude Code, 2026-11-16): the refusal named only the code, and the commonest cause is an order trap, not a dirty tree: an evidence-only commit
+- * (the export or the lineage of the previous round) made after the correction commit leaves HEAD behind the candidate the delta route selects, so no diagnostic can ever be
+- * produced for it and the delta verb then finds none (FPR-DELTA-NO-DIAGNOSTIC). The message says which of the two causes it is and what to do; the decision itself is unchanged.
++ * C30d (PO report on Claude Code, 2026-11-16): the refusal named only the code, and the commonest cause is an order trap, not a dirty tree: a commit made after the correction
++ * commit leaves HEAD behind the candidate the delta route selects, so no diagnostic could be produced for it and the delta verb then found none (FPR-DELTA-NO-DIAGNOSTIC).
++ * C30F-G2: followers that are all evidence-only (the export or the lineage of the previous round, a registration) no longer refuse, see `followerRefusal`; what still refuses is a
++ * follower that is not evidence-only, a HEAD that is not a descendant of the candidate, or a tracked tree that differs from HEAD, and the message says which of them it is and what to do.
+  */
+-function dirtyCandidateRefusal(root, bound, afterCapture = false) {
++function dirtyCandidateRefusal(root, bound, afterCapture = false, followerRefusal = null) {
+   const head = git(root, ["rev-parse", "HEAD"]).trim();
+   if (afterCapture) fail("CDI-DIRTY-CANDIDATE", `HEAD or the tracked tree changed while the command ran (the candidate is ${bound.commit.slice(0, 12)}); the command must not modify tracked files or move HEAD. The capture log was already written under evidence/; remove it before the next attempt.`);
++  if (head !== bound.commit && followerRefusal === null) fail("CDI-DIRTY-CANDIDATE", `the working tree differs from HEAD ${head.slice(0, 12)}, the candidate ${bound.commit.slice(0, 12)} plus evidence-only commits: commit or remove the tracked changes first (git diff --name-only HEAD names them), then run this command again. Nothing was written.`);
+   if (head !== bound.commit) {
+     let followers = null;
+     try { followers = Number.parseInt(git(root, ["rev-list", "--count", `${bound.commit}..${head}`]).trim(), 10); } catch { followers = null; }
+-    fail("CDI-DIRTY-CANDIDATE", `HEAD ${head.slice(0, 12)} is not the candidate ${bound.commit.slice(0, 12)}${Number.isInteger(followers) && followers > 0 ? `; ${followers} commit(s) follow the candidate (typically the export or the lineage of the previous round, an evidence-only commit)` : ""}. The diagnostic is produced while HEAD is the candidate and the tree is clean, so produce it right after the correction commit and BEFORE any evidence, export or lineage commit (register-feature-package.mjs --help, "Critic delta request route"). If such a commit already follows, produce it from a clean checkout of exactly the candidate (a detached checkout of ${bound.commit} used as --root), then place its log and its diagnostic file in this checkout under the same evidence paths and register them. Nothing was written.`);
++    const why = followerRefusal.reason === "not-a-descendant" ? `HEAD is not a descendant of the candidate (rewritten or unrelated history)`
++      : followerRefusal.reason === "no-feature" ? `the spec path ${followerRefusal.specPath} does not lie under specs/<feature-id>/, so no follower commit can be classified as evidence-only`
++        : followerRefusal.reason === "touches-bound-source" ? `the commits after the candidate change the spec or a guardrail it binds`
++          : followerRefusal.offending ? `commit ${followerRefusal.offending.slice(0, 12)} after the candidate is not an evidence-only commit` : `the commits after the candidate could not be read`;
++    fail("CDI-DIRTY-CANDIDATE", `HEAD ${head.slice(0, 12)} is not the candidate ${bound.commit.slice(0, 12)}${Number.isInteger(followers) && followers > 0 ? `; ${followers} commit(s) follow the candidate` : ""}, and ${why}. The diagnostic is produced while HEAD is the candidate, or while every commit after it is an evidence-only commit (a manifest registration, the export of a consumed review, a disposition addendum) and the tracked tree is clean (register-feature-package.mjs --help, "Critic delta request route"). Otherwise produce it right after the correction commit and BEFORE any commit that is not evidence-only, or from a clean checkout of exactly the candidate (a detached checkout of ${bound.commit} used as --root), then place its log and its diagnostic file in this checkout under the same evidence paths and register them. Nothing was written.`);
+   }
+   fail("CDI-DIRTY-CANDIDATE", `the working tree differs from the candidate ${bound.commit.slice(0, 12)}: commit or remove the tracked changes first (git diff --name-only ${bound.commit.slice(0, 12)} names them), then run this command again. Nothing was written.`);
+ }
+ 
++/**
++ * C30F-G2: the HEAD a diagnostic may be produced at is the candidate itself, or a descendant whose every follower commit the course classifier
++ * (`classifyEvidenceOnlyFollowers`, critic-course-admission.mjs) calls evidence-only and that leaves the bound spec and guardrails byte-identical.
++ * Returns null when HEAD is admitted, otherwise the follower refusal for `dirtyCandidateRefusal`.
++ */
++function followerRefusal(root, bound, head, specPath, guardrailPaths) {
++  if (head === bound.commit) return null;
++  const featureId = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\//u.exec(specPath)?.[1];
++  if (featureId === undefined) return { reason: "no-feature", specPath };
++  const classified = classifyEvidenceOnlyFollowers({ repoRoot: root, featureId, candidateCommit: bound.commit, headCommit: head });
++  if (!classified.ok) return { reason: classified.reason, offending: classified.offending };
++  const boundPaths = [specPath, ...guardrailPaths];
++  if (git(root, ["diff", "--name-only", bound.commit, head, "--", ...boundPaths]).trim() !== "") return { reason: "touches-bound-source" };
++  return null;
++}
++
+ /** Execute, capture and bind an actual targeted run. No caller-supplied success flag. */
+ export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = undefined, specPath, guardrailPaths = [], command, label = "targeted-check", logPath, fullVerifyPath = null, pending = [] }) {
+   const bound = candidateBinding(root, candidate);
+@@ -61,7 +84,9 @@ export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = un
+     try { guardrailPaths = deriveRequiredCriticGuardrails({ root, candidate: bound.commit, base, explicitGuardrails: guardrailPaths }).paths; }
+     catch (error) { fail(error?.code ?? "CDI-GUARDRAIL-DERIVATION"); }
+   }
+-  if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") dirtyCandidateRefusal(root, bound);
++  const head = git(root, ["rev-parse", "HEAD"]).trim();
++  const refused = followerRefusal(root, bound, head, specPath, [...new Set(guardrailPaths)]);
++  if (refused !== null || git(root, ["diff", "--name-only", head, "--"]).trim() !== "") dirtyCandidateRefusal(root, bound, false, refused);
+   newDiagnosticPath(root, logPath);
+   if (diagnosticEvidenceLocation(logPath) === null || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
+   // C21B: refused BEFORE the capture, otherwise the failed attempt leaves its log behind and the retry with the same names stops on CDI-OUTPUT-EXISTS.
+@@ -69,7 +94,7 @@ export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = un
+   const spec = source(root, bound.commit, specPath);
+   const guardrails = [...new Set(guardrailPaths)].sort().map(path => source(root, bound.commit, path));
+   const captured = captureEvidence({ command, label, out: logPath, cwd: root, repoRoot: root });
+-  if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") dirtyCandidateRefusal(root, bound, true);
++  if (git(root, ["rev-parse", "HEAD"]).trim() !== head || git(root, ["diff", "--name-only", head, "--"]).trim() !== "") dirtyCandidateRefusal(root, bound, true);
+   const fullVerify = { status: "not-run", evidence: null };
+   if (fullVerifyPath !== null) {
+     const bytes = readDiagnosticArtifact(root, fullVerifyPath);
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 93852af24..161347d54 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -294,7 +294,7 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path,
+       // route is the producer's own derivation (`--base`), never a typed `--guardrail`. The exact base is the one this preflight derived the list over.
+       const reason = diagnosticBase === null
+         ? `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}); this review has no commit base to derive them over, so re-produce the diagnostic with one --guardrail per listed path that is not a protected calibration path`
+-        : `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}). Re-produce the diagnostic so the producer derives the required guardrails itself: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log <evidence log> --out <evidence file> --candidate ${candidateCommit} --base ${diagnosticBase} -- <command>; with --base it adds every required guardrail on its own, so never pass a protected calibration path by --guardrail (the shell guard refuses that command). Keep --base exactly as printed (this preflight's base; a base equal to the candidate derives an empty set). Produce it while HEAD is still the candidate and the tree is clean (CDI-DIRTY-CANDIDATE after any follow-up commit); a second diagnostic for the same candidate gives CCA-DELTA-BINDING until the delta request is registered again`;
++        : `${path} lacks required guardrails (${requiredGuardrailPaths.join(", ")}). Re-produce the diagnostic so the producer derives the required guardrails itself: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log <evidence log> --out <evidence file> --candidate ${candidateCommit} --base ${diagnosticBase} -- <command>; with --base it adds every required guardrail on its own, so never pass a protected calibration path by --guardrail (the shell guard refuses that command). Keep --base exactly as printed (this preflight's base; a base equal to the candidate derives an empty set). Produce it while HEAD is still the candidate or only evidence-only commits (a registration, an export, an addendum) follow it, and the tree is clean (CDI-DIRTY-CANDIDATE after a follow-up commit that is not evidence-only); a second diagnostic for the same candidate gives CCA-DELTA-BINDING until the delta request is registered again`;
+       fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths, diagnosticBase, reason });
+     }
+     const reason = value?.schema === "pipeline.verify-evidence.v0"
+@@ -361,7 +361,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   const evidence = uniquePaths(evidencePaths, "evidence path");
+   if (evidence.length === 0) {
+     // Candidate 17 (Toolbox): the refusal carried no reason; name what is admitted, the exact producers and the flag that passes it.
+-    const reason = `No --evidence was given. Produce evidence for the exact candidate ${candidateCommit}, then pass it with --evidence <file> (repeatable): either a Verify evidence of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --base <base> --commit ${candidateCommit} --out <evidence file>) or a Critic diagnostic evidence (node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, see its --help). Security evidence is not admitted here. Produce it while HEAD is the candidate and the tree is clean.`;
++    const reason = `No --evidence was given. Produce evidence for the exact candidate ${candidateCommit}, then pass it with --evidence <file> (repeatable): either a Verify evidence of mode critic (node \${PIPELINE_PLUGIN_ROOT}/scripts/verify-evidence-producer.mjs --root <root> --mode critic --base <base> --commit ${candidateCommit} --out <evidence file>) or a Critic diagnostic evidence (node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-diagnostic-evidence.mjs, see its --help). Security evidence is not admitted here. Produce it while HEAD is the candidate (or only evidence-only commits follow it) and the tree is clean.`;
+     // C29 A2 (test round 28d): each refusal of the Critic preparation revealed only the next prerequisite. The first refusal an agent meets
+     // now lists the later ones in their fixed order, as push-init lists its unmet checks; the code, the stage and the field set of a
+     // project without a map or a feature package are unchanged.
+@@ -688,7 +688,7 @@ function evidenceRequiredPrerequisites(root, candidateCommit, specPath, courseCo
+     let packaged = false;
+     if (featureId !== null) { try { packaged = JSON.parse(candidateText(root, candidateCommit, `specs/${featureId}/lifecycle.json`)) !== null; } catch { packaged = false; } }
+     if (checks.length === 0 && !packaged) return [];
+-    checks.push({ id: "candidate-evidence", ok: false, status: "missing", code: "CDP-EVIDENCE-REQUIRED", remedy: `produce evidence for ${candidateCommit} while HEAD is that commit and the tree is clean, and pass it with --evidence <file> (see reason)` });
++    checks.push({ id: "candidate-evidence", ok: false, status: "missing", code: "CDP-EVIDENCE-REQUIRED", remedy: `produce evidence for ${candidateCommit} while HEAD is that commit (or only evidence-only commits follow it) and the tree is clean, and pass it with --evidence <file> (see reason)` });
+     if (packaged) {
+       const evidenceDir = `specs/${featureId}/evidence/`;
+       checks.push(
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index c9efbaf7a..a5b9947e8 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -484,6 +484,53 @@ test("first Critic admits actual failed targeted diagnostics with full Verify no
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// C30F-G2: a diagnostic produced while only evidence-only commits follow the candidate binds the CANDIDATE and the preflight judges it exactly as one produced at the candidate.
++test("C30F-G2 the preflight and the course admission accept a registered diagnostic produced behind an evidence-only follower, bound to the candidate", () => {
++  const fx = fixture();
++  try {
++    const featureId = "follow-feat", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`;
++    mkdirSync(join(fx.root, dir, "evidence"), { recursive: true }); mkdirSync(join(fx.root, dir, "design"), { recursive: true });
++    writeFileSync(join(fx.root, `${dir}/spec.md`), "# Follow feature\nAC-1: behavior boundary\n");
++    const unitPath = `${dir}/design/critic-review-unit.json`;
++    writeFileSync(join(fx.root, unitPath), JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior boundary", specPath: `${dir}/spec.md`, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(fx.root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
++    const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", artifacts: [
++      { class: "spec", path: `${dir}/spec.md`, sha256: sha256(readFileSync(join(fx.root, `${dir}/spec.md`))), authority: true, mutability: "mutable", retention: "active" },
++      { class: "design", path: unitPath, sha256: sha256(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }] };
++    writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
++    git(fx.root, ["add", dir]);
++    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature genesis"]);
++    const base = git(fx.root, ["rev-parse", "HEAD"]);
++    writeFileSync(join(fx.root, `${dir}/spec.md`), "# Follow feature\nchanged\n");
++    git(fx.root, ["add", dir]);
++    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "feature candidate"]);
++    const candidate = git(fx.root, ["rev-parse", "HEAD"]);
++    const body = "{\"note\":\"earlier round\"}\n";
++    writeFileSync(join(fx.root, `${dir}/evidence/earlier.json`), body);
++    manifest.artifacts.push({ class: "candidate-evidence", path: `${dir}/evidence/earlier.json`, sha256: sha256(body), authority: false, mutability: "immutable", retention: "retain" });
++    writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
++    git(fx.root, ["add", dir]);
++    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "evidence registered after the candidate"]);
++    assert.notEqual(git(fx.root, ["rev-parse", "HEAD"]), candidate);
++    const value = produceCriticDiagnostic({ root: fx.root, candidate, specPath: `${dir}/spec.md`, guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/follower-targeted.log" });
++    assert.deepEqual(value.candidate, { commit: candidate, tree: git(fx.root, ["rev-parse", `${candidate}^{tree}`]) });
++    assert.match(readFileSync(join(fx.root, "evidence/follower-targeted.log"), "utf8"), new RegExp(`head: ${git(fx.root, ["rev-parse", "HEAD"])}`, "u"), "the capture names HEAD, the follower, not the candidate");
++    // Register it the way the course reads it (one evidence-only commit), then run the preflight with the registration commit.
++    const diagnosticPath = `${dir}/evidence/diagnostic.json`, logPath = `${dir}/evidence/targeted.log`;
++    writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, "evidence/follower-targeted.log")));
++    writeFileSync(join(fx.root, diagnosticPath), JSON.stringify({ ...value, targeted: { ...value.targeted, log: { ...value.targeted.log, path: logPath } } }));
++    for (const path of [diagnosticPath, logPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
++    writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest)}\n`);
++    git(fx.root, ["add", dir]);
++    git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "register the candidate-bound diagnostic"]);
++    const registrationCommit = git(fx.root, ["rev-parse", "HEAD"]);
++    const result = preflightCriticDispatch(input(fx, { base, candidate, specPath: `${dir}/spec.md`, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } }));
++    assert.equal(result.status, "packet-ready", JSON.stringify(result));
++    assert.equal(result.candidate.commit, candidate);
++    assert.equal(result.coordinatorOnly.courseAdmission.featureId, featureId);
++    assert.equal(result.evidence[0].candidate.commit, candidate);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("failed canonical Verify admits review without satisfying final qualification", () => {
+   const fx = fixture();
+   try {
+@@ -1139,7 +1186,8 @@ test("N43 (a) the missing-guardrails refusal for a changed calibration names the
+       // Toolbox follow-up: the base stays the preflight base, the diagnostic is made while HEAD is the candidate, a second one binds to the delta request.
+       assert.match(reason, /Keep --base exactly as printed/u);
+       assert.match(reason, /a base equal to the candidate derives an empty set/u);
+-      assert.match(reason, /still the candidate and the tree is clean \(CDI-DIRTY-CANDIDATE/u);
++      // QG-04 restatement (C30F-G2): the intent (the text names the clean-tree rule and CDI-DIRTY-CANDIDATE) stays; the pinned wording changed because an evidence-only follower no longer refuses.
++      assert.match(reason, /still the candidate or only evidence-only commits \(a registration, an export, an addendum\) follow it, and the tree is clean \(CDI-DIRTY-CANDIDATE after a follow-up commit that is not evidence-only\)/u);
+       assert.match(reason, /CCA-DELTA-BINDING/u);
+       assert.equal(error.details.diagnosticBase, fx.candidate);
+       return true;
