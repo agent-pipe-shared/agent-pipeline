@@ -1,0 +1,404 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 230f19361..1c746ef16 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -782,14 +782,17 @@ export function addSpecAddendum({ root: rootInput, state, approvalPath, readAcce
+ 
+ /**
+  * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
+- * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
++ * packet id is derived from the repository: the feature (the single registered feature course; C30J-J13: with several features that
++ * hold a review unit, for example a retained discarded predecessor, the one whose course the consumed packet's course claim binds),
++ * registrationCommit = HEAD,
+  * the round candidate/base from the consumed packet, the parent from the registered history tail. The record is compiled by
+  * compileRegisteredCriticReviewLineage, written as the immutable `critic-lineage-<sha>.json` and added to the manifest as
+- * non-authority candidate-evidence. Nothing is committed.
++ * non-authority candidate-evidence. Nothing is committed. The optional `featureId` (`--feature <id>`) is a selector that is checked
++ * against the same binding and refused when the claim binds another feature.
+  */
+ const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
+ const DELTA_REQUEST_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-delta-request-[a-f0-9]{64}\.json$/u;
+-export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract, dryRun = false } = {}) {
++export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract, dryRun = false, featureId: selector = null } = {}) {
+   if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
+   let root;
+   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+@@ -806,8 +809,10 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   let features = [];
+   try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
+   if (features.length === 0) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId });
+-  if (features.length > 1) return refused("FPR-LINEAGE-FEATURE-AMBIGUOUS", `more than one feature has a review unit (${features.join(", ")}); the lineage verb needs exactly one registered feature course`, { packetId });
+-  const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
++  if (selector !== null && (typeof selector !== "string" || !features.includes(selector))) return refused("FPR-LINEAGE-FEATURE-SELECTOR", `--feature ${JSON.stringify(selector)} is not a feature that has a Critic review unit (${features.join(", ")}); name one of them: register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId} --feature <feature id>`, { packetId });
++  // C30J-J13: everything below the choice of the feature is derived per feature; a feature whose course the consumed claim does not bind refuses (or compiles to nothing) by itself.
++  const derive = (featureId) => {
++  const manifestPath = `specs/${featureId}/lifecycle.json`;
+   const manifestRead = inspect(root, manifestPath);
+   const checked = validateFeaturePackage(root, manifestPath);
+   if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
+@@ -862,7 +867,26 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
+   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
+   if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}${String(compiled.code).startsWith("CRL-HISTORY-CHAIN:") ? ": the chain to the last registered round broke at the named condition; parent-review-id and previous-sha256 mean the parent is not the last registered round, review-id-repeated that the review id is not new, fresh-from, lane-id-equal and context-equal that the round is not an independent run after its parent" : ""}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: compiled.code, packetId });
+-  const artifact = compiled.value.artifact;
++  return { ready: { featureId, manifestPath, manifestRead, manifest, round, artifact: compiled.value.artifact } };
++  };
++  const attempt = (id) => { try { return derive(id); } catch { return refused("FPR-LINEAGE-COMPILE", `the lineage of ${id} could not be derived`, { packetId }); } };
++  const rerunWith = (id) => `register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId} --feature ${id}`;
++  let chosen;
++  if (selector !== null) {
++    chosen = derive(selector);
++    // A selector that contradicts the packet's own course claim is refused naming the feature the claim binds; it is never followed.
++    const bound = chosen.status === "refused" ? features.filter((id) => id !== selector && attempt(id).status !== "refused") : [];
++    if (bound.length > 0) return refused("FPR-LINEAGE-FEATURE-SELECTOR-CONTRADICTS", `--feature ${selector} contradicts the consumed packet ${packetId}: its course claim binds ${bound.join(", ")}, not ${selector}. Rerun with the bound feature: ${rerunWith(bound[0])}`, { packetId, boundFeatures: bound });
++  } else if (features.length === 1) chosen = derive(features[0]);
++  else {
++    const outcomes = features.map((id) => [id, attempt(id)]);
++    const bound = outcomes.filter(([, outcome]) => outcome.status !== "refused");
++    if (bound.length !== 1) return refused("FPR-LINEAGE-FEATURE-AMBIGUOUS", `more than one feature has a review unit (${outcomes.map(([id, outcome]) => `${id}: ${outcome.status === "refused" ? outcome.code : "claim binds it"}`).join("; ")}) and the course claim of packet ${packetId} binds ${bound.length === 0 ? "none of them" : "more than one of them"}. Name the feature the round belongs to with the selector (it is checked against that claim; the refusal of that feature itself is then printed): ${features.map(rerunWith).join(" | ")}`, { packetId, features });
++    chosen = bound[0][1];
++  }
++  // A refusal or an idempotent replay of the chosen feature answers by itself.
++  if (chosen.ready === undefined) return chosen;
++  const { featureId, manifestPath, manifestRead, manifest, round, artifact } = chosen.ready;
+   // D223 guard: `dryRun` answers "would this write succeed right now" with the SAME derivation, and writes nothing.
+   if (dryRun === true) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-registrable", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`, commitPaths: [manifestPath, artifact.path] };
+   const target = join(root, artifact.path), created = !existsSync(target);
+@@ -1011,7 +1035,7 @@ function manifestCoreUnchanged(root, parent, commit, manifestPath) {
+ }
+ /** When `true` is factually right, and when it is not (shown with the refusal, the skeleton and the help text). */
+ const FULL_ROUND_GUIDANCE = "impactAmbiguous is true only when the changed paths' effect cannot be told even after reading them. A large or risky-looking diff is neither: the diff round exists for it.";
+-export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract, confirmFullRound = false } = {}) {
++export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract, confirmFullRound = false, featureId: selector = null, state = null } = {}) {
+   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
+   let root;
+   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+@@ -1047,7 +1071,20 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+   // The single registered feature course.
+   let features = [];
+   try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
+-  if (features.length !== 1) return refused("FPR-DELTA-FEATURE", features.length === 0 ? "no feature has a Critic review unit; there is no registered feature course" : `more than one feature has a review unit (${features.join(", ")}); the delta verb needs exactly one registered feature course`);
++  // C30J-J13: with several features that hold a review unit, the features the State records as discarded (the PO's recorded decision; a discarded feature takes no further review round) are
++  // left out; the manifest relation `supersedes` alone never retires a feature. The selector decides when that does not leave exactly one, and it never names a discarded feature. The chosen
++  // feature must still hold a registered lineage (FPR-DELTA-NO-LINEAGE below), so a selector never reaches a feature without a round.
++  const reviewUnitFeatures = features, discarded = discardedFeatureIdsOfState(state);
++  const delta = (id) => `register-feature-package.mjs --root <root> --add-delta-request <input.json> --feature ${id}`;
++  if (selector !== null) {
++    if (typeof selector !== "string" || !features.includes(selector)) return refused("FPR-DELTA-FEATURE-SELECTOR", `--feature ${JSON.stringify(selector)} is not a feature that has a Critic review unit (${features.join(", ") || "none"}); name one of them: ${delta("<feature id>")}`);
++    if (discarded.includes(selector)) return refused("FPR-DELTA-FEATURE-DISCARDED", `--feature ${selector}: the State records ${selector} as discarded, and a discarded feature takes no further review round. Name its successor${features.length > 1 ? `: ${features.filter((id) => !discarded.includes(id)).map(delta).join(" | ") || delta("<successor feature id>")}` : ""}`);
++    features = [selector];
++  } else if (features.length > 1) {
++    const active = features.filter((id) => !discarded.includes(id));
++    if (active.length >= 1) features = active;
++  }
++  if (features.length !== 1) return refused("FPR-DELTA-FEATURE", features.length === 0 ? "no feature has a Critic review unit; there is no registered feature course" : `more than one feature has a review unit (${reviewUnitFeatures.join(", ")}) and leaving out the features the State records as discarded does not leave exactly one (a successor's supersedes alone is not enough, the State's discard record is the evidence); name the feature of this course: ${reviewUnitFeatures.map(delta).join(" | ")}`);
+   const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
+   const manifestRead = inspect(root, manifestPath);
+   const checked = validateFeaturePackage(root, manifestPath);
+diff --git a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+index e15f177cd..eae21844e 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+@@ -12,7 +12,11 @@ import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatMo
+ import {
+   PUSH_THREAT_MODEL_UNCHANGED_MARKER, collectPushThreatModelFacts, isPushThreatModelTemplateUnchanged, renderPushThreatModel,
+ } from "../lib/push-threat-model-materialize.mjs";
+-import { addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { spawnSync } from "node:child_process";
++import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
++import { parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
++import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
++import { addCriticDeltaRequest, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import { PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ import { REGISTER_FEATURE_PACKAGE_HELP, pushThreatModelReadback, runRegisterFeaturePackage } from "./register-feature-package.mjs";
+@@ -375,3 +379,224 @@ test("SUP10: the CLI accepts exactly --root <root> --supersedes <id> as the new
+   assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--root <root> --supersedes <predecessor feature id>/u);
+   assert.match(REGISTER_FEATURE_PACKAGE_HELP, /discard-feature/u);
+ });
++
++// C30J-J13 (AC-112 is the closest accepted criterion; consumer blocker 2026-11-17): an active feature has a DISCARDED predecessor whose registration is retained, both with
++// a manifest and a Critic review unit. The review ran and was consumed, yet --add-review-lineage stopped FPR-LINEAGE-FEATURE-AMBIGUOUS (and the delta verb FPR-DELTA-FEATURE)
++// because every feature with a review unit counted. The consumed packet's course claim names exactly one feature's course; the lineage verb now derives the feature from it.
++// Seam (named): the Critic model call; the verdict is a fixture return, every other step runs through the real entry points (preflight CLI, admission, finalizer).
++const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
++delete GIT_ENV.NODE_TEST_CONTEXT;
++const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
++const jsonText = (value) => `${JSON.stringify(value, null, 2)}\n`;
++function git(root, args) {
++  const result = spawnSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-C", root, ...args], { encoding: "utf8", shell: false, env: GIT_ENV });
++  assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
++  return result.stdout.trim();
++}
++const commitPaths = (root, paths, message) => { git(root, ["add", "-f", "--", ...paths]); git(root, ["commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++const CRITIC_SPEC = (id) => `specs/${id}/spec.md`;
++/** One feature package with a Critic review unit: the spec, the unit, the topology entries and the manifest (returned as an object so a later commit can re-digest the spec). */
++function featurePackage(root, id, { supersedes = null } = {}) {
++  const unitPath = `specs/${id}/design/critic-review-unit.json`;
++  put(root, CRITIC_SPEC(id), "# Complete behavior\nAC-1: deliver complete behavior\n");
++  put(root, unitPath, JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior", specPath: CRITIC_SPEC(id), logicalWorkIds: ["scope-one", "scope-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
++  const topology = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
++    const path = `specs/${id}/${rel}`; put(root, path, `${klass}\n`);
++    return { class: klass, path, sha256: sha(readFileSync(join(root, path))), authority, mutability, retention };
++  });
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "approved", candidate: null, supersedes, artifacts: [
++    { class: "spec", path: CRITIC_SPEC(id), sha256: sha(readFileSync(join(root, CRITIC_SPEC(id)))), authority: true, mutability: "mutable", retention: "active" },
++    { class: "design", path: unitPath, sha256: sha(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }, ...topology] };
++  put(root, `specs/${id}/lifecycle.json`, JSON.stringify(manifest));
++  return manifest;
++}
++const treeDigests = (root, id) => Object.fromEntries(readdirSync(join(root, "specs", id), { recursive: true }).map(String).filter((rel) => existsSync(join(root, "specs", id, rel)) && !statSync(join(root, "specs", id, rel)).isDirectory()).sort().map((rel) => [rel, sha(readFileSync(join(root, "specs", id, rel)))]));
++const SPEC_ARGV = (root, base, candidate, diagnosticPath, registrationCommit) => ["--root", root, "--base", base, "--candidate", candidate, "--spec", CRITIC_SPEC(SUCCESSOR), "--evidence", diagnosticPath, "--registration-commit", registrationCommit];
++
++/**
++ * A consumer repository: DISCARDED predecessor `feature-a` (manifest and review unit retained, no review round) and the active successor `feature-b`; round 1 of
++ * the successor is walked through preflight, admission and the finalizer.
++ */
++function consumedRound({ withPredecessor = true, supersedes = null } = {}) {
++  const root = tempRoot();
++  git(root, ["init", "-q", "-b", "main"]);
++  put(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngovernance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
++  put(root, "governance/guidelines/review.md", "Review changed code.\n");
++  put(root, "governance/policies/checklist.md", "- verify\n");
++  put(root, ".gitignore", "/project/pipeline-state.json\n/.claude/pipeline-state.json\n/scratch/\n/evidence/*-targeted-*.log\n");
++  put(root, "project/pipeline.json", jsonText({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md"] }));
++  put(root, "docs/state.md", "state v1\n"); put(root, "docs/findings.md", "findings quoted here\n"); put(root, "pipeline.user.yaml", "gates:\n  human_approval: chat\n");
++  // The State is not a tracked file in a consumer; a successor course reads the predecessor's discard record from it (the manifest relation alone is not enough for the admission).
++  if (supersedes !== null) put(root, ".claude/pipeline-state.json", jsonText({ schema: "pipeline.state.v0", activeFeature: null, discardedFeatures: [{ id: supersedes, planPath: `specs/${supersedes}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null }] }));
++  git(root, ["add", "--", "."]); git(root, ["commit", "-qm", "base"]);
++  if (withPredecessor) { featurePackage(root, PREDECESSOR); commitPaths(root, [`specs/${PREDECESSOR}`], "the discarded predecessor keeps its registration"); }
++  const manifest = featurePackage(root, SUCCESSOR, { supersedes });
++  const genesis = commitPaths(root, [`specs/${SUCCESSOR}`], "declare feature review unit");
++  put(root, CRITIC_SPEC(SUCCESSOR), "# Complete behavior\nAC-1: deliver complete behavior\nImplemented behavior.\n");
++  manifest.artifacts[0].sha256 = sha(readFileSync(join(root, CRITIC_SPEC(SUCCESSOR))));
++  put(root, `specs/${SUCCESSOR}/lifecycle.json`, JSON.stringify(manifest));
++  const candidate = commitPaths(root, [CRITIC_SPEC(SUCCESSOR), `specs/${SUCCESSOR}/lifecycle.json`], "integrate feature behavior");
++  const registered = registerDiagnosticFor(root, candidate, "r1");
++  return { root, genesis, candidate, manifest, ...walkRound(root, { genesis, candidate, diagnosticPath: registered.diagnosticPath, registrationCommit: registered.registration, n: 1 }) };
++}
++function registerDiagnosticFor(root, candidate, tag) {
++  const manifestPath = `specs/${SUCCESSOR}/lifecycle.json`, logPath = `specs/${SUCCESSOR}/evidence/targeted-${tag}.log`, diagnosticPath = `specs/${SUCCESSOR}/evidence/diagnostic-${tag}.json`, capturedPath = `evidence/${SUCCESSOR}-targeted-${tag}.log`;
++  const produced = produceCriticDiagnostic({ root, candidate, specPath: CRITIC_SPEC(SUCCESSOR), guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++  put(root, logPath, readFileSync(join(root, capturedPath)));
++  produced.targeted.log.path = logPath;
++  put(root, diagnosticPath, JSON.stringify(produced));
++  const manifest = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
++  for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  return { diagnosticPath, registration: commitPaths(root, [manifestPath, logPath, diagnosticPath], `register the ${tag} diagnostic`) };
++}
++/** Preflight (real CLI), admission and finalizer of one round; the finalizer writes the lineage itself (D223) and returns what it observed. */
++function walkRound(root, { genesis, candidate, diagnosticPath, registrationCommit, n }) {
++  const argv = SPEC_ARGV(root, genesis, candidate, diagnosticPath, registrationCommit);
++  const preflight = spawnSync(process.execPath, [join(SCRIPTS_DIR, "critic-dispatch-preflight.mjs"), ...argv], { encoding: "utf8", shell: false, env: GIT_ENV, cwd: root });
++  const body = JSON.parse(preflight.stdout.split("\n")[0]);
++  assert.equal(body.status, "packet-ready", `${preflight.stdout}${preflight.stderr}`);
++  const taskId = `critic-round-${n}`, packetId = `a${(n + 9).toString(16)}`.repeat(16);
++  put(root, `evidence/dispatch-record-${taskId}.json`, JSON.stringify({ schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: [CRITIC_SPEC(SUCCESSOR)] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } }));
++  const request = { preflightInput: parseCriticDispatchPreflightArgs(argv), taskId, projectId: "pipeline", sessionId: `session-${n}`, packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
++    verdict: { findings: [], pass: true, deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [] } };
++  admitSessionCriticReview(request, {});
++  const origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
++  const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: origin });
++  assert.equal(finalized.status, "completed", JSON.stringify(finalized));
++  return { packetId, finalized };
++}
++
++test("J13-1: a retained discarded predecessor with a manifest and a review unit no longer makes the lineage of the consumed round ambiguous (the finalizer and the verb choose the successor)", () => {
++  const f = consumedRound();
++  const before = treeDigests(f.root, PREDECESSOR);
++  assert.deepEqual(Object.keys(before).filter((rel) => rel.includes("critic-lineage")), [], "the predecessor holds no lineage record");
++  assert.equal(f.finalized.lineage?.status, "written", `the finalizer writes the lineage under the successor: ${JSON.stringify(f.finalized.lineage)}`);
++  assert.match(f.finalized.lineage.lineagePath, new RegExp(`^specs/${SUCCESSOR}/evidence/critic-lineage-[a-f0-9]{64}\\.json$`, "u"));
++  const manifestBytes = readFileSync(join(f.root, `specs/${SUCCESSOR}/lifecycle.json`));
++  // A repeated identical call is idempotent: the same record, no second one, no change of the manifest.
++  const again = addCriticReviewLineage({ root: f.root, packetId: f.packetId });
++  assert.equal(again.status, "already-registered", JSON.stringify(again));
++  assert.equal(again.lineagePath, f.finalized.lineage.lineagePath);
++  assert.deepEqual(readFileSync(join(f.root, `specs/${SUCCESSOR}/lifecycle.json`)), manifestBytes);
++  assert.equal(readdirSync(join(f.root, "specs", SUCCESSOR, "evidence")).filter((name) => name.startsWith("critic-lineage-")).length, 1);
++  assert.deepEqual(treeDigests(f.root, PREDECESSOR), before, "the predecessor and its history stay byte-identical");
++});
++
++/** Take the lineage the finalizer wrote back out of the working tree, so the verb itself has to register it. */
++function unregisterLineage(f) {
++  rmSync(join(f.root, f.finalized.lineage.lineagePath));
++  git(f.root, ["checkout", "--", `specs/${SUCCESSOR}/lifecycle.json`]);
++  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "");
++}
++
++test("J13-2: the selector --feature is validated against the consumed claim: the bound feature registers, another one is refused naming the bound one, an unknown one is refused, nothing is written by a refusal", () => {
++  const f = consumedRound();
++  unregisterLineage(f);
++  const before = treeDigests(f.root, PREDECESSOR), manifestBytes = readFileSync(join(f.root, `specs/${SUCCESSOR}/lifecycle.json`));
++  // Probing the feature the claim does not bind must leave no private state either: the Critic owner store under the git common directory is identical around the probes.
++  const store = () => { const dir = join(f.root, ".git", "agent-pipeline"); return readdirSync(dir, { recursive: true }).map(String).sort().map((rel) => [rel, statSync(join(dir, rel)).isDirectory() ? "dir" : sha(readFileSync(join(dir, rel)))]); };
++  const storeBefore = store();
++  const unknown = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: "feature-zzz" });
++  assert.equal(unknown.code, "FPR-LINEAGE-FEATURE-SELECTOR", JSON.stringify(unknown));
++  assert.match(unknown.reason, /--add-review-lineage --packet [a-f0-9]{32} --feature <feature id>/u);
++  const contradicts = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: PREDECESSOR });
++  assert.equal(contradicts.code, "FPR-LINEAGE-FEATURE-SELECTOR-CONTRADICTS", JSON.stringify(contradicts));
++  assert.ok(contradicts.reason.includes(`--feature ${SUCCESSOR}`), `the refusal names the bound feature and the command: ${contradicts.reason}`);
++  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "a refusal writes nothing");
++  const dry = addCriticReviewLineage({ root: f.root, packetId: f.packetId, dryRun: true });
++  assert.equal(dry.status, "lineage-registrable", JSON.stringify(dry));
++  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "the dry run writes nothing");
++  assert.deepEqual(store(), storeBefore, "the probes of the non-bound feature changed nothing in the Critic owner store");
++  const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR });
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  assert.equal(added.manifestPath, `specs/${SUCCESSOR}/lifecycle.json`);
++  assert.notDeepEqual(readFileSync(join(f.root, added.manifestPath)), manifestBytes, "the successor's manifest lists the lineage record");
++  assert.deepEqual(treeDigests(f.root, PREDECESSOR), before, "the predecessor is never touched");
++  assert.equal(addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR }).status, "already-registered");
++  assert.equal(addCriticReviewLineage({ root: f.root, packetId: f.packetId }).status, "already-registered");
++});
++
++test("J13-3: when the claim binds none of several features, the refusal names every feature with its own code and the selector command", () => {
++  const f = consumedRound();
++  unregisterLineage(f);
++  rmSync(join(f.root, `specs/${SUCCESSOR}/design/critic-review-unit.json`));
++  featurePackage(f.root, "feature-c");
++  const result = addCriticReviewLineage({ root: f.root, packetId: f.packetId });
++  assert.equal(result.code, "FPR-LINEAGE-FEATURE-AMBIGUOUS", JSON.stringify(result));
++  assert.match(result.reason, /binds none of them/u);
++  for (const id of [PREDECESSOR, "feature-c"]) assert.ok(result.reason.includes(`--add-review-lineage --packet ${f.packetId} --feature ${id}`), `${id}: ${result.reason}`);
++  assert.equal(result.features.length, 2);
++});
++
++/** The lineage of round 1 committed, then a correction commit with its registered diagnostic: the state in which the delta verb runs. */
++function correctedRound(f) {
++  commitPaths(f.root, f.finalized.lineage.commitPaths, "register lineage of round 1");
++  put(f.root, "src/fix2.mjs", "export const fix2 = 2;\n");
++  const candidate = commitPaths(f.root, ["src/fix2.mjs"], "fix: round 2 correction");
++  registerDiagnosticFor(f.root, candidate, "r2");
++  return candidate;
++}
++const deltaInput = (root, map) => put(root, "scratch/delta-input.json", JSON.stringify({ changedBehaviorClaims: ["fix-2"], coordinatorImpactConfirmed: true, impactAmbiguous: false, pathInvariantMap: map }));
++const DISCARDED_STATE = { discardedFeatures: [{ id: PREDECESSOR, discardedBy: "Operator", reason: "abandoned" }] };
++
++test("J13-4: the delta verb chooses the active feature when the State records the other one as discarded; without that evidence it refuses naming the selector", () => {
++  const f = consumedRound();
++  correctedRound(f);
++  const before = treeDigests(f.root, PREDECESSOR);
++  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
++  const unresolved = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json" });
++  assert.equal(unresolved.code, "FPR-DELTA-FEATURE", JSON.stringify(unresolved));
++  assert.ok(unresolved.reason.includes(`--add-delta-request <input.json> --feature ${SUCCESSOR}`), unresolved.reason);
++  const mapStep = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
++  assert.equal(mapStep.code, "FPR-DELTA-MAP", JSON.stringify(mapStep));
++  deltaInput(f.root, Object.fromEntries(mapStep.changedPaths.map((path) => [path, ["inv-one"]])));
++  const added = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
++  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
++  assert.ok(added.commitPaths.every((path) => path.startsWith(`specs/${SUCCESSOR}/`)), JSON.stringify(added.commitPaths));
++  assert.deepEqual(treeDigests(f.root, PREDECESSOR), before, "the predecessor is never touched");
++});
++
++test("J13-5: the delta selector --feature decides without the State; a feature without a registered lineage and an unknown one are refused; the successor relation of the manifest is a second evidence", () => {
++  const f = consumedRound();
++  correctedRound(f);
++  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
++  const unknown = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", featureId: "feature-zzz" });
++  assert.equal(unknown.code, "FPR-DELTA-FEATURE-SELECTOR", JSON.stringify(unknown));
++  const wrong = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", featureId: PREDECESSOR });
++  assert.equal(wrong.code, "FPR-DELTA-NO-LINEAGE", `the predecessor holds no registered round: ${JSON.stringify(wrong)}`);
++  const chosen = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", featureId: SUCCESSOR });
++  assert.equal(chosen.code, "FPR-DELTA-MAP", JSON.stringify(chosen));
++});
++
++test("J13-6: the successor relation in the manifest (supersedes) is a second evidence only: alone it retires nothing, with the State's discard record the active feature is chosen, a selector naming a discarded feature is refused", () => {
++  const f = consumedRound({ supersedes: PREDECESSOR });
++  correctedRound(f);
++  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
++  const alone = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json" });
++  assert.equal(alone.code, "FPR-DELTA-FEATURE", JSON.stringify(alone));
++  assert.ok(alone.reason.includes(`--add-delta-request <input.json> --feature ${SUCCESSOR}`), alone.reason);
++  const chosen = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
++  assert.equal(chosen.code, "FPR-DELTA-MAP", JSON.stringify(chosen));
++  const discarded = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE, featureId: PREDECESSOR });
++  assert.equal(discarded.code, "FPR-DELTA-FEATURE-DISCARDED", JSON.stringify(discarded));
++  assert.ok(discarded.reason.includes(`--feature ${SUCCESSOR}`), `the refusal names the successor command: ${discarded.reason}`);
++});
++
++test("J13-7: the CLI accepts a trailing --feature <id> on the lineage and delta forms only, names it in the usage and the help, and refuses every other composition FPR-ARGS", () => {
++  const root = tempRoot(), packet = "a".repeat(32);
++  const run = (argv) => { let text = ""; const code = runRegisterFeaturePackage(argv, (chunk) => { text += chunk; }); return { code, out: JSON.parse(text) }; };
++  for (const argv of [["--root", root, "--add-review-lineage", "--packet", packet, "--feature", SUCCESSOR], ["--root", root, "--add-delta-request", "in.json", "--feature", SUCCESSOR],
++    ["--root", root, "--add-delta-request", "in.json", "--confirm-full-round", "--feature", SUCCESSOR], ["--root", root, "--add-review-lineage", "--packet", packet, "--feature", SUCCESSOR, "--stage"]]) {
++    assert.equal(run(argv).out.code, "FPR-NO-APPROVED-PLAN", `${JSON.stringify(argv)}: the shape is accepted (the State is the next refusal)`);
++  }
++  for (const argv of [["--root", root, "--add-review-unit", "--feature", SUCCESSOR], ["--root", root, "--add-review-lineage", "--packet", packet, "--feature"], ["--root", root, "--add-review-lineage", "--packet", packet, "--feature", "--stage"],
++    ["--root", root, "--add-review-lineage", "--packet", packet, "--feature", ""], ["--root", root, "--add-review-lineage", "--packet", packet, "--feature", "--root"], ["--root", root, "--add-diagnostic-evidence", "x.json", "--feature", SUCCESSOR],
++    ["--root", root, "--supersedes", PREDECESSOR, "--feature", SUCCESSOR], ["--feature", SUCCESSOR, "--root", root, "--add-review-lineage", "--packet", packet]]) {
++    const refusal = run(argv);
++    assert.equal(refusal.code, 2); assert.equal(refusal.out.code, "FPR-ARGS", JSON.stringify(argv));
++    assert.match(refusal.out.reason, /--add-review-lineage --packet <packetId> \[--feature <feature id>\]/u);
++  }
++  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--add-review-lineage --packet <packetId> \[--feature <feature id>\]/u);
++  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--add-delta-request <input\.json> \[--confirm-full-round\] \[--feature <feature id>\]/u);
++});
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 17e3ce666..1d163c639 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -75,7 +75,10 @@ export function pushThreatModelReadback(root) {
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+-  "register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>] [--stage]",
++  "register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> [--feature <feature id>] | --add-delta-request <input.json> [--confirm-full-round] [--feature <feature id>] | --add-spec-addendum <approval record>] [--stage]",
++  "",
++  "Several features with a Critic review unit (an active feature and a retained DISCARDED predecessor): the lineage verb picks the feature the consumed packet's course claim binds, and the delta verb leaves out the retained predecessors",
++  "  (discarded in the State, or named by a successor's supersedes). Where that does not decide, name the feature with a trailing --feature <feature id> on the lineage or delta command; it is checked, never trusted.",
+   "",
+   "Successor of a DISCARDED feature (the feature it replaces was discarded; its implementation stays in Git history): register it with `register-feature-package.mjs --root <root> --supersedes <predecessor feature id>`.",
+   "  The manifest then carries `supersedes: <id>` and the Critic course admission starts the first full review before the inherited implementation, with no --successor-of at review time. The State must record the predecessor",
+@@ -157,6 +160,9 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   if (argv.length === 1 && argv[0] === "--help") { out(REGISTER_FEATURE_PACKAGE_HELP); return 0; }
+   const stage = argv.length > 2 && argv.at(-1) === "--stage";
+   if (stage) argv = argv.slice(0, -1);
++  // C30J-J13: an optional trailing `--feature <feature id>` names the feature course for the lineage and delta verbs only (it combines with nothing else).
++  let featureSelector = null;
++  if (argv.length > 4 && argv.at(-2) === "--feature") { featureSelector = argv.at(-1); argv = argv.slice(0, -2); }
+   let stagingRoot = null;
+   const emit = (value) => `${JSON.stringify(stage && stagingRoot !== null ? stageCommitPaths(stagingRoot, value) : value)}\n`;
+   const rootIndex = argv.indexOf("--root");
+@@ -176,8 +182,9 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+   // C30I-S3: `--root <root> --supersedes <predecessor feature id>` registers the successor of a DISCARDED feature with its predecessor written into the manifest.
+   const withSupersedes = argv.length === 4 && argv[2] === "--supersedes" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum && !withSupersedes) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit |--add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>]" })}\n`);
++  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum && !withSupersedes) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")
++    || (featureSelector !== null && (!(addLineage || addDelta) || featureSelector === "" || featureSelector.startsWith("--")))) {
++    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit |--add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> [--feature <feature id>] | --add-delta-request <input.json> [--confirm-full-round] [--feature <feature id>] | --add-spec-addendum <approval record>]" })}\n`);
+     return 2;
+   }
+   let root;
+@@ -193,7 +200,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     return 2;
+   }
+   if (addDelta) {
+-    const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract, confirmFullRound: argv[4] === "--confirm-full-round" });
++    const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract, confirmFullRound: argv[4] === "--confirm-full-round", state: read.state, ...(featureSelector === null ? {} : { featureId: featureSelector }) });
+     out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+@@ -203,7 +210,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     return added.status === "refused" ? 2 : 0;
+   }
+   if (addLineage) {
+-    const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract });
++    const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract, ...(featureSelector === null ? {} : { featureId: featureSelector }) });
+     out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
