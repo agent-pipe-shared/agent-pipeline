@@ -102,12 +102,18 @@ function validBasis(value) {
     && SHA256.test(value.planSha256) && SHA256.test(value.specSha256));
 }
 function validTimestamp(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
+// Candidate 30e (first Antigravity greenfield report): a German compound such as `1-2-Spieler-Minispiel` is plain words and short numbers
+// joined by hyphens, yet it mixes lower case, upper case and a digit and so matched the credential rule below. A segment is a word (all
+// lower case or one leading capital, at least three letters), a short all-capital abbreviation (at most six letters) or a one- or
+// two-digit number. A key or token is random mixed case or longer digit runs and never has that shape in every segment.
+const WORD_JOINED = /^(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2})(?:-(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2}))+$/;
 function opaqueToken(value) {
   return value.split(/\s+/).some((token) => {
     const compact = token.replace(/[^A-Za-z0-9_=-]/g, "");
     if (compact.length < 16) return false;
     const hasLower = /[a-z]/.test(compact); const hasUpper = /[A-Z]/.test(compact); const hasDigit = /\d/.test(compact);
-    return /^[A-Z0-9]{16,}$/.test(compact) || (hasLower && hasUpper && hasDigit) || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
+    const mixedClasses = hasLower && hasUpper && hasDigit && !WORD_JOINED.test(compact);
+    return /^[A-Z0-9]{16,}$/.test(compact) || mixedClasses || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
   });
 }
 /**

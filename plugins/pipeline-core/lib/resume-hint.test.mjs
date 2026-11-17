@@ -167,6 +167,21 @@ test("bans credential values, not the English words for them", () => {
   ]) rejects(text);
 });
 
+// C30E-RH1 (first Antigravity greenfield report): a hyphen-joined German compound with a number is ordinary prose, a random mixed-case token is not.
+test("C30E-RH1: words and short numbers joined by hyphens are admitted, random mixed-case tokens still are not", () => {
+  for (const text of [
+    "Minispiel fuer die Familie, 1-2-Spieler-Minispiel mit Punktestand",
+    "Eltern-PIN-Schutz fuer die 30-Minuten-Spielsperre",
+    "Tablet-App mit Mehr-Spieler-Duell und Zutaten-Fänger",
+  ]) accepts(text);
+  for (const text of [
+    "tablet notes aB3dE5fG7hJ9kL1mN3pQ",
+    "tablet notes Ab1-Cd2-Ef3-Gh4-Ij5-Kl6",
+    "tablet notes Xk9-Zq2-Wv7-Rt4-Yb8-Hn3",
+    "tablet notes Spieler_Mini1Spiel_Xy",
+  ]) rejects(text);
+});
+
 test("pins the residual the shape filter cannot close without a word list", () => {
   for (const text of ADMITTED_RESIDUAL) accepts(text);
 });
