@@ -32,6 +32,13 @@
       "owner": "scripts/dispatch-record-write.mjs"
     },
     {
+      "topic": "Model exception",
+      "claude": "a PO-recorded, expiring exception admits one model outside the routing",
+      "codex": "not applicable (no tool-layer model parameter to admit)",
+      "antigravity": "not applicable (the native alias list is fixed)",
+      "owner": "scripts/dispatch-model-exception.mjs"
+    },
+    {
       "topic": "Own session descriptor at close",
       "claude": "derived for Claude",
       "codex": "derived for the closing runner",

@@ -172,6 +172,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
 | Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
 | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
 | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |
+| Model exception | a PO-recorded, expiring exception admits one model outside the routing | not applicable (no tool-layer model parameter to admit) | not applicable (the native alias list is fixed) |
 | Own session descriptor at close | derived for Claude | derived for the closing runner | derived for the closing runner |
 | Close entry | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` |
 | Telemetry row at close | `usage-ledger.mjs` | not available | not available |
