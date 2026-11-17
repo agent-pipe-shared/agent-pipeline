@@ -1327,7 +1327,9 @@
           "GDM02",
           "GDM03",
           "GDM04",
-          "GDM05"
+          "GDM05",
+          "GDM06",
+          "GDM07"
         ],
         "maxBytes": 65536
       }
