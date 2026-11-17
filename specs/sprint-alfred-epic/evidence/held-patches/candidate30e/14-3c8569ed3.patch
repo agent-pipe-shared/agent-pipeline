@@ -1,0 +1,64 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 3ea3dbe9ff09736b517c4482f603c24d94c55471..70d6c41dadcb0069d2800a33a5b63535f2cccbff 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -143,7 +143,8 @@
+           "TCP051",
+           "TCP052",
+           "TCP053",
+-          "TCP054"
++          "TCP054",
++          "TCP055"
+         ],
+         "maxBytes": 65536
+       }
+@@ -479,7 +480,19 @@
+           "CCA083",
+           "CCA084",
+           "CCA085",
+-          "CCA086"
++          "CCA086",
++          "CCA087",
++          "CCA088",
++          "CCA089",
++          "CCA090",
++          "CCA091",
++          "CCA092",
++          "CCA093",
++          "CCA094",
++          "CCA095",
++          "CCA096",
++          "CCA097",
++          "CCA098"
+         ],
+         "maxBytes": 65536
+       }
+@@ -603,7 +616,17 @@
+           "CDPF111",
+           "CDPF112",
+           "CDPF113",
+-          "CDPF114"
++          "CDPF114",
++          "CDPF115",
++          "CDPF116",
++          "CDPF117",
++          "CDPF118",
++          "CDPF119",
++          "CDPF120",
++          "CDPF121",
++          "CDPF122",
++          "CDPF123",
++          "CDPF124"
+         ],
+         "maxBytes": 65536
+       }
+@@ -820,7 +843,8 @@
+           "CGB037",
+           "CGB038",
+           "CGB039",
+-          "CGB040"
++          "CGB040",
++          "CGB041"
+         ],
+         "maxBytes": 65536
+       }

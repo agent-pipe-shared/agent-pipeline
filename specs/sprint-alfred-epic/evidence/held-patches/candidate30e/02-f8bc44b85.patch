@@ -1,0 +1,50 @@
+diff --git a/plugins/pipeline-core/lib/resume-hint.mjs b/plugins/pipeline-core/lib/resume-hint.mjs
+index 1359bac9e08d6c6951a97857e72caa9b40691898..d9859f08271f34ddd7114cb5647624c6de1e2c1d 100644
+--- a/plugins/pipeline-core/lib/resume-hint.mjs
++++ b/plugins/pipeline-core/lib/resume-hint.mjs
+@@ -102,12 +102,18 @@ function validBasis(value) {
+     && SHA256.test(value.planSha256) && SHA256.test(value.specSha256));
+ }
+ function validTimestamp(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
++// Candidate 30e (first Antigravity greenfield report): a German compound such as `1-2-Spieler-Minispiel` is plain words and short numbers
++// joined by hyphens, yet it mixes lower case, upper case and a digit and so matched the credential rule below. A segment is a word (all
++// lower case or one leading capital, at least three letters), a short all-capital abbreviation (at most six letters) or a one- or
++// two-digit number. A key or token is random mixed case or longer digit runs and never has that shape in every segment.
++const WORD_JOINED = /^(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2})(?:-(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2}))+$/;
+ function opaqueToken(value) {
+   return value.split(/\s+/).some((token) => {
+     const compact = token.replace(/[^A-Za-z0-9_=-]/g, "");
+     if (compact.length < 16) return false;
+     const hasLower = /[a-z]/.test(compact); const hasUpper = /[A-Z]/.test(compact); const hasDigit = /\d/.test(compact);
+-    return /^[A-Z0-9]{16,}$/.test(compact) || (hasLower && hasUpper && hasDigit) || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
++    const mixedClasses = hasLower && hasUpper && hasDigit && !WORD_JOINED.test(compact);
++    return /^[A-Z0-9]{16,}$/.test(compact) || mixedClasses || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
+   });
+ }
+ /**
+diff --git a/plugins/pipeline-core/lib/resume-hint.test.mjs b/plugins/pipeline-core/lib/resume-hint.test.mjs
+index dd4e67f8e2001315d806fed26a6d4821e32bc0c1..253eaed923421b837f92ebcf5ae948c87d9c9b77 100644
+--- a/plugins/pipeline-core/lib/resume-hint.test.mjs
++++ b/plugins/pipeline-core/lib/resume-hint.test.mjs
+@@ -167,6 +167,21 @@ test("bans credential values, not the English words for them", () => {
+   ]) rejects(text);
+ });
+ 
++// C30E-RH1 (first Antigravity greenfield report): a hyphen-joined German compound with a number is ordinary prose, a random mixed-case token is not.
++test("C30E-RH1: words and short numbers joined by hyphens are admitted, random mixed-case tokens still are not", () => {
++  for (const text of [
++    "Minispiel fuer die Familie, 1-2-Spieler-Minispiel mit Punktestand",
++    "Eltern-PIN-Schutz fuer die 30-Minuten-Spielsperre",
++    "Tablet-App mit Mehr-Spieler-Duell und Zutaten-Fänger",
++  ]) accepts(text);
++  for (const text of [
++    "tablet notes aB3dE5fG7hJ9kL1mN3pQ",
++    "tablet notes Ab1-Cd2-Ef3-Gh4-Ij5-Kl6",
++    "tablet notes Xk9-Zq2-Wv7-Rt4-Yb8-Hn3",
++    "tablet notes Spieler_Mini1Spiel_Xy",
++  ]) rejects(text);
++});
++
+ test("pins the residual the shape filter cannot close without a word list", () => {
+   for (const text of ADMITTED_RESIDUAL) accepts(text);
+ });

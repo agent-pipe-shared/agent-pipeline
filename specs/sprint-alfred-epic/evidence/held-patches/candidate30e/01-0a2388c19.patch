@@ -1,0 +1,71 @@
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+index e33894fea9d5e5d8a85699d83bdce14b0a250cfd..6606f4dfeb8a311aa436124461a5fdbc141a06ea 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+@@ -22,6 +22,9 @@ export const CARRY_FORWARD_SCHEMA = "pipeline.evidence-carry-forward.v1";
+ export const EVIDENCE_PATH_PATTERNS = Object.freeze([
+   /^specs\/[^/]+\/evidence\/.+$/u,
+   /^specs\/[^/]+\/audit-bundles\/.+$/u,
++  // The writer, the close-commit split and the administration paths all use the repository-root location audit-bundles/<feature>/...;
++  // the specs/<feature>/audit-bundles/ form above stays for compatibility (candidate 30e, first Antigravity greenfield report).
++  /^audit-bundles\/[^/]+\/.+$/u,
+   /^specs\/[^/]+\/lifecycle\.json$/u,
+   /^specs\/[^/]+\/result\.md$/u,
+   /^project\/push-threat-model\.md$/u,
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+index b0cc9deea2ab0c9086fcb50ca3aa7fc12f956df5..9ed61063063ff0071d710aaf334707ab403e347f 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+@@ -48,10 +48,12 @@ function baseRepo() {
+ }
+ 
+ test("ECF1: the evidence set is closed by record class, everything else is product-bound", () => {
+-  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
++  // Candidate 30e: the repository-root audit-bundles/<feature>/<commit>/... location the bundle writer really uses is an evidence path too.
++  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "audit-bundles/f/0123456789abcdef0123456789abcdef01234567/proofs/002-push.json",
++    "audit-bundles/f/manifest.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
+     assert.equal(isEvidencePath(path), true, path);
+   }
+-  for (const path of ["specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",
++  for (const path of ["audit-bundles", "audit-bundles/f", "audit-bundles/f/../../src/app.mjs", "src/audit-bundles/f/x.json", "specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",
+     "specs/f/evidenceX/a.json", "specs/f/lifecycle.json.bak", "specs/evidence/x.json", "scripts/evidence/x.json", "", "/specs/f/evidence/x.json", "specs/f/evidence/../plan.md"]) {
+     assert.equal(isEvidencePath(path), false, path);
+   }
+diff --git a/plugins/pipeline-core/lib/record-only-paths.mjs b/plugins/pipeline-core/lib/record-only-paths.mjs
+index d9319297d6cfa71cfe891f830b2cb9ca81c63f3f..e0c0dcf18d7f6a66f94ec11eefa66cad409edfce 100644
+--- a/plugins/pipeline-core/lib/record-only-paths.mjs
++++ b/plugins/pipeline-core/lib/record-only-paths.mjs
+@@ -30,6 +30,8 @@ export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
+ 
+ export const AUTHORITY_CARRY_EXTENSION_PATTERNS = Object.freeze([
+   /^specs\/[^/]+\/audit-bundles\/.+$/u,
++  // The repository-root location the bundle writer actually uses (candidate 30e); the specs/<feature>/ form above is kept.
++  /^audit-bundles\/[^/]+\/.+$/u,
+   /^project\/push-threat-model\.md$/u,
+ ]);
+ 
+diff --git a/plugins/pipeline-core/lib/record-only-paths.test.mjs b/plugins/pipeline-core/lib/record-only-paths.test.mjs
+index 31fadc395fdb1c159b80a29a970c182659f67e5d..0e652ac355a520415fd7171651b161cdfc8149e6 100644
+--- a/plugins/pipeline-core/lib/record-only-paths.test.mjs
++++ b/plugins/pipeline-core/lib/record-only-paths.test.mjs
+@@ -46,14 +46,16 @@ test("ROP3: membership and normalisation behave as before", () => {
+   }
+ });
+ 
+-test("ROP4: the two extension classes are separate from the record-only set and accepted by the extension predicate only", () => {
+-  assert.equal(AUTHORITY_CARRY_EXTENSION_PATTERNS.length, 2);
++test("ROP4: the extension classes are separate from the record-only set and accepted by the extension predicate only", () => {
++  // Candidate 30e: three patterns now, the repository-root audit-bundles/<feature>/ location the writer really uses joined the specs/<feature>/ form.
++  assert.equal(AUTHORITY_CARRY_EXTENSION_PATTERNS.length, 3);
+   assert.ok(Object.isFrozen(AUTHORITY_CARRY_EXTENSION_PATTERNS));
+-  for (const path of ["specs/f/audit-bundles/b.json", "specs/f/audit-bundles/deep/c.json", "project/push-threat-model.md", "./project/push-threat-model.md"]) {
++  for (const path of ["specs/f/audit-bundles/b.json", "specs/f/audit-bundles/deep/c.json", "audit-bundles/f/0123456789abcdef0123456789abcdef01234567/proofs/002-push.json",
++    "audit-bundles/f/README.md", "project/push-threat-model.md", "./project/push-threat-model.md"]) {
+     assert.equal(isAuthorityCarryExtensionPath(path), true, path);
+     assert.equal(isRecordOnlyPath(path), false, `${path} must not be record-only`);
+   }
+-  for (const path of ["specs/f/evidence/a.json", "docs/state.md", "specs/f/audit-bundles", "project/other.md", "", undefined]) {
++  for (const path of ["specs/f/evidence/a.json", "docs/state.md", "specs/f/audit-bundles", "audit-bundles", "audit-bundles/f", "audit-bundles/f/", "project/other.md", "", undefined]) {
+     assert.equal(isAuthorityCarryExtensionPath(path), false, String(path));
+   }
+ });

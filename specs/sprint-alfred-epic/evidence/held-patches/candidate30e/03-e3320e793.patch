@@ -1,0 +1,64 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 5bf97fa153746d40cde4a093f9b721d27797c447..17fd01281fa4aefd775c551bfdfaf8dd5ec9c072 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -523,6 +523,12 @@ export function isBootstrapReadCommand(value, {
+   catch { return false; }
+ }
+ 
++/** True when a native read names the pipeline-start skill of the plugin copy this hook belongs to (same file the shell spellings read). */
++export function isBootstrapSkillReadTarget(value, { pipelineStartSkill = PIPELINE_START_SKILL } = {}) {
++  if (typeof value !== "string" || value.trim() === "") return false;
++  try { return resolve(value) === resolve(pipelineStartSkill); } catch { return false; }
++}
++
+ /** The one command the session bootstrap barrier admits, spelled so that
+  * `isBootstrapReadCommand` accepts it: a `cat` of the quoted pipeline-start
+  * SKILL path, with forward slashes on Windows. Returns null when no copy-safe
+@@ -725,6 +731,13 @@ export async function runAntigravityPreToolGuard(rawInput) {
+         const innerCode = /\bGUARD-[A-Z0-9]+(?:-[A-Z0-9]+)*\b/u.exec(refusal)?.[0];
+         if (refusal !== null) deny(refusal, { code: innerCode ?? "native-read-refused", fields: { tool: normalized.toolName, kind: target.kind } });
+       }
++      // Candidate 30e (first Antigravity greenfield report): the session bootstrap barrier is consumed by the read of the pipeline-start
++      // skill. The shell spelling (`cat`, `sed -n`) always consumed it; the host's own native read of the same file did not, so a Critic
++      // or Goldfish that read the skill natively was denied on its first shell call. The same read, the same file, the same authority.
++      if (normalized.toolName === "Read" && readTargets.some((target) => isBootstrapSkillReadTarget(target.value))) {
++        const marker = join(readRoot, ".git", "agent-pipeline", "run", `session-${nativeHookSessionId(input, {})}`, "requires-bootstrap.pending");
++        try { rmSync(marker, { force: true }); } catch { /* an absent marker is the normal case */ }
++      }
+     }
+     allow();
+     return;
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 48f2ee5b3edc6bc92464293c9a40ca33836420d9..24a8b7c8b9b122ca6c0c158d8c07f4da074facb0 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -1760,6 +1760,28 @@ check("Antigravity pretool guard writes no handoff for another conversation, ano
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// C30E-BAR1 (first Antigravity greenfield report): the host's native read of the pipeline-start skill consumes the bootstrap barrier like the
++// shell spellings do; a native read of any other file does not.
++check("Antigravity pretool guard: a native read of the pipeline-start skill consumes the session bootstrap barrier (C30E-BAR1)", () => {
++  const f = agyHandoffFixture();
++  try {
++    const marker = join(f.root, ".git", "agent-pipeline", "run", `session-${AGY_HANDOFF_CONVERSATION}`, "requires-bootstrap.pending");
++    const skill = fileURLToPath(new URL("../skills/pipeline-start/SKILL.md", import.meta.url));
++    const arm = () => { mkdirSync(join(marker, ".."), { recursive: true }); writeFileSync(marker, "pending\n"); };
++    const nativeRead = (path) => run({ ...f.host, toolCall: { name: "read_file", args: { Path: path } } }, f.root);
++    arm();
++    assert.equal(decision(run(f.hostEnvelope("node verify.mjs"), f.root)).decision, "deny", "the armed barrier refuses a shell call");
++    writeFileSync(join(f.root, "notes.txt"), "x\n");
++    assert.equal(decision(nativeRead(join(f.root, "notes.txt"))).decision, "allow");
++    assert.equal(existsSync(marker), true, "a native read of another file leaves the barrier armed");
++    assert.equal(decision(nativeRead(skill)).decision, "allow");
++    assert.equal(existsSync(marker), false, "a native read of the pipeline-start skill consumes the barrier");
++    arm();
++    nativeRead(`${skill}.other`);
++    assert.equal(existsSync(marker), true, "a different file next to the skill does not consume it");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ // AC-175D: a conversation that names another conversation's id in the export would be served that conversation's
+ // unconsumed handoff by the CLI, so the hook refuses such an export before it runs.
+ check("Antigravity pretool guard refuses an Antigravity export naming another conversation and leaves that conversation's handoff untouched (AC-175D)", () => {
