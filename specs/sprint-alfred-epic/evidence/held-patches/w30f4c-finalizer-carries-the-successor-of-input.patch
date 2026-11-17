@@ -1,0 +1,103 @@
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index aabedc820..245daf88e 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -109,6 +109,7 @@ const CLI_HELP = [
+   "         route {routeId, runner, adapter, provider, modelTier, effortTier}, review {base, candidate, specPath, guardrailPaths[], evidencePaths[],",
+   "         priorCriticEvidencePath|null}, verdictPath, event (null or {eventOutPath, featureId});",
+   "         schema pipeline.session-critic-finalization-request.v1 (v2 adds review.courseContext, v3 adds review.genericBatchRef)",
++  "         review.courseContext keys: featureId, registrationCommit, acceptedReference, criterionLocator, deltaRequestPath, and optionally successorOf (a feature id)",
+   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
+   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
+   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
+@@ -298,13 +299,19 @@ function genericBatchFor(options, preflight) {
+ function genericCourseFor(reservation) {
+   return { courseSourceSha256: reservation.sourceSha256, courseDecisionSha256: reservation.decisionSha256 };
+ }
+-function featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256) {
+-  const course=preflight.coordinatorOnly.courseAdmission;
++// C30F-G4C: the same feature-id pattern as PACKAGE_FEATURE_ID in critic-dispatch-preflight.mjs (not exported there).
++const SUCCESSOR_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
++export function featureCourseInputFor(options,course,preflight,root) {
+   const context=options.preflightInput.courseContext??{featureId:course.featureId,registrationCommit:preflight.candidate.commit,
+     acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+-  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:course.courseBase??candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
++  return {repoRoot:root,featureId:context.featureId,baseCommit:course.courseBase??candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
+     registrationCommit:context.registrationCommit,requestedMode:context.deltaRequestPath===null?"full":"delta",
+-    acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath};
++    acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath,
++    ...(Object.hasOwn(context,"successorOf")?{successorOf:context.successorOf}:{})};
++}
++function featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256) {
++  const course=preflight.coordinatorOnly.courseAdmission;
++  const courseInput=featureCourseInputFor(options,course,preflight,root);
+   return reserveFeatureCriticReviewUnitOwnership({repoRoot:root,controlRoot,packetId,preflightSha256,courseInput,
+     sourceSha256:course.sourceSha256,decisionSha256:course.decisionSha256});
+ }
+@@ -329,7 +336,8 @@ function validateCliRequest(value) {
+     || !(value.event === null || (exact(value.event, EVENT_KEYS)
+       && typeof value.event.eventOutPath === "string"
+       && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+-  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
++  if (version2 && value.review.courseContext !== null && (!exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath", ...(record(value.review.courseContext) && Object.hasOwn(value.review.courseContext, "successorOf") ? ["successorOf"] : [])])
++    || (Object.hasOwn(value.review.courseContext, "successorOf") && !(typeof value.review.courseContext.successorOf === "string" && SUCCESSOR_FEATURE_ID.test(value.review.courseContext.successorOf))))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+   if (version3 && (!exact(value.review.genericBatchRef, ["batchId", "registrationSha256", "memberSha256"])
+     || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST", SCF_REQUEST_SHAPE);
+   if (hasSignedImportAnchor) {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index ae2057294..02bf91b83 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -3109,3 +3109,52 @@ test("CGR-09 a resumed child's second return replaces its first for the entry, a
+     assert.equal(JSON.parse(merged.stderr).code, "CSM-CHILD-DUPLICATE", merged.stderr);
+   } finally { cleanup(other); }
+ });
++
++// C30F-G4C (AC-108): the finalizer request carries the optional sixth course key `successorOf` and forwards it. Criterion-bound cases, written before the change.
++function g4cV2Request(fx, courseContext) {
++  return cliRequest(fx, { schema: SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA, review: { ...cliRequest(fx).review, courseContext } });
++}
++const G4C_CONTEXT = { featureId: "feature-a-successor", registrationCommit: "a".repeat(40), acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
++
++test("C30F-G4C (a) a v2 request whose courseContext carries a valid successorOf is accepted and the preflight input carries it; without the key nothing changes", () => {
++  const fx = fixture();
++  try {
++    const seen = [];
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    const deps = { preflightCriticDispatchFn: (input) => { seen.push(input); throw new Error("g4c-spy-stop"); } };
++    for (const command of ["admit", "finalize"]) {
++      seen.length = 0;
++      runSessionCriticFinalizerCli([command, "--root", fx.root, "--request", writeScratchRequest(fx, "g4c-a.json", g4cV2Request(fx, { ...G4C_CONTEXT, successorOf: "feature-a-predecessor" }))], deps);
++      assert.equal(seen.length, 1, command);
++      assert.equal(seen[0].courseContext.successorOf, "feature-a-predecessor", command);
++      seen.length = 0;
++      const plain = runSessionCriticFinalizerCli([command, "--root", fx.root, "--request", writeScratchRequest(fx, "g4c-a2.json", g4cV2Request(fx, G4C_CONTEXT))], deps);
++      assert.notEqual(plain.output.code, "SCF-REQUEST", command);
++      assert.equal(Object.hasOwn(seen[0].courseContext, "successorOf"), false, command);
++    }
++  } finally { cleanup(fx); }
++});
++
++test("C30F-G4C (b) an invalid successorOf (not a feature id, wrong type, extra key) is refused SCF-REQUEST", () => {
++  const fx = fixture();
++  try {
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    for (const bad of [{ successorOf: "Not A Feature" }, { successorOf: 7 }, { successorOf: null }, { successorOf: "" }, { successorOf: "../x" }, { successorOf: "feature-a", other: 1 }]) {
++      const result = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g4c-b.json", g4cV2Request(fx, { ...G4C_CONTEXT, ...bad }))]);
++      assert.equal(result.output.code, "SCF-REQUEST", JSON.stringify(bad));
++    }
++  } finally { cleanup(fx); }
++});
++
++test("C30F-G4C (c) the course input built for the reservation carries successorOf when given and is unchanged when absent", async () => {
++  const { featureCourseInputFor } = await import("./session-critic-finalizer.mjs");
++  assert.equal(typeof featureCourseInputFor, "function");
++  const course = { featureId: "feature-a-successor", courseBase: "b".repeat(40) };
++  const preflight = { candidate: { commit: "c".repeat(40), base: "d".repeat(40) } };
++  const context = { featureId: "feature-a-successor", registrationCommit: "a".repeat(40), acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
++  const absent = featureCourseInputFor({ preflightInput: { courseContext: context } }, course, preflight, "/r");
++  assert.deepEqual(Object.keys(absent), ["repoRoot", "featureId", "baseCommit", "candidateCommit", "registrationCommit", "requestedMode", "acceptedReference", "criterionLocator", "deltaRequestPath"]);
++  const given = featureCourseInputFor({ preflightInput: { courseContext: { ...context, successorOf: "feature-a-predecessor" } } }, course, preflight, "/r");
++  assert.equal(given.successorOf, "feature-a-predecessor");
++  assert.deepEqual({ ...given, successorOf: undefined }, { ...absent, successorOf: undefined });
++});
