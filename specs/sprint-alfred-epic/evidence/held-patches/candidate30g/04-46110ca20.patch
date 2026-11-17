@@ -1,0 +1,458 @@
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 2c9f8c91ab390d2c7712c28758974ab10b47003b..927186645b79c4879f72fea85537d6c61ac358f1 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -44,6 +44,7 @@ import { readState, run } from "./pipeline-state.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
+ import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
++import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
+ import * as po from "../lib/po-gate-authority.mjs";
+@@ -442,6 +443,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
+       }
+       let ownerLifecycle = null;
++      let boundAtBootstrap = null;
+       if (oneShot) {
+         // C30d (QG-04, restated in place; was C22 CGF-04 "first stop of the real CLI ONESHOT-RESULT-NOT-BOUND"): a Continuity feature with no bound Result no longer stops the close with a repair chain, because
+         // every step of that chain is agent authority. The first call of the real CLI runs the bootstrap plan, its apply action (owner route when the project has a catalogue), the agent-run reconcile and the
+@@ -456,6 +458,11 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         // the owned commit (commit-pipeline-owned --agent, the same step 4 of the old repair chain) takes every pipeline-owned path that was waiting, so the tree is clean, not just unchanged
+         assert.equal(porcelain(), "", `${identity.runner}: the bootstrap is committed and the question wrote nothing more (before: ${JSON.stringify(treeBefore)})`);
+         assert.notEqual(JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result, null, "the Result is bound");
++        // C30G-D1 (Part D, root cause): the committed Result file carries exactly the digest the State binds and the package validates, so the normal flow does not leave the state in which a bound Result cannot close.
++        boundAtBootstrap = JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8")).continuity.authority.result.sha256;
++        assert.equal(fileSha(resultPath), boundAtBootstrap, `${identity.runner}: the Result file the bootstrap committed is the bound digest`);
++        const packageAfterBootstrap = validateFeaturePackage(fx.root, MANIFEST);
++        assert.equal(packageAfterBootstrap.ok, true, `${identity.runner}: the package validates after the bootstrap commit: ${JSON.stringify(packageAfterBootstrap.findings)}`);
+       }
+       const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
+       // C28 (QG-04, restated in place): the Result binding is one function because a declined acceptance retires the bound Result and the second close binds it again through the very same verbs.
+@@ -602,6 +609,8 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         const finalRecord = JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "publication-close", last.result.lifecycleId, "evidence", "final-verification.json"), "utf8"));
+         assert.ok(["required-checks", "optional-checks-only", "empty-plan", "unavailable"].includes(finalRecord.securityCoverage), `${identity.runner}: coverage label ${finalRecord.securityCoverage}`);
+         assert.match(last.result.message, /until then this feature's audit bundle holds no security evidence\.$/u);
++        // C30G-D1 (Part D): no stage between the bootstrap and the end of the close (acceptance, Verify, package moves, audit request, Result close block, close) changed the Result the State binds.
++        if (!decline && boundAtBootstrap !== null) assert.equal(fileSha(resultPath), boundAtBootstrap, `${identity.runner}: the Result file is unchanged from the bootstrap to the end of the close`);
+         assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
+         if (selfExport) {
+           const exportDir = `specs/${FEATURE_ID}/evidence/critic/${packetId}`;
+diff --git a/plugins/pipeline-core/scripts/continuity-owner-route.mjs b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+index 60ee1bfcdf44c08296369ef4cc865a92d0c418fb..58c1ec41068d705b617e1cf7c13f557434bdc01d 100644
+--- a/plugins/pipeline-core/scripts/continuity-owner-route.mjs
++++ b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+@@ -70,6 +70,25 @@ function courseMessage(refusal, root, entry) {
+   }
+ }
+ 
++const ANSI_SEQUENCE = /\u001b\[[0-9;?]*[ -/]*[@-~]/gu;
++/**
++ * C30G-D1 (AC-108): the entry runs in this process and prints its refusal on the process streams, where the caller of this script saw it only as a bare COR-ENTRY-EXIT.
++ * The streams are tee'd for exactly the synchronous entry call: everything still passes through unchanged; `text()` is the bounded refusal text (stderr first, then stdout; first 400 characters, no ANSI).
++ */
++function teeEntryOutput() {
++  const captured = { stderr: [], stdout: [] };
++  const restore = [];
++  for (const name of ['stderr', 'stdout']) {
++    const stream = process[name], original = stream.write;
++    stream.write = function (chunk, ...rest) { captured[name].push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8')); return original.call(this, chunk, ...rest); };
++    restore.push(() => { stream.write = original; });
++  }
++  return {
++    stop: () => { for (const undo of restore) undo(); },
++    text: () => (captured.stderr.join('').trim() || captured.stdout.join('').trim()).replace(ANSI_SEQUENCE, '').slice(0, 400),
++  };
++}
++
+ async function run(argv) {
+   const { root, lifecycleId, entry, tail } = parseRun(argv);
+   if (entry === 'close-feature') {
+@@ -103,13 +122,16 @@ async function run(argv) {
+       const bound = observeSessionCleanupState(root);
+       const expectedStateSha256 = createHash('sha256').update(readFileSync(bound.path)).digest('hex');
+       let result;
++      const tee = teeEntryOutput();
+       try {
+         result = executeOnboardingContinuityOwnerRouteEntry({ rootDir: root, sessionCleanup: runtime.sessionCleanup, entry, argv: [...tail], expectedStateSha256 });
+       } catch (error) {
+         result = { status: 'unavailable', code: error?.code ?? 'COR-ENTRY-REFUSED', attempted: false, exitCode: null };
+-      }
++      } finally { tee.stop(); }
++      const entryText = tee.text();
++      const entryTail = entryText === '' ? '' : `: ${entryText}`;
+       if (result.status === 'unavailable' && result.attempted === true) {
+-        refuse('COR-ENTRY-HELD', `the entry was attempted and then refused (${result.code}); the binding is kept because a write may have happened. Release it only after reading the State: ${healCommand(root)}`, { held: true });
++        refuse('COR-ENTRY-HELD', `the entry was attempted and then refused (${result.code}${entryTail}); the binding is kept because a write may have happened. Release it only after reading the State: ${healCommand(root)}`, { held: true });
+       }
+       try {
+         const before = observeSessionCleanupState(root);
+@@ -120,8 +142,8 @@ async function run(argv) {
+       } catch (error) {
+         refuse('COR-RELEASE-HELD', `the entry ran but its owner-route binding could not be released (${error?.code ?? 'error'}). Release it with: ${healCommand(root)}`, { held: true });
+       }
+-      if (result.status !== 'completed') refuse(result.code ?? 'COR-ENTRY-REFUSED', `the entry was refused before it wrote anything (${result.code ?? 'refused'}); the binding is released`);
+-      return { status: result.exitCode === 0 ? 'completed' : 'refused', code: result.exitCode === 0 ? null : 'COR-ENTRY-EXIT', entry, exitCode: result.exitCode, released: true };
++      if (result.status !== 'completed') refuse(result.code ?? 'COR-ENTRY-REFUSED', `the entry was refused before it wrote anything (${result.code ?? 'refused'}${entryTail}); the binding is released`);
++      return { status: result.exitCode === 0 ? 'completed' : 'refused', code: result.exitCode === 0 ? null : 'COR-ENTRY-EXIT', entry, exitCode: result.exitCode, ...(result.exitCode === 0 ? {} : { message: entryText === '' ? `the entry exited ${result.exitCode} and printed no refusal text` : entryText }), released: true };
+     });
+   } finally {
+     await runtime.dispose();
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 8833a6f2c9ad09793a7e5120850a98b7ad81cef4..2f33982ed6b21f3f67cbf1fbd0b32da786b9ca07 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -28,6 +28,7 @@ import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatch
+ import { closeSbom, sbomFindingHelp } from "../lib/sbom-close.mjs";
+ import { SBOM_OVERRIDE_CODES, createSbomOverrideRequest, verifySbomOverrideProof } from "../lib/sbom-override-authority.mjs";
+ import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
++import { diagnoseResultCloseBinding } from "./pipeline-state.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -70,6 +71,16 @@ function readFeatureState(root, deps) {
+   return state;
+ }
+ function command(runner, executable, argv, code) { return parseJsonOutput(runner(executable, argv), code); }
++// C30G-D1: a refused owner-route entry ends its stderr with the one-line result envelope, whose `message` is the entry's own refusal text. The plain lines before it stay; the raw JSON does not.
++function withEntryRefusalText(message) {
++  const lines = String(message ?? "").trim().split("\n");
++  let envelope = null;
++  try { envelope = JSON.parse(lines.at(-1)); } catch { envelope = null; }
++  if (envelope?.schema !== "pipeline.continuity-owner-route-result.v1") return String(message ?? "");
++  const plain = lines.slice(0, -1).join("\n").trim();
++  const entry = typeof envelope.message === "string" ? envelope.message.trim() : "";
++  return [plain, `${envelope.code ?? "refused"}${entry === "" || plain.includes(entry) ? "" : `: ${entry}`}`].filter(Boolean).join(" ");
++}
+ function flagPairs(values) {
+   const argv = [];
+   for (const [name, value] of Object.entries(values)) {
+@@ -282,6 +293,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   // C24 (Claude greenfield): a resume dropped the packet, and with two Critic rounds on record the printed command stopped at ONESHOT-CRITIC-PACKET-MISSING.
+   const rerun = (id) => `${rerunBase}${packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
+   const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
++  // C30G-D1 (AC-108): a bound Result that cannot close is named read-only, with the repair that works, before the close block ever plans (nothing is written).
++  const resultCloseBlocked = (current, id) => {
++    const authority = current.continuity?.authority;
++    const cause = diagnoseResultCloseBinding(root, authority?.result, authority?.prd?.path, authority?.spec?.path);
++    return cause === null ? null : stopResult("result-close-block", "ONESHOT-RESULT-CLOSE-BLOCKED", cause.text, `nothing was written. ${cause.repair} Then rerun the identical command: ${rerun(id)}`);
++  };
+   const stages = [];
+   // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
+   const handoverPath = (() => {
+@@ -488,6 +505,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         if (entered.status === "stopped") return Object.freeze({ ...entered, stop: Object.freeze({ ...entered.stop, repair: `${note} ${entered.stop.repair}` }), resultBootstrap: info });
+         return Object.freeze({ ...entered, ...(Array.isArray(entered.stages) ? { stages: ["result-bootstrap", ...entered.stages] } : {}), resultBootstrap: info });
+       }
++      // C30G-D1: the same cause is named here, before Verify and the package moves, so a Result that changed after it was bound costs no partial close evidence.
++      if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && state.continuity.authority?.result) {
++        const blocked = resultCloseBlocked(state, again);
++        if (blocked !== null) return blocked;
++      }
+       // C21C: the missing PO acknowledgement of a caller-authored Critic used to surface only inside the close, after Verify and the package move. Its signature needs
+       // a clean tree, so the close's evidence had to be committed and the bound candidate went stale. Named here, it stops before anything was written.
+       let acknowledgementGap = null;
+@@ -703,6 +725,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         let current = state;
+         if (state.continuity.queueHead?.nextAction !== "close") {
+           stages.push("result-close-block");
++          const blockedAtBlock = resultCloseBlocked(state, resumeLifecycleId);
++          if (blockedAtBlock !== null) return blockedAtBlock;
+           const result = state.continuity.authority?.result;
+           try {
+             const flags = ["--feature-id", featureId, "--expected-revision", String(state.continuity.revision), "--result-path", result?.path, "--result-sha256", result?.sha256];
+@@ -716,7 +740,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+               command(runner, plan.applyAction?.executable, plan.applyAction?.argv, "ONESHOT-RESULT-CLOSE-APPLY");
+             }
+           } catch (error) {
+-            return stopResult("result-close-block", error.refusalCode ?? error.code, error.message, repairFor(error, resumeLifecycleId));
++            return stopResult("result-close-block", error.refusalCode ?? error.code, withEntryRefusalText(error.message), repairFor(error, resumeLifecycleId));
+           }
+           current = readFeatureState(root, deps);
+         }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 6221bceb14cd38c31367c433626f1f99154c179c..d2036e453dba020a443b9dd046db41b72a8d7c08 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -426,6 +426,69 @@ test("P3: a feature with Continuity gets its Result close block and close reques
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// ---- C30G-D1 (AC-108): a Result that cannot close is named before the close block, with the repair that works ------------------------------------
++const RESULT_FILE = "specs/feature-abc/result.md";
++
++test("C30G-D1: a bound Result whose bytes changed after the bootstrap stops the close before Verify and any State write, names the cause and the Git restore, and the stop is gone after that repair", () => {
++  const f = oneShotFixture({ continuity: true });
++  try {
++    writeFileSync(join(f.root, RESULT_FILE), "# Result\n\nChanged after the Result bootstrap bound it.\n");
++    f.git("add", "-A"); f.git("commit", "-q", "-m", "change the result after it was bound");
++    const stateBefore = readFileSync(join(f.root, STATE_PATH));
++    const stopped = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
++    assert.equal(stopped.stage, "result-close-block");
++    assert.equal(stopped.stop.code, "ONESHOT-RESULT-CLOSE-BLOCKED");
++    assert.match(stopped.stop.reason, new RegExp(`digest-changed: .*bound ${f.resultSha.slice(0, 12)}, current [0-9a-f]{12}`, "u"));
++    assert.match(stopped.stop.reason, /commit or revert of the Result after the Result bootstrap changes the bytes the State binds/u);
++    assert.match(stopped.stop.reason, /git restore --source=<commit> -- specs\/feature-abc\/result\.md/u);
++    assert.doesNotMatch(`${stopped.stop.reason} ${stopped.stop.repair}`, /rebind/iu, "the rebind route cannot repair a changed digest");
++    assert.match(stopped.stop.repair, /git restore -- specs\/feature-abc\/result\.md[\s\S]*git restore --source=<commit> -- specs\/feature-abc\/result\.md[\s\S]*rerun the identical command/u);
++    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false, "stopped before Verify");
++    assert.equal(f.calls.some((call) => call.includes("continuity-result-close")), false, "no close plan or apply ran");
++    assert.deepEqual(readFileSync(join(f.root, STATE_PATH)), stateBefore, "no State write");
++    // The named repair, run as printed: the bound bytes come back from the commit before the change.
++    f.git("restore", "--source=HEAD~1", "--", RESULT_FILE);
++    assert.equal(readFileSync(join(f.root, RESULT_FILE), "utf8"), "# Result\n");
++    f.git("add", "-A"); f.git("commit", "-q", "-m", "restore the bound result");
++    const proceeded = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(proceeded.status, "commit-required", JSON.stringify(proceeded).slice(0, 400));
++    assert.ok(f.calls.includes("pipeline-state continuity-result-close-apply"), "the close went past the Result close block");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30G-D1: a Result that changes between the first check and the close block is still named at the block, before its plan runs", () => {
++  const f = oneShotFixture({ continuity: true });
++  try {
++    const runner = (executable, argv) => {
++      if (argv[1] === "feature-package-apply") writeFileSync(join(f.root, RESULT_FILE), "# Result\n\nChanged by a stage in between.\n");
++      return f.runner(executable, argv);
++    };
++    const stopped = oneShotClose(f.input, { runCommand: runner });
++    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
++    assert.equal(stopped.stop.code, "ONESHOT-RESULT-CLOSE-BLOCKED");
++    assert.match(stopped.stop.reason, /digest-changed: /u);
++    assert.equal(f.calls.some((call) => call.includes("continuity-result-close")), false, "the plan never ran");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30G-D1: a refused close plan or apply on the owner route appends the entry's own refusal text and never dumps the raw envelope", () => {
++  const f = oneShotFixture({ continuity: true, ownerRoute: true });
++  try {
++    const envelope = { schema: "pipeline.continuity-owner-route-result.v1", status: "refused", code: "COR-ENTRY-EXIT", entry: "continuity-result-close-plan", exitCode: 2, message: "Error: Result-close plan refused (PS-RESULT-CLOSE-RESULT: a cause only the entry knows); zero mutation.", released: true };
++    const runner = (executable, argv) => {
++      if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs" && argv.includes("continuity-result-close-plan")) return { status: 2, stdout: "", stderr: `${JSON.stringify(envelope)}\n` };
++      return f.runner(executable, argv);
++    };
++    const stopped = oneShotClose(f.input, { runCommand: runner });
++    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
++    assert.equal(stopped.stage, "result-close-block");
++    assert.match(stopped.stop.reason, /COR-ENTRY-EXIT/u);
++    assert.match(stopped.stop.reason, /a cause only the entry knows/u);
++    assert.doesNotMatch(stopped.stop.reason, /"schema"/u, "the raw envelope is not the message");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("C21B: a Continuity feature with no bound Result stops before Verify with the exact bootstrap chain and writes no close evidence", () => {
+   // C30D-G1 (QG-04, restated in place): the close now takes the bootstrap plan itself, so the one State call it makes is the plan; this fixture's plan is refused, so the stop, the manual chain and the
+   // guarantee that nothing past the plan ran (no Verify, no package stage, no apply, no commit) stay exactly as they were.
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index c4bb82350a9d0f9e781d163e54a668fc4b244bd9..1328bb7e3e211f11931af4e27169d6f22060e500 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -896,6 +896,69 @@ test("D231 owner route: the four Close-route entries run through the spawned CLI
+   assertReleased(c, "close-apply");
+ });
+ 
++test("C30G-D1: a refused owner-route entry never ends in a bare COR-ENTRY-EXIT: the envelope carries the entry's own refusal text, bounded, and nothing is written", () => {
++  const c = ownerRouteProject("cor-entry-exit");
++  const before = readFileSync(c.statePath);
++  const refused = ownerRun(c, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", "7",
++    "--result-path", "specs/feature/result.md", "--result-sha256", hash(Buffer.from("bytes the State never bound\n"))]);
++  assert.equal(refused.status, 2, refused.stderr);
++  const envelope = envelopeOf(refused);
++  assert.equal(envelope.status, "refused");
++  assert.equal(envelope.code, "COR-ENTRY-EXIT");
++  assert.equal(envelope.exitCode, 2);
++  assert.equal(typeof envelope.message, "string");
++  assert.match(envelope.message, /PS-RESULT-CLOSE-RESULT: digest-changed: /u, "the entry's refusal text names the cause");
++  assert.ok(envelope.message.length <= 400, "the carried text is bounded");
++  assert.doesNotMatch(envelope.message, /\u001b/u, "no ANSI sequence is carried");
++  assert.match(refused.stderr, /Error: Result-close plan refused \(PS-RESULT-CLOSE-RESULT: digest-changed: /u, "the entry's own stderr still passes through");
++  assert.deepEqual(readFileSync(c.statePath), before, "a refused entry writes nothing");
++  assertReleased(c, "refused entry");
++});
++
++test("C30G-D1 (Part D): on a real bootstrap, an edited, then committed-and-reverted Result is named digest-changed, and the Git restore the text names brings the close plan and apply back", () => {
++  const p = ownerRouteProject("cor-restore");
++  const relative = "specs/feature/result.md";
++  const git = (...args) => execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-C", p.root, ...args], { encoding: "utf8" }).trim();
++  const planned = ownerRun(p, ["continuity-result-bootstrap-plan"]);
++  assert.equal(planned.status, 0, planned.stderr);
++  const applied = ownerRun(p, JSON.parse(planned.stdout).applyAction.argv.slice(1));
++  assert.equal(applied.status, 0, applied.stderr);
++  const stateOf = () => JSON.parse(readFileSync(p.statePath, "utf8"));
++  const bound = stateOf().continuity.authority.result;
++  assert.equal(hash(readFileSync(p.resultPath)), bound.sha256, "the bootstrap bound the appended bytes");
++  git("add", "--", relative); git("commit", "-q", "-m", "bind the Result"); // the owned commit of the bootstrap
++  const closeArgv = () => ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(stateOf().continuity.revision), "--result-path", relative, "--result-sha256", bound.sha256];
++  const stateBefore = readFileSync(p.statePath);
++  // (1) an edit that was not committed: git restore -- <path>
++  writeFileSync(p.resultPath, Buffer.concat([readFileSync(p.resultPath), Buffer.from("\nAn agent edit after the bootstrap.\n")]));
++  const edited = ownerRun(p, closeArgv());
++  assert.equal(edited.status, 2, edited.stderr);
++  assert.match(edited.stderr, /PS-RESULT-CLOSE-RESULT: digest-changed: /u);
++  assert.match(edited.stderr, /git restore -- specs\/feature\/result\.md/u);
++  assert.equal(envelopeOf(edited).code, "COR-ENTRY-EXIT");
++  git("restore", "--", relative);
++  assert.equal(hash(readFileSync(p.resultPath)), bound.sha256);
++  const restoredPlan = ownerRun(p, closeArgv());
++  assert.equal(restoredPlan.status, 0, restoredPlan.stderr);
++  // (2) the bound bytes committed, then a revert committed: git restore --source=<commit that holds the bound bytes> -- <path>
++  writeFileSync(p.resultPath, p.historical); git("add", "--", relative); git("commit", "-q", "-m", "revert the Result");
++  const reverted = ownerRun(p, closeArgv());
++  assert.equal(reverted.status, 2, reverted.stderr);
++  assert.match(reverted.stderr, /PS-RESULT-CLOSE-RESULT: digest-changed: .*bound [0-9a-f]{12}, current [0-9a-f]{12}/u);
++  assert.match(reverted.stderr, /git restore --source=<commit> -- specs\/feature\/result\.md/u);
++  assert.deepEqual(readFileSync(p.statePath), stateBefore, "the refused plans wrote nothing to the State");
++  const holder = git("log", "--format=%h", "--", relative).split("\n").find((commit) => hash(execFileSync("git", ["-C", p.root, "show", `${commit}:${relative}`])) === bound.sha256);
++  assert.ok(holder, "a commit holds the bound bytes");
++  git("restore", `--source=${holder}`, "--", relative);
++  assert.equal(hash(readFileSync(p.resultPath)), bound.sha256);
++  const closePlan = ownerRun(p, closeArgv());
++  assert.equal(closePlan.status, 0, closePlan.stderr);
++  const closeApplied = ownerRun(p, JSON.parse(closePlan.stdout).applyAction.argv.slice(1));
++  assert.equal(closeApplied.status, 0, closeApplied.stderr);
++  assert.equal(stateOf().continuity.queueHead.nextAction, "close", "the close went past the Result close block");
++  assertReleased(p, "restored close");
++});
++
+ test("C23 F25: a released member counts as settled only when its facts and its release evidence name one image, and a recovered binding only when it never wrote", () => {
+   const { onboardingContinuityReleasedSettledImage: settled } = continuityApi;
+   const facts = (...shas) => shas.map((sha256) => ({ namespaceId: "selected-state", sha256 }));
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-close.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-close.test.mjs
+index bbfcd068eed00ee9b4fe02454f08b242b3ae4c47..59830d15a4e7f8e2902d213b34c9c85a88a9df5c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-close.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-close.test.mjs
+@@ -323,3 +323,61 @@ test("physical Result must be a stable regular single-link file", () => {
+     ]).status, 2, mode);
+   }
+ });
++
++// ---- C30G-D1 (AC-108): a refused Result close names its cause; the code PS-RESULT-CLOSE-RESULT and the exit code 2 stay as they were ----
++const closePlanArgv = (f, resultPath = f.resultPath, resultSha256 = f.resultSha256) => [
++  "continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(f.revision), "--result-path", resultPath, "--result-sha256", resultSha256];
++
++const CAUSES = [
++  ["missing", "missing-or-unsafe", /does not exist/u, (f, abs) => rmSync(abs)],
++  ["symlink", "missing-or-unsafe", /symbolic link/u, (f, abs) => { const target = join(f.root, "specs", "feature", "real-result.md"); const bytes = readFileSync(abs); rmSync(abs); writeFileSync(target, bytes); symlinkSync("real-result.md", abs); }],
++  ["hardlink", "missing-or-unsafe", /more than one hard link/u, (f, abs) => linkSync(abs, join(f.root, "specs", "feature", "second-name.md"))],
++  ["changed", "digest-changed", /bound [0-9a-f]{12}, current [0-9a-f]{12}/u, (f, abs) => writeFileSync(abs, "# Result\n\nEdited after the Result was bound.\n")],
++  ["empty", "empty-or-oversized", /is empty/u, (f, abs) => writeFileSync(abs, "")],
++  ["oversized", "empty-or-oversized", /larger than 1048576 bytes/u, (f, abs) => writeFileSync(abs, Buffer.alloc(1048577, 97))],
++];
++
++test("C30G-D1: a refused Result close plan and apply name the cause after the unchanged code, and write nothing", () => {
++  for (const [name, cause, pattern, mutate] of CAUSES) {
++    const f = fixture(`cause-${name}`);
++    const planned = plan(f);
++    mutate(f, join(f.root, f.resultPath));
++    const before = readFileSync(f.statePath);
++    const refusedPlan = invoke(f.root, closePlanArgv(f));
++    assert.equal(refusedPlan.status, 2, name);
++    assert.match(refusedPlan.stderr, new RegExp(`PS-RESULT-CLOSE-RESULT: ${cause}: `, "u"), `${name} plan: ${refusedPlan.stderr}`);
++    assert.match(refusedPlan.stderr, pattern, `${name} plan: ${refusedPlan.stderr}`);
++    assert.match(refusedPlan.stderr, new RegExp(f.resultPath.replaceAll(".", "\\."), "u"), `${name} plan names the Result path`);
++    const refusedApply = invoke(f.root, planned.applyAction.argv.slice(1));
++    assert.equal(refusedApply.status, 2, name);
++    assert.match(refusedApply.stderr, new RegExp(`Result-close apply refused \\(PS-RESULT-CLOSE-RESULT: ${cause}: `, "u"), `${name} apply: ${refusedApply.stderr}`);
++    assert.match(refusedApply.stderr, pattern, `${name} apply: ${refusedApply.stderr}`);
++    assert.match(refusedApply.stderr, /zero mutation/u);
++    assert.deepEqual(readFileSync(f.statePath), before, `${name}: nothing is written`);
++  }
++});
++
++test("C30G-D1: a Result that equals the Spec path is named as such (the plan; its apply cannot be planned)", () => {
++  const f = fixture("spec-path");
++  const specBytes = Buffer.from("# Spec\n", "utf8");
++  writeFileSync(join(f.root, AUTHORITY.specPath), specBytes);
++  const refused = invoke(f.root, closePlanArgv(f, AUTHORITY.specPath, sha256(specBytes)));
++  assert.equal(refused.status, 2);
++  assert.match(refused.stderr, /PS-RESULT-CLOSE-RESULT: is-prd-or-spec: /u);
++  assert.match(refused.stderr, /specs\/feature\/spec\.md/u);
++});
++
++test("C30G-D1: a changed Result is repaired by restoring the bound bytes, never by a rebind; the same plan then goes through", () => {
++  const f = fixture("restore");
++  const abs = join(f.root, f.resultPath);
++  const bound = readFileSync(abs);
++  writeFileSync(abs, "# Result\n\nReverted to something else.\n");
++  const refused = invoke(f.root, closePlanArgv(f));
++  assert.match(refused.stderr, /digest-changed: /u);
++  assert.match(refused.stderr, /commit or revert of the Result after the Result bootstrap changes the bytes the State binds/u);
++  assert.match(refused.stderr, /git restore --source=<commit> -- specs\/feature\/Result\.md/u);
++  assert.doesNotMatch(refused.stderr, /rebind/iu, "the rebind route cannot repair a changed digest and is never named as the repair");
++  writeFileSync(abs, bound);
++  const accepted = invoke(f.root, closePlanArgv(f));
++  assert.equal(accepted.status, 0, accepted.stderr);
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index b7c7ca9239d1acaa223792ff6ea8bfbfbfe03635..5600538a73e8e148f2ba01cf7e64f4c4fdb6da6a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -7035,6 +7035,37 @@ function observeResultCloseArtifact(dir, binding) {
+     : null;
+ }
+ 
++/**
++ * C30G-D1 (AC-108): why a bound Result cannot close, in the exact conditions observeResultCloseArtifact and the PRD/Spec check refuse today; null when it can.
++ * Pure and read-only (it never writes). The repair names only the route that works: no entry moves the binding to a changed file, so the way back is the bound bytes from Git.
++ */
++export function diagnoseResultCloseBinding(dir, binding, prdPath, specPath) {
++  const path = typeof binding?.path === "string" ? binding.path : "(no path)";
++  const bound = String(binding?.sha256 ?? "").slice(0, 12);
++  const restore = `Repair: bring the bound bytes (digest ${bound}) back from Git, then rerun the same command: git restore -- ${path} for an edit that was not committed; for a change that was committed or reverted, run git restore --source=<commit> -- ${path} with the newest commit before the change that holds the bound bytes (git log --format=%h -- ${path} lists the commits that touched it; the commit that bound the Result is the one before the change). The rerun names bound and current again: equal digests mean it is repaired, otherwise restore from the next older commit. If no commit holds those bytes, stop and report it: the State is never edited by hand.`;
++  if (path === prdPath || path === specPath) {
++    return { cause: "is-prd-or-spec", text: `is-prd-or-spec: the bound Result path ${path} is the PRD or the Spec path, so it is not an Implementation Result. This is a defect of the State binding, not of the file: the Result bootstrap binds specs/<feature>/result.md. Report it; the State is never edited by hand.`, repair: "Report it; the State is never edited by hand." };
++  }
++  const observed = physicalRebindFile(dir, binding?.path);
++  if (observed === null) {
++    let detail = "does not exist or is not a safe repository-relative path";
++    try {
++      const info = lstatSync(join(dir, path));
++      detail = info.isSymbolicLink() ? "is a symbolic link" : !info.isFile() ? "is not a regular file" : info.nlink !== 1 ? "has more than one hard link"
++        : "changed while it was read, or a directory above it is a symbolic link";
++    } catch { /* the default detail */ }
++    return { cause: "missing-or-unsafe", text: `missing-or-unsafe: the bound Result ${path} ${detail}; a Result must be one regular file with a single link. ${restore}`, repair: restore };
++  }
++  const size = observed.bytes.byteLength;
++  if (size < 1 || size > CONTINUITY_RESULT_MAX_BYTES) {
++    return { cause: "empty-or-oversized", text: `empty-or-oversized: the bound Result ${path} ${size < 1 ? "is empty (0 bytes)" : `is ${size} bytes, larger than ${CONTINUITY_RESULT_MAX_BYTES} bytes`}. ${restore}`, repair: restore };
++  }
++  if (observed.sha256 !== binding?.sha256) {
++    return { cause: "digest-changed", text: `digest-changed: the bound Result ${path} no longer has the bytes the State binds (bound ${bound}, current ${observed.sha256.slice(0, 12)}). A commit or revert of the Result after the Result bootstrap changes the bytes the State binds, and so does any later edit. No Pipeline entry moves the binding to a changed file. ${restore}`, repair: restore };
++  }
++  return null;
++}
++
+ function resultClosePlanPayload(root, request, resultFile, expectedStateSha256,
+   expectedPostStateSha256, updatedAt) {
+   return {
+@@ -7084,7 +7115,7 @@ function buildResultClosePlan(dir, request, existing, updatedAt) {
+   if (resultFile === null
+     || request.result.path === existing.state.continuity.authority.prd.path
+     || request.result.path === existing.state.continuity.authority.spec.path) {
+-    return { ok: false, code: "PS-RESULT-CLOSE-RESULT" };
++    return { ok: false, code: "PS-RESULT-CLOSE-RESULT", cause: diagnoseResultCloseBinding(dir, request.result, existing.state.continuity.authority.prd.path, existing.state.continuity.authority.spec.path)?.text };
+   }
+   const transition = bindContinuityResultForClose(
+     existing.state.continuity,
+@@ -7154,7 +7185,7 @@ function runResultCloseCommand(sub, rest, deps) {
+     const updatedAt = deps.now();
+     const planned = buildResultClosePlan(deps.dir, plannedRequest, readStateRaw(deps.dir), updatedAt);
+     if (!planned.ok) {
+-      console.error(`Error: Result-close plan refused (${planned.code}); zero mutation.`);
++      console.error(`Error: Result-close plan refused (${planned.code}${planned.cause ? `: ${planned.cause}` : ""}); zero mutation.`);
+       return 2;
+     }
+     const writer = fileURLToPath(import.meta.url);
+@@ -7198,7 +7229,9 @@ function runResultCloseCommand(sub, rest, deps) {
+   try {
+     const resultFile = observeResultCloseArtifact(deps.dir, request.result);
+     if (resultFile === null) {
+-      console.error("Error: Result-close apply refused (PS-RESULT-CLOSE-RESULT); zero mutation.");
++      const state = readStateRaw(deps.dir);
++      const cause = state.status === "ok" ? diagnoseResultCloseBinding(deps.dir, request.result, state.state.continuity?.authority?.prd?.path, state.state.continuity?.authority?.spec?.path)?.text : undefined;
++      console.error(`Error: Result-close apply refused (PS-RESULT-CLOSE-RESULT${cause ? `: ${cause}` : ""}); zero mutation.`);
+       return 2;
+     }
+     const payload = resultCloseApplyPayload(deps.dir, request, apply, resultFile);

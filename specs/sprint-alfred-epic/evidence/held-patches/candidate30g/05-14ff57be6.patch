@@ -1,0 +1,486 @@
+diff --git a/plugins/pipeline-core/lib/gate-definition-changes.mjs b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+index af7b5515af72f73200ebffa3b6a8c1b39d62230d..27cfc0cafc2fd705dd088afaaa32696bcc2e0b64 100644
+--- a/plugins/pipeline-core/lib/gate-definition-changes.mjs
++++ b/plugins/pipeline-core/lib/gate-definition-changes.mjs
+@@ -308,7 +308,9 @@ export function describeGateDefinitionChange(change) {
+ }
+ 
+ /** The repair the close and inspect name for an unproven list: the PO's one acknowledgement of exactly that list. */
+-export function gateChangeAcknowledgementRepair({ stateWriter = "pipeline-state.mjs" } = {}) {
++export function gateChangeAcknowledgementRepair({ stateWriter = "pipeline-state.mjs", commitOwned = "commit-pipeline-owned.mjs" } = {}) {
+   return `the PO acknowledges the unproven gate-definition changes once for this range: run node ${stateWriter} approve-gate-change-acknowledgement --by <the label the PO gives for this command>, `
+-    + "which prints the PO's signing command for exactly this list (or records it at once in chat mode); history is never rewritten and a revert does not remove a change";
++    + "which prints the PO's signing command for exactly this list (or records it at once in chat mode); history is never rewritten and a revert does not remove a change. "
++    // C30G-D2: the signing command refuses a dirty tree and the signature names the current HEAD, so the order is fixed.
++    + `The signing command refuses a dirty tree: first commit the Pipeline's own outputs with node ${commitOwned} --root <the project root> --agent and move everything else out of the work tree, then the PO signs at the current HEAD and the agent commits nothing between the signature and its command, then rerun the identical close command`;
+ }
+diff --git a/plugins/pipeline-core/lib/gate-definition-changes.test.mjs b/plugins/pipeline-core/lib/gate-definition-changes.test.mjs
+index 8194b6c4aacc0ce2e472acff8cfdf3dd635104df..0822aa7313ecbad50efc83a8f1ff8fb0957c4026 100644
+--- a/plugins/pipeline-core/lib/gate-definition-changes.test.mjs
++++ b/plugins/pipeline-core/lib/gate-definition-changes.test.mjs
+@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, buildGateChangeAcknowledgementSubject, describeGateDefinitionChange,
+-  gateChangeAcknowledgementConfirmationLines, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
++  gateChangeAcknowledgementConfirmationLines, gateChangeAcknowledgementRepair, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
+ 
+ const roots = [];
+ after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+@@ -162,3 +162,12 @@ test("the acknowledgement subject names the unproven changes at the clean HEAD a
+   assert.match(lines.join("\n"), /project\/pipeline\.yaml changed in [a-f0-9]{12}/u);
+   assert.match(lines.at(-1), /acknowledged after the fact/u);
+ });
++
++test("C30G-D2: the repair of an unproven gate-definition change orders the clean-tree route: the Pipeline's own outputs in, the rest out, the signature at the current HEAD, the rerun", () => {
++  const text = gateChangeAcknowledgementRepair({ stateWriter: "state.mjs", commitOwned: "owned.mjs" });
++  assert.match(text, /run node state\.mjs approve-gate-change-acknowledgement --by <the label the PO gives for this command>/u, "the signing route is unchanged");
++  const order = [/commit the Pipeline's own outputs with node owned\.mjs --root <the project root> --agent/u, /move everything else out of the work tree/u, /signs at the current HEAD/u, /commits? nothing between the signature and its command/u, /rerun the identical close command/u];
++  let from = 0;
++  for (const part of order) { const found = part.exec(text.slice(from)); assert.ok(found, `${part} in order`); from += found.index + found[0].length; }
++  assert.match(gateChangeAcknowledgementRepair(), /commit-pipeline-owned\.mjs --root/u, "the default spelling names the script");
++});
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+index 23c5691c6f33372a757373a80140fa1eb2c233d4..3bf9c28b8d906f0dcca1a1a521b8e491962eb423 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+@@ -17,8 +17,10 @@
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+-import { join, resolve } from "node:path";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { courseEvidenceGapText } from "../lib/critic-course-admission.mjs";
+ import { classifyDirtyTree, porcelainPaths } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { ACKNOWLEDGE_TRAILER, runningGoldfishCommitNotice } from "../lib/running-goldfish-scope.mjs";
+@@ -86,7 +88,13 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
+     return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
+   }
+   const evidence = manifestEvidence(root, owned, untracked, git);
+-  if (evidence.refusal) return { status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: evidence.refusal, owned, missing: evidence.missing };
++  if (evidence.refusal) {
++    // A refusal that is not about missing evidence (git ls-files failed) carries no groups and keeps its plain reason.
++    const trackedDirty = porcelainPaths(status.stdout.split("\n").filter((line) => line !== "" && !line.startsWith("?? ")).join("\n"));
++    const repair = Array.isArray(evidence.groups) && evidence.groups.length ? manifestEvidenceRepair({ root, groups: evidence.groups, trackedDirty, untracked, git }) : undefined;
++    // The old closing sentence ("restore or re-register that evidence first") named no way a half-closed close could follow; it is replaced by the recovery, and kept only where no recovery could be built.
++    return { status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: repair === undefined ? `${evidence.refusal} Restore or re-register that evidence first (register-feature-package.mjs), then rerun this command.` : `${evidence.refusal} ${repair}`, owned, missing: evidence.missing, ...(repair === undefined ? {} : { repair }) };
++  }
+   const carried = evidence.carried;
+   const rest = untouched.filter((path) => !carried.includes(path));
+   const left = { ...(rest.length ? { untouched: rest } : {}), ...(carried.length ? { carried } : {}) };
+@@ -117,9 +125,40 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
+ // regular file whose bytes match the listed digest is carried into the same commit; anything else refuses, naming it.
+ const FEATURE_MANIFEST = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\/lifecycle\.json$/u;
+ 
++// C30G-D2 (AC-108): the refusal below used to end in "restore or re-register that evidence", which nobody could follow when a close had stopped half way and a file was gone.
++// The recovery is named from what Git shows: an UNCOMMITTED manifest is brought back to its committed revision (the close builds it and its evidence again), and when the COMMITTED
++// manifest already lists the file, only the original bytes can stand in for it (a new Verify run is refused as FPR-VERIFY-IMMUTABLE), else the damaged course route of the course reader.
++// Only text and the `repair` field: what is committed and when this refuses are unchanged.
++const SELF = fileURLToPath(import.meta.url);
++const bounded = (list) => `${list.slice(0, 8).join(", ")}${list.length > 8 ? ", ..." : ""}`;
++
++function committedEvidencePaths(manifestPath, git) {
++  const shown = git(["show", `HEAD:${manifestPath}`]);
++  if (!isSuccessfulSpawn(shown) || typeof shown.stdout !== "string") return new Set();
++  try { return new Set((JSON.parse(shown.stdout)?.artifacts ?? []).filter((entry) => entry?.class === "candidate-evidence" && typeof entry.path === "string").map((entry) => entry.path)); } catch { return new Set(); }
++}
++
++function manifestEvidenceRepair({ root, groups, trackedDirty, untracked, git }) {
++  return groups.map(({ manifestPath, feature, missing }) => {
++    const dir = `specs/${feature}/`;
++    const restore = [manifestPath, `${dir}acceptance.md`].filter((path) => trackedDirty.includes(path));
++    const away = [...untracked].filter((path) => path.startsWith(dir));
++    const clean = `${restore.length ? `git restore -- ${restore.join(" ")}` : "leave the tracked files as they are"}${away.length ? `; move the ${away.length} untracked file(s) under ${dir} out of the work tree (${bounded(away)}), never delete them` : ""}`;
++    const kept = missing.filter((path) => committedEvidencePaths(manifestPath, git).has(path));
++    if (!kept.length) {
++      return `The manifest ${manifestPath} is not committed (the close stopped half way) and lists evidence that is gone. Bring it back to the committed revision: ${clean}; then rerun the identical close command (finish-feature.mjs --one-shot, with the arguments the stop printed): it builds the manifest and its evidence again.`;
++    }
++    // Read in register-feature-package (lib/feature-package-registration.mjs addVerifyEvidence): a listed path whose bytes differ from the registered digest is FPR-VERIFY-IMMUTABLE, so a new Verify run cannot replace it.
++    return `The committed manifest ${manifestPath} already lists ${bounded(kept)}, so a restore does not remove the entry. Its digest is fixed and registered evidence is never replaced (FPR-VERIFY-IMMUTABLE), so a new Verify run cannot stand in for the file. `
++      + `If you still hold the original file, put it back at its path with exactly the listed bytes and run node ${SELF} --root ${root} --agent again: it commits the file together with the manifest. `
++      + `If the file is gone for good: ${courseEvidenceGapText("CCA-EVIDENCE-READ", null)}`;
++  }).join(" ");
++}
++
+ function manifestEvidence(root, owned, untracked, git) {
+   const carried = [];
+   const missing = [];
++  const groups = [];
+   for (const manifestPath of owned) {
+     const match = FEATURE_MANIFEST.exec(manifestPath);
+     if (!match) continue;
+@@ -131,6 +170,8 @@ function manifestEvidence(root, owned, untracked, git) {
+     const tracked = git(["ls-files", "-z", "--", `specs/${match[1]}`]);
+     if (!isSuccessfulSpawn(tracked) || typeof tracked.stdout !== "string") return { refusal: "git ls-files failed", missing: [], carried: [] };
+     const trackedPaths = new Set(tracked.stdout.split("\0").filter(Boolean));
++    const group = { manifestPath, feature: match[1], missing: [] };
++    groups.push(group);
+     for (const entry of listed) {
+       if (trackedPaths.has(entry.path) || carried.includes(entry.path)) continue;
+       let ok = false;
+@@ -142,13 +183,12 @@ function manifestEvidence(root, owned, untracked, git) {
+             && createHash("sha256").update(readFileSync(file)).digest("hex") === entry.sha256;
+         } catch { ok = false; }
+       }
+-      if (ok) carried.push(entry.path); else missing.push(entry.path);
++      if (ok) carried.push(entry.path); else { missing.push(entry.path); group.missing.push(entry.path); }
+     }
+   }
+   if (missing.length) {
+-    return { carried: [], missing, refusal: `the feature manifest lists candidate evidence that is neither committed nor an untracked file with exactly the listed bytes (${missing.join(", ")}). `
+-      + "Committing the manifest without it would leave a manifest revision that names a file its own commit does not hold, and the Critic course of that feature could not be read again. "
+-      + "Restore or re-register that evidence first (register-feature-package.mjs), then rerun this command." };
++    return { carried: [], missing, groups: groups.filter((group) => group.missing.length), refusal: `the feature manifest lists candidate evidence that is neither committed nor an untracked file with exactly the listed bytes (${missing.join(", ")}). `
++      + "Committing the manifest without it would leave a manifest revision that names a file its own commit does not hold, and the Critic course of that feature could not be read again." };
+   }
+   return { carried, missing: [] };
+ }
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+index aef4d83deba0da0d3b9429de274deb6ff8b6a70c..4cf6fc51e93a4f1b30846bb44ee9aae0aa63a6fa 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+@@ -4,7 +4,7 @@
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { courseEvidenceGapText, criticCourseRepair, locateCourseEvidenceGap, resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
+@@ -141,6 +141,66 @@ test("Codex report: listed evidence with other bytes than the manifest digest re
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// C30G-D2 (AC-108): a close that stopped half way left an uncommitted manifest listing evidence a person deleted. The refusal named no route and nobody could proceed.
++// The recovery must be in the result (`repair`, and the end of `reason`), and a tree that FOLLOWS it must commit or report nothing to commit.
++test("C30G-D2: a manifest that lists deleted evidence refuses with the recovery for an uncommitted manifest, and following that recovery ends in nothing-to-commit", () => {
++  const { root, run, put, evidencePath } = featureRepo("recover");
++  try {
++    rmSync(join(root, evidencePath));
++    put("specs/feat-1/evidence/verify-candidate.json", "{}\n");
++    put("specs/feat-1/acceptance.md", "# Acceptance\n");
++    const head = run("rev-parse", "HEAD").trim();
++    const refused = commitPipelineOwned(["--root", root, "--agent"]);
++    assert.equal(refused.status, "refused");
++    assert.equal(refused.code, "CPO-MANIFEST-EVIDENCE");
++    assert.deepEqual(refused.missing, [evidencePath]);
++    assert.equal(typeof refused.repair, "string", JSON.stringify(refused));
++    assert.ok(refused.reason.endsWith(refused.repair), "the reason ends with the recovery");
++    assert.ok(refused.repair.includes("git restore -- specs/feat-1/lifecycle.json"), refused.repair);
++    assert.ok(refused.repair.includes("specs/feat-1/evidence/verify-candidate.json") && refused.repair.includes("specs/feat-1/acceptance.md"), "the untracked close outputs are named");
++    assert.match(refused.repair, /never delete/u);
++    assert.match(refused.repair, /rerun the identical close command/u);
++    assert.doesNotMatch(refused.repair, /FPR-VERIFY-IMMUTABLE|already lists/u, "the manifest at HEAD does not list it: the other route is not offered");
++    assert.equal(run("rev-parse", "HEAD").trim(), head, "a refusal commits nothing");
++    // Follow the recovery exactly as it is worded: restore the manifest, move the untracked close outputs out of the work tree.
++    run("restore", "--", "specs/feat-1/lifecycle.json");
++    const outside = realpathSync(mkdtempSync(join(tmpdir(), "cpo-moved-")));
++    try {
++      renameSync(join(root, "specs/feat-1/evidence/verify-candidate.json"), join(outside, "verify-candidate.json"));
++      renameSync(join(root, "specs/feat-1/acceptance.md"), join(outside, "acceptance.md"));
++      const after = commitPipelineOwned(["--root", root, "--agent"]);
++      assert.ok(["nothing-to-commit", "committed"].includes(after.status), JSON.stringify(after));
++      assert.equal(run("status", "--porcelain").trim(), "");
++    } finally { rmSync(outside, { recursive: true, force: true }); }
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("C30G-D2: when the manifest at HEAD already lists the missing file a new Verify run cannot replace it: the recovery is the original bytes, else the course reader's damaged-course route", () => {
++  const { root, run, put, evidencePath } = featureRepo("head-lists");
++  try {
++    run("add", "--", "specs/feat-1/lifecycle.json");
++    run("commit", "-q", "-m", "manifest alone", "--", "specs/feat-1/lifecycle.json");
++    rmSync(join(root, evidencePath));
++    put("specs/feat-1/lifecycle.json", `${readFileSync(join(root, "specs/feat-1/lifecycle.json"), "utf8")}\n`);
++    const refused = commitPipelineOwned(["--root", root, "--agent"]);
++    assert.equal(refused.code, "CPO-MANIFEST-EVIDENCE", JSON.stringify(refused));
++    assert.ok(refused.reason.endsWith(refused.repair));
++    assert.doesNotMatch(refused.reason, /Restore or re-register that evidence first/u, "the old closing sentence is replaced, not kept beside the recovery");
++    // Reading register-feature-package (addVerifyEvidence): a registered path with other bytes is FPR-VERIFY-IMMUTABLE, so a new Verify run cannot stand in; no producer or registration is offered.
++    assert.match(refused.repair, /already lists specs\/feat-1\/evidence\/final-candidate-verify\.json, so a restore does not remove the entry/u);
++    assert.match(refused.repair, /registered evidence is never replaced \(FPR-VERIFY-IMMUTABLE\)/u);
++    assert.doesNotMatch(refused.repair, /--add-verify-evidence|verify-evidence-producer/u);
++    assert.match(refused.repair, /put it back at its path with exactly the listed bytes and run node \S+commit-pipeline-owned\.mjs --root \S+ --agent again/u);
++    assert.match(refused.repair, /new feature of rigor 1[\s\S]*discard-feature/u, "the damaged-course way on of the course reader, when the file is gone for good");
++    // Following the first route: the original bytes put back, the same command carries them into the manifest commit.
++    put(evidencePath, `${JSON.stringify({ schema: "example.verify.v1", status: "pass" })}\n`);
++    const after = commitPipelineOwned(["--root", root, "--agent"]);
++    assert.equal(after.status, "committed", JSON.stringify(after));
++    assert.deepEqual(after.carried, [evidencePath]);
++    assert.equal(run("status", "--porcelain").trim(), "");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("K98 row 7/7: a refusal for any other foreign file keeps the plain reason", () => {
+   const result = refusedFor(" M other.txt\n");
+   assert.equal(result.code, "CPO-FOREIGN-CHANGES");
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 2f33982ed6b21f3f67cbf1fbd0b32da786b9ca07..ad565294b5ec2fb2c585fc4a4be86eb12b3a8e58 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -299,6 +299,17 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     const cause = diagnoseResultCloseBinding(root, authority?.result, authority?.prd?.path, authority?.spec?.path);
+     return cause === null ? null : stopResult("result-close-block", "ONESHOT-RESULT-CLOSE-BLOCKED", cause.text, `nothing was written. ${cause.repair} Then rerun the identical command: ${rerun(id)}`);
+   };
++  // C30G-D2 (AC-108): ONE ordered route for every stop whose repair needs a CLEAN tree (a PO signature, an owned commit, a Verify of the committed candidate).
++  // A person who followed the old text ("commit them or move them") was sent into a hand edit of evidence. Null on a clean tree, so the plain repair stays as it was.
++  const cleanTreeRoute = ({ refuses, sign = null, then }) => {
++    const porcelain = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
++    const dirty = porcelain?.status === 0 ? String(porcelain.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)) : [];
++    if (dirty.length === 0) return null;
++    const steps = [`(1) the Pipeline's own outputs go in with node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent (when it refuses with CPO-MANIFEST-EVIDENCE, its result carries the repair to follow), everything else is moved out of the work tree, never deleted`];
++    if (sign !== null) steps.push(`(${steps.length + 1}) ${sign} (the signature is made on the clean tree at the current HEAD: commit nothing between the signature and its command)`);
++    steps.push(`(${steps.length + 1}) ${then}`);
++    return `the work tree has ${dirty.length} uncommitted path(s) (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}) and ${refuses} refuses a dirty tree, so in this order: ${steps.join("; ")}`;
++  };
+   const stages = [];
+   // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
+   const handoverPath = (() => {
+@@ -418,7 +429,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         if (verified.verified !== true) return stopResult("sbom", verified.code, `the signed override was refused (${verified.code}): ${blockedText}`, `${verified.code === SBOM_OVERRIDE_CODES.noAnchor || verified.code === SBOM_OVERRIDE_CODES.untrusted ? "the project's trust anchors (project/critical-human-proof.json) do not name the signing key; " : ""}${signText}`, { sbomOverrideRequest: requestPath });
+         sbom = closeSbom({ ...sbomInput, override: `The PO accepted the findings listed here by signature (key ${verified.authority.keyReference}).`, authority: verified.authority });
+         if (sbom.status === "ready") sbom.files.push({ path: `${evidenceDir}/sbom/override-request.json`, text: `${JSON.stringify(verified.request, null, 2)}\n` }, { path: `${evidenceDir}/sbom/override-proof.json`, text: `${JSON.stringify(proof, null, 2)}\n` });
+-        else return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "), `${helps.join(" ")}`);
++        else return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "), `${helps.join(" ")} Then rerun the identical command: ${rerun(again)}`);
+       }
+       // C24 (Claude greenfield): a round that did not pass used to surface only inside Verify, after the Result bootstrap, with no way out named, and a run took a PO's word in chat for an acceptance.
+       let standing = null;
+@@ -495,7 +506,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         try { receipt = JSON.parse(String(committed?.stdout ?? "")); } catch { receipt = null; }
+         if (committed?.status !== 0 || (receipt?.status !== "committed" && receipt?.status !== "nothing-to-commit")) {
+           return stopResult("result-bootstrap", "ONESHOT-RESULT-BOOTSTRAP-COMMIT", `commit-pipeline-owned refused (${receipt?.code ? `${receipt.code}: ${String(receipt.reason ?? "").slice(0, 300)}` : failedText(committed)}), so the applied Result bootstrap is written but not committed.`,
+-            `repair what the refusal names, then run ${commitCommand}, then ${rerun(lifecycle ?? again)}`);
++            `${typeof receipt?.repair === "string" && receipt.repair !== "" ? `the refusal carries its own repair, follow it: ${receipt.repair}; then` : "repair what the refusal names, then"} run ${commitCommand}, then ${rerun(lifecycle ?? again)}`);
+         }
+         const info = Object.freeze({ commit: typeof receipt.commit === "string" ? receipt.commit : null, paths: Object.freeze(Array.isArray(receipt.owned) ? receipt.owned.filter((path) => typeof path === "string") : []), reconciled: reconcile !== null });
+         const note = `This call first ran the Result bootstrap and committed it${info.commit === null ? " (nothing was left to commit)" : ` as ${info.commit}`}${info.paths.length === 0 ? "" : ` (${info.paths.join(", ")})`}; every "nothing was written" below counts from that commit on, and the rerun command below does not run the bootstrap again.${humanAcceptance === null ? "" : " The answer given with --human-acceptance was not carried over: it was given before this candidate existed, so the question is asked again for the candidate it names."}`;
+@@ -518,19 +529,21 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         if (independence?.status === "acknowledgement-required") acknowledgementGap = String(independence.message ?? "");
+       } catch { acknowledgementGap = null; /* the close keeps its own check */ }
+       if (acknowledgementGap !== null) {
+-        // C21E: the signing command behind this acknowledgement refuses a dirty tree, and the PO should not find that out by entering a passphrase. The raw runner keeps the status column intact; rawGit trims it away.
+-        const porcelain = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+-        const dirty = porcelain?.status === 0 ? String(porcelain.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)) : [];
+-        const dirtyNote = dirty.length === 0 ? "" : `first commit the ${dirty.length} uncommitted path(s) or move them out of the work tree, because the signing command refuses a dirty tree (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}); `;
+-        return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${dirtyNote}record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
++        // C21E: the signing command behind this acknowledgement refuses a dirty tree, and the PO should not find that out by entering a passphrase. C30G-D2: the same ordered route as every other stop that needs a clean tree.
++        const route = cleanTreeRoute({ refuses: "the signing command", sign: "the PO signs the acknowledgement as the reason says", then: `rerun the identical command: ${rerun(again)}` });
++        return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${route ?? `record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`}`);
+       }
+       // ADR-0096 (Claude test run 3, L4): a gate-definition change without a proof is named before Verify; its PO acknowledgement also needs a clean tree and the current HEAD.
+       let gateChanges = null;
+       try { gateChanges = command(runner, process.execPath, [COORDINATOR, "gate-changes", "--root", root], "ONESHOT-GATE-CHANGES"); } catch { gateChanges = null; /* the close keeps its own check */ }
+       if (gateChanges?.status === "unproven" && Array.isArray(gateChanges.unproven)) {
+         const listed = gateChanges.unproven.slice(0, 8).join("; ");
++        const commitOwnedPath = join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs");
++        const repairText = String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER).replaceAll("commit-pipeline-owned.mjs --root <the project root>", `${commitOwnedPath} --root ${root}`);
++        // C30G-D2: on a dirty tree the coordinator's own order sentence is replaced by the route below (it names the dirty paths), so the signing step is the repair up to that sentence.
++        const route = cleanTreeRoute({ refuses: "the signing command", sign: repairText.split(". The signing command refuses a dirty tree")[0], then: `rerun the identical command: ${rerun(again)}` });
+         return stopResult("gate-changes", "CLOSE-GATE-CHANGE-UNPROVEN", `${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${listed}${gateChanges.unproven.length > 8 ? "; ..." : ""}.`,
+-          `nothing was written; ${String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER)}; then rerun the identical command: ${rerun(again)}`);
++          `nothing was written; ${route ?? `${repairText}; then rerun the identical command: ${rerun(again)}`}`);
+       }
+       // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
+       let addenda = null;
+@@ -647,7 +660,14 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       if (requalify) stages.push("requalify-candidate");
+       stages.push("verify-candidate");
+       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
+-      if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(again)}`);
++      if (verify?.status !== 0) {
++        // C30G-D2 (AC-108): the producer reports a dirty tree as status "dirty" (exit 1, no red suite). "Without committing" left a half-closed tree with no way on; the same ordered route as the signature stops names it.
++        let reportedDirty = false;
++        try { reportedDirty = JSON.parse(String(verify?.stdout ?? "")).status === "dirty"; } catch { reportedDirty = false; }
++        const route = reportedDirty ? cleanTreeRoute({ refuses: "the candidate Verify", then: `rerun the identical command: ${rerun(again)}` }) : null;
++        if (route !== null) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", "The candidate Verify reported status dirty: it judges only a committed candidate, and the work tree holds uncommitted paths (no suite ran).", route);
++        return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(again)}`);
++      }
+       stages.push("register-verify-evidence");
+       const register = runner(process.execPath, [REGISTER_PACKAGE, "--root", root, "--add-verify-evidence", verifyPath]);
+       if (register?.status !== 0) return stopResult("register-verify-evidence", "ONESHOT-REGISTER-FAILED", failedText(register), `register the evidence by hand to see the typed refusal: node ${REGISTER_PACKAGE} --root ${root} --add-verify-evidence ${verifyPath}`);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index d2036e453dba020a443b9dd046db41b72a8d7c08..b9a4a148af0d52dbbe309b07537cd436d190ab45 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -9,6 +9,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { finishFeature, oneShotClose } from "./finish-feature.mjs";
++import { gateChangeAcknowledgementRepair } from "../lib/gate-definition-changes.mjs";
+ import { canonical } from "../lib/po-approval-proof.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import { closeSbom } from "../lib/sbom-close.mjs";
+@@ -799,13 +800,96 @@ test("C21E: the acknowledgement stop names the uncommitted paths before the PO i
+     writeFileSync(join(f.root, STATE_PATH), `${readFileSync(join(f.root, STATE_PATH), "utf8")} \n`);
+     const stopped = oneShotClose(f.input, { runCommand: f.runner });
+     assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+-    assert.match(stopped.stop.repair, /first commit the 2 uncommitted path\(s\)/u);
++    // C30G-D2 (QG-04, restated in place): the note became the one ordered route shared by every stop whose repair needs a clean tree (the text "first commit ... or move them" is replaced by the three ordered steps).
++    assert.match(stopped.stop.repair, /the work tree has 2 uncommitted path\(s\)/u);
+     assert.ok(stopped.stop.repair.includes("untracked-note.md") && stopped.stop.repair.includes(STATE_PATH), stopped.stop.repair);
+     assert.match(stopped.stop.repair, /rerun the identical command/u);
+     assert.deepEqual(f.calls, [], "the note changes no stage order");
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// C30G-D2 (AC-108): the repair of a stop that needs a clean tree is one ordered route: the Pipeline's own outputs in with commit-pipeline-owned, everything else out, the signature on the clean tree at the current HEAD with nothing committed in between, the identical rerun.
++const ORDERED_ROUTE = /\(1\) the Pipeline's own outputs go in with node \S+commit-pipeline-owned\.mjs --root \S+ --agent[\s\S]*everything else is moved out of the work tree[\s\S]*never deleted[\s\S]*\(2\)[\s\S]*clean tree at the current HEAD[\s\S]*nothing between the signature and its command[\s\S]*\(3\)[\s\S]*rerun the identical command/u;
++test("C30G-D2: the gate-change stop on a dirty tree lists the dirty paths (bounded to 8) and orders commit-pipeline-owned, the signature on the clean HEAD, the identical rerun; a clean tree keeps the plain repair", () => {
++  const clean = oneShotFixture({ gateChangesUnproven: true });
++  try {
++    const plain = oneShotClose(clean.input, { runCommand: clean.runner }).stop.repair;
++    assert.doesNotMatch(plain, /uncommitted|\(1\)/u, "a clean tree needs no route");
++    assert.match(plain, /^nothing was written; the PO acknowledges the unproven gate-definition changes once for this range: run node \S+pipeline-state\.mjs approve-gate-change-acknowledgement --by/u);
++  } finally { rmSync(clean.root, { recursive: true, force: true }); }
++  const f = oneShotFixture({ gateChangesUnproven: true });
++  try {
++    for (let index = 1; index <= 10; index += 1) writeFileSync(join(f.root, `leftover-${String(index).padStart(2, "0")}.md`), "x\n");
++    const stopped = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(stopped.stop.code, "CLOSE-GATE-CHANGE-UNPROVEN");
++    assert.match(stopped.stop.repair, /the work tree has 10 uncommitted path\(s\)/u);
++    assert.ok(stopped.stop.repair.includes("leftover-08.md") && !stopped.stop.repair.includes("leftover-09.md"), "bounded to 8 paths");
++    assert.match(stopped.stop.repair, ORDERED_ROUTE);
++    assert.match(stopped.stop.repair, /approve-gate-change-acknowledgement --by/u, "the signature step is the coordinator's own repair");
++    assert.deepEqual(f.calls, [], "the route changes no stage order");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30G-D2: the real coordinator repair text goes through the gate-change stop with the script paths and the root filled in, and its order sentence is never doubled by the dirty-tree route", () => {
++  const real = (f) => (executable, argv) => (argv[1] === "gate-changes" && argv[0]?.endsWith("close-coordinator.mjs")
++    ? { status: 0, stdout: JSON.stringify({ schema: "pipeline.close-gate-changes.v1", status: "unproven", unproven: ["GS-1 pipeline.user.yaml changed in 0123456789ab: no proof"], repair: gateChangeAcknowledgementRepair() }), stderr: "" }
++    : f.runner(executable, argv));
++  const clean = oneShotFixture({ gateChangesUnproven: true });
++  try {
++    const repair = oneShotClose(clean.input, { runCommand: real(clean) }).stop.repair;
++    assert.ok(!repair.includes("<the project root>"), repair);
++    assert.ok(repair.includes(`commit-pipeline-owned.mjs --root ${clean.root} --agent`), "the clean-tree repair carries the order sentence with the real root");
++    assert.ok(repair.includes(`${STATE_WRITER} approve-gate-change-acknowledgement`));
++  } finally { rmSync(clean.root, { recursive: true, force: true }); }
++  const f = oneShotFixture({ gateChangesUnproven: true });
++  try {
++    writeFileSync(join(f.root, "leftover.md"), "x\n");
++    const repair = oneShotClose(f.input, { runCommand: real(f) }).stop.repair;
++    assert.ok(!repair.includes("<the project root>"), repair);
++    assert.equal(repair.split("commit-pipeline-owned.mjs --root").length - 1, 1, "the order is stated once, by the route");
++    assert.doesNotMatch(repair, /The signing command refuses a dirty tree: first commit/u);
++    assert.match(repair, ORDERED_ROUTE);
++    assert.ok(repair.includes(`${STATE_WRITER} approve-gate-change-acknowledgement`));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30G-D2: a refused bootstrap commit carries the typed repair the commit command printed", () => {
++  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "stuck" });
++  try {
++    const runner = (executable, argv) => (argv[0]?.endsWith("commit-pipeline-owned.mjs")
++      ? { status: 2, stdout: JSON.stringify({ schema: "pipeline.commit-pipeline-owned.v1", status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: "the manifest lists evidence that is gone", repair: "run git restore -- specs/feature-abc/lifecycle.json" }), stderr: "" }
++      : f.runner(executable, argv));
++    const stopped = oneShotClose(f.input, { runCommand: runner });
++    assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-COMMIT", JSON.stringify(stopped).slice(0, 400));
++    assert.match(stopped.stop.repair, /run git restore -- specs\/feature-abc\/lifecycle\.json/u);
++    assert.match(stopped.stop.repair, /commit-pipeline-owned\.mjs --root [^ ]+ --agent/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C30G-D2: a candidate Verify that reports status dirty lists the dirty paths and the ordered route instead of 'without committing'; a real red Verify keeps its text", () => {
++  const f = oneShotFixture();
++  try {
++    writeFileSync(join(f.root, "foreign.txt"), "x\n");
++    const dirtyVerify = (executable, argv) => (argv[0]?.endsWith("verify-evidence-producer.mjs") ? { status: 1, stdout: JSON.stringify({ status: "dirty", exitCode: 1, steps: [{ name: "candidate-preflight", exitCode: 1 }] }), stderr: "" } : f.runner(executable, argv));
++    const stopped = oneShotClose(f.input, { runCommand: dirtyVerify });
++    assert.equal(stopped.stage, "verify-candidate"); assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED");
++    assert.match(stopped.stop.reason, /dirty/u);
++    assert.doesNotMatch(stopped.stop.reason, /candidate-preflight/u, "the raw evidence JSON is not the reason");
++    assert.match(stopped.stop.repair, /the work tree has \d+ uncommitted path\(s\)/u);
++    assert.ok(stopped.stop.repair.includes("foreign.txt"), stopped.stop.repair);
++    assert.match(stopped.stop.repair, /\(1\) the Pipeline's own outputs go in with node \S+commit-pipeline-owned\.mjs --root \S+ --agent[\s\S]*everything else is moved out of the work tree[\s\S]*never deleted/u);
++    assert.match(stopped.stop.repair, /rerun the identical command/u);
++    assert.doesNotMatch(stopped.stop.repair, /without committing/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++  const red = oneShotFixture({ verifyRed: true });
++  try {
++    const stopped = oneShotClose(red.input, { runCommand: red.runner });
++    assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED");
++    assert.match(stopped.stop.reason, /suite red/u);
++    assert.match(stopped.stop.repair, /^fix what the Verify output names without committing, then rerun the identical command: /u);
++  } finally { rmSync(red.root, { recursive: true, force: true }); }
++});
++
+ test("C21E: the close writes the Critic addenda before Verify, asks for their commit, and the rerun goes on to Verify", () => {
+   const f = oneShotFixture({ addendaWritten: true });
+   try {
+@@ -1718,3 +1802,71 @@ test("C22B CGF-12: the handover's technical-close line is read from the recorded
+     assert.match(readFileSync(join(dir, "docs/state.md"), "utf8"), /^\*\*Technical close:\*\* .*not readable/mu, "an entry without a readable close time is named, not papered over");
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
++
++// C30G-D2 (AC-108): a stop with no way on is the dead end this test keeps out. It reads the SOURCE of the one-shot, takes the repair argument of every
++// stopResult( call, and requires a runnable command shape or one explicit human-actor phrase in it. A repair written as a name (a helper or a text constant
++// defined in the same file) is read through that one definition, because the stop's text is what the definition holds.
++function skipQuoted(src, from) {
++  const quote = src[from];
++  for (let index = from + 1; index < src.length; index += 1) {
++    if (src[index] === "\\") { index += 1; continue; }
++    if (src[index] === quote) return index + 1;
++    if (quote === "`" && src[index] === "$" && src[index + 1] === "{") index = skipBraces(src, index + 1) - 1;
++  }
++  throw new Error("unterminated string literal");
++}
++function skipBraces(src, from) {
++  let depth = 0;
++  for (let index = from; index < src.length;) {
++    const char = src[index];
++    if (char === "'" || char === "\"" || char === "`") { index = skipQuoted(src, index); continue; }
++    if (char === "{") depth += 1;
++    if (char === "}") { depth -= 1; if (depth === 0) return index + 1; }
++    index += 1;
++  }
++  throw new Error("unbalanced braces");
++}
++function stopResultArguments(src) {
++  const calls = [];
++  for (let at = src.indexOf("stopResult("); at !== -1; at = src.indexOf("stopResult(", at + 1)) {
++    if (src.slice(Math.max(0, at - 9), at) === "function ") continue;
++    const args = []; let depth = 0; let argStart = at + "stopResult(".length;
++    for (let index = argStart; index < src.length;) {
++      const char = src[index];
++      if (char === "'" || char === "\"" || char === "`") { index = skipQuoted(src, index); continue; }
++      if (char === "/" && src[index + 1] === "/") { index = src.indexOf("\n", index); continue; }
++      if (char === "(" || char === "[" || char === "{") depth += 1;
++      else if (char === ")" && depth === 0) { args.push(src.slice(argStart, index)); break; }
++      else if (char === ")" || char === "]" || char === "}") depth -= 1;
++      else if (char === "," && depth === 0) { args.push(src.slice(argStart, index)); argStart = index + 1; }
++      index += 1;
++    }
++    calls.push({ at, line: src.slice(0, at).split("\n").length, args: args.map((arg) => arg.trim()) });
++  }
++  return calls;
++}
++const RUNNABLE_SHAPE = /\bnode |\bgit |\$\{rerun|\brerun\(/u;
++const HUMAN_ACTOR = /\bthe PO\b|\bhand the PO\b/u;
++// A stop that cannot satisfy the contract is listed here with its reason, never skipped silently. The test below proves each entry is still needed.
++const CONTRACT_EXCEPTIONS = Object.freeze({});
++test("C30G-D2: every stop of the one-shot names a way on: a non-empty repair with a runnable command shape or an explicit human actor", () => {
++  const source = readFileSync(new URL("./finish-feature.mjs", import.meta.url), "utf8");
++  const calls = stopResultArguments(source);
++  assert.equal(calls.length, source.split("stopResult(").length - 2, "every call but the definition was read");
++  assert.ok(calls.length >= 30, `only ${calls.length} stops were read`);
++  // A name is read through the definition nearest BEFORE the call (the same name is bound in several scopes of the file).
++  const definition = (name, at) => { const matches = [...source.matchAll(new RegExp(`(?:const|let) ${name.replace(/\$/gu, "\\$")} =`, "gu"))].filter((match) => match.index < at); const match = matches.at(-1); return match === undefined ? "" : source.slice(match.index, source.indexOf(";\n", match.index)); };
++  const reached = new Set(); const failing = [];
++  for (const call of calls) {
++    assert.ok(call.args.length >= 4, `stopResult at line ${call.line} has no repair argument`);
++    const repair = call.args[3];
++    assert.notEqual(repair, "", `the repair at line ${call.line} is empty`); assert.notEqual(repair, "\"\"", `the repair at line ${call.line} is empty`);
++    const text = [repair, ...[...new Set(repair.match(/[A-Za-z_$][\w$]*/gu) ?? [])].map((name) => definition(name, call.at))].join("\n");
++    const code = /^"([A-Z0-9-]+)"$/u.exec(call.args[1])?.[1] ?? `line ${call.line}`;
++    if (RUNNABLE_SHAPE.test(text) || HUMAN_ACTOR.test(text)) continue;
++    failing.push(code);
++    if (Object.hasOwn(CONTRACT_EXCEPTIONS, code)) reached.add(code);
++  }
++  assert.deepEqual(failing.filter((code) => !Object.hasOwn(CONTRACT_EXCEPTIONS, code)), [], "these stops name no runnable command and no human actor: fix their repair text");
++  assert.deepEqual([...reached].sort(), Object.keys(CONTRACT_EXCEPTIONS).sort(), "every listed exception is still a real exception");
++});
