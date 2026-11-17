@@ -22,6 +22,9 @@
  * again. `--write-policy` writes a first policy that accepts the current violations, only when
  * none exists. A project without `architecture/map` is `not-applicable`, never failed. The fitness
  * evaluator, whose outcomes the rigor lifecycle binds by digest, is not changed.
+ * The policy is deliberately permanent (PO decision 2026-11-17): it has no owner and no expiry, a
+ * later edit is a gate-protected change (GS-16, ADR-0096), and nothing about it ever stops a close
+ * for age.
  *
  * Usage: node architecture-boundary-check.mjs [--root <dir>] [--json] [--write-policy | --preview-prd <repo-relative PRD path>]
  * `--preview-prd` (read-only, no signature) checks the tree against the PROPOSED design of a PRD before the PO signs it.

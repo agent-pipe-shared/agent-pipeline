@@ -32,7 +32,7 @@
     },
     {
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
-      "rawSha256": "5c5a18576bdc972b0c1592101625fa2a1693882da0806915cf9161fc3165ceaa"
+      "rawSha256": "1f950ed40ecfd2e3fa61261cb3e570faac0aa8919eb77bf4c03c1beb0d8162ac"
     },
     {
       "path": "roles/critic.md",
@@ -40,7 +40,7 @@
     },
     {
       "path": "templates/prompts/critic-review.md",
-      "rawSha256": "2bbad87b775d0a5e94370d14126bfdac07e76c5dd0918ca6a839f08a8cbfea2e"
+      "rawSha256": "0cff1316bc921a381e7df9c14083001228d10bd79db239bd56154ba8759edf32"
     }
   ]
 }
