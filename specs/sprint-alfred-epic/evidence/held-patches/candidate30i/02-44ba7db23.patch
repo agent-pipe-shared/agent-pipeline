@@ -1,0 +1,182 @@
+diff --git a/plugins/pipeline-core/lib/agy-central-snapshot.mjs b/plugins/pipeline-core/lib/agy-central-snapshot.mjs
+index 642615c78528c396c07e62c24ed17884050c41de..9976e7778b48fdf9677ab2f466fe1f8e621e30fa 100644
+--- a/plugins/pipeline-core/lib/agy-central-snapshot.mjs
++++ b/plugins/pipeline-core/lib/agy-central-snapshot.mjs
+@@ -506,6 +506,10 @@ export const AGY_RUNNER_MODEL_MAP = Object.freeze({ sonnet: 'flash', haiku: 'fla
+ // `unknown component: tool "Read" not found in registry`, so no pipeline subagent could start. The frontmatter `tools:` list is rewritten through
+ // this second closed table; the names come from the runner's own registry as reported by that run (a real Antigravity smoke run is still open).
+ export const AGY_RUNNER_TOOL_MAP = Object.freeze({ Read: 'read_file', Write: 'write_file', Edit: 'edit_file', Bash: 'run_command', Grep: 'grep_search', Glob: 'find_by_name' });
++// C30I-S1B (AC-108): every agent of the runner view is a subagent only (a role agent is never the main session agent), and the two
++// inherited defaults that decide what it may execute and which hooks it inherits are pinned explicitly. `inheritMcp` is left alone
++// (open PO question). A source that already carries one of these keys is refused AGV-AGENT-KEY-CONFLICT, never overwritten.
++const AGY_RUNNER_PINNED_KEYS = Object.freeze(['mainAgent: false', 'subagent: true', 'commandExecutionPolicy: sandbox', 'inheritCustomizations: true']);
+ const VIEW_DIR = 'agy-runner-view';
+ const VIEW_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
+ const AGENT_FILE = /^agents\/[^/]+\.md$/;
+@@ -527,7 +531,10 @@ export function transformAgyRunnerAgent(relPath, bytes) {
+   }
+   if (hits.length > 1) throw fail('AGV-AGENT-MODEL-AMBIGUOUS', relPath);
+   if (toolHits.length > 1) throw fail('AGV-AGENT-TOOLS-AMBIGUOUS', relPath);
+-  if (hits.length === 0 && toolHits.length === 0) return bytes;
++  const pinned = AGY_RUNNER_PINNED_KEYS.map((line) => line.slice(0, line.indexOf(':')));
++  for (let index = 1; index < close; index++) {
++    if (pinned.some((key) => lines[index].startsWith(`${key}:`))) throw fail('AGV-AGENT-KEY-CONFLICT', relPath);
++  }
+   if (hits.length === 1) {
+     const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
+     if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
+@@ -540,6 +547,8 @@ export function transformAgyRunnerAgent(relPath, bytes) {
+     if (names.some((name) => !Object.hasOwn(AGY_RUNNER_TOOL_MAP, name))) throw fail('AGV-AGENT-TOOL-UNMAPPED', relPath);
+     lines[toolHits[0]] = `tools: [${names.map((name) => AGY_RUNNER_TOOL_MAP[name]).join(', ')}]${match[2]}`;
+   }
++  const eol = lines[close].endsWith('\r') ? '\r' : '';
++  lines.splice(close, 0, ...AGY_RUNNER_PINNED_KEYS.map((line) => `${line}${eol}`));
+   return Buffer.from(lines.join('\n'), 'utf8');
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+index 61cce0951431813c314362498059398d5730304d..2b1fe4e2ddb39f30fb0b70ef83c6e02358fe91be 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+@@ -21,6 +21,8 @@ import * as hostScript from '../../scripts/installed-plugin-attestation-host.mjs
+ 
+ const NAME = 'agent-pipeline-core';
+ const HERE = dirname(fileURLToPath(import.meta.url));
++// C30I-S1B: the four lines the runner view adds before the closing frontmatter line of every agent (QG-04: bytes restated, not weakened).
++const SUBAGENT_ONLY = 'mainAgent: false\nsubagent: true\ncommandExecutionPolicy: sandbox\ninheritCustomizations: true\n';
+ const agentFile = (model, extra = '') => `---\nname: sample\ndescription: sample agent\nmodel: ${model}\n---\n${extra}Body of the agent.\nmodel: ${model}\n`;
+ 
+ function files(root) {
+@@ -235,8 +237,8 @@ test('the runner view differs from the shared source only in the mapped model li
+   assert.deepEqual(Object.keys(made).sort(), Object.keys(source).sort(), 'the same file set, tests included');
+   const changed = Object.keys(source).filter((path) => !source[path].equals(made[path])).sort();
+   assert.deepEqual(changed, ['agents/a.md', 'agents/b.md']);
+-  assert.equal(made['agents/a.md'].toString(), source['agents/a.md'].toString().replace('\nmodel: sonnet\n', '\nmodel: flash\n'));
+-  assert.equal(made['agents/b.md'].toString(), source['agents/b.md'].toString().replace('\nmodel: haiku\n', '\nmodel: flash\n'));
++  assert.equal(made['agents/a.md'].toString(), source['agents/a.md'].toString().replace('\nmodel: sonnet\n---\n', `\nmodel: flash\n${SUBAGENT_ONLY}---\n`));
++  assert.equal(made['agents/b.md'].toString(), source['agents/b.md'].toString().replace('\nmodel: haiku\n---\n', `\nmodel: flash\n${SUBAGENT_ONLY}---\n`));
+   assert.match(made['agents/a.md'].toString(), /\nmodel: sonnet\n$/, 'a body line is not frontmatter and stays');
+   assert.equal(made['skills/critic-review/NOTES.md'].toString(), 'model: sonnet\nuntouched outside agents\n');
+   assert.deepEqual({ ...snap.AGY_RUNNER_MODEL_MAP }, { sonnet: 'flash', haiku: 'flash', opus: 'pro' }, 'PO decision D13: exactly this closed table');
+@@ -251,14 +253,14 @@ test('the runner view differs from the shared source only in the mapped model li
+ 
+ test('the transform is one closed table: frontmatter model line only, anything unmapped is refused with a typed code', () => {
+   const mapped = (model) => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from(`---\nname: x\nmodel: ${model}\n---\nbody\n`)).toString();
+-  assert.equal(mapped('sonnet'), '---\nname: x\nmodel: flash\n---\nbody\n');
+-  assert.equal(mapped('haiku'), '---\nname: x\nmodel: flash\n---\nbody\n');
+-  assert.equal(mapped('opus'), '---\nname: x\nmodel: pro\n---\nbody\n');
++  assert.equal(mapped('sonnet'), `---\nname: x\nmodel: flash\n${SUBAGENT_ONLY}---\nbody\n`);
++  assert.equal(mapped('haiku'), `---\nname: x\nmodel: flash\n${SUBAGENT_ONLY}---\nbody\n`);
++  assert.equal(mapped('opus'), `---\nname: x\nmodel: pro\n${SUBAGENT_ONLY}---\nbody\n`);
+   for (const model of ['inherit', 'flash', 'pro', 'fast', 'claude-sonnet-4-5', 'Opus', '']) {
+     assert.throws(() => mapped(model), { code: 'AGV-AGENT-MODEL-UNMAPPED' }, model);
+   }
+   const noModel = Buffer.from('---\nname: x\n---\nbody\n');
+-  assert.equal(snap.transformAgyRunnerAgent('agents/x.md', noModel), noModel, 'no model line: nothing to map, bytes untouched');
++  assert.equal(snap.transformAgyRunnerAgent('agents/x.md', noModel).toString(), `---\nname: x\n${SUBAGENT_ONLY}---\nbody\n`, 'no model line: nothing to map, only the subagent-only keys are added');
+   const elsewhere = Buffer.from('---\nmodel: opus\n---\n');
+   assert.equal(snap.transformAgyRunnerAgent('skills/s/SKILL.md', elsewhere), elsewhere, 'only agents/*.md is in scope');
+   assert.equal(snap.transformAgyRunnerAgent('agents/nested/x.md', elsewhere), elsewhere);
+@@ -267,9 +269,9 @@ test('the transform is one closed table: frontmatter model line only, anything u
+ 
+ test('the runner view also maps the frontmatter tools list to the runner registry names, one closed table, typed refusals (D1)', () => {
+   const view = (tools, model = 'model: sonnet\n') => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from(`---\nname: x\n${model}tools: ${tools}\n---\nbody\n`)).toString();
+-  assert.equal(view('[Read, Grep, Glob]', ''), '---\nname: x\ntools: [read_file, grep_search, find_by_name]\n---\nbody\n', 'an agent without a model line still gets its tools mapped');
+-  assert.equal(view('[Read, Edit, Write, Grep, Glob, Bash]'), '---\nname: x\nmodel: flash\ntools: [read_file, edit_file, write_file, grep_search, find_by_name, run_command]\n---\nbody\n');
+-  assert.equal(view('[]', ''), '---\nname: x\ntools: []\n---\nbody\n', 'an empty list stays empty');
++  assert.equal(view('[Read, Grep, Glob]', ''), `---\nname: x\ntools: [read_file, grep_search, find_by_name]\n${SUBAGENT_ONLY}---\nbody\n`, 'an agent without a model line still gets its tools mapped');
++  assert.equal(view('[Read, Edit, Write, Grep, Glob, Bash]'), `---\nname: x\nmodel: flash\ntools: [read_file, edit_file, write_file, grep_search, find_by_name, run_command]\n${SUBAGENT_ONLY}---\nbody\n`);
++  assert.equal(view('[]', ''), `---\nname: x\ntools: []\n${SUBAGENT_ONLY}---\nbody\n`, 'an empty list stays empty');
+   assert.throws(() => view('[Read, WebFetch]'), { code: 'AGV-AGENT-TOOL-UNMAPPED' });
+   assert.throws(() => view('[read_file]'), { code: 'AGV-AGENT-TOOL-UNMAPPED' }, 'a name that is already native is not silently accepted');
+   assert.throws(() => view('Read, Grep'), { code: 'AGV-AGENT-TOOLS-UNPARSEABLE' });
+@@ -536,8 +538,8 @@ test('installed-plugin-attestation-host readback: a view install verifies; the v
+ test('option 3: the central snapshot carries the mapped model lines and its own verify stays honest', (t) => {
+   const w = world(t);
+   const published = snap.publishAgySnapshot({ sourcePluginRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, deps: w.snapshotDeps });
+-  assert.equal(readFileSync(join(published.root, 'agents', 'a.md'), 'utf8'), agentFile('sonnet').replace('\nmodel: sonnet\n', '\nmodel: flash\n'));
+-  assert.equal(readFileSync(join(published.root, 'agents', 'b.md'), 'utf8'), agentFile('haiku').replace('\nmodel: haiku\n', '\nmodel: flash\n'));
++  assert.equal(readFileSync(join(published.root, 'agents', 'a.md'), 'utf8'), agentFile('sonnet').replace('\nmodel: sonnet\n---\n', `\nmodel: flash\n${SUBAGENT_ONLY}---\n`));
++  assert.equal(readFileSync(join(published.root, 'agents', 'b.md'), 'utf8'), agentFile('haiku').replace('\nmodel: haiku\n---\n', `\nmodel: flash\n${SUBAGENT_ONLY}---\n`));
+   assert.equal(readFileSync(join(published.root, 'skills', 'critic-review', 'NOTES.md'), 'utf8'), 'model: sonnet\nuntouched outside agents\n', 'outside agents/ nothing is mapped');
+   const verified = snap.verifyAgySnapshot({ root: published.root, snapshotSha256: published.snapshotSha256 });
+   assert.equal(verified.status, 'verified');
+@@ -546,7 +548,7 @@ test('option 3: the central snapshot carries the mapped model lines and its own
+   chmodSync(target, 0o600);
+   writeFileSync(target, agentFile('sonnet'));
+   assert.throws(() => snap.verifyAgySnapshot({ root: published.root, snapshotSha256: published.snapshotSha256 }), (error) => typeof error?.code === 'string' && /^AGS-/.test(error.code));
+-  writeFileSync(target, agentFile('sonnet').replace('\nmodel: sonnet\n', '\nmodel: flash\n') + '\n');
++  writeFileSync(target, agentFile('sonnet').replace('\nmodel: sonnet\n---\n', `\nmodel: flash\n${SUBAGENT_ONLY}---\n`) + '\n');
+   assert.throws(() => snap.verifyAgySnapshot({ root: published.root, snapshotSha256: published.snapshotSha256 }), (error) => typeof error?.code === 'string' && /^AGS-/.test(error.code));
+ });
+ 
+@@ -558,6 +560,56 @@ test('option 3: an unmapped model value is refused AGV-AGENT-MODEL-UNMAPPED and
+   assert.equal(existsSync(join(w.home, '.agent-pipeline', 'agy-runner-view')), false);
+ });
+ 
++// ---- C30I-S1B: every shipped agent is marked subagent-only in the runner view (AC-108) -------------------------------------------
++
++const PINNED_KEYS = ['mainAgent: false', 'subagent: true', 'commandExecutionPolicy: sandbox', 'inheritCustomizations: true'];
++const SHIPPED_AGENTS = ['afk-claude-worker', 'consult-advisor', 'critic', 'goldfish-deep', 'goldfish-implementor', 'goldfish-mechanic', 'plan-verifier', 'readiness-reviewer'];
++const SHIPPED_AGENT_DIR = join(import.meta.dirname, '..', '..', 'agents');
++
++test('the runner view pins mainAgent false, subagent true, sandbox and inheritCustomizations in this order just before the closing line', () => {
++  const out = snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\nname: x\nmodel: sonnet\n---\nbody\n')).toString();
++  assert.equal(out, `---\nname: x\nmodel: flash\n${PINNED_KEYS.join('\n')}\n---\nbody\n`);
++});
++
++test('all eight shipped agent files carry the four keys in order, keep their model and tools rewrites, and the Claude sources stay unchanged', () => {
++  assert.deepEqual(readdirSync(SHIPPED_AGENT_DIR).filter((name) => name.endsWith('.md')).map((name) => name.slice(0, -3)).sort(), SHIPPED_AGENTS);
++  for (const name of SHIPPED_AGENTS) {
++    const source = readFileSync(join(SHIPPED_AGENT_DIR, `${name}.md`));
++    const before = Buffer.from(source);
++    const lines = snap.transformAgyRunnerAgent(`agents/${name}.md`, source).toString().split('\n');
++    const close = lines.indexOf('---', 1);
++    assert.deepEqual(lines.slice(close - 4, close), PINNED_KEYS, `${name}: four keys in order just before the closing line`);
++    const front = lines.slice(1, close - 4).join('\n');
++    assert.doesNotMatch(front, /^model: (sonnet|haiku|opus)$/m, `${name}: model rewritten`);
++    assert.doesNotMatch(front, /^tools:.*\b(Read|Write|Edit|Bash|Grep|Glob)\b/m, `${name}: tools rewritten`);
++    assert.equal(/^inheritMcp:/m.test(lines.join('\n')), false, `${name}: inheritMcp untouched`);
++    assert.ok(source.equals(before), `${name}: the source bytes are unchanged`);
++    assert.doesNotMatch(source.toString(), /^(mainAgent|subagent|commandExecutionPolicy|inheritCustomizations):/m, `${name}: the Claude source carries none of the keys`);
++  }
++});
++
++test('a CRLF agent file stays CRLF with the four keys, a file without frontmatter is returned unchanged', () => {
++  const crlf = snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\r\nname: x\r\nmodel: haiku\r\n---\r\nbody\r\n')).toString();
++  assert.equal(crlf, `---\r\nname: x\r\nmodel: flash\r\n${PINNED_KEYS.join('\r\n')}\r\n---\r\nbody\r\n`);
++  assert.equal(crlf.replace(/\r\n/g, '').includes('\n'), false, 'no bare LF appears');
++  const plain = Buffer.from('no frontmatter\nmodel: sonnet\n');
++  assert.equal(snap.transformAgyRunnerAgent('agents/x.md', plain), plain);
++  const unclosed = Buffer.from('---\nname: x\nbody\n');
++  assert.equal(snap.transformAgyRunnerAgent('agents/x.md', unclosed), unclosed);
++});
++
++test('a source frontmatter that already carries one of the four keys is refused AGV-AGENT-KEY-CONFLICT, and the output is not transformed twice', () => {
++  for (const key of ['mainAgent: true', 'subagent: false', 'commandExecutionPolicy: auto', 'inheritCustomizations: false', 'mainAgent: false']) {
++    assert.throws(() => snap.transformAgyRunnerAgent('agents/x.md', Buffer.from(`---\nname: x\n${key}\n---\nbody\n`)), { code: 'AGV-AGENT-KEY-CONFLICT' }, key);
++  }
++  const once = snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\nname: x\nmodel: opus\n---\nbody\n'));
++  assert.throws(() => snap.transformAgyRunnerAgent('agents/x.md', once), { code: 'AGV-AGENT-KEY-CONFLICT' }, 'the view is never an input of the transform');
++  const again = snap.transformAgyRunnerAgent('agents/x.md', Buffer.from('---\nname: x\nmodel: opus\n---\nbody\n'));
++  assert.ok(again.equals(once), 'the same source always gives the same bytes');
++  const body = Buffer.from('---\nname: x\n---\nmainAgent: true in the body is no frontmatter key\n');
++  assert.doesNotThrow(() => snap.transformAgyRunnerAgent('agents/x.md', body));
++});
++
+ // ---- bounded storage -----------------------------------------------------------------------------------------------------------
+ 
+ // A second plugin source, an unrelated view of it (valid, so only a reference can keep it) and the decoys the prune must never touch.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index 431fe099fd42b0c636a021dacc9051675416aa8b..cb11fb9baa08b542e23d882e8d1e010678c3ef94 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -18,6 +18,8 @@ or `pro`, of the registry route; a Gemini model id is refused there). A read-onl
+ `pipeline.role-dispatch-request.v1` packet (`transport: "antigravity"`, `resultDestination: { kind: "return" }`) for the prepare step
+ below; a code-writing Goldfish takes its provider, model and scope from the generated briefing and the registry route alone.
+ 
++The runner view marks every shipped Pipeline agent subagent-only: besides the `model:` and `tools:` rewrites it writes `mainAgent: false`, `subagent: true`, `commandExecutionPolicy: sandbox` and `inheritCustomizations: true` before the closing frontmatter line (the Claude source files are unchanged; a source that already carries one of the four keys is refused `AGV-AGENT-KEY-CONFLICT`). So `agy --agent <name>` and `/agents` must not offer a role agent as the main session agent, which stays the Elephant, while `invoke_subagent` still starts it. `inheritMcp` is not set (open PO question). Open, an attended PO step: a real `invoke_subagent` per role on runner 1.5.10 and whether `mainAgent: false` changes what `agy agents` lists are not provable here.
++
+ ### Native Goldfish dispatch (measured, candidate 20 G20-8 B)
+ 
+ Measured shape of the host tool (`w252-agy-native-subagent-measurement.md`): `invoke_subagent` takes FLAT arguments, `TypeName`, `Role`

@@ -1,0 +1,513 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index f9f00062de69546792ce98c6ec9a92c695267880..3dddcf2630749e1567a348cc69cb03caace6ae35 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1424,6 +1424,7 @@
+           "SAR19",
+           "SAR20",
+           "SAR21",
++          "SAR22",
+           "SAS01",
+           "SAS02",
+           "SAS03",
+diff --git a/plugins/pipeline-core/lib/chat-gate-ceremony.mjs b/plugins/pipeline-core/lib/chat-gate-ceremony.mjs
+index 748afdf1069a905e9111a2f5f6d173417ab278b2..0780cdd35741c3e8be4a441b351ad13af17dd776 100644
+--- a/plugins/pipeline-core/lib/chat-gate-ceremony.mjs
++++ b/plugins/pipeline-core/lib/chat-gate-ceremony.mjs
+@@ -163,8 +163,9 @@ export function requireAttendedChatGateConfirmation({ summaryLines = [], expecte
+ // Declaration-only imports: the two owners exchange opaque handles, not callbacks.
+ import { AsyncLocalStorage } from "node:async_hooks";
+ import { createHash, randomBytes } from "node:crypto";
+-import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync } from "node:fs";
++import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
+ import { join, relative, isAbsolute } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { canonical } from "./po-approval-proof.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
+@@ -373,6 +374,56 @@ function ceremonyExecuteBody(data){
+   data.executionHandle=Object.freeze({});ceremonyLiveOperations.delete(data);
+   if(error)throw error;return {status:"executed",executionHandle:data.executionHandle,memberRef:data.memberRef===null?null:Object.freeze({...data.memberRef}),ownerResult:result,sourceRefs:ceremonyInventory(data.repository).groups.get(data.id).map(x=>x.ref)};
+ }
++// C30I-S6: the ceremony body (a passphrase prompt) runs outside the registry lock, so nothing else says whether the process that started a ceremony still
++// runs. Each ceremony therefore records that process once, in the registry's own lock-owner identity, next to (never inside) its closed records, and a later
++// start judges it with the registry's own judge: only a provably gone owner lets the ceremony be retired; no record, a live or an unjudgeable owner never does.
++const CEREMONY_OWNER_SCHEMA="pipeline.chat-gate-ceremony-owner.v1";
++const ceremonyOwnerDirectory=repo=>join(repo.commonDir,"agent-pipeline","chat-gate-ceremony-owners");
++const ceremonyOwnerFile=(repo,id)=>join(ceremonyOwnerDirectory(repo),`${id}.json`);
++const ROUTINE_REPAIR_SCRIPT=fileURLToPath(new URL("../scripts/routine-repair.mjs",import.meta.url));
++function ceremonyWriteOwner(data){
++  ensureHardenedPrivateDirectory(data.repository.commonDir,ceremonyOwnerDirectory(data.repository));
++  writePrivateFileNoReplaceAtomic(ceremonyOwnerFile(data.repository,data.id),Buffer.from(canonical({schema:CEREMONY_OWNER_SCHEMA,id:data.id,owner:ceremonyRegistry.sessionAuthorityLockOwner()})));
++}
++function ceremonyReadOwner(repo,id){
++  try{const value=JSON.parse(readFileSync(ceremonyOwnerFile(repo,id),"utf8"));return value?.schema===CEREMONY_OWNER_SCHEMA&&value.id===id?value:null;}catch{return null;}
++}
++/**
++ * C30I-S6: finishes, as `cancelled`, every ceremony an earlier process left half-way (records short of a terminal, or a registry member that lags the
++ * records or was never released) whose owner process is provably gone, through the registry's own advance and release. A ceremony of this process, one
++ * whose owner is live or cannot be judged, and one that recorded no owner are kept and named (`kept`), never retired. Runs inside the boundary.
++ */
++export function retireAbandonedChatGateCeremonies({repository:input,boundary,judge=ceremonyRegistry.judgeSessionAuthorityLockOwner}){
++  const repo=ceremonyRepository(input),retired=[],kept=[];
++  try{lstatSync(join(repo.commonDir,"agent-pipeline","session-authority","catalogue.json"));}catch(error){if(error.code==="ENOENT")return {retired,kept};throw error;}
++  const port=createChatGateAuthorityProducerPort({repository:repo});
++  for(const [id,rows] of ceremonyInventory(repo).groups){
++    if([...ceremonyLiveOperations].some(live=>live.id===id))continue;
++    const first=rows.find(x=>x.record.phase==="reserved"),last=rows.find(x=>x.record.phase==="terminal-observed")??rows.find(x=>x.record.phase==="running")??rows[0];
++    const {phase,terminal,bindingSha256,...core}=first.record,operationHandle=Object.freeze({});
++    const data={port,repository:repo,id,core,association:core.association,entry:core.entry,bindingSha256,phase:last.record.phase,executing:false,terminal:last.record.terminal??"cancelled",operationHandle};
++    ceremonyOperations.set(operationHandle,data);
++    const member=ceremonyRegistry.recoverAbandonedSessionAuthorityMember({boundary,producerPort:port,operationHandle,bindingSha256});
++    if(last.record.phase==="terminal-observed"&&member===null)continue;
++    const owner=ceremonyReadOwner(repo,id),verdict=owner===null?null:judge(owner);
++    if(verdict!=="dead"){kept.push({id,why:owner===null?"no process is recorded as its owner":`its owner process is ${verdict}`});continue;}
++    for(const next of ["running","terminal-observed"])if(!rows.some(x=>x.record.phase===next))ceremonyPublish(data,next,next==="terminal-observed"?"cancelled":null);
++    if(member!==null){
++      const advanced=ceremonyRegistry.advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:member.memberHandle,expectedMemberRef:member.memberRef,operationHandle});
++      const terminalHandle=Object.freeze({});ceremonyTerminals.set(terminalHandle,{port,data});
++      ceremonyRegistry.releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:member.memberHandle,expectedMemberRef:advanced.memberRef,terminalHandle});
++    }
++    rmSync(ceremonyOwnerFile(repo,id),{force:true});retired.push(id);
++  }
++  return {retired,kept};
++}
++/** A refusal the ceremony's own records cause names the runnable repair, instead of the bare `chat:` reason. */
++function ceremonyRepairable(error,repo,kept){
++  if(typeof error?.message!=="string"||!error.message.startsWith("chat:"))return error;
++  const why=kept.length?kept.map(row=>`${row.id.slice(0,8)}: ${row.why}`).join("; "):"its records and the registry disagree";
++  error.repair=`an earlier PO ceremony was left half-way and this start cannot retire it (${why}). If no PO ceremony runs in another terminal, run: node ${ROUTINE_REPAIR_SCRIPT} run move-aside --no-goldfish-running --root ${repo.primaryRoot} --reason "<why>" (the registry is retained aside, nothing is deleted); otherwise finish that ceremony first`;
++  return error;
++}
+ /** Source-owner adapter: no callable operation argument and no caller terminal verdict. */
+ function runRegisteredCeremony({repository:input,entry,input:ownerInput}){
+   const repo=ceremonyRepository(input),port=createChatGateAuthorityProducerPort({repository:repo});
+@@ -381,7 +432,13 @@ function runRegisteredCeremony({repository:input,entry,input:ownerInput}){
+   let cataloguePresent=false;
+   ceremonyRegistry.withSessionAuthorityBoundary({repository:repo},boundary=>{
+     try{lstatSync(join(repo.commonDir,"agent-pipeline","session-authority","catalogue.json"));cataloguePresent=true;}catch(error){if(error.code!=="ENOENT")throw error;}
+-    if(cataloguePresent){const reserved=ceremonyRegistry.reserveSessionAuthorityMember({boundary,producerPort:port,association:data.association,operationHandle:prepared.operationHandle});data.memberHandle=reserved.memberHandle;data.memberRef=reserved.memberRef;}
++    let kept=[];
++    if(cataloguePresent){
++      const settled=retireAbandonedChatGateCeremonies({repository:repo,boundary});kept=settled.kept;
++      if(settled.retired.length)process.stderr.write(`Retired ${settled.retired.length} earlier PO ceremony(ies) left half-way by a process that has ended: ${settled.retired.map(id=>id.slice(0,8)).join(", ")}.\n`);
++    }
++    ceremonyWriteOwner(data);
++    if(cataloguePresent){let reserved;try{reserved=ceremonyRegistry.reserveSessionAuthorityMember({boundary,producerPort:port,association:data.association,operationHandle:prepared.operationHandle});}catch(error){throw ceremonyRepairable(error,repo,kept);}data.memberHandle=reserved.memberHandle;data.memberRef=reserved.memberRef;}
+     ceremonyPublish(data,"reserved");ceremonyPublish(data,"running");
+     if(data.memberHandle)data.memberRef=ceremonyRegistry.advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:data.memberHandle,expectedMemberRef:data.memberRef,operationHandle:prepared.operationHandle}).memberRef;
+   });
+@@ -389,6 +446,7 @@ function runRegisteredCeremony({repository:input,entry,input:ownerInput}){
+   try{executed=ceremonyExecuteBody(data);}catch(caught){error=caught;}
+   if(data.phase==="terminal-observed")ceremonyRegistry.withSessionAuthorityBoundary({repository:repo},boundary=>{
+     if(data.memberHandle){const finished=port.finishOperation({operationHandle:prepared.operationHandle,executionHandle:data.executionHandle,entry:"prompt-return",input:{},expectedMemberRef:data.memberRef});ceremonyRegistry.releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:data.memberHandle,expectedMemberRef:data.memberRef,terminalHandle:finished.terminalHandle});}
++    rmSync(ceremonyOwnerFile(repo,data.id),{force:true});
+   });
+   if(error)throw error;return executed.ownerResult;
+ }
+diff --git a/plugins/pipeline-core/lib/routine-repair.mjs b/plugins/pipeline-core/lib/routine-repair.mjs
+index 7b8b69ed596bc86a0bfec781fbb5f17fb056f184..ceedf11a55cde9d78267b7780a63f87f643de492 100644
+--- a/plugins/pipeline-core/lib/routine-repair.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.mjs
+@@ -253,7 +253,9 @@ export function classifyInspectFindings(inspect) {
+   if (inspect?.registry?.read?.status === "refused") {
+     add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
+     const named = /^([a-z0-9-]+):/u.exec(String(inspect.registry.read.reason ?? ""))?.[1];
+-    if (named !== undefined && healFirstProducers.has(named)) rows.at(-1).reconcileRefused = true;
++    // C30I-S6: a producer names its refusals by the module's short prefix (`chat:member-source-drift` for producer chat-gate), so the prefix
++    // matches the producer id or its first segment; the exact-name match alone left that refusal outside the list (RR-OUTSIDE-LIST).
++    if (named !== undefined && [...healFirstProducers].some((producerId) => producerId === named || producerId.startsWith(`${named}-`))) rows.at(-1).reconcileRefused = true;
+   }
+   return rows;
+ }
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+index 38b0d990bd6658e97548f4ca656b369a9567ab7b..379145c08bfceccdccae3ca31e178eafdc1b60db 100644
+--- a/plugins/pipeline-core/lib/routine-repair.test.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -502,6 +502,19 @@ test("classifyInspectFindings allows only the two named findings", () => {
+   assert.deepEqual(classifyInspectFindings({ ...emptyInspect, reservations: [{ sliceId: "S", settled: null }] }).map((r) => r.allowed), [false]);
+ });
+ 
++// C30I-S6 (queue C30-21, PO report 2026-11-17): the registry read of a half-way PO ceremony refuses `chat:member-source-drift`, named by the module's
++// short prefix while the producer is `chat-gate`; move-aside answered RR-OUTSIDE-LIST for it, so only the human's own command could clear it.
++test("C30I-S6: the chat-gate ceremony refusal (short prefix chat:, producer chat-gate) is classified as a reconcile-refused producer, exactly like the other producers", () => {
++  const stuck = { ...emptyInspect, registry: { status: "present", producers: [{ producerId: "chat-gate", status: "reconcile-refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "chat:member-source-drift", inFlight: 0 }],
++    read: { status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "chat:member-source-drift" } } };
++  const rows = classifyInspectFindings(stuck);
++  assert.deepEqual(rows.map((row) => row.source), ["producer:chat-gate", "registry-read"]);
++  assert.deepEqual(rows.map((row) => row.reconcileRefused), [true, true], "the read refusal names that producer through its prefix, so move-aside heals first and moves aside only what heal did not resolve");
++  // The prefix is a match, not a wildcard: a refusal whose prefix is no producer's first segment stays outside the list.
++  const other = { ...stuck, registry: { ...stuck.registry, read: { status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "chatty:member-source-drift" } } };
++  assert.deepEqual(classifyInspectFindings(other).map((row) => row.reconcileRefused), [true, undefined]);
++});
++
+ test("CLI: list prints the closed list, an unknown kind is refused outside the list, and a real run writes the ledger", () => withRepo((root, ap) => {
+   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8", shell: false });
+   const listed = run("list");
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 3d2de2e4ba40ea09578e295032cebf0091f8dd1d..24bb8b7f5c6a79641dfd0ecaf480b9cef228c2b9 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -768,6 +768,19 @@ export function reserveSessionAuthorityMember({boundary:token,producerPort,assoc
+ function memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index){const brand=memberBrands.get(memberHandle);if(!brand||brand.repositorySha256!==repoDigest(repo)||brand.producerPort!==producerPort)fail('SDC-AUTHORITY-CAS','unowned-member-handle');ref(expectedMemberRef);const row=state.rows[index].members.find(x=>x.value.memberId===brand.memberId&&x.value.memberGeneration===brand.memberGeneration);if(!row||!equal(row.ref,expectedMemberRef))fail('SDC-AUTHORITY-CAS','member-preimage');return {row,brand};}
+ export function recoverSessionAuthorityMember({boundary:token,producerPort,operationHandle,expectedMemberRef}){const repo=boundary(token);retiredRegistryAdmission(repo,'recover');const {pairs,index}=selectPort(repo,token,producerPort);ref(expectedMemberRef);const state=stateRead(repo,pairs,{reconcile:false});const row=state.rows[index].members.find(m=>equal(m.ref,expectedMemberRef));if(!row||row.value.phase==='released')fail('SDC-AUTHORITY-CAS','recovery-member-preimage');const observed=operation(producerPort,operationHandle,pairs[index].participant);const m=row.value;if(!equal(observed.association,m.association)||observed.bindingSha256!==m.bindingSha256||!equal(observed.kinds,m.kinds)||observed.phase!==m.phase||!equal(observed.sourceFacts,m.sourceFacts))fail('SDC-AUTHORITY-CAS','recovery-owner-binding');const actual=memberships(producerPort.reconcile({producerRecord:freeze(structuredClone(state.rows[index].record.value)),memberRecords:freeze(state.rows[index].members.map(x=>x.value)),releaseRecords:freeze(state.rows[index].members.filter(x=>x.release).map(x=>x.release.value))}),pairs[index].participant);if(!equal(actual,state.rows[index].record.value.baseline))fail('SDC-AUTHORITY-CAS','recovery-namespace-drift');const memberHandle=Object.freeze({});memberBrands.set(memberHandle,{repositorySha256:repoDigest(repo),producerPort,operationHandle,memberId:m.memberId,memberGeneration:m.memberGeneration});return freeze({memberHandle,memberRef:row.ref,producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref});}
+ function advanceOwnedSessionAuthorityMember({boundary:token,producerPort,memberHandle,expectedMemberRef,operationHandle},refreshOnly=false){const repo=boundary(token);retiredRegistryAdmission(repo,'advance-terminal');const {pairs,index}=selectPort(repo,token,producerPort);const state=stateRead(repo,pairs,{reconcile:false});const {row,brand}=memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index);if(brand.operationHandle!==operationHandle)fail('SDC-AUTHORITY-CAS','operation-handle-changed');const observed=operation(producerPort,operationHandle,pairs[index].participant);const m=row.value;if(!equal(observed.association,m.association)||observed.bindingSha256!==m.bindingSha256||!equal(observed.kinds,m.kinds)||m.phase==='released')fail('SDC-AUTHORITY-CAS','operation-binding-changed');if(refreshOnly&&(!['native-goldfish','agy-family-dispatch'].includes(pairs[index].participant.producerId)||observed.phase!==m.phase))fail('SDC-AUTHORITY-CAS','source-refresh-phase');if(equal(observed,{association:m.association,kinds:m.kinds,phase:m.phase,bindingSha256:m.bindingSha256,sourceFacts:m.sourceFacts}))return freeze({memberRef:row.ref,producerRef:state.rows[index].record.ref,catalogueRef:state.catalogue.ref});const allowed={reserved:['armed','running','terminal-observed'],armed:['running','terminal-observed'],running:['terminal-observed'],'terminal-observed':[]};if(refreshOnly){if(!['native-goldfish','agy-family-dispatch'].includes(pairs[index].participant.producerId)||observed.phase!==m.phase)fail('SDC-AUTHORITY-CAS','source-refresh-phase');}else if(!allowed[m.phase]?.includes(observed.phase))fail('SDC-AUTHORITY-CAS','invalid-member-transition');return retiredRegistryDescriptorGuard(repo,m.association,()=>{const next={...m,...observed,revision:generation(m.revision+1),updatedAt:new Date().toISOString()};const memberRef=publish(repo,memberPath(next),next,row.ref);const refs=updateMembership(repo,state,index,next,memberRef);stage('after-owner-effects-readback',next,memberRef);return freeze(refs);});}
++/** C30I-S6: the member of an operation whose owner has ended, read WITHOUT the strict reconcile (the very check a half-way operation fails, so
++ * `recoverSessionAuthorityMember` cannot serve it). The caller has proven the owner gone; the handle then advances and releases the member through the
++ * ordinary `advanceSessionAuthorityMember` and `releaseSessionAuthorityMember`, with their own checks. null when the binding has no unreleased member. */
++export function recoverAbandonedSessionAuthorityMember({boundary:token,producerPort,operationHandle,bindingSha256}){
++  const repo=boundary(token);retiredRegistryAdmission(repo,'recover-abandoned');
++  const {pairs,index}=selectPort(repo,token,producerPort);sha(bindingSha256);
++  const rows=stateRead(repo,pairs,{reconcile:false}).rows[index].members.filter(m=>m.value.bindingSha256===bindingSha256&&m.value.phase!=='released');
++  if(rows.length>1)fail('SDC-AUTHORITY-CAS','abandoned-member-ambiguous');
++  if(!rows.length)return null;
++  const m=rows[0].value,memberHandle=Object.freeze({});
++  memberBrands.set(memberHandle,{repositorySha256:repoDigest(repo),producerPort,operationHandle,memberId:m.memberId,memberGeneration:m.memberGeneration});
++  return freeze({memberHandle,memberRef:rows[0].ref});
++}
+ export function releaseSessionAuthorityMember({boundary:token,producerPort,memberHandle,expectedMemberRef,terminalHandle}){const repo=boundary(token);retiredRegistryAdmission(repo,'release-terminal');const {pairs,index}=selectPort(repo,token,producerPort);const state=stateRead(repo,pairs,{reconcile:false});const {row}=memberFor(repo,producerPort,memberHandle,expectedMemberRef,state,index);const m=row.value;if(m.phase!=='terminal-observed')fail('SDC-AUTHORITY-HELD','terminal-not-observed');const observed=producerPort.observeTerminal(terminalHandle);exact(observed,['terminal','sourceFacts'],'terminal');const value={schema:schema('release'),repositorySha256:repoDigest(repo),producerId:m.producerId,memberId:m.memberId,memberGeneration:m.memberGeneration,memberPreimageSha256:row.ref.sha256,bindingSha256:m.bindingSha256,...observed,createdAt:new Date().toISOString()};validateRelease(value,repo,m,pairs[index].participant);stage('after-terminal-readback-before-release',m,row.ref);const path=releasePath(m);let releaseRef;if(existsSync(safePath(repo,path))){const prior=readRecord(repo,path);validateRelease(prior.value,repo,m,pairs[index].participant);if(prior.value.memberPreimageSha256!==row.ref.sha256||prior.value.terminal!==observed.terminal||!equal(prior.value.sourceFacts,observed.sourceFacts))fail('SDC-AUTHORITY-CAS','release-prefix-changed');releaseRef=prior.ref;}else releaseRef=publish(repo,path,value);stage('after-release-published-before-member-update',m,row.ref,releaseRef);const next={...m,phase:'released',revision:generation(m.revision+1),updatedAt:new Date().toISOString(),releaseRef};const memberRef=publish(repo,memberPath(next),next,row.ref);const refs=updateMembership(repo,state,index,next,memberRef);stage('after-member-release-published',next,memberRef,releaseRef);
+   // C19I-W238: a release is when a member becomes settled, so the walked registry is trimmed here, with the state already in memory.
+   // The release is already published: whatever the prune meets (marker, a move, the producer publication) is its own problem, never the release's. The next release (or the explicit prune verb) retries it.
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 47e2e959bb9cfe98edcfe1494fe31f504de79360..a24c96ed702075dd6edaaf0552753e0e1c8352da 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -1323,7 +1323,31 @@ export { spawnOpenssl };
+  * the PO key directory. It reports its exit code only -- it has no stderr to read. */
+ function runOpenssl(args, cwd, dependencies) {
+   const result = spawnOpenssl(args, { cwd, stdio: "inherit" }, dependencies);
+-  if (result?.status !== 0) fail(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
++  if (result?.status !== 0) {
++    const error = new Error(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
++    // C30I-S6: only a process that ran and exited non-zero can be a refused passphrase; the signing retry below reads this.
++    error.opensslExitCode = Number.isSafeInteger(result?.status) ? result.status : null;
++    throw error;
++  }
++}
++
++/** C30I-S6: the passphrase a human types for a protected key may be retyped up to three times inside one run. Every attempt is the SAME spawn over the
++ * same already confirmed intent file: nothing is written or confirmed again between attempts, and after the last refusal the run ends with one line. */
++const PASSPHRASE_ATTEMPTS = 3;
++function runSigningOpenssl(args, cwd, dependencies, passphraseKey) {
++  for (let attempt = 1; ; attempt += 1) {
++    try { return runOpenssl(args, cwd, dependencies); }
++    catch (error) {
++      if (!passphraseKey || error?.opensslExitCode == null) throw error;
++      if (attempt >= PASSPHRASE_ATTEMPTS) fail(`openssl failed with exit code ${error.opensslExitCode} after ${PASSPHRASE_ATTEMPTS} passphrase attempts; nothing was signed or recorded: run the same command again to retype the passphrase`);
++      process.stderr.write(`The passphrase was not accepted (attempt ${attempt} of ${PASSPHRASE_ATTEMPTS}); type it again.\n`);
++    }
++  }
++}
++
++/** C30I-S6: the one printed failure line of a ceremony, plus the repair a refusal carries (a registry or ceremony refusal sets `repair`; before, it was dropped). */
++export function formatHumanApprovalFailure(error) {
++  return `PO-HUMAN-APPROVAL-FAILED: ${error.message}\n${typeof error?.repair === "string" && error.repair !== "" ? `Repair: ${error.repair}\n` : ""}`;
+ }
+ 
+ /** The absolute directories this process itself works in: the OS user's home and temporary directories
+@@ -2415,7 +2439,7 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies,
+   io.write(artifacts.intent, intentSha256, { mode: 0o600 });
+   // The signing spawn runs from the PO key directory (it already receives the key path there), never
+   // from the process's inherited working directory, which may be a repository.
+-  try { runOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dirname(keys.privateKey), dependencies); }
++  try { runSigningOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dirname(keys.privateKey), dependencies, isPrivateKeyPassphraseProtected(keys.privateKey, dependencies)); }
+   finally { rmSync(artifacts.intent, { force: true }); }
+   try {
+     const authority = json(keys.authority); const publicKey = io.read(keys.publicKey, "utf8");
+@@ -3262,6 +3286,6 @@ if (isDirectInvocation(import.meta.url)) {
+     try {
+       const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
+       process.stdout.write(formatHumanApprovalCliResult(result));
+-    } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
++    } catch (error) { process.stderr.write(formatHumanApprovalFailure(error)); process.exitCode = 2; }
+   }
+ }
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 7d490428df2cf62f89df7b8ba4a0abb28d620926..0d8446dc9917cdb1db7b7b942775a794b0a1fdfd 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -4024,7 +4024,8 @@ function treeListing(root) {
+  * Only the repository-root snapshots use this; the git-common-dir, home and key-directory listings still use
+  * the unfiltered treeListing.
+  */
+-const CEREMONY_OWNED_PRIVATE_STATE = Object.freeze([".git/agent-pipeline/chat-gate-ceremonies", ".git/agent-pipeline/session-authority"]);
++// C30I-S6: the ceremony also records its owner process beside its records (.git/agent-pipeline/chat-gate-ceremony-owners), the same kind of wrapper-owned private state.
++const CEREMONY_OWNED_PRIVATE_STATE = Object.freeze([".git/agent-pipeline/chat-gate-ceremonies", ".git/agent-pipeline/chat-gate-ceremony-owners", ".git/agent-pipeline/session-authority"]);
+ function repositoryTreeListing(root) {
+   return treeListing(root).filter((entry) => entry !== ".git/agent-pipeline"
+     && !CEREMONY_OWNED_PRIVATE_STATE.some((owned) => entry === owned || entry.startsWith(owned + "/")));
+@@ -6678,3 +6679,194 @@ for (const [label, schema] of M2_SIGN_KINDS) {
+     } finally { cleanup(dirs); }
+   });
+ }
++
++/* ------------------------------------------------------------------------- *
++ * C30I-S6 (queue C30-21, criterion AC-109): a signing step that fails (a mistyped
++ * passphrase makes OpenSSL exit non-zero) ends the ceremony cleanly, so the next
++ * entry works at once. The fixture repository carries an initialized session-authority
++ * registry (catalogue present), which is what makes every ceremony hold a registry
++ * member; without a catalogue no member exists and the defect cannot show.
++ * ------------------------------------------------------------------------- */
++import { inspectSessionAuthorityRegistryRead } from "../lib/session-authority-registry.mjs";
++import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
++
++function c30i6Registry(dirs) {
++  return prepareSessionAuthorityRegistryFixture({ root: realpathSync(dirs.repoRoot) }).repository;
++}
++/** A spawn that answers the readiness probe like the healthy stub and the signing call like OpenSSL: a non-zero exit while `state.fail` is above zero. */
++function c30i6Spawn(state) {
++  return (executable, args, options) => {
++    const signing = executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private\.pem$/u.test(String(entry)));
++    if (!signing) return executable === "openssl" ? answerOpensslProbe(executable, args) : spawnSync(executable, args, { stdio: "pipe" });
++    state.signCalls += 1;
++    if (state.fail > 0) { state.fail -= 1; return { status: 1 }; }
++    const key = createPrivateKey({ key: readFileSync(args[args.indexOf("-inkey") + 1], "utf8"), format: "pem", passphrase: LEVER_PASSPHRASE });
++    writeFileSync(args[args.indexOf("-out") + 1], sign(null, readFileSync(args[args.indexOf("-in") + 1]), key));
++    return { status: 0 };
++  };
++}
++function c30i6Ceremony(dirs, state) {
++  const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
++  return runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: "a".repeat(64) })],
++    { observeCandidate: () => observed, readConfirmation: () => "approve", spawn: c30i6Spawn(state) });
++}
++function c30i6Fixture() {
++  const dirs = fixtureDirs();
++  writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
++  writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
++  keyFixture(dirs.directory);
++  return dirs;
++}
++
++test("C30I-S6: a failed signing (a mistyped passphrase) ends the ceremony cleanly and the very next entry works at once", () => {
++  const dirs = c30i6Fixture();
++  try {
++    const repository = c30i6Registry(dirs);
++    const state = { fail: 3, signCalls: 0 };
++    assert.throws(() => c30i6Ceremony(dirs, state), /openssl failed/u);
++    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" }, "the registry reads after the failed signing: nothing is left half-way");
++    assert.deepEqual(c30i6CeremonyFiles(repository).filter((name) => name.endsWith(".terminal-observed.json")).length, 1, "the failed ceremony ended with its terminal record");
++    const second = c30i6Ceremony(dirs, state);
++    assert.equal(second.ok, true);
++    assert.equal(second.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
++    assert.equal(state.signCalls, 4);
++  } finally { cleanup(dirs); }
++});
++
++function c30i6Confirming(dirs, state, confirmations) {
++  const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
++  return runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: "a".repeat(64) })],
++    { observeCandidate: () => observed, readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; }, spawn: c30i6Spawn(state) });
++}
++
++test("C30I-S6 (4): a mistyped passphrase may be retyped inside the same run; every attempt signs the same confirmed intent and the confirmation is not repeated", () => {
++  const dirs = c30i6Fixture();
++  try {
++    c30i6Registry(dirs);
++    const state = { fail: 2, signCalls: 0 }, confirmations = [];
++    const result = c30i6Confirming(dirs, state, confirmations);
++    assert.equal(result.ok, true);
++    assert.equal(state.signCalls, 3, "two refused passphrases and the accepted one");
++    assert.equal(confirmations.length, 1, "the confirmation is asked once, not once per attempt");
++    const artifacts = criticalArtifacts(dirs);
++    assert.equal(JSON.parse(readFileSync(artifacts.proof, "utf8")).schema, "pipeline.po-approval-proof.v1");
++    assert.equal(existsSync(artifacts.intent), false, "the temporary intent file is gone");
++    assert.equal(existsSync(artifacts.signature), false, "the temporary signature file is gone");
++  } finally { cleanup(dirs); }
++});
++
++test("C30I-S6 (2)+(4): three refused passphrases end the run cleanly with one line that says to run the same command again, nothing is written, and the rerun needs no repair", () => {
++  const dirs = c30i6Fixture();
++  try {
++    const repository = c30i6Registry(dirs);
++    const state = { fail: 3, signCalls: 0 }, confirmations = [];
++    assert.throws(() => c30i6Confirming(dirs, state, confirmations), (error) => /3 passphrase attempts/u.test(error.message) && /run the same command again/u.test(error.message) && !/\n/u.test(error.message));
++    assert.equal(state.signCalls, 3);
++    assert.equal(confirmations.length, 1);
++    const artifacts = criticalArtifacts(dirs);
++    assert.equal(existsSync(artifacts.proof), false, "a refused signing records no proof");
++    assert.equal(existsSync(artifacts.signer), false);
++    assert.equal(existsSync(artifacts.intent), false);
++    assert.equal(existsSync(artifacts.signature), false);
++    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" });
++    assert.equal(c30i6Confirming(dirs, state, confirmations).ok, true, "the same command, run again, signs at once");
++  } finally { cleanup(dirs); }
++});
++
++test("C30I-S6: the printed failure of a ceremony carries the repair a refusal names, on its own line, and stays one line when there is none", async () => {
++  const { formatHumanApprovalFailure } = await import("./po-human-approval.mjs");
++  assert.equal(formatHumanApprovalFailure(new Error("plain refusal")), "PO-HUMAN-APPROVAL-FAILED: plain refusal\n");
++  const withRepair = Object.assign(new Error("chat:member-source-drift"), { repair: "run node x/routine-repair.mjs run move-aside --no-goldfish-running --root <root> --reason \"<why>\"" });
++  assert.equal(formatHumanApprovalFailure(withRepair), "PO-HUMAN-APPROVAL-FAILED: chat:member-source-drift\nRepair: run node x/routine-repair.mjs run move-aside --no-goldfish-running --root <root> --reason \"<why>\"\n");
++  assert.equal(formatHumanApprovalFailure(Object.assign(new Error("x"), { repair: 5 })), "PO-HUMAN-APPROVAL-FAILED: x\n", "only a text repair is printed");
++});
++
++/** Runs one ceremony in a child process that ends (SIGKILL) at the signing step, so the ceremony is left half-way by a process that is gone. */
++function c30i6Killed(dirs, home) {
++  const pem = readFileSync(join(dirs.directory, "po-private.pem"), "utf8");
++  if (pem.includes("-----BEGIN PRIVATE KEY-----")) writeFileSync(join(dirs.directory, "po-private.pem"), createPrivateKey(pem).export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: LEVER_PASSPHRASE }));
++  const code = `
++    import { spawnSync } from "node:child_process";
++    const { runHumanApproval } = await import(process.env.C30I6_MODULE);
++    const repoRoot = process.env.C30I6_REPO, directory = process.env.C30I6_DIR, home = process.env.C30I6_HOME;
++    runHumanApproval(["authorize-critical", "--repo-root", repoRoot, "--directory", directory, "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md", "--kind", "push", "--subject-sha256", "${"a".repeat(64)}", "--expires-at", "2999-01-01T00:00:00.000Z"],
++      { observeCandidate: () => ({ commit: "${"d".repeat(40)}", tree: "${"e".repeat(40)}" }), readConfirmation: () => "approve", isTTY: true, homedirFn: () => home,
++        spawn: (executable, args, options) => {
++          if (executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private[.]pem$/u.test(String(entry)))) process.kill(process.pid, "SIGKILL");
++          const run = spawnSync(executable, args, { stdio: "pipe", cwd: options?.cwd });
++          return { status: run.status, stdout: run.stdout, stderr: run.stderr, error: run.error };
++        } });`;
++  return spawnSync(process.execPath, ["--input-type=module", "-e", code],
++    { encoding: "utf8", env: { ...process.env, C30I6_MODULE: new URL("./po-human-approval.mjs", import.meta.url).href, C30I6_REPO: dirs.repoRoot, C30I6_DIR: dirs.directory, C30I6_HOME: home } });
++}
++const c30i6CeremonyFiles = (repository) => {
++  const dir = join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies");
++  return existsSync(dir) ? readdirSync(dir).sort() : [];
++};
++
++for (const variant of ["the process ended while signing (member and records agree, owner gone)", "the process ended after the terminal record was written and before the registry member followed (member lags the records)"]) {
++  test(`C30I-S6 (1)+(3): ${variant} -- the next ceremony start retires it with a note and then succeeds`, { skip: REQUIRES_OPENSSL }, () => {
++    const dirs = c30i6Fixture(), home = outsideRepositoryTemp("po-c30i6-home-");
++    try {
++      const repository = c30i6Registry(dirs);
++      const killed = c30i6Killed(dirs, home);
++      assert.equal(killed.signal, "SIGKILL", `the child must end at the signing step: ${killed.stderr}`);
++      const before = c30i6CeremonyFiles(repository);
++      assert.equal(before.length, 2, `reserved and running, no terminal: ${before.join(", ")}`);
++      const id = before[0].split(".")[0];
++      if (variant.includes("lags")) {
++        // The terminal record exists on disk while the registry member still says it runs: the exact state a process that ended between the two writes leaves.
++        const running = JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", `${id}.running.json`), "utf8"));
++        writeFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", `${id}.terminal-observed.json`), canonical({ ...running, phase: "terminal-observed", terminal: "cancelled" }), { mode: 0o600 });
++      }
++      const state = { fail: 0, signCalls: 0 };
++      const result = c30i6Ceremony(dirs, state);
++      assert.equal(result.ok, true, "the next entry works at once, with no repair");
++      const after = c30i6CeremonyFiles(repository);
++      assert.ok(after.includes(`${id}.terminal-observed.json`), "the abandoned ceremony now has its terminal record");
++      assert.equal(JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", `${id}.terminal-observed.json`), "utf8")).terminal, "cancelled");
++      assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" });
++    } finally { cleanup(dirs); rmSync(home, { recursive: true, force: true }); }
++  });
++}
++
++test("C30I-S6 (3): a half-way ceremony whose owner was never recorded is not retired on a guess; the refusal names the runnable repair", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = c30i6Fixture(), home = outsideRepositoryTemp("po-c30i6-home-");
++  try {
++    const repository = c30i6Registry(dirs);
++    assert.equal(c30i6Killed(dirs, home).signal, "SIGKILL");
++    const dir = join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies");
++    const id = c30i6CeremonyFiles(repository)[0].split(".")[0];
++    const running = JSON.parse(readFileSync(join(dir, `${id}.running.json`), "utf8"));
++    writeFileSync(join(dir, `${id}.terminal-observed.json`), canonical({ ...running, phase: "terminal-observed", terminal: "cancelled" }), { mode: 0o600 });
++    rmSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremony-owners"), { recursive: true, force: true });
++    assert.throws(() => c30i6Ceremony(dirs, { fail: 0, signCalls: 0 }), (error) => typeof error.repair === "string"
++      && /routine-repair\.mjs run move-aside --no-goldfish-running --root /u.test(error.repair) && /owner/u.test(error.repair));
++  } finally { cleanup(dirs); rmSync(home, { recursive: true, force: true }); }
++});
++
++test("C30I-S6 (3): a ceremony that is still running in this process is never retired by a ceremony that starts meanwhile", () => {
++  const dirs = c30i6Fixture();
++  try {
++    const repository = c30i6Registry(dirs);
++    const state = { fail: 0, signCalls: 0 };
++    let nested = null;
++    const inner = c30i6Spawn(state);
++    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
++    const outerSpawn = (executable, args, options) => {
++      const signing = executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private\.pem$/u.test(String(entry)));
++      if (signing && nested === null) {
++        nested = "started";
++        try { runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { kind: "publication", subjectSha256: "a".repeat(64) })], { observeCandidate: () => observed, readConfirmation: () => "approve", spawn: c30i6Spawn({ fail: 0, signCalls: 0 }) }); nested = "completed"; }
++        catch (error) { nested = `refused: ${error.message}`; }
++        const terminals = c30i6CeremonyFiles(repository).filter((name) => name.endsWith(".terminal-observed.json"));
++        const cancelled = terminals.filter((name) => JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", name), "utf8")).terminal === "cancelled");
++        assert.deepEqual(cancelled, [], "no ceremony of a running owner is ever cancelled by someone else");
++      }
++      return inner(executable, args, options);
++    };
++    const result = runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: "a".repeat(64) })], { observeCandidate: () => observed, readConfirmation: () => "approve", spawn: outerSpawn });
++    assert.equal(result.ok, true, `the outer ceremony still completes (nested: ${nested})`);
++  } finally { cleanup(dirs); }
++});
++
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.mjs b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+index 9e8973e3cebe37f234d3f5f6fd848b8cbd90fedf..176423815155fb9ca8a94d48df1c8775392aa2bc 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+@@ -47,7 +47,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
+ import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+-import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
++import { retireAbandonedChatGateCeremonies } from "../lib/chat-gate-ceremony.mjs";
++import { healSessionAuthorityDrift, initializeSessionAuthorityRegistry, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+ import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedCommits, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+ import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
+ import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
+@@ -411,9 +412,27 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
+     catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a legacy stop-failure record could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
+   }
+   const stopFields = { ...(stopFailures?.retired.length ? { retiredStopFailures: stopFailures.retired } : {}), ...(stopFailures?.kept.length ? { keptStopFailures: stopFailures.kept } : {}) };
++  // C30I-S6: heal retires a PO ceremony that a process which has since ended left half-way (the registry's own owner judge; a live or unrecorded owner is
++  // kept and named); move-aside rebuilds the catalogue it moved away while a Close lifecycle exists, because the one-shot close decides its owner-route
++  // mode from that catalogue and would silently switch to the direct route without it; with no Close lifecycle the registry stays absent until the next
++  // governed dispatch initializes it (D44), as before. `registryRebuilt` says what happened; the status is never silent.
++  let ceremonies = null, registryRebuilt = null;
++  const closeLifecycleExists = (() => { try { return readdirSync(join(repository.commonDir, "agent-pipeline", "publication-close")).length > 0; } catch { return false; } })();
++  const hadCatalogue = closeLifecycleExists && existsSync(join(repository.commonDir, "agent-pipeline", "session-authority", "catalogue.json"));
+   try {
+-    if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => { entered.value = true; return healSessionAuthorityDrift({ boundary }); }));
+-    else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
++    if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => {
++      entered.value = true;
++      try { ceremonies = retireAbandonedChatGateCeremonies({ repository, boundary }); }
++      catch (error) { ceremonies = { retired: [], kept: [], refused: short(error) }; }
++      return healSessionAuthorityDrift({ boundary });
++    }));
++    else {
++      const moved = retryWhileSessionAuthorityLockHeld((entered) => moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }));
++      if (hadCatalogue && moved?.status === "moved-aside") {
++        const rebuilt = initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
++        registryRebuilt = { status: rebuilt.status, ...(rebuilt.status === "initialized" ? {} : { reason: rebuilt.reason ?? rebuilt.code ?? null, note: "the registry stays without a catalogue until the next governed dispatch initializes it fresh" }) };
++      }
++    }
+   } catch (error) {
+     const heal = typeof error?.repair === "string" ? { repair: error.repair } : parsed.verb === "heal" ? { repair: sessionAuthorityRepairCommand(root, "inspect") } : {};
+     return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal, ...stopFields }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
+@@ -423,7 +442,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
+   // is not reported healed; inspect names what holds it.
+   if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained, ...stopFields,
+     ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { scratch }) }, 2);
+-  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...stopFields, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
++  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(registryRebuilt === null ? {} : { registryRebuilt }), ...(ceremonies === null || (!ceremonies.retired.length && !ceremonies.kept.length && ceremonies.refused === undefined) ? {} : { chatGateCeremonies: ceremonies }), ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...stopFields, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2), undefined, { env: process.env });
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 9ad598747beee4f474456efebddfcf04ace0ef38..2bc4aeef6c8f7126845657873865d639562eed44 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -600,6 +600,22 @@ const cases = [
+     assert.ok(aside, JSON.stringify(found.next));
+     assert.match(aside.why, /does not clear a finalizer stop-failure record/u, aside.why);
+   }) },
++  // C30I-S6 (queue C30-21): the PO's move-aside removed the catalogue, and the later close silently ran on the direct route instead of the owner route.
++  { id: "SAR22", name: "C30I-S6 move-aside rebuilds the catalogue it moved away while a Close lifecycle exists (the one-shot close decides its owner-route mode from it) and says so; without one the registry stays absent as before", run: () => fixture(({ root }) => {
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    const catalogue = join(repository.commonDir, "agent-pipeline/session-authority/catalogue.json");
++    assert.equal(existsSync(catalogue), true, "the first governed dispatch initialized the registry");
++    mkdirSync(join(repository.commonDir, "agent-pipeline/publication-close/lifecycle-a"), { recursive: true, mode: 0o700 });
++    const moved = repair("move-aside", "--root", root, "--no-goldfish-running", "--reason", "the ceremony namespace changed under a stopped ceremony");
++    assert.equal(moved.code, 0, JSON.stringify(moved.result));
++    assert.equal(moved.result.status, "moved-aside");
++    assert.deepEqual(moved.result.registryRebuilt, { status: "initialized" });
++    assert.equal(existsSync(catalogue), true, "the owner-route catalogue is back: the open close keeps its mode");
++    assert.equal(moved.result.registry.read.status, "readable", JSON.stringify(moved.result.registry));
++    const aside = moved.result.retained.find((name) => name.endsWith("-repair-move-aside"));
++    assert.equal(existsSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", aside, "catalogue.json")), true, "the old registry is still retained, not deleted");
++  }) },
+   // ---- SAD diag: the state authority refusal names an untyped cause after the code parenthesis, its elapsed time, and an opt-in trace ----
+   { id: "SAS01", name: "SAD diag (1) a typed refusal keeps its text and ends with the elapsed time", run: () => {
+     const typed = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 });

@@ -1,0 +1,465 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 101f09e7577e2d3088d80ba7a7652a00446706ad..f9f00062de69546792ce98c6ec9a92c695267880 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -495,7 +495,9 @@
+           "CCA098",
+           "CCA099",
+           "CCA100",
+-          "CCA101"
++          "CCA101",
++          "CCA102",
++          "CCA103"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 94d7090c2fb9457ed8998191018883c4fbb7c66e..076a3f0ad8261a020ac6ca017d891e7ca384d9d7 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -22,8 +22,9 @@ import { bytes as projectAuthorityBytes, resolveProjectAuthorityPaths } from "./
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const MODES = new Set(["full", "delta"]);
+-const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+-const SHA256 = /^[a-f0-9]{64}$/u;
++// Exported for the registration writer of `supersedes` (C30I-S3): one feature id grammar, never a second copy of it.
++export const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
++const SHA256 =/^[a-f0-9]{64}$/u;
+ const DELTA_KEYS = ["changedPaths", "changedBehaviorClaims", "priorReceipt", "pathInvariantMap", "pathInvariantMapSha256", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
+ const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ const exact = (value, keys) => object(value)
+@@ -860,9 +861,12 @@ function discardedFeatureIds(root){
+  try{
+   const paths=resolveProjectAuthorityPaths({rootDir:root});if(paths.status!=='ready'||typeof paths.state!=='string')return [];
+   const raw=projectAuthorityBytes(root,paths.state);if(raw===null)return [];
+-  const state=JSON.parse(raw.toString('utf8'));
+-  return Array.isArray(state?.discardedFeatures)?[...new Set(state.discardedFeatures.filter(e=>object(e)&&typeof e.id==='string'&&FEATURE_ID.test(e.id)&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0).map(e=>e.id))]:[];
++  return discardedFeatureIdsOfState(JSON.parse(raw.toString('utf8')));
+  }catch{return [];}}
++// The notion of "recorded as discarded", read from an already parsed State: shared by the course admission above and the registration writer of `supersedes` (C30I-S3).
++export function discardedFeatureIdsOfState(state){
++ return Array.isArray(state?.discardedFeatures)?[...new Set(state.discardedFeatures.filter(e=>object(e)&&typeof e.id==='string'&&FEATURE_ID.test(e.id)&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0).map(e=>e.id))]:[];
++}
+ function recordedDiscarded(root,featureId){return discardedFeatureIds(root).includes(featureId);}
+ /** True when the feature manifest at the commit declares a predecessor feature (read-only; only decides which repair sentence a CCA-MANIFEST-READ refusal prints). */
+ export function criticCourseDeclaresPredecessor({repoRoot,featureId,commit}){
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 62487f14d2903d7557e40eea804e168ec57f9fb3..abbcbbe7cd88ef3d8b46ddff0a9c26d9dd25a8aa 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -1777,4 +1777,65 @@ test("C30F-G4B (e) a later round WITHOUT the input recovers the predecessor from
+   rmSync(join(fx.root, ".claude"), {recursive: true, force: true});
+   assert.equal(later().code, "CCA-GENESIS-BINDING", "no State at all");
+ });
++// C30I-S3 (queue C30-12; AC-108 is the closest accepted criterion): `register-feature-package.mjs --supersedes <id>` writes the relation at creation, so round 1 of the
++// successor of a DISCARDED feature needs no `--successor-of`. The successor is registered through the REAL registration function (a stub envelope reader with the real
++// reader's contract is the one named seam), committed, and admitted exactly as the hand-written manifest of C30F-G4. Neutral ids only.
++import {registerFeaturePackage as registerSuccessorPackage} from "./feature-package-registration.mjs";
++import {PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson} from "./plan-spec-state-v2.mjs";
++function registeredSuccessorFixture({supersedes = null} = {}) {
++  const root = mkdtempSync(join(tmpdir(), "critic-successor-reg-"));
++  const featureId = "feature-b", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, planPath = `${dir}/prd.md`, specPath = `${dir}/spec.md`;
++  git(root, ["init", "-q"]); git(root, ["config", "user.name", "Fixture"]); git(root, ["config", "user.email", "fixture@example.invalid"]);
++  const commit = (message) => { git(root, ["add", "."]); git(root, ["commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++  mkdirSync(join(root, "src"), {recursive: true}); mkdirSync(join(root, dir), {recursive: true});
++  writeFileSync(join(root, "README.md"), "pre\n");
++  const pre = commit("pre-manifest");
++  writeFileSync(join(root, planPath), "# PRD\n"); writeFileSync(join(root, specPath), "# Spec\nAC-1 behavior\n");
++  const planSha256 = hash(readFileSync(join(root, planPath))), specSha256 = hash(readFileSync(join(root, specPath)));
++  const envelope = Buffer.from(`${JSON.stringify({featureId, manifestPath, request: {binding: {sources: {companions: []}}}})}\n`);
++  const envelopeSha256 = hash(envelope), envelopePath = `${dir}/evidence/accepted-delivery-contract-${envelopeSha256}.json`;
++  mkdirSync(join(root, `${dir}/evidence`), {recursive: true}); writeFileSync(join(root, envelopePath), envelope);
++  const planSubmission = {schema: PLAN_SUBMISSION_SCHEMA, featureId, planPath, planSha256, specPath, specSha256, profile: "mini", profileSha256: H("a"), submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z"};
++  const state = {schema: "pipeline.state.v0", activeFeature: {id: featureId, planPath, phase: "implementation"}, planSubmission, planApproved: true,
++    planApproval: {schema: RETAINED_APPROVAL_SCHEMA, approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z", submissionSha256: sha256CanonicalJson(planSubmission), profileSha256: H("a"),
++      poGateAuthority: {schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: H("b"), runtimeSha256: H("c"), receiptSha256: H("d"), repositoryFingerprint: H("e"), planPath, planSha256, specPath, specSha256},
++      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null, acceptedContract: {schema: "pipeline.accepted-delivery-contract-reference.v1", path: envelopePath, sha256: envelopeSha256}},
++    discardedFeatures: [{id: PREDECESSOR, planPath: `specs/${PREDECESSOR}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null}]};
++  // The envelope reader's contract: CAC-REGISTRATION-INVALID until the manifest exists (the writer re-reads it after writing), then ok.
++  const readAcceptedDeliveryContract = ({dir: at}) => (existsSync(join(at, manifestPath)) ? {ok: true, code: null} : {code: "CAC-REGISTRATION-INVALID"});
++  const registered = registerSuccessorPackage({root, state, readAcceptedDeliveryContract, ...(supersedes === null ? {} : {supersedes})});
++  assert.equal(registered.status, "registered", JSON.stringify(registered));
++  const base = commit("register the successor package");
++  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 1;\n"); const code = commit("delivered code");
++  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 2;\n"); const candidate = commit("candidate");
++  const fx = {root, featureId, manifestPath, pre, base, code, candidate, git: (...a) => git(root, a)};
++  recordDiscarded(fx);
++  return fx;
++}
++test("C30I-S3 (a) a successor registered with --supersedes is admitted in round 1 over the inherited range WITHOUT --successor-of, exactly as a hand-written supersedes of C30F-G4", () => {
++  const fx = registeredSuccessorFixture({supersedes: PREDECESSOR});
++  assert.equal(JSON.parse(git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])).supersedes, PREDECESSOR);
++  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
++  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++  const identity = successorIdentity(fx, fx.pre);
++  assert.equal(identity.ok, true, JSON.stringify(identity));
++  const course = identity.value.courseIdentity, introduced = hash(`${git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])}\n`);
++  assert.equal(course.genesisCandidate.base, fx.pre, "the inherited range review starts from the commit before the inherited implementation");
++  assert.equal(fx.git("rev-list", "--count", `${fx.pre}..${fx.candidate}`), "3", "the inherited range holds the registered package, the delivered code and the candidate");
++  assert.deepEqual(course.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
++  assert.equal(course.originalManifestSha256, introduced);
++  assert.deepEqual(identity.value.aliases, []);
++  assert.equal(successorIdentity(fx, fx.code).value.courseIdentity.successor, undefined, "a base that holds the manifest never takes the successor route");
++  // The explicit input of C30F-G4B stays valid beside the written relation and is still refused when it names another predecessor.
++  assert.equal(successorOfIdentity(fx, {successorOf: PREDECESSOR}).ok, true);
++  recordDiscarded(fx, [PREDECESSOR, "feature-c"]);
++  assert.equal(successorOfIdentity(fx, {successorOf: "feature-c"}).code, "CCA-SUCCESSOR-OF");
++});
++test("C30I-S3 (b) the control: the same successor registered WITHOUT the flag still needs --successor-of at review time (the trap the flag removes)", () => {
++  const fx = registeredSuccessorFixture();
++  assert.equal(JSON.parse(git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])).supersedes, null);
++  assert.equal(readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre})).decision.code, "CCA-MANIFEST-READ");
++  assert.equal(successorIdentity(fx, fx.pre).code, "CCA-MANIFEST-READ");
++  assert.equal(successorOfIdentity(fx, {successorOf: PREDECESSOR}).ok, true, "the supported route for an already registered successor is unchanged");
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 1d2c54f01cb6570afbcb0298685bbb51b2c4eddd..263ba02acce44799ad967dd782533fb5b46d4f6d 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -41,7 +41,7 @@ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArt
+ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
+-import { COURSE_EVIDENCE_GAP_CODES, courseEvidenceGapText, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
++import { COURSE_EVIDENCE_GAP_CODES, FEATURE_ID, courseEvidenceGapText, discardedFeatureIdsOfState, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+ import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+ import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
+ import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+@@ -185,10 +185,12 @@ function resolveRigor(state) {
+ // supersede is refused -- an entry is never dropped silently.
+ const SUPERSEDABLE_STATES = Object.freeze(["approved", "implementing"]);
+ const REDERIVED_CLASSES = new Set(["prd", "spec", "acceptance", "result"]);
+-function supersededRegistrations(bytes, featureId, envelopePath, root = null) {
++// C30I-S3: a manifest that declares a predecessor (`supersedes`) is rebuilt only when the caller names that very predecessor again (`supersedes` argument), so the
++// relation is carried over and never dropped or changed; without the argument the rebuild is refused exactly as before.
++function supersededRegistrations(bytes, featureId, envelopePath, root = null, supersedes = null) {
+   let manifest;
+   try { manifest = JSON.parse(bytes.toString("utf8")); } catch { return null; }
+-  if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== null || !Array.isArray(manifest.artifacts)) return null;
++  if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== supersedes || !Array.isArray(manifest.artifacts)) return null;
+   const unitPath = criticReviewUnitPath(featureId);
+   const kept = manifest.artifacts.filter((entry) => !REDERIVED_CLASSES.has(entry?.class) && !(entry?.class === "design" && entry.path === unitPath));
+   const evidence = kept.filter((entry) => entry?.class === "candidate-evidence");
+@@ -213,14 +215,39 @@ function approvalBoundSources(envelope) {
+   return bound;
+ }
+ 
++/** C30I-S3: the `supersedes` an existing manifest of this feature declares (null or a feature id), or undefined when the bytes are no manifest of this feature. */
++function declaredRelation(bytes, featureId) {
++  try {
++    const manifest = JSON.parse(bytes.toString("utf8"));
++    return manifest?.schema === FEATURE_PACKAGE_SCHEMA && manifest.feature?.id === featureId ? (manifest.supersedes ?? null) : undefined;
++  } catch { return undefined; }
++}
++
++/**
++ * C30I-S3: the refusal of an optional `--supersedes <predecessor feature id>` input, or null when it may be written. The id grammar is the course admission's
++ * (FEATURE_ID) narrowed by this module's own manifest id grammar (SAFE_ID, which the topology validator enforces on `supersedes`), and "discarded" is the
++ * course admission's own reading of the State (discardedFeatureIdsOfState). Every refusal names its repair.
++ */
++function supersedesRefusal(supersedes, featureId, state) {
++  if (typeof supersedes !== "string" || !FEATURE_ID.test(supersedes) || !SAFE_ID.test(supersedes)) {
++    return refused("FPR-SUPERSEDES-PATTERN", `--supersedes must name the predecessor feature by its id (lowercase letters, digits and single hyphens, for example feature-a), not ${JSON.stringify(supersedes)}. Register without --supersedes when this feature has no discarded predecessor`);
++  }
++  if (supersedes === featureId) return refused("FPR-SUPERSEDES-SELF", `--supersedes names the feature itself (${featureId}); name the discarded predecessor, or register without --supersedes`);
++  if (!discardedFeatureIdsOfState(state).includes(supersedes)) {
++    return refused("FPR-SUPERSEDES-NOT-DISCARDED", `the State does not record ${supersedes} as discarded. Discard it first with the discard-feature route (pipeline-state.mjs discard-feature), or register without --supersedes when this feature is an ordinary one`);
++  }
++  return null;
++}
++
+ /**
+  * @param {object} input
+  * @param {string} input.root absolute repository root
+  * @param {object} input.state the parsed project authority State (read by the caller through its own resolver)
+  * @param {Function} input.readAcceptedDeliveryContract the existing envelope reader (`scripts/pipeline-state.mjs`)
++ * @param {string} [input.supersedes] C30I-S3: the discarded predecessor of a successor feature, written as the manifest's `supersedes` (absent or null: no relationship, as before)
+  * @returns {object} `pipeline.feature-package-registration.v1`: status registered | already-registered | refused
+  */
+-export function registerFeaturePackage({ root: rootInput, state, readAcceptedDeliveryContract } = {}) {
++export function registerFeaturePackage({ root: rootInput, state, readAcceptedDeliveryContract, supersedes: supersedesInput } = {}) {
+   if (typeof readAcceptedDeliveryContract !== "function" || !object(state)) return refused("FPR-ARGS", "root, state and the envelope reader are required");
+   let root;
+   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+@@ -238,6 +265,12 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+     return refused("FPR-NO-APPROVED-PLAN", "no current plan approval of the v9 accepted-contract shape exists for the active feature; run approve-plan first");
+   }
+   const manifestPath = `specs/${featureId}/lifecycle.json`;
++  // C30I-S3: the optional predecessor is validated before the State, the envelope or the tree is touched further.
++  const supersedes = supersedesInput === undefined || supersedesInput === null ? null : supersedesInput;
++  if (supersedes !== null) {
++    const rejected = supersedesRefusal(supersedes, featureId, state);
++    if (rejected !== null) return rejected;
++  }
+ 
+   // 2. The envelope: the existing reader decides whether its bytes re-derive.
+   const envelopeRead = repositoryRelative(envelopePath) ? inspect(root, envelopePath) : { kind: "other" };
+@@ -260,12 +293,16 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+   const existing = existingRead.kind === "file" ? existingRead.bytes : null;
+   let superseded = null;
+   if (existingRead.kind !== "absent") {
++    // C30I-S3: an approved manifest is never edited, so a flag that does not match the relation it already holds is refused with the supported route.
++    const held = supersedes !== null && existing ? declaredRelation(existing, featureId) : undefined;
++    if (held === null) return refused("FPR-SUPERSEDES-LATE", `${manifestPath} was registered without a predecessor (supersedes: null) and an approved manifest is never edited, so --supersedes cannot be added now. Name the discarded predecessor at review time instead: add --successor-of <feature id of the discarded predecessor> to the prepare-dispatch.mjs critic or critic-dispatch-preflight.mjs command of the first review round`, { manifestPath });
++    if (typeof held === "string" && held !== supersedes) return refused("FPR-SUPERSEDES-CONFLICT", `${manifestPath} already declares supersedes ${held} and an approved manifest is never edited: rerun with --supersedes ${held}, or without the flag`, { manifestPath });
+     if (observed?.code && !READER_BEFORE_REGISTRATION.includes(observed.code) || observed?.ok === true) {
+       return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, envelopePath, manifestSha256: digest(existing ?? Buffer.alloc(0)), readerCode: observed?.code ?? null };
+     }
+     // Antigravity greenfield 2026-11-08: after a reopen the old manifest blocked the new approval and the agent hand-edited it.
+     // A manifest that lists only earlier approvals of this feature is superseded by the current one: rebuilt here, the earlier envelopes retained.
+-    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath, root) : null;
++    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath, root, supersedes) : null;
+     if (superseded === null) {
+       const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
+       return refused("FPR-MANIFEST-CONFLICT", checked.ok
+@@ -351,7 +388,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+       : { class: entry.class, path: entry.path, sha256: entry.sha256, authority: entry.authority, mutability: entry.mutability, retention: entry.retention, ...(Object.hasOwn(entry, "amendment") ? { amendment: entry.amendment } : {}) });
+   }
+   artifacts.push({ class: "candidate-evidence", path: envelopePath, sha256: digest(envelopeBytes), authority: false, mutability: "immutable", retention: "retain" });
+-  const manifest = { schema: FEATURE_PACKAGE_SCHEMA, feature: { id: featureId, rigor: rigor.rigor }, state: lifecycle.status, artifacts, candidate: null, supersedes: null };
++  const manifest = { schema: FEATURE_PACKAGE_SCHEMA, feature: { id: featureId, rigor: rigor.rigor }, state: lifecycle.status, artifacts, candidate: null, supersedes };
+   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
+ 
+   // 6. Exclusive creates only (never overwrite): the generated documents first, the manifest last. Any later failure undoes exactly what was created here.
+@@ -407,7 +444,9 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+       result: "absent -> generated status record (authority:false, immutable, active); present -> registered as found, never rewritten, append-only (authority:true only when the approval's companion binding names this path and digest)",
+       envelope: "candidate-evidence, authority:false, immutable, retain (fixed by the topology)",
+       candidate: "null (only verifying/completed require a candidate binding)",
+-      supersedes: "null (no relationship; only superseded/retained require one)",
++      supersedes: supersedes === null
++        ? "null (no relationship; only superseded/retained require one). A successor of a DISCARDED feature registers with --supersedes <predecessor feature id> (the State must record the predecessor as discarded); an already registered successor names it at review time with --successor-of"
++        : `${supersedes} (the discarded predecessor named with --supersedes <predecessor feature id>; the State records it as discarded, and the Critic course admission reads it as the successor of a discarded feature)`,
+     },
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+index a800135474b626a0aecab9b88e76923d9cbc1841..78f1108f2cd57c30d8f8fcd74419498faa903af3 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { createHash } from "node:crypto";
++import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+@@ -11,7 +12,10 @@ import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatMo
+ import {
+   PUSH_THREAT_MODEL_UNCHANGED_MARKER, collectPushThreatModelFacts, isPushThreatModelTemplateUnchanged, renderPushThreatModel,
+ } from "../lib/push-threat-model-materialize.mjs";
+-import { pushThreatModelReadback } from "./register-feature-package.mjs";
++import { registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
++import { PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
++import { REGISTER_FEATURE_PACKAGE_HELP, pushThreatModelReadback, runRegisterFeaturePackage } from "./register-feature-package.mjs";
+ 
+ const SHIPPED_TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "default-push-threat-model.md");
+ 
+@@ -169,3 +173,150 @@ test("PTG7: the verdict reads the file system only: it creates nothing and never
+   assert.equal(existsSync(join(root, "project")), false, "no directory was created");
+   assert.equal(pushThreatModelVerdict(join(root, "no-such-directory")).ok, true, "an unreadable root has no active push approval");
+ });
++
++// C30I-S3 (queue C30-12; AC-108 is the closest accepted criterion): `register-feature-package.mjs --supersedes <predecessor feature id>` writes the relation of the
++// successor of a DISCARDED feature at registration, so the Critic course no longer depends on the review-time `--successor-of` alone. Neutral ids only.
++// Seam (named, not hidden): the envelope reader is a stub with the real reader's contract (CAC-REGISTRATION-INVALID until the manifest lists the envelope, then ok);
++// the real reader resolves the manifest through validateFeaturePackage, which these cases run on the written manifest.
++const SUCCESSOR = "feature-b";
++const PREDECESSOR = "feature-a";
++const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const put = (root, path, bytes) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), bytes); };
++function successorRoot() {
++  const root = tempRoot();
++  put(root, `specs/${SUCCESSOR}/prd.md`, "# PRD\n");
++  put(root, `specs/${SUCCESSOR}/spec.md`, "# Spec\nAC-1 behavior\n");
++  return root;
++}
++/** The State of an approved v9 plan for the successor; `tag` makes a second approval (a re-approval writes another envelope). */
++function approvedState(root, { tag = "one", discarded = [PREDECESSOR] } = {}) {
++  const planPath = `specs/${SUCCESSOR}/prd.md`, specPath = `specs/${SUCCESSOR}/spec.md`;
++  const planSha256 = sha(readFileSync(join(root, planPath))), specSha256 = sha(readFileSync(join(root, specPath)));
++  const envelope = Buffer.from(`${JSON.stringify({ featureId: SUCCESSOR, manifestPath: `specs/${SUCCESSOR}/lifecycle.json`, request: { binding: { sources: { companions: [] } } }, tag })}\n`);
++  const envelopeSha256 = sha(envelope), envelopePath = `specs/${SUCCESSOR}/evidence/accepted-delivery-contract-${envelopeSha256}.json`;
++  put(root, envelopePath, envelope);
++  const planSubmission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: SUCCESSOR, planPath, planSha256, specPath, specSha256, profile: "mini", profileSha256: "a".repeat(64), submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z" };
++  const poGateAuthority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "b".repeat(64), runtimeSha256: "c".repeat(64), receiptSha256: "d".repeat(64), repositoryFingerprint: "e".repeat(64), planPath, planSha256, specPath, specSha256 };
++  return {
++    schema: "pipeline.state.v0", activeFeature: { id: SUCCESSOR, planPath, phase: "implementation" }, planSubmission, planApproved: true,
++    planApproval: { schema: RETAINED_APPROVAL_SCHEMA, approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z", submissionSha256: sha256CanonicalJson(planSubmission), profileSha256: "a".repeat(64), poGateAuthority,
++      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null,
++      acceptedContract: { schema: "pipeline.accepted-delivery-contract-reference.v1", path: envelopePath, sha256: envelopeSha256 } },
++    discardedFeatures: discarded.map((id) => ({ id, planPath: `specs/${id}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null })),
++  };
++}
++const manifestOf = (root) => join(root, `specs/${SUCCESSOR}/lifecycle.json`);
++const envelopeReader = ({ dir, envelopePath }) => (existsSync(manifestOf(dir)) && readFileSync(manifestOf(dir), "utf8").includes(envelopePath) ? { ok: true, code: null } : { code: "CAC-REGISTRATION-INVALID" });
++const register = (root, state, supersedes) => registerFeaturePackage({ root, state, readAcceptedDeliveryContract: envelopeReader, ...(supersedes === undefined ? {} : { supersedes }) });
++const treeOf = (root) => readdirSync(join(root, "specs"), { recursive: true }).map(String).sort();
++const sameBytes = (root) => readFileSync(manifestOf(root), "utf8");
++
++test("SUP1: --supersedes writes the predecessor into the manifest of the successor and the topology validator accepts it", () => {
++  const root = successorRoot();
++  const result = register(root, approvedState(root), PREDECESSOR);
++  assert.equal(result.status, "registered", JSON.stringify(result));
++  assert.equal(JSON.parse(sameBytes(root)).supersedes, PREDECESSOR);
++  assert.equal(validateFeaturePackage(root, `specs/${SUCCESSOR}/lifecycle.json`).ok, true);
++  assert.match(result.choices.supersedes, /--supersedes <predecessor feature id>/u);
++});
++
++test("SUP2: without the flag the manifest is byte-identical to today's (supersedes null); the flagged one differs in exactly that line", () => {
++  const plain = successorRoot(), flagged = successorRoot();
++  assert.equal(register(plain, approvedState(plain)).status, "registered");
++  assert.equal(register(flagged, approvedState(flagged), PREDECESSOR).status, "registered");
++  assert.match(sameBytes(flagged), /\n  "supersedes": "feature-a"\n\}\n$/u);
++  assert.match(sameBytes(plain), /\n  "supersedes": null\n\}\n$/u);
++  assert.equal(sameBytes(flagged).replace(`"supersedes": "${PREDECESSOR}"`, '"supersedes": null'), sameBytes(plain));
++  const absent = successorRoot();
++  assert.equal(register(absent, approvedState(absent), null).status, "registered", "null means absent, as no flag");
++  assert.equal(sameBytes(absent), sameBytes(plain));
++});
++
++test("SUP3: a predecessor the State does not record as discarded is refused with the repair, before any write", () => {
++  for (const discarded of [[], ["feature-z"]]) {
++    const root = successorRoot(), state = approvedState(root, { discarded });
++    const before = treeOf(root);
++    const result = register(root, state, PREDECESSOR);
++    assert.equal(result.status, "refused", JSON.stringify(result));
++    assert.equal(result.code, "FPR-SUPERSEDES-NOT-DISCARDED");
++    assert.match(result.reason, /discard-feature/u);
++    assert.match(result.reason, /without --supersedes/u);
++    assert.deepEqual(treeOf(root), before, "nothing was written: no manifest, no generated acceptance or result");
++    assert.equal(register(root, state).status, "registered", "the same package registers without the flag as an ordinary feature");
++  }
++});
++
++test("SUP4: the feature's own id is refused, also when the State records it as discarded", () => {
++  const root = successorRoot();
++  const result = register(root, approvedState(root, { discarded: [SUCCESSOR, PREDECESSOR] }), SUCCESSOR);
++  assert.equal(result.code, "FPR-SUPERSEDES-SELF", JSON.stringify(result));
++  assert.equal(existsSync(manifestOf(root)), false);
++});
++
++test("SUP5: an id that is no feature id of the course admission, or no safe feature id of the manifest topology, is refused", () => {
++  for (const bad of ["Not A Feature", "", "../x", "Feature_A", 7, {}]) {
++    const root = successorRoot();
++    const result = register(root, approvedState(root), bad);
++    assert.equal(result.code, "FPR-SUPERSEDES-PATTERN", `${JSON.stringify(bad)}: ${JSON.stringify(result)}`);
++    assert.equal(existsSync(manifestOf(root)), false);
++  }
++});
++
++test("SUP6: the same flag twice is the same no-op as today, and a rerun without the flag changes nothing either", () => {
++  const root = successorRoot(), state = approvedState(root);
++  assert.equal(register(root, state, PREDECESSOR).status, "registered");
++  const once = sameBytes(root);
++  assert.equal(JSON.parse(once).supersedes, PREDECESSOR);
++  const again = register(root, state, PREDECESSOR);
++  assert.equal(again.status, "already-registered", JSON.stringify(again));
++  assert.equal(sameBytes(root), once);
++  assert.equal(register(root, state).status, "already-registered");
++  assert.equal(sameBytes(root), once);
++});
++
++test("SUP7: another value for a manifest that holds a relation is refused with a typed repair; an approved manifest is never edited", () => {
++  const root = successorRoot(), state = approvedState(root, { discarded: [PREDECESSOR, "feature-c"] });
++  assert.equal(register(root, state, PREDECESSOR).status, "registered");
++  const once = sameBytes(root);
++  const result = register(root, state, "feature-c");
++  assert.equal(result.code, "FPR-SUPERSEDES-CONFLICT", JSON.stringify(result));
++  assert.match(result.reason, new RegExp(PREDECESSOR, "u"));
++  assert.equal(sameBytes(root), once);
++});
++
++test("SUP8: a manifest registered earlier with supersedes null plus the flag later is refused and the repair names --successor-of at review time", () => {
++  const root = successorRoot(), state = approvedState(root);
++  assert.equal(register(root, state).status, "registered");
++  const once = sameBytes(root);
++  const result = register(root, state, PREDECESSOR);
++  assert.equal(result.code, "FPR-SUPERSEDES-LATE", JSON.stringify(result));
++  assert.match(result.reason, /--successor-of <feature id of the discarded predecessor>/u);
++  assert.equal(sameBytes(root), once);
++});
++
++test("SUP9: a re-approval rebuilds a flagged manifest only with the same flag: the relation is carried, never dropped, never changed", () => {
++  const root = successorRoot();
++  assert.equal(register(root, approvedState(root), PREDECESSOR).status, "registered");
++  const second = approvedState(root, { tag: "two", discarded: [PREDECESSOR, "feature-c"] });
++  const once = sameBytes(root);
++  assert.equal(register(root, second).code, "FPR-MANIFEST-CONFLICT", "without the flag the rebuild stays refused, as today");
++  assert.equal(register(root, second, "feature-c").code, "FPR-SUPERSEDES-CONFLICT");
++  assert.equal(sameBytes(root), once);
++  const rebuilt = register(root, second, PREDECESSOR);
++  assert.equal(rebuilt.status, "registered", JSON.stringify(rebuilt));
++  assert.equal(JSON.parse(sameBytes(root)).supersedes, PREDECESSOR);
++  assert.equal(validateFeaturePackage(root, `specs/${SUCCESSOR}/lifecycle.json`).ok, true);
++});
++
++test("SUP10: the CLI accepts exactly --root <root> --supersedes <id> as the new shape, names it in the help, and refuses every other composition FPR-ARGS", () => {
++  const root = tempRoot();
++  const run = (argv) => { let text = ""; const code = runRegisterFeaturePackage(argv, (chunk) => { text += chunk; }); return { code, out: JSON.parse(text) }; };
++  assert.notEqual(run(["--root", root, "--supersedes", PREDECESSOR]).out.code, "FPR-ARGS", "the shape is accepted (the State is the next refusal)");
++  for (const argv of [["--supersedes", PREDECESSOR, "--root", root], ["--root", root, "--supersedes"], ["--root", root, "--supersedes", "--stage"], ["--root", root, "--supersedes", PREDECESSOR, "extra"],
++    ["--root", root, "--add-review-unit", "--supersedes", PREDECESSOR], ["--root", root, "--supersedes", PREDECESSOR, "--add-review-unit"]]) {
++    const refusal = run(argv);
++    assert.equal(refusal.code, 2); assert.equal(refusal.out.code, "FPR-ARGS", JSON.stringify(argv));
++  }
++  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--root <root> --supersedes <predecessor feature id>/u);
++  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /discard-feature/u);
++});
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 40aae4f71a96500a46b700a7544d4a1a75433955..17e3ce666a33a7e97f6153fec5fac1756c73b1ab 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -75,7 +75,12 @@ export function pushThreatModelReadback(root) {
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>] [--stage]",
++  "register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>] [--stage]",
++  "",
++  "Successor of a DISCARDED feature (the feature it replaces was discarded; its implementation stays in Git history): register it with `register-feature-package.mjs --root <root> --supersedes <predecessor feature id>`.",
++  "  The manifest then carries `supersedes: <id>` and the Critic course admission starts the first full review before the inherited implementation, with no --successor-of at review time. The State must record the predecessor",
++  "  as discarded (discard it first with the discard-feature route, or register without the flag when the feature is an ordinary one). The flag is given at the first registration only: an approved manifest is never edited,",
++  "  so a feature already registered without it names the predecessor at review time with --successor-of <feature id of the discarded predecessor>.",
+   "",
+   "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
+   "  your commit stays one `git commit -F <message file>` of what is staged.",
+@@ -169,8 +174,10 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   const addDelta = (argv.length === 4 || (argv.length === 5 && argv[4] === "--confirm-full-round")) && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+   // ADR-0095: `--add-spec-addendum <approval record>` registers a PO-approved Spec addendum and its approval record.
+   const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>]" })}\n`);
++  // C30I-S3: `--root <root> --supersedes <predecessor feature id>` registers the successor of a DISCARDED feature with its predecessor written into the manifest.
++  const withSupersedes = argv.length === 4 && argv[2] === "--supersedes" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
++  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum && !withSupersedes) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
++    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit |--add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>]" })}\n`);
+     return 2;
+   }
+   let root;
+@@ -215,7 +222,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+-  const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract });
++  const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract, ...(withSupersedes ? { supersedes: argv[3] } : {}) });
+   const printed = result.status === "registered" || result.status === "already-registered" ? { ...result, ...commitPlan(root, result) } : result;
+   out(emit(printed));
+   return result.status === "refused" ? 2 : 0;
+diff --git a/plugins/pipeline-core/skills/critic-review/references/coordinator-course.md b/plugins/pipeline-core/skills/critic-review/references/coordinator-course.md
+index aa59d156c1bae36273b9885ce7a261c77fa7cfb2..c42d8f708d1045bc04580f886b1d63596f617e8a 100644
+--- a/plugins/pipeline-core/skills/critic-review/references/coordinator-course.md
++++ b/plugins/pipeline-core/skills/critic-review/references/coordinator-course.md
+@@ -132,6 +132,8 @@ declared-unobserved`: its model and effort are the briefing's declaration, never
+ any host-observed predicate. Use the task id of
+ that record for every round (next section).
+ 
++When the feature replaces a feature that was discarded, register it with `register-feature-package.mjs --root <root> --supersedes <predecessor feature id>` so the first full review starts before the inherited implementation without any review-time flag; a feature already registered without it still names the predecessor with `--successor-of <feature id of the discarded predecessor>` on the first round.
++
+ ## Real commits after a consumed PASS (D199)
+ 
+ A consumed PASS ends the course only for the same candidate. Real (non-evidence) commits after the passed

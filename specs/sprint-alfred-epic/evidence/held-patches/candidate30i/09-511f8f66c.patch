@@ -1,0 +1,234 @@
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index c7a3ad0af8aa224de69a11256959a8be25ea1000..a68d6926cffb7a318d6ad5876ab770da32c7de09 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -145,12 +145,24 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put();
+   put("The two workarounds that cost the most time before they were written down:");
+   put();
+-  put("- **A provenance-bearing commit.** Write the message (subject, blank line,");
+-  put("  body, blank line, then the `AI-Assisted: true` and `Dispatch:` trailers) to a");
+-  put("  file under `scratch/commit-msg/`. Stage with `git add -- <paths>` as its own");
+-  put("  call, then commit with `git commit -F <msgfile> -- <paths>`. `-m` with");
+-  put("  `--trailer` and a parenthesised trailer value such as");
+-  put("  `Dispatch: <ID> (goldfish)` is refused by guard-push.");
++  put("- **A provenance-bearing commit.** Stage with `git add -- <paths>` as its own");
++  put("  call. For your own (non-dispatched) commits, then commit in ONE plain command:");
++  put('  `git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <ID>" -- <paths>`.');
++  put("  One `-m` per paragraph; the two trailers only as `--trailer` flags, never as `-m`");
++  put("  (each `-m` adds a blank line). Two Git facts decide whether it is admitted: a body whose");
++  put("  last paragraph is plain prose keeps the blank line before the trailers; a last body");
++  put("  paragraph made only of `Key: value` lines is read by Git as a trailer block, the");
++  put("  trailers are glued under it with no blank line, and the commit is refused");
++  put("  (`GIT-03-TRAILERS-GLUED-TO-BODY`). Keep the body prose, or use the file route.");
++  put("  For a long or multi-paragraph body, non-ASCII text, a backslash or a newline inside an");
++  put("  argument, write the message (subject, blank line, body, blank line, then the");
++  put("  `AI-Assisted: true` and `Dispatch:` trailers) to a file under `scratch/commit-msg/` and");
++  put("  commit with `git commit -F <msgfile> -- <paths>`. The guard-push limit is exact, not");
++  put("  blanket: it admits a quoted parenthesised trailer value such as");
++  put("  `Dispatch: <ID> (goldfish)` in the one-command form only for one plain printable-ASCII");
++  put("  `git commit` on one line, with no backslash and no global option (`-c`, `-C`); outside");
++  put("  that shape the parenthesis is refused. Git itself has no problem with it. A dispatched");
++  put("  Goldfish uses the message-file route its briefing names (§6).");
+   put("- **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.");
+   put("  Write the file from Node instead.");
+   put();
+@@ -345,8 +357,8 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put();
+   put("- Give a native file-read tool an absolute path. A relative path fails in child sessions.");
+   put("- Separate a revision from a path with `--`: `git diff <rev> -- <path>`.");
+-  put("- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a");
+-  put("  trailer is required.");
++  put("- Commit with the one-command form (`-m` paragraphs plus `--trailer` flags, §1) when the");
++  put("  body is plain prose; for a long body or the Goldfish route use `git commit -F <file>`.");
+   put("- Never commit the output of a close or another Pipeline writer by hand. Run the command");
+   put("  that the tool printed; it owns that commit.");
+   put("- On a run longer than a few minutes, say briefly what is running and what comes next,");
+diff --git a/harness/scripts/generate-agent-obligations.test.mjs b/harness/scripts/generate-agent-obligations.test.mjs
+index ecac3272691bbbfa2033d9a5be193a0aa0930244..a66e17ca96364b9664f7dfe2d4036334cc4f7961 100644
+--- a/harness/scripts/generate-agent-obligations.test.mjs
++++ b/harness/scripts/generate-agent-obligations.test.mjs
+@@ -270,3 +270,34 @@ test("AC-1: a hand-maintained line is marked as such, so the boundary is visible
+   const marks = document.match(/hand-maintained/gu) ?? [];
+   assert.ok(marks.length >= 2, `expected every hand-maintained section to say so; found ${marks.length}`);
+ });
++
++// C30-19 / AC-111 (slice C30I-S4B): the commit-route texts say what really holds for the one-command commit with trailers.
++const COMMIT_ROUTE_FILES = [
++  "templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md",
++  "templates/prompts/goldfish-task.md", "plugins/pipeline-core/templates/prompts/goldfish-task.md",
++  "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs", "plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
++];
++test("AC-111: the generated obligations teach the one-command commit first, the file route as the fallback, and the Git glue fact", () => {
++  const document = renderAgentObligations();
++  const oneCommand = document.indexOf('git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <ID>"');
++  assert.ok(oneCommand > 0, "the one-command form is named");
++  assert.ok(oneCommand < document.indexOf("git commit -F <msgfile> -- <paths>"), "the one-command form comes first");
++  assert.match(document, /GIT-03-TRAILERS-GLUED-TO-BODY/u);
++  assert.match(document, /Key: value/u);
++  assert.match(document, /plain printable-ASCII/u, "the guard-push limit is stated exactly");
++  assert.match(document, /commit with `git commit -F <msgfile> -- <paths>`/u, "the AC-106 contract phrase stays");
++});
++test("AC-111: no commit-route text keeps the blanket claim that guard-push refuses -m with --trailer", () => {
++  for (const rel of COMMIT_ROUTE_FILES) {
++    const text = readFileSync(join(REPO_ROOT, rel), "utf8");
++    assert.doesNotMatch(text, /is refused by guard-push/u, rel);
++    assert.doesNotMatch(text, /guard-push refuses it/u, rel);
++    assert.doesNotMatch(text, /guard-push refuses `-m` with a parenthesised/u, rel);
++    assert.doesNotMatch(text, /`-m` is refused where a/u, rel);
++  }
++});
++test("AC-111: the Goldfish route keeps the message file and names the accurate reason", () => {
++  const text = readFileSync(join(REPO_ROOT, "templates/prompts/goldfish-task.md"), "utf8");
++  assert.match(text, /There is exactly one commit route: the message file/u);
++  assert.match(text, /guard-dispatch-budget/u);
++});
+diff --git a/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs b/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs
+index 59c30ff0741486be228113cf8e31be50b09b7038..d48190aebeea3697c1fa4f33b53ff38f459a9ce3 100644
+--- a/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs
++++ b/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs
+@@ -48,7 +48,9 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
+   // K-32: a path with `[ ]` would be a glob for git; --literal-pathspecs stages and commits exactly the named files.
+   const literal = normalized.some((path) => /[[\]]/u.test(path)) ? ["--literal-pathspecs"] : [];
+   const stageArgv = [...literal, "add", "--", ...normalized];
+-  // Ruling 150: the message-file route. guard-push refuses `-m` with a parenthesised `--trailer`, so the
++  // Ruling 150: the message-file route. After the working cap guard-dispatch-budget admits a closing `git commit` only
++  // without a parenthesis, and the Goldfish trailer `Dispatch: <id> (goldfish)` has one (guard-push itself admits a quoted
++  // parenthesised trailer in one plain printable-ASCII commit), so the
+   // producer names the file (the agent writes it with its Write tool) and the commit step reads it with -F.
+   const messagePath = `scratch/commit-msg/${taskId}.txt`;
+   const commitArgv = [...literal, "commit", "-F", messagePath, "--", ...normalized];
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 8a81eaa943347293341c35b24eb08869ac91ff0b..ea7aa55368d81220cc2547a1df5615ab5c9fc125 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -1676,8 +1676,9 @@ function commitMessageFileRemediation(command) {
+   return "Remediation: use separate stage and commit tool calls, naming the same exact paths in both. "
+     + "Run \"git add -- <paths>\" first. For marker-free literal content, use "
+     + "\"git commit -m 'docs: update guidance' -m 'Explain the change' --trailer 'AI-Assisted: true' -- <paths>\". "
+-    + "Keep each -m argument on one line. Parentheses in a scoped subject or required Dispatch role, "
+-    + "and other fail-closed shell markers, remain refused even when quoted. Preserve that exact content "
++    + "Keep each -m argument on one line. A quoted parenthesis in a scoped subject or required Dispatch role "
++    + "is admitted by guard-push only in one plain printable-ASCII git commit on one line, with no backslash and no global option; "
++    + "other fail-closed shell markers remain refused even when quoted. Preserve that exact content "
+     + "and required trailers in a message file, then use \"git commit -F <msgfile> -- <paths>\". "
+     + "Include Dispatch only when the repository requires it; never strip required provenance to fit the file-free form.";
+ }
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 8f10ed0122b213b55bae0473271344cf3309a70c..0dd0a6ce292f69da8e0c9a965866058497b0f268 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -36,12 +36,24 @@ bounds, so read that list instead of guessing.
+ 
+ The two workarounds that cost the most time before they were written down:
+ 
+-- **A provenance-bearing commit.** Write the message (subject, blank line,
+-  body, blank line, then the `AI-Assisted: true` and `Dispatch:` trailers) to a
+-  file under `scratch/commit-msg/`. Stage with `git add -- <paths>` as its own
+-  call, then commit with `git commit -F <msgfile> -- <paths>`. `-m` with
+-  `--trailer` and a parenthesised trailer value such as
+-  `Dispatch: <ID> (goldfish)` is refused by guard-push.
++- **A provenance-bearing commit.** Stage with `git add -- <paths>` as its own
++  call. For your own (non-dispatched) commits, then commit in ONE plain command:
++  `git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <ID>" -- <paths>`.
++  One `-m` per paragraph; the two trailers only as `--trailer` flags, never as `-m`
++  (each `-m` adds a blank line). Two Git facts decide whether it is admitted: a body whose
++  last paragraph is plain prose keeps the blank line before the trailers; a last body
++  paragraph made only of `Key: value` lines is read by Git as a trailer block, the
++  trailers are glued under it with no blank line, and the commit is refused
++  (`GIT-03-TRAILERS-GLUED-TO-BODY`). Keep the body prose, or use the file route.
++  For a long or multi-paragraph body, non-ASCII text, a backslash or a newline inside an
++  argument, write the message (subject, blank line, body, blank line, then the
++  `AI-Assisted: true` and `Dispatch:` trailers) to a file under `scratch/commit-msg/` and
++  commit with `git commit -F <msgfile> -- <paths>`. The guard-push limit is exact, not
++  blanket: it admits a quoted parenthesised trailer value such as
++  `Dispatch: <ID> (goldfish)` in the one-command form only for one plain printable-ASCII
++  `git commit` on one line, with no backslash and no global option (`-c`, `-C`); outside
++  that shape the parenthesis is refused. Git itself has no problem with it. A dispatched
++  Goldfish uses the message-file route its briefing names (§6).
+ - **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.
+   Write the file from Node instead.
+ 
+@@ -250,8 +262,8 @@ gate, and answer an automatic continuation in one line until the human has acted
+ 
+ - Give a native file-read tool an absolute path. A relative path fails in child sessions.
+ - Separate a revision from a path with `--`: `git diff <rev> -- <path>`.
+-- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a
+-  trailer is required.
++- Commit with the one-command form (`-m` paragraphs plus `--trailer` flags, §1) when the
++  body is plain prose; for a long body or the Goldfish route use `git commit -F <file>`.
+ - Never commit the output of a close or another Pipeline writer by hand. Run the command
+   that the tool printed; it owns that commit.
+ - On a run longer than a few minutes, say briefly what is running and what comes next,
+diff --git a/plugins/pipeline-core/templates/prompts/goldfish-task.md b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+index 0ddb003c3b40ff5b64b83fc234e134af7ed0bdb4..312c77669e8523529f566c1c162b1c55543b8ba1 100644
+--- a/plugins/pipeline-core/templates/prompts/goldfish-task.md
++++ b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+@@ -602,7 +602,7 @@ bypass hooks, or publish the v4 record. If it refuses an input, report its
+ typed code and stop; the native host-commit path above remains separate.
+ 
+ **For write tasks: commit BEFORE writing this report** — reference your commit SHA in the sections below; this ordering is what keeps finals from truncating mid-report (evidence: 0 truncated finals since the pattern is in use, vs. 4 incidents at 2–5 min resume cost before). Every goldfish commit message CONTAINS the trailer line `Dispatch: <TASK_ID> (goldfish)` and `AI-Assisted: true` in its final trailer block. `Dispatch:` evidences ONE fact only — WHICH work package the diff belongs to (deterministic work-package/diff-authorship evidence for close step 6b and the Critic). It does NOT evidence who performed the commit act itself — a dispatch that authors a diff but is truncated before committing, and whose orchestrator finishes that last step, produces a `Dispatch:` line textually identical to the ordinary case. `AI-Assisted: true` records anonymous assistance only. Provider/model co-author data, session URLs/IDs, account identifiers, and other private correlation metadata are prohibited. **Commit by explicit pathspec, never by wildcard:** the generated flow stages only the exact paths and commits only those same pathspecs. Staging is necessary for new files; it is redundant but safe for tracked files. NEVER `git add -A` or `git add .` — in a shared working tree a wildcard add lets another parallel goldfish's files ride along on your commit. Do NOT chain the two with `&&`: the closed shell grammar refuses composed commands, so `git add -- <p> && git commit -- <p>` is denied outright (`GUARD-OPERATOR-UNAPPROVED`). This paragraph used to prescribe exactly that chain; it was corrected on 2026-08-28 after the guard refused it in a live dispatch.
+-There is exactly one commit route: the message file. Write the message (subject, blank line, body, blank line, then the two trailers `AI-Assisted: true` and `Dispatch: <TASK_ID> (goldfish)`) to `scratch/commit-msg/<taskId>.txt`, then run `git commit -F scratch/commit-msg/<taskId>.txt -- <paths>` with the exact pathspec after `--`. Never use `-m` with `--trailer`: guard-push refuses it. If you are running inside a git worktree, pass that file as an ABSOLUTE path: a relative one is resolved against the main checkout rather than your cwd and the commit is refused as `GIT-03-UNREADABLE-MESSAGE-FILE` even though your file exists (`backlog/items/2026-08-28-a-relative-commit-message-file-is-unreadable-from-a-worktree.md`; one dispatch lost its entire run to this). **The trailer block is the LAST paragraph of the commit message** — separated from the body by exactly ONE blank line (that blank line is git's REQUIRED separator; do not omit it), with NO blank line between the trailer lines themselves: `Dispatch:` and `AI-Assisted:` (and `Commit-Act:`, when present) sit as consecutive lines. A blank line INSIDE the trailer block (between trailer lines) is what makes git's trailer parser see nothing, silently breaking machine-parseable authorship.
++There is exactly one commit route: the message file. Write the message (subject, blank line, body, blank line, then the two trailers `AI-Assisted: true` and `Dispatch: <TASK_ID> (goldfish)`) to `scratch/commit-msg/<taskId>.txt`, then run `git commit -F scratch/commit-msg/<taskId>.txt -- <paths>` with the exact pathspec after `--`. Do not use `-m` with `--trailer` here: your `Dispatch: <TASK_ID> (goldfish)` trailer holds a parenthesis, and once the working budget is spent `guard-dispatch-budget` admits a closing `git commit` only when the whole command carries no parenthesis, so the one-command form can stop working at the moment you most need it, while the message file works at every point (guard-push and guard-git themselves admit the one-command form before the cap; that form is for non-dispatched commits). If you are running inside a git worktree, pass that file as an ABSOLUTE path: a relative one is resolved against the main checkout rather than your cwd and the commit is refused as `GIT-03-UNREADABLE-MESSAGE-FILE` even though your file exists (`backlog/items/2026-08-28-a-relative-commit-message-file-is-unreadable-from-a-worktree.md`; one dispatch lost its entire run to this). **The trailer block is the LAST paragraph of the commit message** — separated from the body by exactly ONE blank line (that blank line is git's REQUIRED separator; do not omit it), with NO blank line between the trailer lines themselves: `Dispatch:` and `AI-Assisted:` (and `Commit-Act:`, when present) sit as consecutive lines. A blank line INSIDE the trailer block (between trailer lines) is what makes git's trailer parser see nothing, silently breaking machine-parseable authorship.
+ 
+ **`Commit-Act:` trailer (conditional, third line — backlog item `2026-08-08-the-commit-trailer-cannot-say-who-performed-the-commit-act.md`):** add a third trailer line `Commit-Act: orchestrator` ONLY when the orchestrating (Elephant) session performed the commit act itself instead of the dispatched Goldfish — e.g. finishing a truncated dispatch's last step per `roles/elephant.md` EL-13a. Absent by default: the ordinary case (Goldfish authors the diff AND runs the commit) carries no `Commit-Act:` line and is unchanged. Where `Dispatch:` evidences diff authorship (which work package the change belongs to), `Commit-Act:` evidences a DIFFERENT fact — who actually ran `git commit` — and the two are independent: a commit can carry a correct `Dispatch:` line and still need `Commit-Act: orchestrator` alongside it. When present, `Commit-Act:` is a normal trailer line inside the same block, no blank line before or after it relative to the other trailer lines.
+ 
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 8f10ed0122b213b55bae0473271344cf3309a70c..0dd0a6ce292f69da8e0c9a965866058497b0f268 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -36,12 +36,24 @@ bounds, so read that list instead of guessing.
+ 
+ The two workarounds that cost the most time before they were written down:
+ 
+-- **A provenance-bearing commit.** Write the message (subject, blank line,
+-  body, blank line, then the `AI-Assisted: true` and `Dispatch:` trailers) to a
+-  file under `scratch/commit-msg/`. Stage with `git add -- <paths>` as its own
+-  call, then commit with `git commit -F <msgfile> -- <paths>`. `-m` with
+-  `--trailer` and a parenthesised trailer value such as
+-  `Dispatch: <ID> (goldfish)` is refused by guard-push.
++- **A provenance-bearing commit.** Stage with `git add -- <paths>` as its own
++  call. For your own (non-dispatched) commits, then commit in ONE plain command:
++  `git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <ID>" -- <paths>`.
++  One `-m` per paragraph; the two trailers only as `--trailer` flags, never as `-m`
++  (each `-m` adds a blank line). Two Git facts decide whether it is admitted: a body whose
++  last paragraph is plain prose keeps the blank line before the trailers; a last body
++  paragraph made only of `Key: value` lines is read by Git as a trailer block, the
++  trailers are glued under it with no blank line, and the commit is refused
++  (`GIT-03-TRAILERS-GLUED-TO-BODY`). Keep the body prose, or use the file route.
++  For a long or multi-paragraph body, non-ASCII text, a backslash or a newline inside an
++  argument, write the message (subject, blank line, body, blank line, then the
++  `AI-Assisted: true` and `Dispatch:` trailers) to a file under `scratch/commit-msg/` and
++  commit with `git commit -F <msgfile> -- <paths>`. The guard-push limit is exact, not
++  blanket: it admits a quoted parenthesised trailer value such as
++  `Dispatch: <ID> (goldfish)` in the one-command form only for one plain printable-ASCII
++  `git commit` on one line, with no backslash and no global option (`-c`, `-C`); outside
++  that shape the parenthesis is refused. Git itself has no problem with it. A dispatched
++  Goldfish uses the message-file route its briefing names (§6).
+ - **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.
+   Write the file from Node instead.
+ 
+@@ -250,8 +262,8 @@ gate, and answer an automatic continuation in one line until the human has acted
+ 
+ - Give a native file-read tool an absolute path. A relative path fails in child sessions.
+ - Separate a revision from a path with `--`: `git diff <rev> -- <path>`.
+-- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a
+-  trailer is required.
++- Commit with the one-command form (`-m` paragraphs plus `--trailer` flags, §1) when the
++  body is plain prose; for a long body or the Goldfish route use `git commit -F <file>`.
+ - Never commit the output of a close or another Pipeline writer by hand. Run the command
+   that the tool printed; it owns that commit.
+ - On a run longer than a few minutes, say briefly what is running and what comes next,
+diff --git a/templates/prompts/goldfish-task.md b/templates/prompts/goldfish-task.md
+index 0ddb003c3b40ff5b64b83fc234e134af7ed0bdb4..312c77669e8523529f566c1c162b1c55543b8ba1 100644
+--- a/templates/prompts/goldfish-task.md
++++ b/templates/prompts/goldfish-task.md
+@@ -602,7 +602,7 @@ bypass hooks, or publish the v4 record. If it refuses an input, report its
+ typed code and stop; the native host-commit path above remains separate.
+ 
+ **For write tasks: commit BEFORE writing this report** — reference your commit SHA in the sections below; this ordering is what keeps finals from truncating mid-report (evidence: 0 truncated finals since the pattern is in use, vs. 4 incidents at 2–5 min resume cost before). Every goldfish commit message CONTAINS the trailer line `Dispatch: <TASK_ID> (goldfish)` and `AI-Assisted: true` in its final trailer block. `Dispatch:` evidences ONE fact only — WHICH work package the diff belongs to (deterministic work-package/diff-authorship evidence for close step 6b and the Critic). It does NOT evidence who performed the commit act itself — a dispatch that authors a diff but is truncated before committing, and whose orchestrator finishes that last step, produces a `Dispatch:` line textually identical to the ordinary case. `AI-Assisted: true` records anonymous assistance only. Provider/model co-author data, session URLs/IDs, account identifiers, and other private correlation metadata are prohibited. **Commit by explicit pathspec, never by wildcard:** the generated flow stages only the exact paths and commits only those same pathspecs. Staging is necessary for new files; it is redundant but safe for tracked files. NEVER `git add -A` or `git add .` — in a shared working tree a wildcard add lets another parallel goldfish's files ride along on your commit. Do NOT chain the two with `&&`: the closed shell grammar refuses composed commands, so `git add -- <p> && git commit -- <p>` is denied outright (`GUARD-OPERATOR-UNAPPROVED`). This paragraph used to prescribe exactly that chain; it was corrected on 2026-08-28 after the guard refused it in a live dispatch.
+-There is exactly one commit route: the message file. Write the message (subject, blank line, body, blank line, then the two trailers `AI-Assisted: true` and `Dispatch: <TASK_ID> (goldfish)`) to `scratch/commit-msg/<taskId>.txt`, then run `git commit -F scratch/commit-msg/<taskId>.txt -- <paths>` with the exact pathspec after `--`. Never use `-m` with `--trailer`: guard-push refuses it. If you are running inside a git worktree, pass that file as an ABSOLUTE path: a relative one is resolved against the main checkout rather than your cwd and the commit is refused as `GIT-03-UNREADABLE-MESSAGE-FILE` even though your file exists (`backlog/items/2026-08-28-a-relative-commit-message-file-is-unreadable-from-a-worktree.md`; one dispatch lost its entire run to this). **The trailer block is the LAST paragraph of the commit message** — separated from the body by exactly ONE blank line (that blank line is git's REQUIRED separator; do not omit it), with NO blank line between the trailer lines themselves: `Dispatch:` and `AI-Assisted:` (and `Commit-Act:`, when present) sit as consecutive lines. A blank line INSIDE the trailer block (between trailer lines) is what makes git's trailer parser see nothing, silently breaking machine-parseable authorship.
++There is exactly one commit route: the message file. Write the message (subject, blank line, body, blank line, then the two trailers `AI-Assisted: true` and `Dispatch: <TASK_ID> (goldfish)`) to `scratch/commit-msg/<taskId>.txt`, then run `git commit -F scratch/commit-msg/<taskId>.txt -- <paths>` with the exact pathspec after `--`. Do not use `-m` with `--trailer` here: your `Dispatch: <TASK_ID> (goldfish)` trailer holds a parenthesis, and once the working budget is spent `guard-dispatch-budget` admits a closing `git commit` only when the whole command carries no parenthesis, so the one-command form can stop working at the moment you most need it, while the message file works at every point (guard-push and guard-git themselves admit the one-command form before the cap; that form is for non-dispatched commits). If you are running inside a git worktree, pass that file as an ABSOLUTE path: a relative one is resolved against the main checkout rather than your cwd and the commit is refused as `GIT-03-UNREADABLE-MESSAGE-FILE` even though your file exists (`backlog/items/2026-08-28-a-relative-commit-message-file-is-unreadable-from-a-worktree.md`; one dispatch lost its entire run to this). **The trailer block is the LAST paragraph of the commit message** — separated from the body by exactly ONE blank line (that blank line is git's REQUIRED separator; do not omit it), with NO blank line between the trailer lines themselves: `Dispatch:` and `AI-Assisted:` (and `Commit-Act:`, when present) sit as consecutive lines. A blank line INSIDE the trailer block (between trailer lines) is what makes git's trailer parser see nothing, silently breaking machine-parseable authorship.
+ 
+ **`Commit-Act:` trailer (conditional, third line — backlog item `2026-08-08-the-commit-trailer-cannot-say-who-performed-the-commit-act.md`):** add a third trailer line `Commit-Act: orchestrator` ONLY when the orchestrating (Elephant) session performed the commit act itself instead of the dispatched Goldfish — e.g. finishing a truncated dispatch's last step per `roles/elephant.md` EL-13a. Absent by default: the ordinary case (Goldfish authors the diff AND runs the commit) carries no `Commit-Act:` line and is unchanged. Where `Dispatch:` evidences diff authorship (which work package the change belongs to), `Commit-Act:` evidences a DIFFERENT fact — who actually ran `git commit` — and the two are independent: a commit can carry a correct `Dispatch:` line and still need `Commit-Act: orchestrator` alongside it. When present, `Commit-Act:` is a normal trailer line inside the same block, no blank line before or after it relative to the other trailer lines.
+ 

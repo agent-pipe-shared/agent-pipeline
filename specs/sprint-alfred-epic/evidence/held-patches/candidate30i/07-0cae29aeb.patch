@@ -1,0 +1,392 @@
+diff --git a/guardrails/git.md b/guardrails/git.md
+index cf2cc4cbc44023d0a3f955e6ecf8b4bccf44e18d..37bc9dbaa447be82817fb40b4a8ae7e5694dbee6 100644
+--- a/guardrails/git.md
++++ b/guardrails/git.md
+@@ -44,6 +44,7 @@ Rule IDs: `GIT-xx`.
+ 
+ - **MUST NOT** put provider- or model-specific co-author trailers, session URLs or IDs, account identifiers, or any other private correlation data into commit metadata. The anonymous marker is the complete AI-assistance signal; `Dispatch:` may identify a grounded work package but must not encode a provider, account, or session.
+ - **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
++- **Commit route (C30-19):** an agent commits with its provenance trailers in one plain command: `git commit -m <subject> [-m <body paragraph>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"` (one `-m` per paragraph; the two trailers only as `--trailer` flags, never as `-m`, because each `-m` adds a blank line; a parenthesised value such as `Dispatch: <id> (goldfish)` is admitted by guard-push when it sits inside quotes and the whole command is one plain `git commit` of printable ASCII on one line, with no backslash and no global option; a body with non-ASCII text, a backslash or a newline in an argument takes the file route instead). The guard reconstructs the message exactly as Git writes it for that command. Git appends `--trailer` entries to the last body paragraph without a blank line when that paragraph is itself a trailer block (every line `Key: value`, or a `Signed-off-by:` line among them), which would make body lines part of the provenance block: the guard refuses that shape as `GIT-03-TRAILERS-GLUED-TO-BODY`; end the body with a plain prose line or drop the body. For a long or multi-paragraph body the message file route (`git commit -F scratch/<message-file>`) stays the fallback. Neither route changes the rule above.
+ - **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples both entries via structural trailer parsing (not a line-anchored text search). The Git guard applies the same final-block rule before an agent-issued commit by default. The onboarding-installed `commit-msg` backstop inspects the finished message, including editor and spawned-process commits: correlation data always blocks, and the presence of either `AI-Assisted:` or `Dispatch:` requires one complete, grounded pair in the final block. Git supplies no reliable agent-vs-human authorship bit, so a message with neither provenance signal remains allowed at that boundary; the direct agent command guard supplies the default requirement there. Project `commitTrailerPolicy: warn` is only for a dated migration; `off` is an explicit opt-out from the two provenance conventions and never disables the unconditional correlation-data refusal. A wrapped continuation or blank line inside the block makes the structural check fail instead of accepting body prose as provenance; the `/close` ritual checks the current block for prohibited correlation metadata.
+ 
+ 
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 3dddcf2630749e1567a348cc69cb03caace6ae35..68198e39072d1fef62c334f360f0e46ec66630c8 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -2234,7 +2234,13 @@
+           "CMP040",
+           "CMP041",
+           "CMP042",
+-          "CMP043"
++          "CMP043",
++          "CMP044",
++          "CMP045",
++          "CMP046",
++          "CMP047",
++          "CMP048",
++          "CMP049"
+         ],
+         "maxBytes": 65536
+       },
+diff --git a/plugins/pipeline-core/guardrails/git.md b/plugins/pipeline-core/guardrails/git.md
+index cf2cc4cbc44023d0a3f955e6ecf8b4bccf44e18d..37bc9dbaa447be82817fb40b4a8ae7e5694dbee6 100644
+--- a/plugins/pipeline-core/guardrails/git.md
++++ b/plugins/pipeline-core/guardrails/git.md
+@@ -44,6 +44,7 @@ Rule IDs: `GIT-xx`.
+ 
+ - **MUST NOT** put provider- or model-specific co-author trailers, session URLs or IDs, account identifiers, or any other private correlation data into commit metadata. The anonymous marker is the complete AI-assistance signal; `Dispatch:` may identify a grounded work package but must not encode a provider, account, or session.
+ - **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
++- **Commit route (C30-19):** an agent commits with its provenance trailers in one plain command: `git commit -m <subject> [-m <body paragraph>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"` (one `-m` per paragraph; the two trailers only as `--trailer` flags, never as `-m`, because each `-m` adds a blank line; a parenthesised value such as `Dispatch: <id> (goldfish)` is admitted by guard-push when it sits inside quotes and the whole command is one plain `git commit` of printable ASCII on one line, with no backslash and no global option; a body with non-ASCII text, a backslash or a newline in an argument takes the file route instead). The guard reconstructs the message exactly as Git writes it for that command. Git appends `--trailer` entries to the last body paragraph without a blank line when that paragraph is itself a trailer block (every line `Key: value`, or a `Signed-off-by:` line among them), which would make body lines part of the provenance block: the guard refuses that shape as `GIT-03-TRAILERS-GLUED-TO-BODY`; end the body with a plain prose line or drop the body. For a long or multi-paragraph body the message file route (`git commit -F scratch/<message-file>`) stays the fallback. Neither route changes the rule above.
+ - **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples both entries via structural trailer parsing (not a line-anchored text search). The Git guard applies the same final-block rule before an agent-issued commit by default. The onboarding-installed `commit-msg` backstop inspects the finished message, including editor and spawned-process commits: correlation data always blocks, and the presence of either `AI-Assisted:` or `Dispatch:` requires one complete, grounded pair in the final block. Git supplies no reliable agent-vs-human authorship bit, so a message with neither provenance signal remains allowed at that boundary; the direct agent command guard supplies the default requirement there. Project `commitTrailerPolicy: warn` is only for a dated migration; `off` is an explicit opt-out from the two provenance conventions and never disables the unconditional correlation-data refusal. A wrapped continuation or blank line inside the block makes the structural check fail instead of accepting body prose as provenance; the `/close` ritual checks the current block for prohibited correlation metadata.
+ 
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index c737c39f7ca9ab837c5f681e02d7003c5fb65359..72afa76af8cabac57c317e95229a7c07a976b86e 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -271,7 +271,7 @@ import { spawnSync } from "node:child_process";
+ import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+-import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings } from "../lib/commit-message-policy.mjs";
++import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings, ONE_COMMAND_TRAILER_FORM } from "../lib/commit-message-policy.mjs";
+ import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
+ import { commitCommandPaths, runningGoldfishCommitNotice } from "../lib/running-goldfish-scope.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+@@ -1130,6 +1130,8 @@ let inspection;
+     "GIT-03-DISPATCH-MISSING",
+     "GIT-03-DISPATCH-AMBIGUOUS",
+     "GIT-03-DISPATCH-MALFORMED",
++    // C30-19: a glued trailer block is a structure fault of the provenance convention, so it follows the same warn/off modes.
++    "GIT-03-TRAILERS-GLUED-TO-BODY",
+   ]);
+   const blocking = inspection.findings.filter((finding) => !conventionCodes.has(finding.code) || markerMode === "blocking");
+   const warningOnly = inspection.findings.filter((finding) => conventionCodes.has(finding.code) && markerMode === "warn");
+@@ -1143,8 +1145,9 @@ let inspection;
+       // Candidate 19 (D7, AGY and Codex greenfield): repeated refusals because the text named the rule but not the accepted form.
+       ...(blocking.some((f) => conventionCodes.has(f.code))
+         ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own.",
++          // C30-19: the one plain command comes first (`--trailer` flags, which Git keeps in one final block); the message file is the fallback.
+           // G20-21 (AGY greenfield): several `-m` flags each start a new paragraph, so the two trailers were split by a blank line and refused again.
+-          "Write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`; do not split the trailers across several `-m` flags (each `-m` adds a blank line)."]
++          `Commit in one plain command: \`${ONE_COMMAND_TRAILER_FORM}\` - one \`-m\` per paragraph, the two trailers only as \`--trailer\` flags, never as \`-m\` (each \`-m\` adds a blank line). For a long or multi-paragraph body, or one with non-ASCII text, a backslash or a newline inside an argument (guard-push refuses a parenthesised \`Dispatch: <id> (goldfish)\` in such a command), write the whole message to a file under scratch/ and commit with \`git commit -F scratch/<message-file>\`.`]
+         : []),
+       "If the runner or host told you to add such lines (a commit-attribution reminder), the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md, commit messages).",
+     ]);
+diff --git a/plugins/pipeline-core/hooks/guard-git.test.mjs b/plugins/pipeline-core/hooks/guard-git.test.mjs
+index 653436b403aa35fba622e9274e109de4030448e5..1bc51453985ea22d3c8d30ec90846767f0930b47 100644
+--- a/plugins/pipeline-core/hooks/guard-git.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.test.mjs
+@@ -859,6 +859,27 @@ check("GIT03-10 block  body lines cannot pose as the final provenance block",
+     projectDir: GIT03_BLOCKING_DIR,
+     stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
+   });
++// C30-19: a commit with its provenance trailers is one plain command (-m paragraphs plus --trailer flags). The guard judges the bytes
++// real Git writes; a body whose last paragraph Git reads as a trailer block gets the trailers glued on, so it is refused with the repair.
++check("GIT03-17 allow  one command: -m subject, -m prose body, two --trailer flags (with a parenthesised Dispatch value)",
++  'git commit -m "feat(x): a thing" -m "Plain prose body." --trailer "AI-Assisted: true" --trailer "Dispatch: NVA-GIT03 (goldfish)"', ALLOW, {
++    projectDir: NO_CONFIG_DIR,
++  });
++check("GIT03-18 block  one command whose body ends in a Key: value paragraph glues the trailers to it",
++  'git commit -m "feat(x): a thing" -m "Why: it matters" --trailer "AI-Assisted: true" --trailer "Dispatch: NVA-GIT03 (goldfish)"', BLOCK, {
++    projectDir: NO_CONFIG_DIR,
++    stderrIncludes: ["GIT-03-TRAILERS-GLUED-TO-BODY", "Accepted form:", 'git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"', "plain prose", "git commit -F scratch/<message-file>"],
++  });
++check("GIT03-19 block  a missing Dispatch refusal names the one-command form before the message-file fallback",
++  'git commit -m "feat(x): a thing" --trailer "AI-Assisted: true"', BLOCK, {
++    projectDir: NO_CONFIG_DIR,
++    stderrIncludes: ["GIT-03-DISPATCH-MISSING", 'git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"', "git commit -F scratch/<message-file>", "long or multi-paragraph body"],
++  });
++check("GIT03-20 block  duplicated provenance entries and a provider co-author trailer stay refused in the one-command form",
++  'git commit -m "feat(x): a thing" --trailer "AI-Assisted: true" --trailer "AI-Assisted: true" --trailer "Dispatch: stage-0 (elephant)" --trailer "Co-Authored-By: Claude <noreply@anthropic.com>"', BLOCK, {
++    projectDir: NO_CONFIG_DIR,
++    stderrIncludes: ["GIT-03-MARKER-AMBIGUOUS", "GIT-03-PROVIDER-COAUTHOR"],
++  });
+ // C23 (Antigravity greenfield F24): the hook process runs in the project root; the command runs in the child's own worktree, named by tool_input.cwd.
+ const GIT03_CHILD_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-child-"));
+ writeFileSync(join(GIT03_CHILD_DIR, "child-only.txt"),
+@@ -900,6 +921,18 @@ check("GIT03-11 warn  provenance conventions stay non-blocking in warn mode",
+     projectDir: GIT03_WARN_DIR,
+     stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "commitTrailerPolicy is \"warn\""],
+   });
++// C30-19: the glued-trailer refusal follows the project's mode like the other provenance conventions: a warning in `warn`, silent in `off`.
++const GIT03_GLUED_COMMAND = 'git commit -m "feat(x): a thing" -m "Fixes: #1" --trailer "Signed-off-by: A <a@example.invalid>"';
++check("GIT03-21 warn  a glued trailer block is only a warning in warn mode",
++  GIT03_GLUED_COMMAND, WARN, {
++    projectDir: GIT03_WARN_DIR,
++    stderrIncludes: ["GIT-03-TRAILERS-GLUED-TO-BODY", "commitTrailerPolicy is \"warn\""],
++  });
++const GIT03_OFF_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-off-"));
++mkdirSync(join(GIT03_OFF_DIR, ".claude"), { recursive: true });
++writeFileSync(join(GIT03_OFF_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
++check("GIT03-22 allow  a glued trailer block is not judged when the project opted out of the provenance conventions",
++  GIT03_GLUED_COMMAND, ALLOW, { projectDir: GIT03_OFF_DIR });
+ 
+ // ---- GIT-01: commit subject must start with an admitted Conventional Commit type ----------
+ //
+diff --git a/plugins/pipeline-core/lib/commit-message-policy.mjs b/plugins/pipeline-core/lib/commit-message-policy.mjs
+index 233c580532639a1345f9a430b9437dcef0c2c40f..475bcd27ca8c834aedcc842b280a6011a9bcf5c1 100644
+--- a/plugins/pipeline-core/lib/commit-message-policy.mjs
++++ b/plugins/pipeline-core/lib/commit-message-policy.mjs
+@@ -120,6 +120,70 @@ export function parseCommitTrailerBlock(message) {
+   return entries;
+ }
+ 
++/** The one-command spelling every GIT-03 refusal teaches first; the message file (`git commit -F`) is the fallback for a long body. */
++export const ONE_COMMAND_TRAILER_FORM = 'git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"';
++const MESSAGE_FILE_FORM = "git commit -F scratch/<message-file>";
++
++// Git (trailer.c, find_trailer_block_start) appends `--trailer` entries to the LAST paragraph, without a blank line, when that paragraph
++// is itself a trailer block: every line is `Token: value` (token of letters, digits and `-`, optional blanks before the colon) or a
++// continuation, or at least a quarter of them are trailers and one carries a Git-generated prefix. The first paragraph is the title and
++// is never a trailer block. Only the built-in prefixes are modelled: a `trailer.*` key in the user's own Git config can recognise more,
++// which the unchanged `commit-msg` backstop still judges on the finished bytes.
++const GIT_GENERATED_TRAILER_PREFIXES = Object.freeze(["Signed-off-by: ", "(cherry picked from commit "]);
++
++function gitTrailerSeparatorIndex(line) {
++  let blankSeen = false;
++  for (let index = 0; index < line.length; index += 1) {
++    const char = line[index];
++    if (char === ":") return index;
++    if (!blankSeen && /[A-Za-z0-9-]/u.test(char)) continue;
++    if (index > 0 && (char === " " || char === "\t")) { blankSeen = true; continue; }
++    break;
++  }
++  return -1;
++}
++
++/** Would `git commit --trailer ...` glue its entries to the last paragraph of this (already cleaned) message? */
++export function gitReadsLastParagraphAsTrailerBlock(message) {
++  const lines = String(message ?? "").split("\n");
++  const titleEnd = lines.findIndex((line) => line.trim() === "");
++  if (titleEnd < 0) return false;
++  let trailerLines = 0;
++  let nonTrailerLines = 0;
++  let possibleContinuations = 0;
++  let recognizedPrefix = false;
++  let onlyBlanks = true;
++  for (let index = lines.length - 1; index >= titleEnd; index -= 1) {
++    const line = lines[index];
++    if (line.startsWith("#")) { nonTrailerLines += possibleContinuations; possibleContinuations = 0; continue; }
++    if (line.trim() === "") {
++      if (onlyBlanks) continue;
++      nonTrailerLines += possibleContinuations;
++      return (recognizedPrefix && trailerLines * 3 >= nonTrailerLines) || (trailerLines > 0 && nonTrailerLines === 0);
++    }
++    onlyBlanks = false;
++    if (GIT_GENERATED_TRAILER_PREFIXES.some((prefix) => line.startsWith(prefix))) {
++      trailerLines += 1; possibleContinuations = 0; recognizedPrefix = true; continue;
++    }
++    if (gitTrailerSeparatorIndex(line) >= 1 && !/\s/u.test(line[0])) { trailerLines += 1; possibleContinuations = 0; }
++    else if (/\s/u.test(line[0])) possibleContinuations += 1;
++    else { nonTrailerLines += 1 + possibleContinuations; possibleContinuations = 0; }
++  }
++  return false;
++}
++
++/** Git's `whitespace` cleanup, which `-m` and `-F` use: trailing blanks off each line, blank runs collapsed, outer blank lines dropped (an empty `-m ''` adds nothing). */
++function gitWhitespaceCleanup(text) {
++  const out = [];
++  for (const raw of text.replace(/\r\n/gu, "\n").split("\n")) {
++    const line = raw.replace(/[ \t]+$/u, "");
++    if (line === "" && (out.length === 0 || out.at(-1) === "")) continue;
++    out.push(line);
++  }
++  while (out.at(-1) === "") out.pop();
++  return out.join("\n");
++}
++
+ const INTEGRATION_DISPATCH = /^quality-package-([a-f0-9]{64}) \(integration\)$/u;
+ const messageDigest = (message) => createHash("sha256").update(String(message ?? "").replace(/\r\n/gu, "\n"), "utf8").digest("hex");
+ 
+@@ -184,8 +248,8 @@ export function finishedCommitMessageFindings(message, {
+       findings.push({
+         code: "GIT-03-DISPATCH-MISSING",
+         detail: splitAway
+-          ? "no `Dispatch:` entry in the final Git trailer block: a `Dispatch:` line is in the message but a blank line separates it from the last block (each `-m` flag starts a new paragraph); write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`, both trailers as the last lines with no blank line between them"
+-          : "no `Dispatch:` entry in the final Git trailer block; end the message with `AI-Assisted: true` and one `Dispatch:` line (`Dispatch: <task-id> (goldfish)` or `Dispatch: stage-0 (elephant)`) as the last lines, written with `git commit -F scratch/<message-file>`",
++          ? `no \`Dispatch:\` entry in the final Git trailer block: a \`Dispatch:\` line is in the message but a blank line separates it from the last block (each \`-m\` flag starts a new paragraph); commit with \`${ONE_COMMAND_TRAILER_FORM}\` (one \`-m\` per paragraph, the two trailers only as \`--trailer\` flags), or, for a long or multi-paragraph body, write the whole message to a file under scratch/ and commit with \`${MESSAGE_FILE_FORM}\`, both trailers as the last lines with no blank line between them`
++          : `no \`Dispatch:\` entry in the final Git trailer block; end the message with \`AI-Assisted: true\` and one \`Dispatch:\` line (\`Dispatch: <task-id> (goldfish)\` or \`Dispatch: stage-0 (elephant)\`) as the last lines, written with \`${ONE_COMMAND_TRAILER_FORM}\` (or, for a long or multi-paragraph body, \`${MESSAGE_FILE_FORM}\`)`,
+       });
+     } else if (dispatches.length > 1) {
+       findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
+@@ -396,8 +460,24 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
+   // final trailer block.  Reconstruct precisely that shape so the pre-tool
+   // inspection agrees with Git's finished commit and an agent need not pipe a
+   // hand-built multi-line message through the shell just to satisfy GIT-03.
+-  const message = `${parts.join("\n\n")}${trailers.length > 0 ? `${parts.length > 0 ? "\n\n" : ""}${trailers.join("\n")}` : ""}`;
++  // C30-19: the entries follow the cleaned message after a blank line, unless Git reads the last paragraph as a trailer block: then it
++  // appends to that paragraph with no blank line (the bytes below are what Git writes, and that shape is refused further down).
++  // A trailing run of blank and `#` lines is Git's comment footer: the entries go in front of it, not after it.
++  const cleaned = trailers.length > 0 ? gitWhitespaceCleanup(parts.join("\n\n")) : parts.join("\n\n");
++  const cleanedLines = cleaned.split("\n");
++  let bodyEnd = cleanedLines.length;
++  while (trailers.length > 0 && bodyEnd > 0 && (cleanedLines[bodyEnd - 1] === "" || cleanedLines[bodyEnd - 1].startsWith("#"))) bodyEnd -= 1;
++  const body = trailers.length > 0 ? cleanedLines.slice(0, bodyEnd).join("\n") : cleaned;
++  const footer = trailers.length > 0 && cleanedLines.slice(bodyEnd).some((line) => line.startsWith("#")) ? `\n${cleanedLines.slice(bodyEnd).join("\n")}` : "";
++  const glued = trailers.length > 0 && body !== "" && gitReadsLastParagraphAsTrailerBlock(body);
++  const message = `${body}${trailers.length > 0 ? `${body !== "" ? (glued ? "\n" : "\n\n") : ""}${trailers.join("\n")}${footer}` : ""}`;
+   const findings = finishedCommitMessageFindings(message, { requireMarker, requireDispatch }).findings;
++  if (glued) {
++    findings.push({
++      code: "GIT-03-TRAILERS-GLUED-TO-BODY",
++      detail: `\`--trailer\` entries that Git would glue directly under the body: it reads the last body paragraph as a trailer block (every line looks like \`Key: value\`, or a \`Signed-off-by:\` line is among them), appends the entries with no blank line, and the body lines join the provenance block; end the body with a line of plain prose (not \`Key: value\`) or drop the body, and commit with \`${ONE_COMMAND_TRAILER_FORM}\`, or, for a long or multi-paragraph body, write the whole message to a file under scratch/ and commit with \`${MESSAGE_FILE_FORM}\``,
++    });
++  }
+ 
+   for (const { path, reason } of unreadable) {
+     findings.push({
+diff --git a/plugins/pipeline-core/lib/commit-message-policy.test.mjs b/plugins/pipeline-core/lib/commit-message-policy.test.mjs
+index 840f10730ab0931b5b0c07efb59206ff29893198..56053154ace6d3b4ec2a060cd393f9655f086070 100644
+--- a/plugins/pipeline-core/lib/commit-message-policy.test.mjs
++++ b/plugins/pipeline-core/lib/commit-message-policy.test.mjs
+@@ -22,6 +22,10 @@ import {
+   parseIntegrationTrailerBlock,
+ } from "./commit-message-policy.mjs";
+ import { createHash } from "node:crypto";
++import { spawnSync } from "node:child_process";
++import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
+ 
+ let checks = 0;
+ const check = (label, fn) => { cases.push({ id: `CMP${String(cases.length + 1).padStart(3, "0")}`, name: label, run: async () => { await fn(); checks += 1; process.stdout.write(`ok ${label}\n`); } }); };
+@@ -385,6 +389,116 @@ check("CMP19 every trailer example in the conventional-commit skill is accepted
+   assert.match(skill, /must NOT be added/u);
+ });
+ 
++// C30-19 (one plain command with its provenance trailers): the guard must judge the bytes REAL Git writes. These cases run
++// real `git commit` in a throwaway repository with an injected hook-free config and compare. Git appends `--trailer` entries to
++// the LAST paragraph when that paragraph is itself a trailer block (all lines `Token: value`, or a recognised prefix such as
++// `Signed-off-by:` on at least a quarter of the lines); only otherwise does it insert a blank line first.
++const POSIX_QUOTE = (value) => `'${String(value).replace(/'/gu, `'\\''`)}'`;
++const PROVENANCE_ARGS = ["--trailer", "AI-Assisted: true", "--trailer", "Dispatch: C30I-S4 (goldfish)"];
++const oneCommandArgs = (subject, bodies = []) => ["-m", subject, ...bodies.flatMap((body) => ["-m", body]), ...PROVENANCE_ARGS];
++const oneCommandText = (args) => `git commit ${args.map(POSIX_QUOTE).join(" ")}`;
++const STRICT = { requireMarker: true, requireDispatch: true };
++function realGitMessage(args) {
++  const dir = mkdtempSync(join(tmpdir(), "cmp-real-git-"));
++  try {
++    const env = {
++      PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, HOME: dir, USERPROFILE: dir,
++      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: join(dir, "gitconfig"), GIT_TERMINAL_PROMPT: "0",
++    };
++    writeFileSync(join(dir, "gitconfig"), "");
++    const git = (gitArgs) => {
++      const result = spawnSync("git", gitArgs, { cwd: dir, env, encoding: "utf8", shell: false });
++      assert.equal(result.status, 0, `git ${gitArgs[0]}: ${result.stderr}`);
++      return result.stdout;
++    };
++    git(["init", "-q"]);
++    git(["-c", "user.name=probe", "-c", "user.email=probe@example.invalid", "-c", `core.hooksPath=${join(dir, "no-hooks")}`,
++      "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", ...args]);
++    const raw = git(["cat-file", "commit", "HEAD"]);
++    return raw.slice(raw.indexOf("\n\n") + 2);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++}
++
++check("CMP044 the accepted one-command spelling is admitted and the guard's message equals the bytes real Git writes", () => {
++  const prose = [
++    [], ["Explains why."], ["Explains why.", ""], ["para one.", "para two."], ["Why: x\nbecause plain prose."],
++    ["- bullet: x"], ["my_key: x"], ["see https://x.invalid now"], ["Why: x\n  continued\nthen prose."],
++  ];
++  for (const bodies of prose) {
++    const args = oneCommandArgs("feat(x): do a thing", bodies);
++    const result = run(oneCommandText(args), STRICT);
++    assert.deepEqual(codes(result), [], JSON.stringify(bodies));
++    const real = realGitMessage(args);
++    assert.equal(`${result.message}\n`, real, JSON.stringify(bodies));
++    assert.match(real, /\n\nAI-Assisted: true\nDispatch: C30I-S4 \(goldfish\)\n$/u, "real Git keeps the blank separator");
++    assert.deepEqual(parseCommitTrailerBlock(result.message), [
++      { key: "AI-Assisted", value: "true" }, { key: "Dispatch", value: "C30I-S4 (goldfish)" },
++    ], JSON.stringify(bodies));
++  }
++});
++
++check("CMP045 a body whose last paragraph Git reads as a trailer block is refused with the typed repair, on Git's real bytes", () => {
++  // Git also rewrites some glued lines (`Note : x` -> `Note: x`, `https://x` -> `https: //x`): those are refused, their bytes need not match.
++  const rewritten = [["https://x.invalid"], ["Note : x"], ["Why:x"]];
++  const glued = [
++    ["Why: x"], ["Note: a\nNote2: b"], ["Why: x\n  continued"], ["Why:"], ["Why: x\n# remark"],
++    ["Signed-off-by: A <a@example.invalid>\nprose one\nprose two"], ...rewritten,
++  ];
++  for (const bodies of glued) {
++    const args = oneCommandArgs("feat(x): do a thing", bodies);
++    const result = run(oneCommandText(args), STRICT);
++    const real = realGitMessage(args);
++    assert.doesNotMatch(real, /\n\nAI-Assisted: true\n/u, `real Git glues the trailers to the body for ${JSON.stringify(bodies)}`);
++    if (!rewritten.includes(bodies)) assert.equal(`${result.message}\n`, real, JSON.stringify(bodies));
++    const finding = result.findings.find((entry) => entry.code === "GIT-03-TRAILERS-GLUED-TO-BODY");
++    assert.ok(finding, JSON.stringify(bodies));
++    assert.match(finding.detail, /git commit -m <subject> \[-m <body>\] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"/u);
++    assert.match(finding.detail, /plain prose/u);
++    assert.match(finding.detail, /git commit -F scratch\/<message-file>/u);
++  }
++});
++
++check("CMP046 the guard's glue verdict agrees with real Git for each shape of last body paragraph", () => {
++  const shapes = [
++    "plain prose.", "Why: x\nplain prose.", "Why: x\nWhat: y", "intro\n  indented: x", "# remark", "Why: x\n# remark", "# remark\nWhy: x",
++    "prose.\n# remark", "# remark\nprose.", "# a\n\n# b", "para\n\n# tail comment", "Reviewed-by: A\nprose", "Signed-off-by: A\nx\nx\nx", "Signed-off-by: A\nx\nx\nx\nx", "(cherry picked from commit abc)\nprose\nprose",
++    ": x", "a b: c", "key_with_underscore: x", "-x: y", "Why: x\n\nplain closing paragraph.",
++    // The two real bodies of the 2026-11-17 commits that exposed the defect: the first starts `C30-19:` (a valid token, so Git glued
++    // the trailers on), the second starts with a sentence that merely contains a colon (blank line kept).
++    "C30-19: the guard already admits the one-command commit with --trailer; the refusal text still teaches the message file.",
++    "Found on the first real commit with the form: Git appended the trailers directly under the body paragraph.",
++  ];
++  for (const shape of shapes) {
++    const args = oneCommandArgs("feat(x): do a thing", [shape]);
++    const result = run(oneCommandText(args), STRICT);
++    const real = realGitMessage(args);
++    const realGlued = !/\n\nAI-Assisted: true\n/u.test(real);
++    assert.equal(result.findings.some((entry) => entry.code === "GIT-03-TRAILERS-GLUED-TO-BODY"), realGlued, JSON.stringify(shape));
++    // Git drops a `#` line that sits inside a glued trailer block, so only that one shape differs in bytes (it is refused either way).
++    if (shape !== "# remark\nWhy: x") assert.equal(`${result.message}\n`, real, JSON.stringify(shape));
++  }
++});
++
++check("CMP047 the one-command spelling keeps every other GIT-03 refusal exactly as before", () => {
++  const withArgs = (extra, bodies = []) => run(oneCommandText([...oneCommandArgs("feat(x): do a thing", bodies), ...extra]), STRICT);
++  assert.deepEqual(codes(withArgs(["--trailer", "AI-Assisted: true"])), ["GIT-03-MARKER-AMBIGUOUS"]);
++  assert.deepEqual(codes(withArgs(["--trailer", "Dispatch: C30I-S4 (goldfish)"])), ["GIT-03-DISPATCH-AMBIGUOUS"]);
++  assert.deepEqual(codes(run(oneCommandText(["-m", "feat(x): do a thing", "--trailer", "AI-Assisted: true"]), STRICT)), ["GIT-03-DISPATCH-MISSING"]);
++  assert.deepEqual(codes(run(oneCommandText(["-m", "feat(x): do a thing", "--trailer", "Dispatch: C30I-S4 (goldfish)"]), STRICT)), ["GIT-03-MARKER-MISSING"]);
++  assert.deepEqual(codes(withArgs(["--trailer", "Co-Authored-By: Claude <noreply@anthropic.com>"])), ["GIT-03-PROVIDER-COAUTHOR"]);
++  assert.deepEqual(codes(withArgs([], ["see https://claude.ai/code/session_01ABC"])), ["GIT-03-SESSION-URL"]);
++  assert.deepEqual(codes(withArgs(["--trailer", "Dispatch: invented (elephant)"])), ["GIT-03-DISPATCH-AMBIGUOUS"]);
++});
++
++check("CMP048 the Dispatch-missing repair names the one-command --trailer form first and the message file as the fallback", () => {
++  for (const message of ["feat(x): x\n\nDispatch: stage-0 (elephant)\n\nAI-Assisted: true\n", "feat(x): x\n\nAI-Assisted: true\n"]) {
++    const finding = finishedCommitMessageFindings(message, STRICT).findings.find((entry) => entry.code === "GIT-03-DISPATCH-MISSING");
++    const oneCommand = finding.detail.indexOf('git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"');
++    const fileRoute = finding.detail.indexOf("git commit -F scratch/<message-file>");
++    assert.ok(oneCommand >= 0 && fileRoute > oneCommand, message);
++  }
++});
++
+ afterTests(() => {
+ process.stdout.write(`\n${checks}/${checks} commit-message policy checks passed\n`);
+ });
+diff --git a/plugins/pipeline-core/skills/conventional-commit/SKILL.md b/plugins/pipeline-core/skills/conventional-commit/SKILL.md
+index 7337d663ef93e1dd0b5e23f8f22a8bdff05cda7e..0893b05019bd298b28d2b934b56403a532781f1e 100644
+--- a/plugins/pipeline-core/skills/conventional-commit/SKILL.md
++++ b/plugins/pipeline-core/skills/conventional-commit/SKILL.md
+@@ -91,10 +91,13 @@ A commit without a `Dispatch:` trailer is refused too (`GIT-03-DISPATCH-MISSING`
+ Present the full message as a single fenced block. For a normal commit, give the
+ caller the scratch-free form `git commit -m '<subject>' -m '<body paragraph>'
+ --trailer 'AI-Assisted: true' -- <paths>`, adding a grounded `Dispatch:` trailer
+-when the repository requires one. Name the same exact paths in `git add -- <paths>`
++when the repository requires one (a second flag, `--trailer 'Dispatch: <id> (goldfish)'`;
++a parenthesised value is admitted inside quotes while the whole command is printable ASCII on one line, with no backslash). Name the same exact paths in `git add -- <paths>`
+ and in the commit. Keep each argument on one line; use repeated `-m` for separate
+-body paragraphs. Use `-F` only when the content cannot safely be represented as
+-single-line arguments. Render argument quoting for the actual shell (single
++body paragraphs, and never type the trailers as `-m` (each `-m` adds a blank line). Keep the
++last body paragraph plain prose: when every line of it reads `Key: value`, Git glues the
++trailers to it and the guard refuses it (`GIT-03-TRAILERS-GLUED-TO-BODY`). Use `-F` only when the content cannot safely be represented as
++single-line arguments (for example a long or multi-paragraph body). Render argument quoting for the actual shell (single
+ quotes in POSIX shells and PowerShell; double quotes in `cmd.exe`) and never
+ interpolate unreviewed shell syntax. State explicitly: "Proposed message — review and commit
+ yourself; this skill does not run `git commit`." Never invoke `git commit` —
