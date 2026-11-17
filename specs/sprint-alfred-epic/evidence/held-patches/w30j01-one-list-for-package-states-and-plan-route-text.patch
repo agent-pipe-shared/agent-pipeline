@@ -1,0 +1,182 @@
+diff --git a/plugins/pipeline-core/lib/evidence-view-model.mjs b/plugins/pipeline-core/lib/evidence-view-model.mjs
+index 4bd0f335e..b6bdba377 100644
+--- a/plugins/pipeline-core/lib/evidence-view-model.mjs
++++ b/plugins/pipeline-core/lib/evidence-view-model.mjs
+@@ -9,13 +9,13 @@
+  */
+ import { readFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
+-import { validateFeaturePackage } from "./feature-package-topology.mjs";
++import { FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const SHA = /^[a-f0-9]{64}$/u;
+ const VIEW_STATUSES = new Set(["pass", "fail", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
+ const ARTIFACT_STATES = new Set(["verified", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
+-const PACKAGE_STATES = new Set(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
++const PACKAGE_STATES = new Set(FEATURE_STATES);
+ const EXPORT_STATES = new Set(["unavailable", "pending", "delivered", "retryable-failure", "quarantined"]);
+ const CODE = /^[A-Z][A-Z0-9-]{1,63}$/u;
+ // The closed gate vocabulary `gate-estimate.mjs` itself stores and projects
+diff --git a/plugins/pipeline-core/lib/evidence-view-model.test.mjs b/plugins/pipeline-core/lib/evidence-view-model.test.mjs
+index 405646e77..d666e501b 100644
+--- a/plugins/pipeline-core/lib/evidence-view-model.test.mjs
++++ b/plugins/pipeline-core/lib/evidence-view-model.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
++import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -18,6 +18,12 @@ function packageFixture({ corrupt = false } = {}) {
+   return { root, manifest: `specs/${id}/lifecycle.json` };
+ }
+ 
++test("C30J-J1: the viewer reads the package states from the topology owner, with no literal copy of the list", () => {
++  const source = readFileSync(new URL("./evidence-view-model.mjs", import.meta.url), "utf8");
++  assert.equal(source.includes('"superseded"'), false);
++  assert.match(source, /FEATURE_STATES/u);
++});
++
+ test("renders only candidate-bound non-authoritative explicit evidence", () => {
+   const model = buildEvidenceViewModel({ candidate, status: "pass", artifacts: [{ path: "specs/result.md", sha256: "c".repeat(64), state: "verified" }] });
+   assert.equal(model.authority, "non-authoritative"); assert.equal(model.schema, "pipeline.evidence-view-model.v1");
+diff --git a/plugins/pipeline-core/scripts/check-artifact-topology.mjs b/plugins/pipeline-core/scripts/check-artifact-topology.mjs
+index 1249375d5..fa5a2feea 100644
+--- a/plugins/pipeline-core/scripts/check-artifact-topology.mjs
++++ b/plugins/pipeline-core/scripts/check-artifact-topology.mjs
+@@ -4,13 +4,13 @@
+ import { lstatSync, readFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { validateFeatureTopology } from "../lib/feature-package-topology.mjs";
++import { FEATURE_STATES, validateFeatureTopology } from "../lib/feature-package-topology.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
+ export const TOPOLOGY_SCHEMA = "pipeline.artifact-topology.v1";
+-export const TOPOLOGY_STATES = Object.freeze(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
++export const TOPOLOGY_STATES = FEATURE_STATES;
+ export const TOPOLOGY_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "threat-model", "security-readiness", "private-local", "governance-event"]);
+ 
+ function inside(root, target) { const rel = relative(root, target); return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)); }
+diff --git a/plugins/pipeline-core/scripts/check-artifact-topology.test.mjs b/plugins/pipeline-core/scripts/check-artifact-topology.test.mjs
+index 676f79266..19d0168f9 100644
+--- a/plugins/pipeline-core/scripts/check-artifact-topology.test.mjs
++++ b/plugins/pipeline-core/scripts/check-artifact-topology.test.mjs
+@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { DEFAULT_ROOT, checkArtifactTopology, TOPOLOGY_CLASSES, TOPOLOGY_STATES } from "./check-artifact-topology.mjs";
+-import { FEATURE_CLASSES } from "../lib/feature-package-topology.mjs";
++import { FEATURE_CLASSES, FEATURE_STATES } from "../lib/feature-package-topology.mjs";
+ 
+ const root = mkdtempSync(join(tmpdir(), "artifact-topology-"));
+ try {
+@@ -25,6 +25,9 @@ try {
+   const shipped = JSON.parse(readFileSync(join(DEFAULT_ROOT, "governance/artifact-topology.json"), "utf8"));
+   assert.deepEqual(shipped.classes, [...TOPOLOGY_CLASSES]);
+   assert.deepEqual(shipped.states, [...TOPOLOGY_STATES]);
++  // C30J-J1: the nine package states have ONE list (FEATURE_STATES); the topology list is that list, not a copy of it.
++  assert.equal(TOPOLOGY_STATES, FEATURE_STATES);
++  assert.deepEqual([...FEATURE_STATES], ["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
+   writeFileSync(join(root, "governance/artifact-topology.json"), JSON.stringify(base));
+   assert.equal(checkArtifactTopology(root).ok, true);
+   writeFileSync(join(root, "governance/artifact-topology.json"), JSON.stringify({ ...base, states: [...TOPOLOGY_STATES].reverse() }));
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 5600538a7..049d006f2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -624,6 +624,8 @@ import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
+ import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, abandonCalibrationVerifyCommitTransition, rollbackCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, inspectReplayableCalibrationVerifyLayout, inspectCurrentCalibrationVerifyReady, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
+ 
+ export const SCHEMA_ID = "pipeline.state.v0";
++/** C30J-J1: the one list of the two phases an active feature can be in. */
++const ACTIVE_FEATURE_PHASES = new Set(["design", "implementation"]);
+ export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
+ export const CONTINUITY_LOCK_STALE_MS = 30_000;
+ export const ARCHITECTURE_IMPACT_VALUES = Object.freeze([
+@@ -6464,7 +6466,7 @@ function planLegacyResultRepair(dir, state, manifestPath) {
+  * command. The candidate is the current HEAD commit and tree, read the same way the reconcile reads it, so a later
+  * commit changes the digest and the printed command has to be taken again from a fresh completion.
+  */
+-function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
++export function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
+   const root = realpathSync(resolve(dir));
+   const approvalKind = "feature-package-reconcile";
+   const placeholders = [
+@@ -7722,7 +7724,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
+   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-DECISION-STATE" };
+   const state = existing.state;
+   if (state.schema !== SCHEMA_ID || state.planApproved !== true || !state.activeFeature
+-    || !new Set(["design", "implementation"]).has(state.activeFeature.phase)
++    || !ACTIVE_FEATURE_PHASES.has(state.activeFeature.phase)
+     || typeof state.activeFeature.planPath !== "string") return { ok: false, code: "PO-DECISION-STATE" };
+   const prd = physicalRebindFile(dir, state.activeFeature.planPath);
+   const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
+@@ -9163,7 +9165,12 @@ function runFeaturePackageReadCommand(sub, argv) {
+     const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root), correctionRoundFeatureId: featurePackageCorrectionFeatureId(root) });
+     // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
+     // computed before this field is added), so a consumer does not have to re-derive it.
+-    console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
++    // C30J-J1: an invalid current package names its route instead of leaving the reader with findings only.
++    const writer = fileURLToPath(import.meta.url);
++    const routed = plan.status === "rejected" && plan.reason === "invalid-current-package"
++      ? { ...plan, nextAction: `read the findings with: node ${writer} feature-package-status --root ${root} --manifest ${manifest}; a stale digest of a MUTABLE-class artifact is repaired with: node ${writer} feature-package-rebind-mutable --root ${root} --manifest ${manifest}; a drifted Result entry is moved by the reconcile route: node ${writer} feature-package-reconcile --root ${root} --manifest ${manifest} --plan-sha256 <digest printed by the bootstrap plan (plan-start) as reconcileCommand> (the PO signs only when the plan changes more than the Result entry; its signatureCommand is printed beside it); an immutable artifact whose bytes changed is never rebound: the package is superseded by the PO instead` }
++      : plan;
++    console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : routed, null, 2));
+     return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
+   }
+   if (flags.proposal === undefined) {
+@@ -11944,7 +11951,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+ 
+     case "set-phase": {
+       const phase = flags.phase;
+-      if (!new Set(["design", "implementation"]).has(phase)) {
++      if (!ACTIVE_FEATURE_PHASES.has(phase)) {
+         console.error('Error: set-phase requires --phase <design|implementation>.');
+         return 2;
+       }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 8c5a38e0f..4502f8cf1 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -4011,3 +4011,34 @@ assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED"), /push-in
+ assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED", " Run this command again."), /has passed, so it cannot be used\. Run this command again\.$/u);
+ assert.equal(criticalProofRefusalHint("SOME-OTHER-CODE"), "");
+ console.log("C29 R12 expired-proof hint complete.");
++
++// C30J-J1 (SM-1, C30-24): the phase set has one list, and the plan rejection names its route.
++{
++  const source = readFileSync(join(fileURLToPath(new URL(".", import.meta.url)), "pipeline-state.mjs"), "utf8");
++  assert.equal(source.split('new Set(["design", "implementation"])').length - 1, 1, "the two inline phase sets are one named list");
++  const root = mkdtempSync(join(tmpdir(), "c30j-j1-"));
++  try {
++    mkdirSync(join(root, "specs", "j1-pkg"), { recursive: true });
++    const sha = (text) => createHash("sha256").update(text).digest("hex");
++    const manifestRel = "specs/j1-pkg/lifecycle.json";
++    const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "immutable"]].map(([klass, name, authority, mutability]) => {
++      writeFileSync(join(root, "specs", "j1-pkg", name), `# ${klass}\n`);
++      return { class: klass, path: `specs/j1-pkg/${name}`, sha256: sha(`# ${klass}\n`), authority, mutability, retention: "active" };
++    });
++    writeFileSync(join(root, manifestRel), `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "j1-pkg", rigor: 1 }, state: "draft", artifacts: entries, candidate: null, supersedes: null }, null, 2)}\n`);
++    writeFileSync(join(root, "specs", "j1-pkg", "prd.md"), "# prd (edited)\n");
++    const planned = capturedStdout(() => run(["feature-package-plan", "--root", root, "--manifest", manifestRel, "--next-state", "approved"]));
++    assert.equal(planned.result, 2);
++    const plan = JSON.parse(planned.lines.at(-1));
++    assert.equal(plan.reason, "invalid-current-package");
++    assert.equal(typeof plan.nextAction, "string", "the rejection names its route");
++    assert.ok(plan.nextAction.includes(`feature-package-status --root ${root} --manifest ${manifestRel}`), plan.nextAction);
++    assert.ok(plan.nextAction.includes(`feature-package-rebind-mutable --root ${root} --manifest ${manifestRel}`), plan.nextAction);
++    assert.ok(plan.nextAction.includes(`feature-package-reconcile --root ${root} --manifest ${manifestRel}`), plan.nextAction);
++    // a rejection for another reason gains no field
++    writeFileSync(join(root, "specs", "j1-pkg", "prd.md"), "# prd\n");
++    const noop = capturedStdout(() => run(["feature-package-plan", "--root", root, "--manifest", manifestRel, "--next-state", "bogus"]));
++    assert.equal(JSON.parse(noop.lines.at(-1)).nextAction, undefined);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++console.log("C30J-J1 phase list and plan route complete.");
