@@ -10087,7 +10087,7 @@ export function createOnboardingContinuityAuthorityProducerPort({repository}) {
   if (continuityAuthorityPortCache.size>=4096)
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity source port lifetime bound');
   const data = {repository:actualRepository,assurance:'physical-readback',
-    legacy:new Map(),operations:new Set()};
+    legacy:new Map(),operations:new Set(),pendingAdvance:null};
   let port;
   const methods = {
     readAssurance:()=>data.assurance,
@@ -10104,7 +10104,7 @@ export function createOnboardingContinuityAuthorityProducerPort({repository}) {
       const legacyOperations = [];
       if (tuple !== null && tuple !== undefined) {
         const key = continuitySharedStateLogicalLegacyKey(data,snapshot,tuple);
-        let handle = data.legacy.get(key);
+        let handle = data.legacy.get(key) ?? continuityLegacyHandleAcrossAdvance(data,snapshot,tuple,key);
         if (!handle) {
           handle = continuityAuthorityHandle(continuityAuthorityOperations,{data,legacy:true,
             association:{state:'unbound',target:null},phase:'armed',bindingSha256:key,journalRefs:[]});
@@ -10481,6 +10481,11 @@ export function continuityStateEntryRefusalReason(entry) {
   return continuitySharedStateEntries.has(entry) || continuityAdvancingStateEntries.has(entry) ? null
     : `${entry} is not admitted; nothing written. Repair: node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>`;
 }
+// Typed refusal of an advancing entry that cannot be admitted while a session is bound. Both routes run; the text stays inside the
+// 240 characters describeStateAuthorityRefusal prints of a reason. Exported for the length case.
+export function continuityAdvanceRefusalReason(entry) {
+  return `${entry} is not admitted: another session's binding or a bind in flight; nothing written. Repair: reopen-design --by <name>, or node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>`;
+}
 // The cleanup identity a State write of an advancing entry may leave behind: the prepared identity with the revision
 // advanced by one and the continuity fields those writers rewrite. Everything else stays byte-equal to the prepared one.
 function continuityAdvancedIdentity(identity) {
@@ -10527,10 +10532,38 @@ function continuitySharedStateCleanupIdentity(snapshot) {
     binding:snapshot.binding,release:snapshot.release,
   };
 }
-function continuitySharedStateLogicalLegacyKey(data,snapshot,tuple) {
-  return canonicalSha256({repository:data.repository,tuple,
-    cleanupIdentity:continuitySharedStateCleanupIdentity(snapshot),
-    sourceFacts:snapshot.sourceFacts.filter(fact=>fact.namespaceId!=='selected-state')});
+function continuityLegacyKeyOf(data,tuple,cleanupIdentity,sourceFacts) {
+  return canonicalSha256({repository:data.repository,tuple,cleanupIdentity,
+    sourceFacts:sourceFacts.filter(fact=>fact.namespaceId!=='selected-state')});
+}
+export function continuitySharedStateLogicalLegacyKey(data,snapshot,tuple) {
+  return continuityLegacyKeyOf(data,tuple,continuitySharedStateCleanupIdentity(snapshot),snapshot.sourceFacts);
+}
+// True when the binding the State holds is the one of the session that runs this write (resolved from the source-owned current
+// authority context; unresolvable is not bound to it).
+function continuityBoundToCurrentSession(data,tuple) {
+  try {
+    const current=inspectSourceOwnedCurrentAuthorityContext({repository:data.repository}).currentRequester;
+    return current.sessionId===tuple.sessionId && current.descriptorSha256===tuple.descriptorSha256;
+  } catch { return false; }
+}
+// The one re-key: the in-flight write of an advancing entry (data.pendingAdvance) left the cleanup identity at exactly the advanced
+// prepared identity AND the key recomputed from the prepared identity with the current non-selected facts is still the prepared key,
+// so no other fact changed. Only then the existing legacy lifetime handle follows the new key; anything else mints a different
+// lifetime, which the registry's legacy-operation effects check refuses.
+// Exported, with the key function, so the refusal of every other change is exercised without a writer.
+export function continuityLegacyHandleAcrossAdvance(data,snapshot,tuple,key) {
+  const pending=data.pendingAdvance;
+  if (!pending) return undefined;
+  const advanced=continuityAdvancedIdentity(pending.identity);
+  if (advanced===null || !continuityAuthorityEqual(continuitySharedStateCleanupIdentity(snapshot),advanced)
+      || !continuityAuthorityEqual(tuple,pending.tuple)
+      || continuityLegacyKeyOf(data,tuple,pending.identity,snapshot.sourceFacts)!==pending.key)
+    return undefined;
+  const handle=data.legacy.get(pending.key);
+  if (!handle) return undefined;
+  data.legacy.set(key,handle);
+  return handle;
 }
 function continuitySharedStateLegacyDigest(methods,pathSha256) {
   const observations=methods.readBaseline().legacyOperations.map(handle=>methods.observeOperation(handle))
@@ -10613,13 +10646,16 @@ function continuityObserveSharedStateWrite(data,port,methods,handle,context) {
       || snapshot.observed.orphanBinding || snapshot.release.status!=='absent'
       || members.some(value=>value.record.phase==='released'||value.record.phase==='terminal-observed'))
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity historical authority requires owning lifecycle transition');
-  // C30F-G1B: an advancing write moves the identity that keys a bound session's legacy lifetime, so the registry's legacy-operation
-  // effects check (pre and post digest equal) refuses it AFTER the State was written. Observed with a bound session; refuse it before
-  // the write instead, cleanly. Only a State with no session cleanup binding and no live member is admitted for an advancing entry.
-  if (continuityAdvancingStateEntries.has(plan.entry)
-      && ((snapshot.observed.sessionCleanup ?? null)!==null || (snapshot.observed.orphanBinding ?? null)!==null || members.length>0))
-    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted while a session is bound',{reason:
-      `${plan.entry} is not admitted while a session cleanup binding is held; nothing written. Repair: node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo <root>`});
+  // C30I-S2B: an advancing write moves the identity that keys a bound session's legacy lifetime (continuitySharedStateLogicalLegacyKey).
+  // The session that holds the binding (its bind leaves exactly one live member) is admitted: the pending advance recorded below lets
+  // readBaseline follow the lifetime across exactly that advance. Refused before the write, with both routes: a binding of ANOTHER
+  // session (or one that cannot be resolved), a second live member, and a live member with no binding (a bind in flight). An orphan
+  // binding or a released/terminal member is refused by the check above.
+  const advancing=continuityAdvancingStateEntries.has(plan.entry);
+  const bound=(snapshot.observed.sessionCleanup ?? null)!==null;
+  if (advancing && (bound ? members.length>1 || !continuityBoundToCurrentSession(data,snapshot.observed.sessionCleanup) : members.length>0))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted while a session is bound',
+      {reason:continuityAdvanceRefusalReason(plan.entry)});
   if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
     fail('SDC-AUTHORITY-CAS','continuity preexisting baseline drift');
   // Populate only genuine source-created legacy handles, then identify each
@@ -10630,6 +10666,11 @@ function continuityObserveSharedStateWrite(data,port,methods,handle,context) {
   if (new Set(live.map(value=>value.operation)).size!==live.length)
     fail('SDC-AUTHORITY-CAS','continuity duplicate live operation incidence');
   const identity=continuitySharedStateCleanupIdentity(snapshot);
+  // The lifetime of a bound session follows exactly the advance of THIS write (readBaseline); any other write clears it.
+  const tuple=snapshot.observed.sessionCleanup ?? null;
+  data.pendingAdvance=advancing && tuple!==null
+    ? {identity,tuple,
+      key:continuitySharedStateLogicalLegacyKey(data,snapshot,tuple)} : null;
   const legacyOperationsSha256=continuitySharedStateLegacyDigest(methods,plan.selectedPathSha256);
   for (const item of live) {
     item.operation.expectedMemberRef=structuredClone(item.memberRef);
@@ -10673,6 +10714,7 @@ function continuityVerifySharedStateWrite(data,port,methods,handle,witness) {
     return {memberRef:item.memberRef,...observed};
   });
   const legacyOperationsSha256=continuitySharedStateLegacyDigest(methods,owned.plan.selectedPathSha256);
+  data.pendingAdvance=null; // the in-flight write is over; the lifetime already follows the advance
   if (legacyOperationsSha256!==owned.legacyOperationsSha256)
     fail('SDC-AUTHORITY-CAS','continuity legacy operation identity changed');
   owned.postimage=structuredClone(terminal.postimage);owned.stage='verified';

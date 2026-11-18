@@ -10,7 +10,8 @@ import test from "node:test";
 
 import { run } from "./pipeline-state.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
-import { bindOnboardingSessionCleanup, continuityAssertStateWriteIdentity, continuityStateEntryRefusalReason, observeSessionCleanupState,
+import { bindOnboardingSessionCleanup, continuityAdvanceRefusalReason, continuityAssertStateWriteIdentity, continuityLegacyHandleAcrossAdvance,
+  continuitySharedStateLogicalLegacyKey, continuityStateEntryRefusalReason, observeSessionCleanupState,
   releaseOnboardingSessionCleanup } from "../lib/onboarding-continuity.mjs";
 import { createControlledMethodRuntimeFixture, inspectSourceOwnedCurrentAuthorityContext } from "../lib/session-requester-bridge.mjs";
 import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
@@ -265,34 +266,77 @@ test("C30F-G1B: cancel-mixed-plan-state in a neutral-State catalogue project suc
   }
 });
 
-test("C30F-G1B: cancel-submitted-plan is refused cleanly, before any write, while a session-cleanup binding is held", async () => {
-  const fixture = neutralCatalogueFixture();
+// C30I-S2B (AC-108): a session that holds a bound session-cleanup binding completes the two advancing State entries end to end. The binding is
+// the usual state of a real session, so refusing it sent every such session to a recovery detour.
+async function withBoundSession(fixture, body) {
+  const repository = inspectSignedDescriptorCustodyRepository(fixture.root);
+  const runtime = createControlledMethodRuntimeFixture({ repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", "cancel"), sessionId: "cancel-fixture" });
   try {
-    const submitted = submitPlan(fixture);
-    const submissionSha256 = sha256CanonicalJson(submitted.planSubmission);
-    const repository = inspectSignedDescriptorCustodyRepository(fixture.root);
-    const runtime = createControlledMethodRuntimeFixture({ repository,
-      fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", "cancel"), sessionId: "cancel-fixture" });
     await runtime.run(async () => {
       const observed = observeSessionCleanupState(fixture.root);
       const current = inspectSourceOwnedCurrentAuthorityContext({ repository }).currentRequester;
       const tuple = { sessionId: current.sessionId, descriptorSha256: current.descriptorSha256 };
       bindOnboardingSessionCleanup({ rootDir: fixture.root, sessionCleanup: tuple, expectedStateSha256: observed.stateSha256, expectedRevision: observed.revision });
-      const bound = observeSessionCleanupState(fixture.root);
-      assert.notEqual(bound.sessionCleanup, null, "the session is bound");
-      // Observed before the guard: the State was WRITTEN (submission withdrawn, revision + 1) and the registry then refused with
-      // SDC-AUTHORITY-CAS state-legacy-operation-effects, because the bound session's legacy lifetime is keyed by the whole cleanup
-      // identity, which the advance changes. The admission is therefore refused before the write while a session is bound.
-      const before = readFileSync(fixture.statePath);
-      const result = refusedRun(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", submissionSha256], { dir: fixture.root });
-      assert.equal(result.status, 2, result.stderr);
-      assert.match(result.stderr, /SDC-AUTHORITY-UNAVAILABLE: state\.cancel-submitted-plan is not admitted while a session cleanup binding is held; nothing written\./u, result.stderr);
-      assert.doesNotMatch(result.stderr, /untyped|state-legacy-operation-effects/u, result.stderr);
-      assert.deepEqual(readFileSync(fixture.statePath), before, "the refusal wrote nothing");
-      const rebound = observeSessionCleanupState(fixture.root);
-      releaseOnboardingSessionCleanup({ rootDir: fixture.root, sessionCleanup: tuple, expectedStateSha256: rebound.stateSha256, expectedRevision: rebound.revision });
+      assert.notEqual(observeSessionCleanupState(fixture.root).sessionCleanup, null, "the session is bound");
+      await body({ repository, tuple });
     });
+  } finally {
     await runtime.dispose();
+  }
+}
+function releaseBound(fixture, tuple) {
+  const rebound = observeSessionCleanupState(fixture.root);
+  assert.deepEqual(rebound.sessionCleanup, tuple, "the same session is still bound after the write");
+  releaseOnboardingSessionCleanup({ rootDir: fixture.root, sessionCleanup: tuple, expectedStateSha256: rebound.stateSha256, expectedRevision: rebound.revision });
+  assert.equal(observeSessionCleanupState(fixture.root).sessionCleanup, null, "the binding released against the advanced State");
+}
+
+test("C30I-S2B: a bound session completes cancel-submitted-plan end to end, the State advanced by exactly one and its lifetime still consistent", async () => {
+  const fixture = neutralCatalogueFixture();
+  try {
+    const submitted = submitPlan(fixture);
+    const submissionSha256 = sha256CanonicalJson(submitted.planSubmission);
+    await withBoundSession(fixture, async ({ tuple }) => {
+      const result = refusedRun(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", submissionSha256], { dir: fixture.root });
+      assert.equal(result.status, 0, result.stderr);
+      assert.doesNotMatch(result.stderr, /not admitted|state-legacy-operation-effects/u, result.stderr);
+      const after = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+      assert.equal(after.planSubmission, undefined, "the submission is withdrawn");
+      assert.equal(after.planCancellation.submissionSha256, submissionSha256);
+      assert.equal(after.continuity.revision, submitted.continuity.revision + 1, "advanced by exactly one");
+      // An exact replay under the live binding is a zero write.
+      const bytes = readFileSync(fixture.statePath);
+      assert.equal(refusedRun(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", submissionSha256], { dir: fixture.root }).status, 0);
+      assert.deepEqual(readFileSync(fixture.statePath), bytes, "the replay wrote nothing");
+      releaseBound(fixture, tuple);
+    });
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("C30I-S2B: a bound session completes cancel-mixed-plan-state end to end, the State advanced by exactly one", async () => {
+  const fixture = neutralCatalogueFixture();
+  try {
+    const submitted = submitPlan(fixture);
+    const mixed = { ...submitted, planApproval: fixture.priorApproval };
+    writeFileSync(fixture.statePath, `${JSON.stringify(mixed, null, 2)}\n`);
+    await withBoundSession(fixture, async ({ tuple }) => {
+      const args = ["cancel-mixed-plan-state", "--by", "PO", "--reason", "Retire mixed history",
+        "--submission-sha256", sha256CanonicalJson(mixed.planSubmission), "--approval-sha256", sha256CanonicalJson(mixed.planApproval),
+        "--invalidation-sha256", sha256CanonicalJson(mixed.planInvalidation)];
+      const result = refusedRun(args, { dir: fixture.root });
+      assert.equal(result.status, 0, result.stderr);
+      assert.doesNotMatch(result.stderr, /not admitted|state-legacy-operation-effects/u, result.stderr);
+      const after = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+      assert.equal(after.planMixedStateRecovery.recoveredBy, "PO");
+      assert.equal(after.continuity.revision, mixed.continuity.revision + 1, "advanced by exactly one");
+      const bytes = readFileSync(fixture.statePath);
+      assert.equal(refusedRun(args, { dir: fixture.root }).status, 0, "an exact replay is admitted");
+      assert.deepEqual(readFileSync(fixture.statePath), bytes, "the replay wrote nothing");
+      releaseBound(fixture, tuple);
+    });
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -349,6 +393,108 @@ test("C30F-G1B: an advancing entry admits exactly revision + 1 with the writer's
   // A prepared identity without a numeric revision (design-unbound) admits no advance.
   assert.throws(() => continuityAssertStateWriteIdentity(ADVANCING[0], { ...prepared, revision: null, continuity: null }, advanced(prepared)), { code: "SDC-AUTHORITY-CAS" });
   assert.throws(() => continuityAssertStateWriteIdentity(ADVANCING[0], { ...prepared, revision: Number.MAX_SAFE_INTEGER, continuity: { ...prepared.continuity, revision: Number.MAX_SAFE_INTEGER } }, advanced(prepared)), { code: "SDC-AUTHORITY-CAS" });
+});
+
+// C30I-S2B: the bound session's legacy lifetime handle follows exactly the advance of the in-flight advancing write and nothing else.
+function snapshotOf(identity, sourceFacts) {
+  const { continuity, closedFeatures, discardedFeatures, cleanupReleases, binding, release, ...observed } = identity;
+  return { observed: { ...observed, state: { continuity, closedFeatures, discardedFeatures, cleanupReleases } }, binding, release, sourceFacts };
+}
+const BOUND_TUPLE = { sessionId: "controller-synthetic", descriptorSha256: "d".repeat(64) };
+const LEGACY_FACTS = [{ namespaceId: "selected-state", pathSha256: "a".repeat(64), sha256: "1".repeat(64) },
+  { namespaceId: "private", pathSha256: "b".repeat(64), sha256: "2".repeat(64) }];
+function pendingFixture() {
+  const prepared = { ...cleanupIdentity(), sessionCleanup: BOUND_TUPLE };
+  const data = { repository: { synthetic: true }, legacy: new Map(), pendingAdvance: null };
+  const handle = { synthetic: "legacy-lifetime" };
+  const oldKey = continuitySharedStateLogicalLegacyKey(data, snapshotOf(prepared, LEGACY_FACTS), BOUND_TUPLE);
+  data.legacy.set(oldKey, handle);
+  data.pendingAdvance = { identity: prepared, tuple: BOUND_TUPLE, key: oldKey };
+  return { prepared, data, handle, oldKey };
+}
+function followed({ data }, post, facts = LEGACY_FACTS, tuple = BOUND_TUPLE) {
+  const snapshot = snapshotOf(post, facts);
+  const key = continuitySharedStateLogicalLegacyKey(data, snapshot, tuple);
+  return { result: continuityLegacyHandleAcrossAdvance(data, snapshot, tuple, key), key };
+}
+
+test("C30I-S2B: the legacy lifetime handle follows exactly the +1 advance of the in-flight write; every other difference mints a different lifetime", () => {
+  const fixture = pendingFixture();
+  const { prepared, data, handle, oldKey } = fixture;
+  // Every other change is not followed: the key then names a different lifetime and the registry's effects check refuses it.
+  const refused = [
+    ["revision + 2", { ...advanced(prepared), revision: 6, continuity: { ...advanced(prepared).continuity, revision: 6, resume: { mode: "immediate", sourceRevision: 6, reasonCode: "active-turn" } } }, LEGACY_FACTS],
+    ["the advance with another resume reason", advanced(prepared, { resume: { mode: "immediate", sourceRevision: 5, reasonCode: "recovery" } }), LEGACY_FACTS],
+    ["the advance with a changed activeFeatureId", { ...advanced(prepared), activeFeatureId: "other" }, LEGACY_FACTS],
+    ["the advance with a changed private binding", { ...advanced(prepared), privateBinding: { synthetic: true } }, LEGACY_FACTS],
+    ["the advance with a changed non-selected source fact", advanced(prepared), [LEGACY_FACTS[0], { ...LEGACY_FACTS[1], sha256: "3".repeat(64) }]],
+    ["the advance with a removed non-selected source fact", advanced(prepared), [LEGACY_FACTS[0]]],
+  ];
+  for (const [name, post, facts] of refused) {
+    const outcome = followed(fixture, post, facts);
+    assert.equal(outcome.result, undefined, name);
+    assert.equal(data.legacy.has(outcome.key), false, `${name}: no handle was stored under the new key`);
+  }
+  assert.equal(data.legacy.size, 1);
+  // Another session's tuple at the same advanced identity is not followed either.
+  const other = { sessionId: "controller-other", descriptorSha256: "e".repeat(64) };
+  assert.equal(followed(fixture, { ...advanced(prepared), sessionCleanup: other }, LEGACY_FACTS, other).result, undefined, "another session's tuple");
+  // The exact advance, a change of the SELECTED State only: the same handle follows the new key.
+  const ok = followed(fixture, advanced(prepared), [{ ...LEGACY_FACTS[0], sha256: "4".repeat(64) }, LEGACY_FACTS[1]]);
+  assert.equal(ok.result, handle);
+  assert.equal(data.legacy.get(ok.key), handle);
+  assert.equal(data.legacy.get(oldKey), handle, "the previous key keeps its handle");
+  // No pending advance (any other write, or none in flight): never followed.
+  data.pendingAdvance = null;
+  data.legacy.delete(ok.key);
+  assert.equal(followed(fixture, advanced(prepared)).result, undefined, "no write in flight");
+});
+
+test("C30I-S2B: the refusal of an advancing entry that is not admitted names both routes and fits the printed length", () => {
+  for (const entry of ADVANCING) {
+    const reason = continuityAdvanceRefusalReason(entry);
+    assert.match(reason, /nothing written/u);
+    assert.match(reason, /reopen-design --by <name>/u);
+    assert.match(reason, /session-cleanup\.mjs plan-recovery --repo <root>/u);
+    assert.ok(reason.length <= 240, `${entry}: ${reason.length} characters (describeStateAuthorityRefusal prints 240 of the reason)`);
+  }
+});
+
+test("C30I-S2B: a binding of ANOTHER session is refused before any write, naming both routes", async () => {
+  const fixture = neutralCatalogueFixture();
+  try {
+    const submitted = submitPlan(fixture);
+    const submissionSha256 = sha256CanonicalJson(submitted.planSubmission);
+    const repository = inspectSignedDescriptorCustodyRepository(fixture.root);
+    const fixtureRoot = join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures");
+    const owner = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(fixtureRoot, "owner"), sessionId: "owner-fixture" });
+    const other = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(fixtureRoot, "other"), sessionId: "other-fixture" });
+    try {
+      let tuple;
+      await owner.run(async () => {
+        const observed = observeSessionCleanupState(fixture.root);
+        const current = inspectSourceOwnedCurrentAuthorityContext({ repository }).currentRequester;
+        tuple = { sessionId: current.sessionId, descriptorSha256: current.descriptorSha256 };
+        bindOnboardingSessionCleanup({ rootDir: fixture.root, sessionCleanup: tuple, expectedStateSha256: observed.stateSha256, expectedRevision: observed.revision });
+      });
+      await other.run(async () => {
+        const before = readFileSync(fixture.statePath);
+        const result = refusedRun(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", submissionSha256], { dir: fixture.root });
+        assert.equal(result.status, 2, result.stderr);
+        assert.match(result.stderr, /SDC-AUTHORITY-UNAVAILABLE: state\.cancel-submitted-plan is not admitted: another session's binding or a bind in flight; nothing written\./u, result.stderr);
+        assert.match(result.stderr, /reopen-design --by <name>/u);
+        assert.match(result.stderr, /plan-recovery/u);
+        assert.doesNotMatch(result.stderr, /state-legacy-operation-effects/u);
+        assert.deepEqual(readFileSync(fixture.statePath), before, "the refusal wrote nothing");
+      });
+      await owner.run(async () => releaseBound(fixture, tuple));
+    } finally {
+      await other.dispose();
+      await owner.dispose();
+    }
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
 });
 
 test("C30F-G1B: an admitted non-advancing entry keeps the exact identity equality and still refuses a revision advance", () => {
