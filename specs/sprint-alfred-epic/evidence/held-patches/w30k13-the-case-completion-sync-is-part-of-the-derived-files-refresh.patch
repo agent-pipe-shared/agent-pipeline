@@ -1,0 +1,427 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 93c8693fe..e9c42763f 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -21,7 +21,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
+ | The capability inventory gate went red after a suite, hook or skill was added | `scripts/rebaseline-inventory.mjs` | the `sourceBaseline` block of the inventory (protected file) |
+ | A Reader input (capability inventory, observation governance, reader protocol) changed and the plugin's hash-pinned mirrors must follow, or you want to know whether they already drifted | `scripts/sync-reader-inputs.mjs [<root>] [--check]` | the three mirrors, `reader-inputs/manifest.json` and the two pins in `lib/doc-reader-documentation-snapshot.mjs` (`--check` writes nothing) |
+-| After a commit that changed sources, refresh every derived file in one step: the backlog ledger projections, the inventory `sourceBaseline` and the Reader inputs (D223 slice 4; use this instead of the two rows above and `reconcile-backlog-ledger.mjs --activate` one by one) | `scripts/refresh-derived-files.mjs [<root>] [--check]` (`node --test scripts/refresh-derived-files.test.mjs`) | the files of those three steps in the working tree only, never staged or committed; it names the changed paths and the commit instruction; `--check` writes nothing and exits 1 on drift |
++| After a commit that changed sources, refresh every derived file in one step: the backlog ledger projections, the inventory `sourceBaseline` and the Reader inputs (D223 slice 4; use this instead of the two rows above and `reconcile-backlog-ledger.mjs --activate` one by one; it also runs the suites whose test file changed since the inventory baseline and writes their growth-only case-completion augmentation rows, so the separate `cc-sync` step is not needed) | `scripts/refresh-derived-files.mjs [<root>] [--check]` (`node --test scripts/refresh-derived-files.test.mjs`) | the files of those three steps in the working tree only, never staged or committed; it names the changed paths and the commit instruction; `--check` writes nothing and exits 1 on drift |
+ | A release note or retro claims one runner's greenfield course is faster, cheaper or more reliable: check that every marked claim cites a published comparison under `evidence/greenfield-public/` by path and sha256 | `scripts/check-greenfield-comparison-citations.mjs <file.md>` (`node --test scripts/check-greenfield-comparison-citations.test.mjs`) | none |
+ | Re-measure the delivery matrix and run the gap rounds | `scripts/delivery-owners.mjs`, `scripts/delivery-agent-items.mjs`, `scripts/matrix-gaps.mjs`, `scripts/gap-inputs.mjs`, `scripts/gap-summary.mjs`, `scripts/gap-collect.mjs`, `scripts/gap-evidence.mjs`, `scripts/delivery-remeasure-inputs.mjs` | see below |
+ | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
+diff --git a/harness/scripts/check-verify-case-completion.mjs b/harness/scripts/check-verify-case-completion.mjs
+index 5aec56b56..59504be99 100644
+--- a/harness/scripts/check-verify-case-completion.mjs
++++ b/harness/scripts/check-verify-case-completion.mjs
+@@ -1,14 +1,15 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import { spawnSync } from "node:child_process";
+-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+-import { dirname, join, posix, resolve, sep } from "node:path";
++import { closeSync, existsSync, lstatSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { delimiter, dirname, join, posix, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { validateAgainstSchema } from "../../plugins/pipeline-core/lib/schema-lite.mjs";
+ import { validateDeclarativeVerifySuites } from "./check-verify-suite-registration.mjs";
+ import { validateVerifyCaseCompletionPolicy } from "../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs";
+-import { loadAndApplyVerifyCaseCompletionAugmentations } from "./verify-case-completion-augmentation.mjs";
++import { AUGMENTATION_PATH, applyVerifyCaseCompletionAugmentations, growAugmentationRow, loadAndApplyVerifyCaseCompletionAugmentations, validateVerifyCaseCompletionAugmentations } from "./verify-case-completion-augmentation.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ export const DEFAULT_ROOT = resolve(HERE, "..", "..");
+@@ -648,6 +649,91 @@ export function checkVerifyCaseCompletion({
+   return { ok: findings.length === 0, findings, registeredCount: registrations.length, vulnerableCount: vulnerable.length, registryCount: registry.length };
+ }
+ 
++// Ids a suite DECLARES when run the Full Verify way: plain `node <file>`, descriptor 3 a file, the same variables verify-journal.mjs sets. The stream is
++// captured in a private temp directory outside the root, so nothing lands in the working tree.
++function declaredCaseIds(root, path, maxBytes) {
++  const scratch = mkdtempSync(join(tmpdir(), "cc-declared-"));
++  let fd = -1;
++  try {
++    fd = openSync(join(scratch, "stream.out"), "w+");
++    const env = { ...process.env, PATH: `${dirname(realpathSync(process.execPath))}${delimiter}${process.env.PATH ?? ""}`, PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: String(maxBytes) };
++    delete env.NODE_TEST_CONTEXT;
++    const result = spawnSync(process.execPath, [path], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600_000, stdio: ["ignore", "pipe", "pipe", fd] });
++    const declared = readFileSync(join(scratch, "stream.out"), "utf8").split("\n").filter(Boolean).map((text) => { try { return JSON.parse(text); } catch { return null; } }).find((event) => event?.event === "DECLARED")?.caseIds;
++    return result.status === 0 && Array.isArray(declared) ? { ok: true, caseIds: declared } : { ok: false, detail: `exit ${result.status}, declared ${Array.isArray(declared) ? declared.length : "none"}` };
++  } finally {
++    if (fd !== -1) closeSync(fd);
++    rmSync(scratch, { recursive: true, force: true });
++  }
++}
++
++// The third place of the case-completion list, derived: for every registered suite WITH a policy whose test file changed between `since` and the working
++// tree, run it, read what it declares and extend the augmentation row through growAugmentationRow (growth-only; the existing preimage chain is kept).
++// All or nothing: any problem writes nothing. check=true computes the same and writes nothing. Returns { state: "current"|"refreshed"|"DRIFT", lines, problems }.
++export function syncVerifyCaseCompletionAugmentations({ root = DEFAULT_ROOT, since = null, check = false, verifyPath = DEFAULT_VERIFY } = {}) {
++  root = resolve(root);
++  const lines = [], problems = [];
++  const reader = makeReader(root, null);
++  if (!reader.exists(AUGMENTATION_PATH)) return { state: "current", lines: [`no ${AUGMENTATION_PATH} in this root: nothing to extend`], problems };
++  const text = reader.read(AUGMENTATION_PATH);
++  let data;
++  try { data = JSON.parse(text); } catch (error) { return { state: "FAILED", lines, problems: [`${AUGMENTATION_PATH} is not JSON: ${error.message}`] }; }
++  const valid = validateVerifyCaseCompletionAugmentations(data);
++  if (!valid.ok) return { state: "FAILED", lines, problems: [`${AUGMENTATION_PATH} is invalid (${valid.code}): ${valid.error}`] };
++  if (`${JSON.stringify(data, null, 2)}\n` !== text) return { state: "FAILED", lines, problems: [`${AUGMENTATION_PATH} is not in canonical two-space JSON form; refusing to rewrite the existing rows`] };
++  const hint = "node harness/scripts/check-verify-case-completion.mjs --sync-augmentations --since <ref>";
++  if (typeof since !== "string" || since === "" || runGit(root, ["rev-parse", "--verify", `${since}^{commit}`]).status !== 0) {
++    return { state: "FAILED", lines, problems: [`no usable base commit (${JSON.stringify(since)}); name the commit the suites last matched, then run: ${hint}`] };
++  }
++  const findings = [];
++  const registrations = [...parseVerifyRegistrations(reader.read(toPosix(verifyPath)), findings), ...parseDeclarativeRegistrations(reader, findings, root, null)];
++  if (findings.length > 0) return { state: "FAILED", lines, problems: findings };
++  const diff = runGit(root, ["diff", "--name-only", "-z", "--diff-filter=ACMR", since, "--"]);
++  if (diff.status !== 0) return { state: "FAILED", lines, problems: [`git diff ${since} could not be read; run: ${hint}`] };
++  const changed = new Set(diff.stdout.split("\0").filter(Boolean));
++  const next = structuredClone(data);
++  const seen = new Set();
++  for (const registration of registrations) {
++    if (!registration.path.endsWith(".test.mjs") || !changed.has(registration.path) || seen.has(registration.name)) continue;
++    seen.add(registration.name);
++    const sourcePolicy = registration.caseCompletionPolicy ?? null;
++    const row = next.augmentations.find((entry) => entry.name === registration.name);
++    const effective = row?.caseCompletion ?? sourcePolicy;
++    if (!validateVerifyCaseCompletionPolicy(effective)) continue;
++    const declared = declaredCaseIds(root, registration.path, effective.maxBytes);
++    if (!declared.ok) { problems.push(`${registration.name}: could not be run to read its declared ids (${declared.detail}); run it alone with: node ${registration.path}`); continue; }
++    const grown = growAugmentationRow(next, { name: registration.name, file: registration.path, sourcePolicy }, declared.caseIds);
++    if (grown.state === "not-extension") problems.push(`${registration.name}: NOT AN EXTENSION (policy ${grown.policyIds} ids, declared ${grown.declaredIds}); the growth-only rule refuses it, restore the dropped ids in the suite`);
++    else if (grown.state === "extended" || grown.state === "added") lines.push(`${registration.name}: ${grown.from} -> ${grown.to} ids (${grown.state === "added" ? "new augmentation row" : "augmentation row extended"})`);
++  }
++  if (problems.length > 0) return { state: "FAILED", lines, problems };
++  if (JSON.stringify(next) === JSON.stringify(data)) return { state: "current", lines, problems };
++  const composed = applyVerifyCaseCompletionAugmentations(registrations.map((entry) => ({ name: entry.name, file: entry.path, ...((entry.caseCompletion || entry.caseCompletionPresent) ? { caseCompletion: entry.caseCompletionPolicy } : {}) })), next);
++  if (!composed.ok) return { state: "FAILED", lines, problems: [`the extended rows would be refused by the checker (${composed.code}): ${composed.error}`] };
++  if (check) return { state: "DRIFT", lines, problems };
++  writeFileSync(join(root, AUGMENTATION_PATH), `${JSON.stringify(next, null, 2)}\n`);
++  return { state: "refreshed", lines, problems };
++}
++
++function runSyncCli(argv) {
++  const options = { root: DEFAULT_ROOT, since: null, check: false };
++  for (let index = 0; index < argv.length; index += 1) {
++    const key = argv[index];
++    if (key === "--sync-augmentations") continue;
++    if (key === "--check") { options.check = true; continue; }
++    if (key !== "--root" && key !== "--since") throw new Error(`unknown argument ${key}`);
++    const value = argv[++index];
++    if (value === undefined || value.startsWith("--")) throw new Error(`${key} requires a value`);
++    options[key.slice(2)] = value;
++  }
++  const result = syncVerifyCaseCompletionAugmentations(options);
++  for (const line of result.lines) console.log(line);
++  for (const problem of result.problems) console.error(problem);
++  if (result.state === "FAILED") process.exit(2);
++  console.log(`case-completion-augmentations: ${result.state}`);
++  process.exit(result.state === "DRIFT" ? 1 : 0);
++}
++
+ function parseArgs(argv) {
+   const options = { root: DEFAULT_ROOT, registryPath: DEFAULT_REGISTRY, schemaPath: DEFAULT_SCHEMA, verifyPath: DEFAULT_VERIFY, base: null, candidate: null };
+   for (let index = 0; index < argv.length; index += 1) {
+@@ -667,6 +753,10 @@ function parseArgs(argv) {
+ 
+ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+   let result;
++  if (process.argv.includes("--sync-augmentations")) {
++    try { runSyncCli(process.argv.slice(2)); }
++    catch (error) { console.error(`VERIFY-CASE-COMPLETION-SYNC ${error.message}`); process.exit(2); }
++  }
+   try { result = checkVerifyCaseCompletion(parseArgs(process.argv.slice(2))); }
+   catch (error) { console.error(`VERIFY-CASE-COMPLETION-ARGS ${error.message}`); process.exit(2); }
+   if (!result.ok) {
+diff --git a/harness/scripts/verify-case-completion-augmentation.mjs b/harness/scripts/verify-case-completion-augmentation.mjs
+index 199556dce..7ad4cc9aa 100644
+--- a/harness/scripts/verify-case-completion-augmentation.mjs
++++ b/harness/scripts/verify-case-completion-augmentation.mjs
+@@ -20,6 +20,22 @@ const isStrictMonotoneExtension=(previous,next)=>{
+   return true;
+ };
+ 
++// The ONE growth step for a suite whose test file declares ids (the Full Verify way: descriptor 3). It applies the same strict-extension rule as
++// applyVerifyCaseCompletionAugmentations, so what it writes is exactly what the checker accepts: an existing row is extended in place (its
++// previousPolicySha256 and file stay), a suite with only a source policy gets ONE new row bound to that source policy's digest, and anything that is not a
++// strict ordered superset of the current policy (a dropped id, a smaller maxBytes) is returned as 'not-extension' and written nowhere. Mutates `data` only
++// for 'extended' and 'added'. registration = {name, file, sourcePolicy|null}; declaredIds = the ids the suite declared.
++export function growAugmentationRow(data,{name,file,sourcePolicy},declaredIds){
++  const row=data.augmentations.find(r=>r.name===name);
++  const current=row?row.caseCompletion:sourcePolicy;
++  if(!validateVerifyCaseCompletionPolicy(current))return {state:'no-policy'};
++  if(JSON.stringify(current.caseIds)===JSON.stringify(declaredIds))return {state:'in-line',ids:declaredIds.length};
++  const next={schema:current.schema,caseIds:[...declaredIds],maxBytes:current.maxBytes};
++  if(!validateVerifyCaseCompletionPolicy(next)||!isStrictMonotoneExtension(current,next))return {state:'not-extension',policyIds:current.caseIds.length,declaredIds:declaredIds.length};
++  if(row)row.caseCompletion=next;else data.augmentations.push({name,file,caseCompletion:next,previousPolicySha256:policySha256(sourcePolicy)});
++  return {state:row?'extended':'added',from:current.caseIds.length,to:next.caseIds.length};
++}
++
+ export function validateVerifyCaseCompletionAugmentations(data){
+   if(!exact(data,['schema','augmentations'])||data.schema!==AUGMENTATION_SCHEMA||!Array.isArray(data.augmentations)||data.augmentations.length>2048)return failure('AUG-SCHEMA','closed schema and augmentations array required');
+   const names=new Set();
+diff --git a/scripts/refresh-derived-files.mjs b/scripts/refresh-derived-files.mjs
+index eea030fd4..f27afcb43 100644
+--- a/scripts/refresh-derived-files.mjs
++++ b/scripts/refresh-derived-files.mjs
+@@ -1,7 +1,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Purpose: refresh every DERIVED file of a checkout in one step instead of three remembered commands: the backlog ledger projections
+ //          (reconcile-backlog-ledger.mjs --activate), the capability-inventory sourceBaseline (rebaseline-inventory.mjs) and the Reader-input
+-//          mirrors, manifest and pins (sync-reader-inputs.mjs). D223 slice 4: the step is written to the working tree and NEVER staged or
++//          mirrors, manifest and pins (sync-reader-inputs.mjs), and the growth-only case-completion augmentation rows
++//          (check-verify-case-completion.mjs --sync-augmentations: runs the registered suites whose test file changed since the inventory baseline and extends their rows; no id is ever dropped). D223 slice 4: the step is written to the working tree and NEVER staged or
+ //          committed; it names the files it changed and the commit instruction, the agent (or the PO) commits them.
+ // Usage:   node scripts/refresh-derived-files.mjs [<root>] [--check]     (<root> defaults to "."; a clone path such as scratch/clones/<name> works too)
+ //          Run it AFTER the commit that changed the sources, then commit the named files. --check writes nothing and exits 1 on drift.
+@@ -16,7 +17,7 @@ import { resolve } from "node:path";
+ 
+ const args = process.argv.slice(2);
+ if (args.includes("-h") || args.includes("--help")) {
+-  console.log("usage: node scripts/refresh-derived-files.mjs [<root>] [--check]   (refreshes the backlog ledger projections, the inventory sourceBaseline and the Reader inputs; writes the working tree only, never stages or commits; --check writes nothing)");
++  console.log("usage: node scripts/refresh-derived-files.mjs [<root>] [--check]   (refreshes the backlog ledger projections, the inventory sourceBaseline, the Reader inputs and the case-completion augmentation rows; writes the working tree only, never stages or commits; --check writes nothing)");
+   process.exit(0);
+ }
+ const check = args.includes("--check");
+@@ -53,6 +54,8 @@ const fail = (name, result) => {
+ };
+ 
+ const before = fingerprint();
++// The commit the inventory's sourceBaseline names BEFORE step 2 moves it: the last point the derived files were refreshed, hence the base for "which suites changed since".
++const baselineCommit = /"sourceBaseline": \{\s*"commit": "([0-9a-f]{40})"/u.exec(existsSync(resolve(root, "docs/product-capability-inventory.json")) ? readFileSync(resolve(root, "docs/product-capability-inventory.json"), "utf8") : "")?.[1] ?? "";
+ 
+ // 1. Backlog ledger projections. Without --activate the script only plans: "nothing to reconcile" means current.
+ {
+@@ -62,8 +65,29 @@ const before = fingerprint();
+   else steps.push({ name: "backlog-ledger", state: "refreshed" });
+ }
+ 
+-// 2. Capability inventory sourceBaseline: the baseline must name <root>'s HEAD. rebaseline exits 1 when it is already equal.
++// 2. Case-completion augmentation rows (growth-only; the old manual cc-sync step). A suite that declares more ids than its policy lists gets its row extended
++//    with the existing preimage chain. Absent in a root without the files: nothing to derive there. Runs the changed suites, so --check is slower than the others.
++//    It runs BEFORE the inventory step because the baseline commit is the base of its suite selection: when it fails the baseline must not move, or the next run
++//    would select nothing and forget the failure (a baseline that does not resolve is the exception: moving it is the way out of that state).
++let augmentationFailed = false;
+ {
++  const checker = resolve(root, "harness/scripts/check-verify-case-completion.mjs");
++  if (!existsSync(checker) || !existsSync(resolve(root, "harness/config/verify-case-completion-augmentations.v1.json"))) steps.push({ name: "case-completion-augmentations", state: "current" });
++  else {
++    const result = run(checker, ["--sync-augmentations", "--root", root, "--since", baselineCommit, ...(check ? ["--check"] : [])]);
++    const state = /^case-completion-augmentations: (current|refreshed|DRIFT)$/mu.exec(result.stdout)?.[1];
++    if (result.status === 2 || (result.status !== 0 && !(check && result.status === 1)) || state === undefined) {
++      fail("case-completion-augmentations", result);
++      augmentationFailed = baselineCommit !== "" && git("rev-parse", "--verify", `${baselineCommit}^{commit}`).status === 0;
++    } else steps.push({ name: "case-completion-augmentations", state });
++  }
++}
++
++// 3. Capability inventory sourceBaseline: the baseline must name <root>'s HEAD. rebaseline exits 1 when it is already equal.
++if (augmentationFailed) {
++  steps.push({ name: "inventory-baseline", state: "SKIPPED" });
++  console.error("inventory-baseline: not moved because case-completion-augmentations failed (the baseline is the base of its suite selection); fix the suite named above and run this command again.");
++} else {
+   const inventory = resolve(root, "docs/product-capability-inventory.json");
+   const head = git("rev-parse", "HEAD").stdout.trim();
+   const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
+@@ -79,7 +103,7 @@ const before = fingerprint();
+   }
+ }
+ 
+-// 3. Reader inputs (mirrors, manifest, pins). --check is the script's own read-only mode.
++// 4. Reader inputs (mirrors, manifest, pins). --check is the script's own read-only mode.
+ {
+   const result = run(resolve(scriptsDir, "sync-reader-inputs.mjs"), check ? [root, "--check"] : [root]);
+   if (check && result.status === 1) steps.push({ name: "reader-inputs", state: "DRIFT" });
+diff --git a/scripts/refresh-derived-files.test.mjs b/scripts/refresh-derived-files.test.mjs
+index cc8b6fea2..fc5e234c6 100644
+--- a/scripts/refresh-derived-files.test.mjs
++++ b/scripts/refresh-derived-files.test.mjs
+@@ -138,3 +138,184 @@ test("RDF08 the script source never runs git add, commit or stash", () => {
+   assert.doesNotMatch(source, /git\(\s*["'](add|commit|stash|reset|checkout)["']/u);
+   assert.doesNotMatch(source, /["']git["']\s*,\s*\[\s*["'](add|commit|stash|reset|checkout)["']/u);
+ });
++
++// ---- Case-completion augmentation rows (candidate 30k, K1-01 stage 4) ------------------------------------------------
++// The fixture root carries the REAL checker, augmentation module, receipt helper and completion helper (the refresh runs <root>'s own
++// scripts), a minimal verify.mjs and a declarative suite list. Suites are real registerTestCaseCompletion files, so the ids a suite
++// DECLARES come from a real descriptor 3 stream, exactly as the Full Verify reads them.
++const REPO = resolve(import.meta.dirname, "..");
++const { verifyCaseCompletionPolicySha256: sha } = await import(new URL("../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs", import.meta.url).href);
++const { applyVerifyCaseCompletionAugmentations } = await import(new URL("../harness/scripts/verify-case-completion-augmentation.mjs", import.meta.url).href);
++const CC_FILES = [
++  "harness/scripts/check-verify-case-completion.mjs", "harness/scripts/check-verify-suite-registration.mjs", "harness/scripts/verify-case-completion-augmentation.mjs",
++  "plugins/pipeline-core/lib/schema-lite.mjs", "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs", "plugins/pipeline-core/lib/governance-event.mjs",
++  "plugins/pipeline-core/lib/test-case-completion.mjs",
++];
++const AUG = "harness/config/verify-case-completion-augmentations.v1.json";
++const policyOf = (ids, maxBytes = 4096) => ({ schema: "pipeline.verify-case-completion-policy.v1", caseIds: ids, maxBytes });
++const suiteSource = (ids) => `import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
++const ids = ${JSON.stringify(ids)};
++registerTestCaseCompletion({ cases: ids.map((id) => ({ id, name: "case " + id, run() {} })), fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? 3), maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? 4096) });
++`;
++const writeJson = (root, rel, value) => writeFileSync(join(root, rel), `${JSON.stringify(value, null, 2)}\n`);
++const readJson = (root, rel) => JSON.parse(readFileSync(join(root, rel), "utf8"));
++const sourceRows = () => [
++  { name: "alpha-tests", file: "harness/scripts/alpha.test.mjs", caseCompletion: policyOf(["A01"]) },
++  { name: "beta-tests", file: "harness/scripts/beta.test.mjs", caseCompletion: policyOf(["B01"]) },
++  { name: "gamma-tests", file: "harness/scripts/gamma.test.mjs", caseCompletion: policyOf(["G01"]) },
++];
++// alpha: source policy only; beta: an earlier candidate already grew it through an augmentation row; gamma: never changes and must never run.
++function mkCcFixture() {
++  const root = mkFixture();
++  for (const rel of CC_FILES) { mkdirSync(join(root, rel, ".."), { recursive: true }); copyFileSync(join(REPO, rel), join(root, rel)); }
++  mkdirSync(join(root, "harness/config"), { recursive: true });
++  // delta: an INLINE policy in verify.mjs (the other source of a policy next to verify-suites.json).
++  writeFileSync(join(root, "harness/scripts/verify.mjs"), `const TEST_SUITES = [\n  { name: "delta-tests", file: join(scriptDir, "delta.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["D01"], maxBytes: 4096 } },\n];\nconst SCOPED_VERIFY_SUITES = Object.freeze([\n]);\nconst WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([\n]);\n`);
++  writeFileSync(join(root, "harness/scripts/delta.test.mjs"), suiteSource(["D01"]));
++  writeJson(root, "harness/verify-suites.json", { schema: "pipeline.verify-suites.v1", suites: sourceRows() });
++  writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), suiteSource(["A01"]));
++  writeFileSync(join(root, "harness/scripts/beta.test.mjs"), suiteSource(["B01", "B02"]));
++  writeFileSync(join(root, "harness/scripts/gamma.test.mjs"), `throw new Error("an unchanged suite must never be run by the refresh");\n`);
++  writeJson(root, AUG, { schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [
++    { name: "beta-tests", file: "harness/scripts/beta.test.mjs", caseCompletion: policyOf(["B01", "B02"]), previousPolicySha256: sha(policyOf(["B01"])) },
++    { name: "gamma-tests", file: "harness/scripts/gamma.test.mjs", caseCompletion: policyOf(["G01", "G02"]), previousPolicySha256: sha(policyOf(["G01"])) },
++  ] });
++  git(root, "add", "-A");
++  git(root, "commit", "-q", "-m", "cc fixture");
++  const head = git(root, "rev-parse", "HEAD");
++  writeFileSync(join(root, "docs/product-capability-inventory.json"), inventoryText(head, git(root, "rev-parse", "HEAD^{tree}")));
++  git(root, "add", "-A");
++  git(root, "commit", "-q", "-m", "baseline names the commit before the suites grow");
++  return root;
++}
++const growSuite = (root, name, ids) => { writeFileSync(join(root, `harness/scripts/${name}.test.mjs`), suiteSource(ids)); git(root, "add", "-A"); git(root, "commit", "-q", "-m", `${name} grows`); };
++
++test("RDF09 a suite that declares one more id gets exactly one new augmentation row bound to the source policy digest, nothing else moves", () => {
++  const root = mkCcFixture();
++  growSuite(root, "alpha", ["A01", "A02"]);
++  const rowsBefore = readJson(root, AUG).augmentations;
++  const suitesBefore = readFileSync(join(root, "harness/verify-suites.json"), "utf8");
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: refreshed$/mu);
++  const rowsAfter = readJson(root, AUG).augmentations;
++  assert.equal(rowsAfter.length, rowsBefore.length + 1);
++  assert.deepEqual(rowsAfter.slice(0, rowsBefore.length), rowsBefore, "every existing row is byte-for-byte what it was");
++  assert.deepEqual(rowsAfter.at(-1), { name: "alpha-tests", file: "harness/scripts/alpha.test.mjs", caseCompletion: policyOf(["A01", "A02"]), previousPolicySha256: sha(policyOf(["A01"])) });
++  assert.equal(readFileSync(join(root, "harness/verify-suites.json"), "utf8"), suitesBefore, "the source policy is never edited");
++  assert.match(r.stdout, new RegExp(`^  ${AUG.replace(/[./]/g, "\\$&")}$`, "mu"));
++  const composed = applyVerifyCaseCompletionAugmentations(readJson(root, "harness/verify-suites.json").suites, readJson(root, AUG));
++  assert.equal(composed.ok, true, "the checker's own composition accepts the file: " + JSON.stringify(composed));
++  assert.deepEqual(composed.suites.find((s) => s.name === "alpha-tests").caseCompletion.caseIds, ["A01", "A02"]);
++  assert.equal(git(root, "diff", "--cached", "--name-only"), "", "nothing staged");
++  assert.doesNotMatch(git(root, "status", "--porcelain"), /scratch|\.out/u, "the descriptor 3 stream is not left inside the root");
++});
++
++test("RDF10 a second run finds the rows in line and writes nothing", () => {
++  const root = mkCcFixture();
++  growSuite(root, "alpha", ["A01", "A02"]);
++  assert.equal(run(root).status, 0);
++  const bytes = readFileSync(join(root, AUG), "utf8");
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: current$/mu);
++  assert.equal(readFileSync(join(root, AUG), "utf8"), bytes);
++});
++
++test("RDF11 --check names the drifting step, exits 1 and writes nothing", () => {
++  const root = mkCcFixture();
++  growSuite(root, "alpha", ["A01", "A02"]);
++  const bytes = readFileSync(join(root, AUG), "utf8");
++  const r = run(root, "--check");
++  assert.equal(r.status, 1, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: DRIFT$/mu);
++  assert.match(r.stdout, /DRIFT in [^\n]*case-completion-augmentations/u);
++  assert.equal(readFileSync(join(root, AUG), "utf8"), bytes);
++  assert.equal(git(root, "status", "--porcelain"), "");
++});
++
++test("RDF12 a suite whose augmentation row already exists is extended in place: same preimage, same other rows, strictly more ids", () => {
++  const root = mkCcFixture();
++  growSuite(root, "beta", ["B01", "B02", "B03"]);
++  const before = readJson(root, AUG).augmentations;
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  const after = readJson(root, AUG).augmentations;
++  assert.equal(after.length, before.length, "no second row for one suite name");
++  assert.deepEqual(after[0], { ...before[0], caseCompletion: policyOf(["B01", "B02", "B03"]) });
++  assert.equal(after[0].previousPolicySha256, before[0].previousPolicySha256, "the preimage binding is never re-bound");
++  assert.deepEqual(after[1], before[1]);
++});
++
++test("RDF13 a suite that drops a declared id is NOT an extension: reported FAILED, exit 2, the file keeps its bytes", () => {
++  const root = mkCcFixture();
++  growSuite(root, "beta", ["B02"]);
++  const bytes = readFileSync(join(root, AUG), "utf8");
++  const r = run(root);
++  assert.equal(r.status, 2, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: FAILED$/mu);
++  assert.match(r.stderr, /beta-tests: NOT AN EXTENSION/u);
++  assert.equal(readFileSync(join(root, AUG), "utf8"), bytes);
++});
++
++test("RDF14 a changed suite that cannot run is reported FAILED, never skipped silently, and nothing is written", () => {
++  const root = mkCcFixture();
++  writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), `throw new Error("broken suite");\n`);
++  git(root, "add", "-A");
++  git(root, "commit", "-q", "-m", "alpha breaks");
++  const bytes = readFileSync(join(root, AUG), "utf8");
++  const r = run(root);
++  assert.equal(r.status, 2, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: FAILED$/mu);
++  assert.match(r.stderr, /alpha-tests: could not be run/u);
++  assert.equal(readFileSync(join(root, AUG), "utf8"), bytes);
++});
++
++test("RDF17 a failed augmentation step does not move the inventory baseline: a second run still selects the same suites and fails again", () => {
++  const inventory = (root) => readFileSync(join(root, "docs/product-capability-inventory.json"), "utf8");
++  for (const [label, grow] of [["dropped id", (root) => growSuite(root, "beta", ["B02"])], ["broken suite", (root) => { writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), `throw new Error("broken suite");\n`); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "alpha breaks"); }]]) {
++    const root = mkCcFixture();
++    grow(root);
++    const baseline = inventory(root), bytes = readFileSync(join(root, AUG), "utf8");
++    const first = run(root);
++    assert.equal(first.status, 2, `${label}: ${first.stdout}${first.stderr}`);
++    assert.match(first.stdout, /^inventory-baseline: SKIPPED$/mu, label);
++    assert.match(first.stderr, /inventory-baseline: not moved because case-completion-augmentations failed/u, label);
++    assert.equal(inventory(root), baseline, `${label}: the baseline is the base of the suite selection and stays put`);
++    const second = run(root);
++    assert.equal(second.status, 2, `${label}: the same failure is reported again: ${second.stdout}${second.stderr}`);
++    assert.match(second.stdout, /^case-completion-augmentations: FAILED$/mu, label);
++    assert.equal(readFileSync(join(root, AUG), "utf8"), bytes, label);
++  }
++});
++
++test("RDF18 a suite whose policy is INLINE in verify.mjs gets one new row bound to that inline policy's digest", () => {
++  const root = mkCcFixture();
++  growSuite(root, "delta", ["D01", "D02"]);
++  const before = readJson(root, AUG).augmentations;
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  const after = readJson(root, AUG).augmentations;
++  assert.deepEqual(after.slice(0, before.length), before);
++  assert.deepEqual(after.at(-1), { name: "delta-tests", file: "harness/scripts/delta.test.mjs", caseCompletion: policyOf(["D01", "D02"]), previousPolicySha256: sha(policyOf(["D01"])) });
++});
++
++test("RDF15 with no harness case-completion files in the root the step is a silent current and the other steps are unaffected", () => {
++  const root = mkFixture();
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: current$/mu);
++  assert.match(r.stdout, /changed \(3\)/u);
++});
++
++test("RDF16 a sourceBaseline commit that does not resolve names the runnable command instead of guessing a selection", () => {
++  const root = mkCcFixture();
++  writeFileSync(join(root, "docs/product-capability-inventory.json"), inventoryText(ZERO, ZERO));
++  git(root, "add", "-A");
++  git(root, "commit", "-q", "-m", "baseline lost");
++  const r = run(root);
++  assert.equal(r.status, 2, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: FAILED$/mu);
++  assert.match(r.stderr, /node harness\/scripts\/check-verify-case-completion\.mjs --sync-augmentations --since <ref>/u);
++  assert.match(r.stdout, /^inventory-baseline: refreshed$/mu, "an unresolvable baseline is moved anyway: that is the way out of the state, not a deadlock");
++});
