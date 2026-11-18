@@ -693,6 +693,7 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",

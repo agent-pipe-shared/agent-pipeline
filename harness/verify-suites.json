@@ -4606,6 +4606,12 @@
       "nonOverlapNote": "Unique cases: lib/spec-risk-trace.mjs; the close quality readback suite pins the report-only row that uses it"
     },
     {
+      "name": "onboarding-consent-scope-tests",
+      "file": "plugins/pipeline-core/lib/onboarding-consent-scope.test.mjs",
+      "invariantPinned": "The first-round consent question keeps every fact it states in English and German within the length caps, the scope ids and the not-covered ids it returns for the consent record are unchanged, and an unknown language falls back to English (C30K, AC-112)",
+      "nonOverlapNote": "Unique cases: lib/onboarding-consent-scope.mjs; the consent mark and preflight suites pin how the question is relayed and recorded"
+    },
+    {
       "name": "session-authority-registry-fsync-tests",
       "file": "plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs",
       "invariantPinned": "On win32 a directory fsync that fails with EPERM, EINVAL, EISDIR, EACCES or ENOTSUP counts as a succeeded registry write and reports durability unsupported with the error code, while the same codes on another platform and any other code on win32 still throw (C18-6, AC-127)",
