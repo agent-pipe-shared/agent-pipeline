@@ -53,6 +53,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, validOperatorLabel, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { boundedCopySafeCommandForBash } from "../lib/human-command-render.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA, validateDesignWorkflowPackageApprovalRequest } from "../lib/design-workflow-approval.mjs";
@@ -2334,7 +2335,7 @@ function renderAuthorizeCriticalCommand(name, {
     "--subject-sha256", subjectSha256,
     "--expires-at", expiresAt,
   );
-  return boundedCopySafeCommand({ executable: "node", argv });
+  return boundedCopySafeCommandForBash({ executable: "node", argv });
 }
 
 export const PO_HUMAN_APPROVAL_SETUP_BOUNDARY = Object.freeze({

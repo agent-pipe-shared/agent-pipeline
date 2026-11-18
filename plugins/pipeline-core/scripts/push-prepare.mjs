@@ -46,6 +46,7 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { renderHumanStep } from "../lib/human-command-render.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
@@ -1036,7 +1037,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     repoRoot: dir, directory: null, featureId: feature.featureId, plan: feature.planPath, spec: feature.specPath,
     subjectSha256, expiresAt,
   });
-  const authorizeCommand = renderHumanCopySafeCommand({
+  const authorizeCommand = renderHumanStep({
     label: "human authorize-critical",
     executable: authorize.executable,
     argv: authorize.argv,
@@ -1048,6 +1049,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     "--by", by, "--remote", remote, "--destination", destination,
     "--proof-request", artifacts.request, "--proof-authority", artifacts.authority, "--proof", artifacts.proof,
   ];
+  // approve-push compares the three proof paths byte-for-byte with the mirror paths (pipeline-state.mjs localMirrorScratchArtifacts): printed exactly as built, never reshaped.
   const approveCommand = renderHumanCopySafeCommand({
     label: "agent approve-push",
     executable: "node",
