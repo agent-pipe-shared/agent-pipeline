@@ -782,14 +782,17 @@ export function addSpecAddendum({ root: rootInput, state, approvalPath, readAcce
 
 /**
  * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
- * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
+ * packet id is derived from the repository: the feature (the single registered feature course; C30J-J13: with several features that
+ * hold a review unit, for example a retained discarded predecessor, the one whose course the consumed packet's course claim binds),
+ * registrationCommit = HEAD,
  * the round candidate/base from the consumed packet, the parent from the registered history tail. The record is compiled by
  * compileRegisteredCriticReviewLineage, written as the immutable `critic-lineage-<sha>.json` and added to the manifest as
- * non-authority candidate-evidence. Nothing is committed.
+ * non-authority candidate-evidence. Nothing is committed. The optional `featureId` (`--feature <id>`) is a selector that is checked
+ * against the same binding and refused when the claim binds another feature.
  */
 const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
 const DELTA_REQUEST_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-delta-request-[a-f0-9]{64}\.json$/u;
-export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract, dryRun = false } = {}) {
+export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract, dryRun = false, featureId: selector = null } = {}) {
   if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
   let root;
   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
@@ -806,8 +809,10 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   let features = [];
   try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
   if (features.length === 0) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId });
-  if (features.length > 1) return refused("FPR-LINEAGE-FEATURE-AMBIGUOUS", `more than one feature has a review unit (${features.join(", ")}); the lineage verb needs exactly one registered feature course`, { packetId });
-  const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
+  if (selector !== null && (typeof selector !== "string" || !features.includes(selector))) return refused("FPR-LINEAGE-FEATURE-SELECTOR", `--feature ${JSON.stringify(selector)} is not a feature that has a Critic review unit (${features.join(", ")}); name one of them: register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId} --feature <feature id>`, { packetId });
+  // C30J-J13: everything below the choice of the feature is derived per feature; a feature whose course the consumed claim does not bind refuses (or compiles to nothing) by itself.
+  const derive = (featureId) => {
+  const manifestPath = `specs/${featureId}/lifecycle.json`;
   const manifestRead = inspect(root, manifestPath);
   const checked = validateFeaturePackage(root, manifestPath);
   if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
@@ -862,7 +867,26 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
   if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}${String(compiled.code).startsWith("CRL-HISTORY-CHAIN:") ? ": the chain to the last registered round broke at the named condition; parent-review-id and previous-sha256 mean the parent is not the last registered round, review-id-repeated that the review id is not new, fresh-from, lane-id-equal and context-equal that the round is not an independent run after its parent" : ""}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}; if correction commits already follow this round the lineage cannot be registered any more; retire the unregistered round with session-critic-finalizer inspect-course-takeover then supersede-course-takeover (it retires only the rounds above the registered lineage) and rerun that round as a delta from the last registered round`,{ compileCode: compiled.code, packetId });
-  const artifact = compiled.value.artifact;
+  return { ready: { featureId, manifestPath, manifestRead, manifest, round, artifact: compiled.value.artifact } };
+  };
+  const attempt = (id) => { try { return derive(id); } catch { return refused("FPR-LINEAGE-COMPILE", `the lineage of ${id} could not be derived`, { packetId }); } };
+  const rerunWith = (id) => `register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId} --feature ${id}`;
+  let chosen;
+  if (selector !== null) {
+    chosen = derive(selector);
+    // A selector that contradicts the packet's own course claim is refused naming the feature the claim binds; it is never followed.
+    const bound = chosen.status === "refused" ? features.filter((id) => id !== selector && attempt(id).status !== "refused") : [];
+    if (bound.length > 0) return refused("FPR-LINEAGE-FEATURE-SELECTOR-CONTRADICTS", `--feature ${selector} contradicts the consumed packet ${packetId}: its course claim binds ${bound.join(", ")}, not ${selector}. Rerun with the bound feature: ${rerunWith(bound[0])}`, { packetId, boundFeatures: bound });
+  } else if (features.length === 1) chosen = derive(features[0]);
+  else {
+    const outcomes = features.map((id) => [id, attempt(id)]);
+    const bound = outcomes.filter(([, outcome]) => outcome.status !== "refused");
+    if (bound.length !== 1) return refused("FPR-LINEAGE-FEATURE-AMBIGUOUS", `more than one feature has a review unit (${outcomes.map(([id, outcome]) => `${id}: ${outcome.status === "refused" ? outcome.code : "claim binds it"}`).join("; ")}) and the course claim of packet ${packetId} binds ${bound.length === 0 ? "none of them" : "more than one of them"}. Name the feature the round belongs to with the selector (it is checked against that claim; the refusal of that feature itself is then printed): ${features.map(rerunWith).join(" | ")}`, { packetId, features });
+    chosen = bound[0][1];
+  }
+  // A refusal or an idempotent replay of the chosen feature answers by itself.
+  if (chosen.ready === undefined) return chosen;
+  const { featureId, manifestPath, manifestRead, manifest, round, artifact } = chosen.ready;
   // D223 guard: `dryRun` answers "would this write succeed right now" with the SAME derivation, and writes nothing.
   if (dryRun === true) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-registrable", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`, commitPaths: [manifestPath, artifact.path] };
   const target = join(root, artifact.path), created = !existsSync(target);
@@ -1011,7 +1035,7 @@ function manifestCoreUnchanged(root, parent, commit, manifestPath) {
 }
 /** When `true` is factually right, and when it is not (shown with the refusal, the skeleton and the help text). */
 const FULL_ROUND_GUIDANCE = "impactAmbiguous is true only when the changed paths' effect cannot be told even after reading them. A large or risky-looking diff is neither: the diff round exists for it.";
-export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract, confirmFullRound = false } = {}) {
+export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract, confirmFullRound = false, featureId: selector = null, state = null } = {}) {
   if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
   let root;
   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
@@ -1047,7 +1071,20 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   // The single registered feature course.
   let features = [];
   try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
-  if (features.length !== 1) return refused("FPR-DELTA-FEATURE", features.length === 0 ? "no feature has a Critic review unit; there is no registered feature course" : `more than one feature has a review unit (${features.join(", ")}); the delta verb needs exactly one registered feature course`);
+  // C30J-J13: with several features that hold a review unit, the features the State records as discarded (the PO's recorded decision; a discarded feature takes no further review round) are
+  // left out; the manifest relation `supersedes` alone never retires a feature. The selector decides when that does not leave exactly one, and it never names a discarded feature. The chosen
+  // feature must still hold a registered lineage (FPR-DELTA-NO-LINEAGE below), so a selector never reaches a feature without a round.
+  const reviewUnitFeatures = features, discarded = discardedFeatureIdsOfState(state);
+  const delta = (id) => `register-feature-package.mjs --root <root> --add-delta-request <input.json> --feature ${id}`;
+  if (selector !== null) {
+    if (typeof selector !== "string" || !features.includes(selector)) return refused("FPR-DELTA-FEATURE-SELECTOR", `--feature ${JSON.stringify(selector)} is not a feature that has a Critic review unit (${features.join(", ") || "none"}); name one of them: ${delta("<feature id>")}`);
+    if (discarded.includes(selector)) return refused("FPR-DELTA-FEATURE-DISCARDED", `--feature ${selector}: the State records ${selector} as discarded, and a discarded feature takes no further review round. Name its successor${features.length > 1 ? `: ${features.filter((id) => !discarded.includes(id)).map(delta).join(" | ") || delta("<successor feature id>")}` : ""}`);
+    features = [selector];
+  } else if (features.length > 1) {
+    const active = features.filter((id) => !discarded.includes(id));
+    if (active.length >= 1) features = active;
+  }
+  if (features.length !== 1) return refused("FPR-DELTA-FEATURE", features.length === 0 ? "no feature has a Critic review unit; there is no registered feature course" : `more than one feature has a review unit (${reviewUnitFeatures.join(", ")}) and leaving out the features the State records as discarded does not leave exactly one (a successor's supersedes alone is not enough, the State's discard record is the evidence); name the feature of this course: ${reviewUnitFeatures.map(delta).join(" | ")}`);
   const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
   const manifestRead = inspect(root, manifestPath);
   const checked = validateFeaturePackage(root, manifestPath);
