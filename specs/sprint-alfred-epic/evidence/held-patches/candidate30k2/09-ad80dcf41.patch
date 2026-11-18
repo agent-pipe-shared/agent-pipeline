@@ -1,0 +1,66 @@
+diff --git a/harness/scripts/check-verify-case-completion.mjs b/harness/scripts/check-verify-case-completion.mjs
+index 59504be9991d0c7b053d5050f8227a3ed4db8471..e268deb211fc5f151b1ccbabaa142abed06733e6 100644
+--- a/harness/scripts/check-verify-case-completion.mjs
++++ b/harness/scripts/check-verify-case-completion.mjs
+@@ -660,7 +660,9 @@ function declaredCaseIds(root, path, maxBytes) {
+     delete env.NODE_TEST_CONTEXT;
+     const result = spawnSync(process.execPath, [path], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600_000, stdio: ["ignore", "pipe", "pipe", fd] });
+     const declared = readFileSync(join(scratch, "stream.out"), "utf8").split("\n").filter(Boolean).map((text) => { try { return JSON.parse(text); } catch { return null; } }).find((event) => event?.event === "DECLARED")?.caseIds;
+-    return result.status === 0 && Array.isArray(declared) ? { ok: true, caseIds: declared } : { ok: false, detail: `exit ${result.status}, declared ${Array.isArray(declared) ? declared.length : "none"}` };
++    // The ids a suite DECLARES are announced when it registers, before any case runs: a case that fails (or times out) later does not change them, and whether a case passes is
++    // Verify's judgement, not this step's. So a non-zero exit with a declared list is still a reading; a suite that dies before declaring (a throw at load) stays unreadable.
++    return Array.isArray(declared) ? { ok: true, caseIds: declared, exitCode: result.status } : { ok: false, detail: `exit ${result.status}, declared none` };
+   } finally {
+     if (fd !== -1) closeSync(fd);
+     rmSync(scratch, { recursive: true, force: true });
+@@ -702,6 +704,7 @@ export function syncVerifyCaseCompletionAugmentations({ root = DEFAULT_ROOT, sin
+     if (!validateVerifyCaseCompletionPolicy(effective)) continue;
+     const declared = declaredCaseIds(root, registration.path, effective.maxBytes);
+     if (!declared.ok) { problems.push(`${registration.name}: could not be run to read its declared ids (${declared.detail}); run it alone with: node ${registration.path}`); continue; }
++    if (declared.exitCode !== 0) lines.push(`${registration.name}: note, the suite exited ${declared.exitCode} while its ${declared.caseIds.length} declared ids were read (a failing or timed-out case); the declared ids are what the row records, Verify judges the case; run it alone with: node ${registration.path}`);
+     const grown = growAugmentationRow(next, { name: registration.name, file: registration.path, sourcePolicy }, declared.caseIds);
+     if (grown.state === "not-extension") problems.push(`${registration.name}: NOT AN EXTENSION (policy ${grown.policyIds} ids, declared ${grown.declaredIds}); the growth-only rule refuses it, restore the dropped ids in the suite`);
+     else if (grown.state === "extended" || grown.state === "added") lines.push(`${registration.name}: ${grown.from} -> ${grown.to} ids (${grown.state === "added" ? "new augmentation row" : "augmentation row extended"})`);
+diff --git a/scripts/refresh-derived-files.mjs b/scripts/refresh-derived-files.mjs
+index f27afcb434bc2a144135899ebca30534e47027fc..5ef9e692c1b217948a42a8c110c894f1b591d42e 100644
+--- a/scripts/refresh-derived-files.mjs
++++ b/scripts/refresh-derived-files.mjs
+@@ -79,7 +79,11 @@ let augmentationFailed = false;
+     if (result.status === 2 || (result.status !== 0 && !(check && result.status === 1)) || state === undefined) {
+       fail("case-completion-augmentations", result);
+       augmentationFailed = baselineCommit !== "" && git("rev-parse", "--verify", `${baselineCommit}^{commit}`).status === 0;
+-    } else steps.push({ name: "case-completion-augmentations", state });
++    } else {
++      steps.push({ name: "case-completion-augmentations", state });
++      // A suite that exited non-zero after it declared its ids is still read; the checker names that as a note line, shown here so it is not lost.
++      for (const line of result.stdout.split("\n")) if (/: note, the suite exited /u.test(line)) console.log(line);
++    }
+   }
+ }
+ 
+diff --git a/scripts/refresh-derived-files.test.mjs b/scripts/refresh-derived-files.test.mjs
+index fc5e234c6be222a6841f8ec74a377948964ea8d6..0be527b238bf10e8e7869b64c3af9b553aca3651 100644
+--- a/scripts/refresh-derived-files.test.mjs
++++ b/scripts/refresh-derived-files.test.mjs
+@@ -271,6 +271,21 @@ test("RDF14 a changed suite that cannot run is reported FAILED, never skipped si
+   assert.equal(readFileSync(join(root, AUG), "utf8"), bytes);
+ });
+ 
++test("RDF18 a changed suite whose case fails after it declared its ids is still read: the row is extended, the failing exit is named as a note, nothing is skipped", () => {
++  const root = mkCcFixture();
++  writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), `import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
++const ids = ["A01", "A02"];
++registerTestCaseCompletion({ cases: ids.map((id) => ({ id, name: "case " + id, run() { if (id === "A02") throw new Error("a late case fails"); } })), fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? 3), maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? 4096) });
++`);
++  git(root, "add", "-A");
++  git(root, "commit", "-q", "-m", "alpha grows and one case fails");
++  const r = run(root);
++  assert.equal(r.status, 0, r.stdout + r.stderr);
++  assert.match(r.stdout, /^case-completion-augmentations: refreshed$/mu);
++  assert.match(r.stdout, /alpha-tests: note, the suite exited 1 while its 2 declared ids were read/u);
++  assert.deepEqual(readJson(root, AUG).augmentations.at(-1).caseCompletion.caseIds, ["A01", "A02"]);
++});
++
+ test("RDF17 a failed augmentation step does not move the inventory baseline: a second run still selects the same suites and fails again", () => {
+   const inventory = (root) => readFileSync(join(root, "docs/product-capability-inventory.json"), "utf8");
+   for (const [label, grow] of [["dropped id", (root) => growSuite(root, "beta", ["B02"])], ["broken suite", (root) => { writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), `throw new Error("broken suite");\n`); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "alpha breaks"); }]]) {

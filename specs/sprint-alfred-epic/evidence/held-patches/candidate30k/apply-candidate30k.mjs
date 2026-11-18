@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 30k: 13 held patches exported from the build clone chain fd69d44f3..525fab15d
+# PO apply script for candidate 30k: 22 held patches exported from the build clone chain fd69d44f3..ad80dcf41
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -27,6 +27,15 @@ step 10-df4cff8be 'test(pins): restate two neighbour pins for the seventh qualit
 step 11-8c6808847 'test(verify): register the Spec risk trace reader suite and assign its Verify surface'
 step 12-159afbc09 'test(verify): restate the seven outgrown assertion-site counts of the case-completion registry pin'
 step 13-525fab15d 'chore(verify): extend the case-completion augmentation rows for the cases the 30j and 30k lanes added'
+step 14-e2a61fa74 'feat(close): the addenda stop names every written Critic addendum that git status hides and the command that stages it'
+step 15-638a8e17a 'fix(approval): the card of the digest-only override route says that no request file exists on that route'
+step 16-47c80a1e1 'fix(push-init): a missing transport reference names what the value is for each transport kind and shows an example'
+step 17-34147d56b 'docs(plans): options for a browser smoke step in Verify with the smallest first stage'
+step 18-4f219b298 'docs(plans): options to improve the one-turn design question round without a second round'
+step 19-c31fcb4af 'refactor(onboarding): the consent question is shorter and keeps every fact it states'
+step 20-fe262759b 'test(verify): register the consent question suite and assign its Verify surface'
+step 21-61f6abaa0 'docs(adr): accept ADR 0104 with Option A and record why Option B stopped on recon'
+step 22-ad80dcf41 'fix(refresh): a suite that fails a case after it declared its ids is still read by the case-completion step'
 
 node scripts/refresh-derived-files.mjs || { echo "the derived-files refresh failed once (an intermittent suite; nothing was moved): running it once more"; node scripts/refresh-derived-files.mjs; }
 git add -A -- docs plugins/pipeline-core backlog harness/config
