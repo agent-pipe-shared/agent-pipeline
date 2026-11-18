@@ -536,8 +536,9 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
  * C30J-J12 (queue C30-20 gap): the plain-language card that opens the `sign-intent` confirmation for the two ceremonies that are not
  * `authorize-critical`: the guard-override signature digest and the design approval. Pure and read-only: the facts come ONLY from values
  * the ceremony already holds (the structured plan the signature request resolved to, or the validated request binding); it reads nothing,
- * changes no request, digest or proof, and the evidence lines printed after the card are not its business. Any other request (the bare
- * `--intent-sha256` route included, which resolves display lines only) gets no card rather than facts parsed out of display text.
+ * changes no request, digest or proof, and the evidence lines printed after the card are not its business. Any other request gets no card
+ * rather than facts parsed out of display text. The bare `--intent-sha256` route gets the guard-override card only from the structured
+ * `cardFacts` of the resolved description (C30J-J28).
  */
 export function signingConfirmationCard({ requestSchema, request, record, language } = {}) {
   if (requestSchema === "pipeline.human-guard-override-signature-digest.v1") {
@@ -554,6 +555,13 @@ export function signingConfirmationCard({ requestSchema, request, record, langua
         receiptCount: Array.isArray(binding?.reviewReceipts) ? binding.reviewReceipts.length : undefined,
         verdict: binding?.verdict, openFindingCount: Array.isArray(binding?.openFindingIds) ? binding.openFindingIds.length : undefined,
         candidateCommit: request?.approvalIntent?.value?.candidate?.commit } });
+  }
+  // C30J-J28: the digest-only route (no request file). Only a description that carries the guard-override describer's own structured `cardFacts` gets a
+  // card (a maintenance-window description or an unresolved digest has none); the facts are read key by key, never parsed from the display lines, and a
+  // malformed one is left out by the card itself.
+  if (requestSchema === undefined && record?.resolved === true && record.cardFacts !== null && typeof record.cardFacts === "object" && !Array.isArray(record.cardFacts)) {
+    const { toolName, commandClass, expiresAt, pathCount } = record.cardFacts;
+    return signingCeremonyCard({ kind: "guard-override", language, facts: { toolName, commandClass, expiresAt, pathCount } });
   }
   return [];
 }

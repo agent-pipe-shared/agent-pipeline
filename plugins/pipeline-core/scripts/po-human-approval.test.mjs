@@ -3632,6 +3632,80 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
   }
 });
 
+// C30J-J28 (AC-112 closest accepted criterion): the digest-only route (no request file) runs to its confirmation prompt on a fixture plan and
+// prints the plain-language card from the structured facts of the indexed plan, above the unchanged evidence lines.
+const J28_EN_LABELS = ["WHAT YOU ARE SIGNING:", "WHY YOU ARE ASKED NOW:", "WHAT THIS ALLOWS, AND UNTIL WHEN:", "WHAT THIS DOES NOT ALLOW:", "IF YOU DECLINE:", "HOW TO READ THE LINES BELOW:"];
+test("C30J-J28: sign-intent --intent-sha256 on a guard-override digest prints the card from the indexed plan's facts above the unchanged evidence lines", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = hgoFixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const armed = armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo digest-only card\n" });
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const prompts = [];
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", armed.intent.sha256],
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
+    );
+    assert.equal(result.ok, true);
+    assert.equal(prompts.length, 1, "still exactly one human confirmation");
+    const [prompt] = prompts;
+    let at = -1;
+    for (const label of J28_EN_LABELS) { const found = prompt.indexOf(label); assert.ok(found > at, `card label ${label} missing or out of order`); at = found; }
+    assert.ok(prompt.includes('tool "Write"'), "the tool name comes from the indexed plan");
+    assert.match(prompt, /command class "[^"\n]+"/u);
+    assert.match(prompt, /\b1 eligible path is listed below/u, "the eligible-path count comes from the indexed plan");
+    assert.match(prompt, /\(stored as \d{4}-\d{2}-\d{2}T[\d:.]+Z\)/u, "the signed expiry is stated");
+    assert.ok(prompt.includes("authorize-by-signature"));
+    // The evidence lines follow the end line exactly as before: digest first, then the display lines of the describer.
+    const promptLines = prompt.split("\n");
+    const endAt = promptLines.findIndex((entry) => entry.trim() === "-----");
+    assert.ok(endAt > 0, "the card ends with its end line");
+    const evidenceLines = promptLines.slice(endAt + 1).map((entry) => entry.trim()).filter((entry) => entry !== "");
+    assert.equal(evidenceLines[0], `intent sha256: ${armed.intent.sha256}`, "the digest is the first evidence line, exactly as without the card");
+    assert.ok(evidenceLines.some((entry) => entry.startsWith("eligible paths this override would admit: notes.md")));
+    assert.ok(evidenceLines.some((entry) => entry.includes("GUARD-DEVPLAN-NOT-READY")));    // The card carries no raw path and no rationale: those stay in the evidence lines only.
+    assert.equal(prompt.slice(0, prompt.indexOf(`intent sha256: ${armed.intent.sha256}`)).includes("notes.md"), false);
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
+    assert.equal(proof.intentSha256, armed.intent.sha256, "the signature still covers the digest only");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C30J-J28: the digest-only route prints no guard-override card for an unresolved digest or a maintenance-window digest", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = hgoFixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo present but unrelated\n" });
+    const unrelated = createHash("sha256").update("neither gmw nor hgo resolves this either").digest("hex");
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const prompts = [];
+    runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
+    );
+    for (const label of J28_EN_LABELS) assert.equal(prompts[0].includes(label), false, `no card for an unresolved digest: ${label}`);
+    assert.match(prompts[0], /no recorded request/iu);
+  } finally {
+    cleanup(dirs);
+  }
+  const windowDirs = windowFixture();
+  try {
+    keyFixture(windowDirs.directory);
+    const prepared = prepareWindow(windowDirs);
+    anchorFixtureKey(windowDirs.repoRoot, windowDirs.directory);
+    const prompts = [];
+    runHumanApproval(
+      ["sign-intent", "--repo-root", windowDirs.repoRoot, "--directory", windowDirs.directory, "--intent-sha256", prepared.intent.sha256],
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
+    );
+    for (const label of J28_EN_LABELS) assert.equal(prompts[0].includes(label), false, `a maintenance-window digest is not a guard override: ${label}`);
+    assert.ok(prompts[0].includes(WINDOW_REASON), "its own evidence lines are unchanged");
+  } finally {
+    cleanupWindow(windowDirs);
+  }
+});
+
 test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = hgoFixtureDirs();
   try {

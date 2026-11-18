@@ -238,6 +238,28 @@ test("C30J-J12: signingConfirmationCard builds the guard-override card from the 
   assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.signed-quality-package.v1", request: {}, record, language: "en" }), [], "another request schema gets no ceremony card");
 });
 
+// C30J-J28: the digest-only route (`sign-intent --intent-sha256`, no request file) resolves a description whose STRUCTURED `cardFacts` come from the
+// indexed plan; the card is built from those facts and never from the display lines.
+test("C30J-J28: the digest-only guard-override route builds the same card from the structured cardFacts of the resolved description", () => {
+  const description = (cardFacts) => ({ resolved: true, lines: ["recorded request: x (tool Write, class in-root-write)", "window expires at (signed, absolute): " + EXPIRES], ...(cardFacts === undefined ? {} : { cardFacts }) });
+  const bare = (record, language = "en") => signingConfirmationCard({ requestSchema: undefined, request: null, record, language });
+  const lines = bare(description(OVERRIDE_FACTS));
+  assert.deepEqual(lines, ceremony("guard-override", OVERRIDE_FACTS), "the same card the signature request route builds from the same four facts");
+  assert.equal(lines.at(-1), CARD_END_LINE);
+  for (const fact of ['"Write"', '"in-root-write"', EXPIRES, "2 "]) assert.ok(lines.join("\n").includes(fact), fact);
+  assert.deepEqual(bare(description(OVERRIDE_FACTS), "de"), ceremony("guard-override", OVERRIDE_FACTS, "de"), "the configured language applies");
+  // The facts, not the display lines, are the source: lines that say something else change nothing.
+  assert.deepEqual(bare({ ...description(OVERRIDE_FACTS), lines: ["window expires at (signed, absolute): 1999-01-01T00:00:00.000Z"] }), lines);
+  // Absent or malformed facts leave out that part of the card, never a guess.
+  const partial = bare(description({ toolName: "Write", commandClass: 5, expiresAt: "multi\nline", pathCount: -1 })).join("\n");
+  assert.ok(partial.includes('"Write"') && !/in-root-write|\b5\b|multi|-1/u.test(partial), partial);
+  assert.match(partial, /does not show the expiry/u);
+  // No facts or not a plain object: no card at all (a maintenance-window record has none), and an unresolved record gets none either.
+  for (const record of [description(), description(null), description("Write"), description([OVERRIDE_FACTS]), { resolved: false, lines: [], cardFacts: OVERRIDE_FACTS }, { resolved: true, lines: ["x"] }]) assert.deepEqual(bare(record), []);
+  // A request that names another schema never takes the digest-only facts.
+  assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.signed-quality-package.v1", request: {}, record: description(OVERRIDE_FACTS), language: "en" }), []);
+});
+
 test("C30J-J12: signingConfirmationCard builds the design-approval card from the validated request binding, in the configured language", () => {
   const request = { schema: "pipeline.design-approval-request.v1", binding: { featureId: FEATURE, sources: { prd: { path: "specs/feature-a/prd.md", sha256: SHA("1") }, spec: { path: "specs/feature-a/spec.md", sha256: SHA("2") }, companions: [{ path: "specs/feature-a/c1.md", sha256: SHA("3") }] }, reviewReceipts: [{ round: 1 }], verdict: "open-findings", openFindingIds: ["DCC-1", "DCC-2"] }, approvalIntent: { value: { candidate: CANDIDATE }, sha256: SHA("4") } };
   const en = signingConfirmationCard({ requestSchema: request.schema, request, record: { resolved: true, lines: [] }, language: "en" }).join("\n");

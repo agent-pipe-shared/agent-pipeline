@@ -5714,7 +5714,15 @@ function describeHumanGuardOverrideSelectionCore({ rootDir, pluginRoot, intentSh
       const rendered=hgoDisplayText(text,HGO_SUMMARY_MAX_RATIONALE_CHARS);
       return hgoDisplayText(guard,64).text+": \""+rendered.text+"\""+(rendered.truncated?" [truncated]":"");
     }).join("; ");
-    return {resolved:true,code:"HGO-RECORD-RESOLVED",materialArtifact,requestBinding,
+    // C30J-J28: the structured facts the indexed plan already holds, for the plain-language card; never parsed from the display lines.
+    // A value that is not the expected type is left out, so a consumer states only what is there.
+    const cardFacts = {
+      ...(typeof planned.toolName === "string" ? {toolName: planned.toolName} : {}),
+      ...(typeof planned.commandClass === "string" ? {commandClass: planned.commandClass} : {}),
+      ...(typeof planned.expiresAt === "string" ? {expiresAt: planned.expiresAt} : {}),
+      ...(Array.isArray(planned.eligiblePaths) ? {pathCount: planned.eligiblePaths.length} : {}),
+    };
+    return {resolved:true,code:"HGO-RECORD-RESOLVED",materialArtifact,requestBinding,cardFacts,
       ...(includeFullMaterial ? {fullReviewMaterial: planned} : {}),lines:hgoClipLines([
       "recorded request: "+(planned.schema===NATIVE_PLAN_SCHEMA?NATIVE_REQUEST_SCHEMA:REQUEST_SCHEMA)+" (tool "+hgoDisplayText(planned.toolName,32).text+", class "+hgoDisplayText(planned.commandClass,64).text+")",
       "eligible paths this override would admit: "+eligiblePaths.join(", ")+pathsNote,

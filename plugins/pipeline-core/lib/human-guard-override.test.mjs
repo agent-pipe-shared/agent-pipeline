@@ -41,6 +41,7 @@ import {
   concurrentWorktreeAdvisory,
   consumeHumanGuardOverride,
   describeHumanGuardOverrideSelection,
+  describeHumanGuardOverrideSignatureRequest,
   HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   humanGuardOverrideInternals,
@@ -937,6 +938,43 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
     // paths / denying guard's rationale / expiry").
     assert.ok(secondText.includes("GUARD-DEVPLAN-SHELL"));
     assert.match(secondText, /expires at/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// C30J-J28 (AC-112 closest accepted criterion, queue C30-20 gap): the describer hands back the STRUCTURED facts the indexed plan already holds
+// next to its display lines, so the digest-only sign-intent route can build the plain-language card without parsing display text.
+test("C30J-J28: describeHumanGuardOverrideSelection() returns the four structured card facts from the indexed plan, the display lines and the index format unchanged", () => {
+  const root = fixtureSignature();
+  try {
+    const armed = prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "card-facts.md", content: "facts\n" }, denials: denial, nowMs: Date.now() });
+    const signing = prepareHumanGuardOverrideForSignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: armed.recorded.requestSha256, scriptPath: armed.scriptPath,
+      humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+    });
+    const resolved = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: signing.intentSha256, scriptPath: armed.scriptPath });
+    assert.equal(resolved.resolved, true);
+    // The facts are exactly the plan's own values: compare with the physical plan the resolver bound, read independently here.
+    const plan = JSON.parse(readFileSync(resolved.materialArtifact.path, "utf8"));
+    assert.deepEqual(resolved.cardFacts, { toolName: plan.toolName, commandClass: plan.commandClass, expiresAt: plan.expiresAt, pathCount: plan.eligiblePaths.length });
+    assert.equal(resolved.cardFacts.toolName, "Write");
+    assert.equal(typeof resolved.cardFacts.commandClass, "string");
+    assert.ok(resolved.cardFacts.pathCount >= 1);
+    // The display lines are the ones that were already there, and the facts are NOT derived from them (no parsing of display text).
+    assert.equal(resolved.lines.length, 4);
+    assert.ok(resolved.lines[0].startsWith("recorded request: "));
+    assert.ok(resolved.lines[3].startsWith("window expires at (signed, absolute): "));
+    // The disclosure index keeps its closed key list: the facts come from the indexed plan, not from a new index key.
+    const index = JSON.parse(readFileSync(join(dirname(resolved.materialArtifact.path), `${signing.intentSha256}.disclosure.json`), "utf8"));
+    assert.deepEqual(Object.keys(index).sort(), ["authorSourceRoot", "expiresAt", "intentSha256", "planSha256", "reasonSha256", "requestSha256", "root", "schema", "selectionSha256"]);
+    // An unresolved digest carries no facts at all.
+    const unresolved = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: createHash("sha256").update("no such intent").digest("hex"), scriptPath: armed.scriptPath });
+    assert.equal(unresolved.resolved, false);
+    assert.equal(Object.hasOwn(unresolved, "cardFacts"), false);
+    // The signature-request describer holds the same facts next to its full material.
+    const viaRequest = describeHumanGuardOverrideSignatureRequest({ schema: "pipeline.human-guard-override-signature-digest.v1", requestSha256: armed.recorded.requestSha256, planSha256: armed.plan.planSha256, selectionSha256: resolved.requestBinding.selectionSha256, intentSha256: signing.intentSha256 }, { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: armed.scriptPath });
+    assert.deepEqual(viaRequest.cardFacts, resolved.cardFacts);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
