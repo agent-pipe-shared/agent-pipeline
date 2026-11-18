@@ -271,6 +271,21 @@ test("RDF14 a changed suite that cannot run is reported FAILED, never skipped si
   assert.equal(readFileSync(join(root, AUG), "utf8"), bytes);
 });
 
+test("RDF18 a changed suite whose case fails after it declared its ids is still read: the row is extended, the failing exit is named as a note, nothing is skipped", () => {
+  const root = mkCcFixture();
+  writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), `import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
+const ids = ["A01", "A02"];
+registerTestCaseCompletion({ cases: ids.map((id) => ({ id, name: "case " + id, run() { if (id === "A02") throw new Error("a late case fails"); } })), fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? 3), maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? 4096) });
+`);
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "alpha grows and one case fails");
+  const r = run(root);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^case-completion-augmentations: refreshed$/mu);
+  assert.match(r.stdout, /alpha-tests: note, the suite exited 1 while its 2 declared ids were read/u);
+  assert.deepEqual(readJson(root, AUG).augmentations.at(-1).caseCompletion.caseIds, ["A01", "A02"]);
+});
+
 test("RDF17 a failed augmentation step does not move the inventory baseline: a second run still selects the same suites and fails again", () => {
   const inventory = (root) => readFileSync(join(root, "docs/product-capability-inventory.json"), "utf8");
   for (const [label, grow] of [["dropped id", (root) => growSuite(root, "beta", ["B02"])], ["broken suite", (root) => { writeFileSync(join(root, "harness/scripts/alpha.test.mjs"), `throw new Error("broken suite");\n`); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "alpha breaks"); }]]) {

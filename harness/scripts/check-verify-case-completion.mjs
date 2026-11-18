@@ -660,7 +660,9 @@ function declaredCaseIds(root, path, maxBytes) {
     delete env.NODE_TEST_CONTEXT;
     const result = spawnSync(process.execPath, [path], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600_000, stdio: ["ignore", "pipe", "pipe", fd] });
     const declared = readFileSync(join(scratch, "stream.out"), "utf8").split("\n").filter(Boolean).map((text) => { try { return JSON.parse(text); } catch { return null; } }).find((event) => event?.event === "DECLARED")?.caseIds;
-    return result.status === 0 && Array.isArray(declared) ? { ok: true, caseIds: declared } : { ok: false, detail: `exit ${result.status}, declared ${Array.isArray(declared) ? declared.length : "none"}` };
+    // The ids a suite DECLARES are announced when it registers, before any case runs: a case that fails (or times out) later does not change them, and whether a case passes is
+    // Verify's judgement, not this step's. So a non-zero exit with a declared list is still a reading; a suite that dies before declaring (a throw at load) stays unreadable.
+    return Array.isArray(declared) ? { ok: true, caseIds: declared, exitCode: result.status } : { ok: false, detail: `exit ${result.status}, declared none` };
   } finally {
     if (fd !== -1) closeSync(fd);
     rmSync(scratch, { recursive: true, force: true });
@@ -702,6 +704,7 @@ export function syncVerifyCaseCompletionAugmentations({ root = DEFAULT_ROOT, sin
     if (!validateVerifyCaseCompletionPolicy(effective)) continue;
     const declared = declaredCaseIds(root, registration.path, effective.maxBytes);
     if (!declared.ok) { problems.push(`${registration.name}: could not be run to read its declared ids (${declared.detail}); run it alone with: node ${registration.path}`); continue; }
+    if (declared.exitCode !== 0) lines.push(`${registration.name}: note, the suite exited ${declared.exitCode} while its ${declared.caseIds.length} declared ids were read (a failing or timed-out case); the declared ids are what the row records, Verify judges the case; run it alone with: node ${registration.path}`);
     const grown = growAugmentationRow(next, { name: registration.name, file: registration.path, sourcePolicy }, declared.caseIds);
     if (grown.state === "not-extension") problems.push(`${registration.name}: NOT AN EXTENSION (policy ${grown.policyIds} ids, declared ${grown.declaredIds}); the growth-only rule refuses it, restore the dropped ids in the suite`);
     else if (grown.state === "extended" || grown.state === "added") lines.push(`${registration.name}: ${grown.from} -> ${grown.to} ids (${grown.state === "added" ? "new augmentation row" : "augmentation row extended"})`);

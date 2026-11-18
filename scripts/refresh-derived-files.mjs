@@ -79,7 +79,11 @@ let augmentationFailed = false;
     if (result.status === 2 || (result.status !== 0 && !(check && result.status === 1)) || state === undefined) {
       fail("case-completion-augmentations", result);
       augmentationFailed = baselineCommit !== "" && git("rev-parse", "--verify", `${baselineCommit}^{commit}`).status === 0;
-    } else steps.push({ name: "case-completion-augmentations", state });
+    } else {
+      steps.push({ name: "case-completion-augmentations", state });
+      // A suite that exited non-zero after it declared its ids is still read; the checker names that as a note line, shown here so it is not lost.
+      for (const line of result.stdout.split("\n")) if (/: note, the suite exited /u.test(line)) console.log(line);
+    }
   }
 }
 
