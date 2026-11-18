@@ -188,6 +188,10 @@ export const POWERSHELL_ADMITTED_SHAPES = [
     example: "$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"; node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\"" },
 ];
 
+// C30J-J26: the code every native-read and PowerShell read refusal leads with, one constant for its three denial sites
+// (lib/guard/read-scope.mjs, lib/guard/powershell-dialect.mjs, hooks/antigravity-pretool-guard.mjs) and the generated briefing block.
+export const READ_TARGET_CODE = "GUARD-READ-TARGET";
+
 // C18-8 (AC-239): GUARD-READ-TARGET for a native read tool (not a credential target) -- what a permitted read of a plugin file looks like.
 export const READ_TARGET_EXACT_FILE_ADVICE = "Name one exact file path, without a wildcard: use the Read tool with file_path set to that file "
   + "(plugin files are read this way, e.g. file_path <plugin root>/scripts/example.mjs), or Grep with path set to that one file. "

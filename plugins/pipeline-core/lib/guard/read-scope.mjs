@@ -4,7 +4,7 @@
 import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
-import { nativeReadCredentialTargetDenialText, READ_TARGET_EXACT_FILE_ADVICE } from "./grammar-denials.mjs";
+import { nativeReadCredentialTargetDenialText, READ_TARGET_CODE, READ_TARGET_EXACT_FILE_ADVICE } from "./grammar-denials.mjs";
 import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.mjs";
 import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
@@ -905,7 +905,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
   if (pluginMissing !== null) {
     return verdict(2, missingPluginFileDenialText(pluginMissing, `with Glob (path ${pluginMissing.listDirectory}, pattern *)`));
   }
-  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+  return verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`
     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
     + (toolName === "Glob"
       ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), also with a name filter as the last part (<directory>/**/*ledger*), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"

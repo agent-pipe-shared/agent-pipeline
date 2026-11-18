@@ -263,12 +263,26 @@ test("AC-7: the document carries no absolute or machine-specific path", () => {
 
 test("AC-1: a hand-maintained line is marked as such, so the boundary is visible", () => {
   const document = readFileSync(OBLIGATIONS_PATH, "utf8");
-  // The grammar rule and the commit discipline are stated rather than derived --
-  // no component exports either as data. That is acceptable; being silent about
+  // The grammar prose and the commit discipline are stated rather than derived --
+  // no component exports the commit rules as data. That is acceptable; being silent about
   // it is not, because a reader cannot otherwise tell which lines a source
   // change would update.
   const marks = document.match(/hand-maintained/gu) ?? [];
   assert.ok(marks.length >= 2, `expected every hand-maintained section to say so; found ${marks.length}`);
+});
+
+// C30J-J26 (AC-112): since C30J-J18 the guard module exports the admitted shell shapes as data, so the section-1 comment must not say no
+// component exports the grammar; it names what is exported instead. The "hand-maintained" mark above stays (the prose is still stated).
+test("C30J-J26: section 1 does not claim that no component exports the grammar, and names the exported shape table", async () => {
+  for (const rel of ["templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md"]) {
+    const text = readFileSync(join(REPO_ROOT, rel), "utf8");
+    assert.doesNotMatch(text, /no component\s+exports the whole grammar/u, rel);
+    assert.match(text, /ADMITTED_GRAMMAR_SHAPES/u, rel);
+    assert.match(text, /GRAMMAR_DENIAL_REMEDY/u, rel);
+  }
+  const grammar = await import("../../plugins/pipeline-core/lib/guard/grammar-denials.mjs");
+  assert.ok(Array.isArray(grammar.ADMITTED_GRAMMAR_SHAPES) && grammar.ADMITTED_GRAMMAR_SHAPES.length > 0, "the shape table is exported");
+  assert.ok(Array.isArray(grammar.GRAMMAR_DENIAL_REMEDY), "the refusal lines are exported");
 });
 
 // C30-19 / AC-111 (slice C30I-S4B): the commit-route texts say what really holds for the one-command commit with trailers.

@@ -887,7 +887,50 @@ test("C30J-J18 pin: the builder reads the grammar from the guard module and type
   for (const code of [...Object.keys(g.GRAMMAR_DENIAL_GUIDANCE), g.READ_COMMAND_UNSUPPORTED_CODE, g.READ_SCOPE_DENIAL_CODE]) {
     assert.ok(!source.includes(code), `the code ${code} is read from its export, not typed`);
   }
-  assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the one code without an exported constant is not typed either");
+  assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the read-target code is read from its export (READ_TARGET_CODE), not typed either");
+});
+
+// C30J-J26 (AC-112): GUARD-READ-TARGET becomes one exported constant used at its three denial sites; the briefing block names the code; the
+// denial bytes do not change. The earlier J18 case 1 and pin above stay as they are (they still hold); these cases add the code.
+const READ_TARGET_LEAD = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n";
+const codeLines = (source) => source.split("\n").filter((line) => !line.trim().startsWith("//"));
+
+test("C30J-J26 the read-target code is one exported constant, and the native Read denial bytes are identical", async () => {
+  const g = await guardGrammar();
+  assert.equal(g.READ_TARGET_CODE, "GUARD-READ-TARGET");
+  const { readToolScopeVerdict } = await import("../lib/guard/read-scope.mjs");
+  const root = mkdtempSync(join(tmpdir(), "j26-read-target-"));
+  try {
+    const result = readToolScopeVerdict({ tool_name: "Glob", tool_input: { pattern: "**", path: "." } }, root, {});
+    assert.equal(result.exitCode, 2);
+    assert.ok(result.stderr.startsWith(READ_TARGET_LEAD), "the first line is byte-identical to the previous literal");
+    assert.ok(result.stderr.startsWith(`BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${g.READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`));
+    assert.ok(result.stderr.includes(g.READ_TARGET_EXACT_FILE_ADVICE), "the advice line still follows");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("C30J-J26 pin: the three denial sites read the code from the export and type no literal of it", () => {
+  for (const rel of [["lib", "guard", "read-scope.mjs"], ["lib", "guard", "powershell-dialect.mjs"], ["hooks", "antigravity-pretool-guard.mjs"]]) {
+    const source = readFileSync(join(HERE, "..", ...rel), "utf8");
+    const code = codeLines(source).join("\n");
+    assert.ok(/READ_TARGET_CODE[^;]*from "\.{1,2}\/(?:lib\/)?(?:guard\/)?grammar-denials\.mjs"/u.test(source), `${rel.join("/")} imports the constant`);
+    assert.ok(/\$\{READ_TARGET_CODE\}/u.test(code), `${rel.join("/")} uses the constant in its denial text`);
+    assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(code), `${rel.join("/")} types no literal of the code`);
+  }
+});
+
+test("C30J-J26 the briefing block names the read-target code in the native read entry, once, read from the export", async () => {
+  const { runDispatchBriefing } = await lib();
+  const g = await guardGrammar();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  const entry = `- A refused native Read, Glob or Grep call (\`${g.READ_TARGET_CODE}\`; the guard prints this advice): ${g.READ_TARGET_EXACT_FILE_ADVICE}`;
+  assert.equal(text.split(entry).length, 2, "the entry appears exactly once");
+  assert.equal(text.split(`\`${g.READ_TARGET_CODE}\``).length, 2, "the code is named once, in that entry");
+  const source = readFileSync(join(HERE, "..", "lib", "dispatch-briefing-build.mjs"), "utf8");
+  assert.ok(/READ_TARGET_CODE/u.test(source) && !/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the builder reads the code from its export");
 });
 
 // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three

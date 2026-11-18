@@ -129,8 +129,9 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put();
   put("<!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's");
   put("     exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/");
-  put("     grammar-denials.mjs); the rest of this rule is stated, because no component");
-  put("     exports the whole grammar as data. Source of truth:");
+  put("     grammar-denials.mjs); the prose of this rule is stated here. The same module exports the");
+  put("     admitted shell shapes as data (ADMITTED_GRAMMAR_SHAPES, GRAMMAR_DENIAL_REMEDY) and the");
+  put("     generated briefing carries them. Source of truth:");
   put("     plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables");
   put("     below ARE measured. -->");
   put();

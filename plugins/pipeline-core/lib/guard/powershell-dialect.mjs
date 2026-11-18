@@ -9,7 +9,7 @@ import { exactReadyReceipt, verdict } from "./verdict.mjs";
 import * as constants from "./constants.mjs";
 import { PIPELINE_STATE_SCRIPT } from "./constants.mjs";
 import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
-import { POWERSHELL_ADMITTED_SHAPES, POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
+import { POWERSHELL_ADMITTED_SHAPES, POWERSHELL_GRAMMAR_EXAMPLES, READ_TARGET_CODE } from "./grammar-denials.mjs";
 import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
 import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
 
@@ -192,7 +192,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
     return (containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
       || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
       ? verdict(0)
-      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+      : verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`
         + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`
         + `${readTargetProtectedRootsAdvice()}\n`);
   }

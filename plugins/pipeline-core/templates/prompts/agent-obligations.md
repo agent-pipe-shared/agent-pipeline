@@ -20,8 +20,9 @@ spends a tool use from the budget that is also the stop condition.
 
 <!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's
      exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/
-     grammar-denials.mjs); the rest of this rule is stated, because no component
-     exports the whole grammar as data. Source of truth:
+     grammar-denials.mjs); the prose of this rule is stated here. The same module exports the
+     admitted shell shapes as data (ADMITTED_GRAMMAR_SHAPES, GRAMMAR_DENIAL_REMEDY) and the
+     generated briefing carries them. Source of truth:
      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
      below ARE measured. -->
 

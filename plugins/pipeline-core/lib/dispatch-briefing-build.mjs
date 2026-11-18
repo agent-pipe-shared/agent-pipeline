@@ -20,7 +20,7 @@ import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, pa
 import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
 import {
   GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE,
-  READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY, READ_TARGET_EXACT_FILE_ADVICE,
+  READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY, READ_TARGET_CODE, READ_TARGET_EXACT_FILE_ADVICE,
 } from "./guard/grammar-denials.mjs";
 
 export const BRIEFING_PACKAGE_SCHEMA = "pipeline.dispatch-briefing-package.v1";
@@ -327,8 +327,7 @@ export function obligationsReadSentence(obligationsPath) {
 
 // C30J-J18 (consumer report: ~30 shell-guard refusals in a main run, ~70 in subagents; the admitted spellings were unknown beforehand).
 // ONE block, read from the guard's own exports (lib/guard/grammar-denials.mjs) so that it prints exactly what a refusal prints and can
-// never be typed a second time. The native read-tool refusal of the exact-file advice has no exported code constant, so its entry is led by
-// that exported advice alone and its code name is not typed here (the wanted export is named in the held patch's notes). Pure: no input.
+// never be typed a second time. The native read-tool refusal's entry names its code from the exported READ_TARGET_CODE (C30J-J26). Pure: no input.
 export function admittedShellShapesBlock() {
   return [
     "**Admitted shell shapes (read from the guard's own grammar; the text its refusals print):**",
@@ -342,7 +341,7 @@ export function admittedShellShapesBlock() {
     `- \`${READ_SCOPE_DENIAL_CODE}\`: ${READ_SCOPE_DENIAL_GUIDANCE}`,
     ...READ_SCOPE_DENIAL_REMEDY.map((line) => `  - ${line}`),
     "",
-    `- A refused native Read, Glob or Grep call (the guard prints this advice): ${READ_TARGET_EXACT_FILE_ADVICE}`,
+    `- A refused native Read, Glob or Grep call (\`${READ_TARGET_CODE}\`; the guard prints this advice): ${READ_TARGET_EXACT_FILE_ADVICE}`,
   ].join("\n");
 }
 
