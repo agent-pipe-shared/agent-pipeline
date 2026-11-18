@@ -1,0 +1,212 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index b6b51c8f191cfc02cff18995f22c467e813c735f..5f216efae7408951940b595f6386a1a69ca2bd68 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -225,6 +225,7 @@ import { parallelReminderPreToolUseStdout, readParallelReminderEvery, tickParall
+ import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
+ import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
+ import { criticExcludedRole } from "../lib/critic-correction-input-bindings.mjs";
++import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
+ import { allowContextStdout, checkpointNoticeText, criticResumeRefusalText, criticResumeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
+ import {
+   CLOSING_ALLOWANCE,
+@@ -1732,7 +1733,7 @@ function criticReadRefusal(input, rootDir, dependencies) {
+     : [toolInput.file_path, toolInput.path, toolInput.pattern].filter((value) => typeof value === "string");
+   const root = String(rootDir ?? "").replaceAll("\\", "/").replace(/\/+$/u, "");
+   let calibration = null;
+-  for (const name of ["project/pipeline.json", ".claude/pipeline.json"]) {
++  for (const name of CALIBRATION_PATHS) {
+     try { calibration = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(join(rootDir, ...name.split("/")), "utf8")); break; } catch { /* the next calibration location, or none */ }
+   }
+   for (const word of words) {
+diff --git a/plugins/pipeline-core/hooks/guard-gate-strength.mjs b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+index 4464aa528554148826ebca713e7b606949dfb3d2..77044624ac85060c7f34a2a645309acac929fbec 100644
+--- a/plugins/pipeline-core/hooks/guard-gate-strength.mjs
++++ b/plugins/pipeline-core/hooks/guard-gate-strength.mjs
+@@ -64,6 +64,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
++import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
+ import { writeTargetPath } from "../lib/tool-write-target.mjs";
+ import { designReviewReceiptWriteRefusal } from "../lib/design-review-receipt-write-guard.mjs";
+ import { privateStateWriteRefusal } from "../lib/private-state-write-guard.mjs";
+@@ -96,6 +97,10 @@ import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mj
+ 
+ const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+ 
++const [NEUTRAL_CALIBRATION_FILE, LEGACY_CALIBRATION_FILE] = CALIBRATION_PATHS;
++const CALIBRATION_VERIFY_ROUTE = "To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. ";
++const calibrationMirrorRule = (mirrorPath, mirrorRuleId) => `For any other key: its byte-equal mirror ${mirrorPath} (${mirrorRuleId}) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.`;
++
+ export const GATE_STRENGTH_PATHS = Object.freeze([
+   Object.freeze({
+     id: "GS-1",
+@@ -154,15 +159,17 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
+   // (project/guard-config.json, guard-lifecycle-ready.mjs,
+   // guard-gate-strength-origin-attestation.test.mjs), so those keep their numbers and the
+   // Nova entries are appended after them.
++  // GS-10/GS-11 name each other as the mirror: both names come from the one shared calibration list (neutral first), and the sentence that says
++  // so is written once (CALIBRATION_MIRROR_RULE) instead of twice.
+   Object.freeze({
+     id: "GS-10",
+-    path: "project/pipeline.json",
+-    reason: "the project authority configuration declares verify and core settings and must not be edited directly. To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. For any other key: its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
++    path: NEUTRAL_CALIBRATION_FILE,
++    reason: `the project authority configuration declares verify and core settings and must not be edited directly. ${CALIBRATION_VERIFY_ROUTE}${calibrationMirrorRule(LEGACY_CALIBRATION_FILE, "GS-11")}`,
+   }),
+   Object.freeze({
+     id: "GS-11",
+-    path: ".claude/pipeline.json",
+-    reason: "the legacy-tier project authority configuration declares verify and core settings. To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. For any other key: its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
++    path: LEGACY_CALIBRATION_FILE,
++    reason: `the legacy-tier project authority configuration declares verify and core settings. ${CALIBRATION_VERIFY_ROUTE}${calibrationMirrorRule(NEUTRAL_CALIBRATION_FILE, "GS-10")}`,
+   }),
+   Object.freeze({
+     id: "GS-12",
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+index 9c965d65604373bd624dc27a872855ca6501285b..756d728a3b340e841c288075c701ea7a99befe84 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+@@ -18,6 +18,8 @@ import * as authorityFacade from "./project-authority.mjs";
+ import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority.mjs";
+ import { readCalibrationStakes } from "./security-close-status.mjs";
+ import { closeQualityReadback } from "./close-quality-readback.mjs";
++import { TWIN_PATHS } from "../scripts/repository-mode-promote.mjs";
++import { GATE_STRENGTH_PATHS } from "../hooks/guard-gate-strength.mjs";
+ 
+ const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+ const SCRATCH = join(REPO_ROOT, "scratch");
+@@ -111,6 +113,52 @@ test("the four remaining calibration path lists use the shared one: no quoted ca
+   assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import CALIBRATION_PATHS of project-authority-read.mjs");
+ });
+ 
++// C30K-K11 (finding K1-04, stage 2): the five lists J9 and J17 left, and the two mirror-rule guard texts.
++// Read rules kept per site (not changed): repository-mode-promote writes/reads BOTH twins (order irrelevant to the result); critic-dispatch-preflight reads
++// the first READABLE twin (repositoryMode) and the first twin with a valid project name; guard-dispatch-budget parses the first READABLE twin; push-prepare
++// names the neutral file when it exists, else the legacy one, plus the mirror sentence only when both exist.
++const CALIBRATION_LIST_SITES_K11 = [
++  ["scripts", "repository-mode-promote.mjs"],
++  ["scripts", "critic-dispatch-preflight.mjs"],
++  ["hooks", "guard-dispatch-budget.mjs"],
++  ["scripts", "push-prepare.mjs"],
++  ["hooks", "guard-gate-strength.mjs"],
++];
++const CALIBRATION_TEXT_SITES_K11 = [
++  ["scripts", "critic-dispatch-preflight.mjs"],
++  ["scripts", "push-prepare.mjs"],
++  ["hooks", "guard-gate-strength.mjs"],
++];
++const codeLines = (parts) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", ...parts), "utf8").split("\n")
++  .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/u.test(line));
++
++test("the five remaining calibration lists use the shared one: no quoted calibration literal is left in their sources", () => {
++  const literal = /["'`](?:project|\.claude)\/pipeline\.json(?::[^"'`]*)?["'`]/u;
++  const offenders = CALIBRATION_LIST_SITES_K11.filter((parts) => codeLines(parts).some((line) => literal.test(line))).map((parts) => parts.join("/"));
++  assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import CALIBRATION_PATHS of project-authority-read.mjs");
++});
++
++test("the mirror-rule texts name the two calibration files through the shared list, not as retyped names", () => {
++  const anywhere = /(?:project|\.claude)\/pipeline\.json/u;
++  const offenders = CALIBRATION_TEXT_SITES_K11.filter((parts) => codeLines(parts).some((line) => anywhere.test(line))).map((parts) => parts.join("/"));
++  assert.deepEqual(offenders, [], "a text that names both calibration files is built from CALIBRATION_PATHS of project-authority-read.mjs");
++});
++
++test("the exported twin list of repository-mode-promote is the shared list", () => {
++  assert.deepEqual([...TWIN_PATHS], [...authorityRead.CALIBRATION_PATHS]);
++  assert.equal(Object.isFrozen(TWIN_PATHS), true);
++});
++
++test("the guard texts of the two calibration mirrors read byte for byte as before (GS-10 and GS-11)", () => {
++  const tail = " is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.";
++  const route = "To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. For any other key: its byte-equal mirror ";
++  const byId = new Map(GATE_STRENGTH_PATHS.map((rule) => [rule.id, rule]));
++  assert.equal(byId.get("GS-10").path, "project/pipeline.json");
++  assert.equal(byId.get("GS-10").reason, `the project authority configuration declares verify and core settings and must not be edited directly. ${route}.claude/pipeline.json (GS-11)${tail}`);
++  assert.equal(byId.get("GS-11").path, ".claude/pipeline.json");
++  assert.equal(byId.get("GS-11").reason, `the legacy-tier project authority configuration declares verify and core settings. ${route}project/pipeline.json (GS-10)${tail}`);
++});
++
+ test("the calibration read orders stay what each reader did: neutral first, and the file resolver is not the same rule", () => {
+   const put = (base, rel, text) => { mkdirSync(dirname(join(base, rel)), { recursive: true }); writeFileSync(join(base, rel), text); };
+   const fresh = () => { const dir = join(WORK, `order-${counter += 1}`); mkdirSync(dir, { recursive: true }); return dir; };
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index bf3300cee91b2e1ddb006d5f36e232467ab91fb6..214a8bd4e554dc7e62c9c146943991a1837829f9 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -33,7 +33,7 @@ import {
+   deriveRequiredCriticGuardrails,
+ } from "../lib/critic-required-guardrails.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
++import { CALIBRATION_PATHS, resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
+ import {
+   RequirementTraceabilityError,
+   evaluateRequirementTraceability,
+@@ -220,7 +220,7 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
+   const historyPaths = historyPathsInBindings(derived);
+   if (historyPaths.length > 0) {
+     const reason = `The range changes block-history-shaped file(s) that are neither a built-in project-state record (${[...PROJECT_STATE_CONVENTION_FILES, ...PROJECT_STATE_CONVENTION_DIRECTORIES].join(", ")}) nor listed in criticFindingRecordPaths: ${historyPaths.join(", ")}. The Critic may not read history, so the review would stop after its packet was reserved.`;
+-    const repair = `Add ${historyPaths.map((path) => JSON.stringify(path)).join(", ")} to criticFindingRecordPaths in project/pipeline.json AND to its byte-equal mirror .claude/pipeline.json (each a PO-signed step), commit both, rebuild the candidate and rerun the preflight; or keep the file out of the reviewed range.`;
++    const repair = `Add ${historyPaths.map((path) => JSON.stringify(path)).join(", ")} to criticFindingRecordPaths in ${CALIBRATION_PATHS[0]} AND to its byte-equal mirror ${CALIBRATION_PATHS[1]} (each a PO-signed step), commit both, rebuild the candidate and rerun the preflight; or keep the file out of the reviewed range.`;
+     fail("CDP-HISTORY-IN-RANGE", reason, { reason, paths: historyPaths, repair });
+   }
+   if (reference === null || reference === undefined) {
+@@ -618,14 +618,14 @@ const fillPlaceholder = (path, hint) => `<FILL ${path}: ${hint}>`;
+ /** The calibration project name in the form admit accepts (SAFE_ID, lower case), or null. Read-only. */
+ // Read here rather than through repository-freshness.mjs, whose imports would take this preflight out of its write-free closure (CDPF086). The first readable calibration decides, as in calibrationProjectId.
+ function calibrationRepositoryMode(root) {
+-  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
++  for (const relativePath of CALIBRATION_PATHS) {
+     try { return JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.repositoryMode ?? null; } catch { /* no readable calibration at this path */ }
+   }
+   return null;
+ }
+ 
+ function calibrationProjectId(root) {
+-  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
++  for (const relativePath of CALIBRATION_PATHS) {
+     try {
+       const project = JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.project;
+       if (typeof project === "string" && SAFE_ID.test(project.toLowerCase())) return project.toLowerCase();
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 4575bfe0cd1277eb0496fcc86d0e65dfb52b8587..3c754ef966b5f38e34dae845dd3cc71a5b69b369 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -54,7 +54,7 @@ import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestinatio
+ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+ import { PUSH_THREAT_MODEL_TEMPLATE_NOTICE, PUSH_THREAT_MODEL_TEMPLATE_STATE, pushThreatModelFileUnchanged, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { declaredRepositoryMode } from "./repository-freshness.mjs";
+-import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
++import { CALIBRATION_PATHS, LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { exportHandoverQueue, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
+ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+@@ -370,8 +370,9 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+   if (declared?.mode !== "local-only") return null;
+   const remotes = (gitOutput(dir, ["remote"], deps) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+   if (!remotes.includes(remote)) return null;
+-  const file = existsSync(join(dir, "project", "pipeline.json")) ? "project/pipeline.json" : ".claude/pipeline.json";
+-  const mirror = existsSync(join(dir, "project", "pipeline.json")) && existsSync(join(dir, ".claude", "pipeline.json")) ? " and in its byte-equal mirror .claude/pipeline.json" : "";
++  const [neutralCalibration, legacyCalibration] = CALIBRATION_PATHS;
++  const file = existsSync(join(dir, neutralCalibration)) ? neutralCalibration : legacyCalibration;
++  const mirror = existsSync(join(dir, neutralCalibration)) && existsSync(join(dir, legacyCalibration)) ? ` and in its byte-equal mirror ${legacyCalibration}` : "";
+   return {
+     id: "repository-mode",
+     code: "PUSH-REPOSITORY-MODE-MISMATCH",
+diff --git a/plugins/pipeline-core/scripts/repository-mode-promote.mjs b/plugins/pipeline-core/scripts/repository-mode-promote.mjs
+index 738d97f33f1b07f701a6931033d780e4a0ea6275..1ccf4ab2e45b0f39607555016d4360f0903a0921 100644
+--- a/plugins/pipeline-core/scripts/repository-mode-promote.mjs
++++ b/plugins/pipeline-core/scripts/repository-mode-promote.mjs
+@@ -23,8 +23,10 @@ import { randomBytes } from "node:crypto";
+ import { closeSync, constants, fsyncSync, lstatSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from "node:fs";
+ import { dirname, join, basename } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
+ 
+-export const TWIN_PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
++// Both twins are read and written, so the order of the shared list changes no result (it stays neutral first, as before).
++export const TWIN_PATHS = CALIBRATION_PATHS;
+ const SCHEMA = "pipeline.repository-mode-promotion.v1";
+ const MAX_BYTES = 1_048_576;
+ const SIGNED_ROUTE = "any other change to the calibration stays on the signed route: plan it with node <plugin-root>/scripts/guard-human-override.mjs plan";

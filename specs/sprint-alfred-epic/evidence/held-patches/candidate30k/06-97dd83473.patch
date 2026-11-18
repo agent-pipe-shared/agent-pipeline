@@ -1,0 +1,397 @@
+diff --git a/docs/audit-bundles-technical.md b/docs/audit-bundles-technical.md
+index 50b098cd55d2f8fe26e4f83c672d43e0a24ff4dc..0d12b9b08c58f87949c4c014ace9ccb5baa896fb 100644
+--- a/docs/audit-bundles-technical.md
++++ b/docs/audit-bundles-technical.md
+@@ -13,34 +13,35 @@ bytes, and an optional detached `signature.json`.
+ - Path traversal via a crafted `sourcePath`/`bundlePath` — `rootPath` rejects
+   an absolute path, a path containing a backslash, or any resolved target
+   that escapes the repository root or bundle root
+-  (`audit-bundle.mjs:16`), and is applied to every artifact source
+-  (`audit-bundle.mjs:33`) and output path (`audit-bundle.mjs:30`).
++  (`rootPath` in `audit-bundle.mjs`), and is applied to every artifact source
++  and the output path (`buildAuditBundle`).
+ - Tampered or substituted artifact bytes — `buildAuditBundle` rejects if a
+   source file's live SHA-256 no longer matches the plan's recorded
+-  `sha256` (`AB-SOURCE-DIGEST`, `audit-bundle.mjs:33`); `verifyAuditBundle`
++  `sha256` (`AB-SOURCE-DIGEST`); `verifyAuditBundle`
+   independently rehashes every bundled artifact and reports `AB-DIGEST
+   <path>` for a mismatch or `AB-MISSING <path>` for an absent file
+-  (`audit-bundle.mjs:43`).
++  (`verifyAuditBundleSync`).
+ - Silently overwriting an existing bundle — `buildAuditBundle` is
+   create-only: it fails `AB-OUTPUT-EXISTS` if the output directory already
+   exists, and writes `manifest.json` with the exclusive `wx` flag
+-  (`audit-bundle.mjs:31,35`).
++  (`buildAuditBundle`).
+ - A signature being read as legal identity, key custody, trusted time, or
+   authorization — every signature record is stamped `assurance:
+-  "cryptographic-binding-only"` (`audit-bundle.mjs:67,70,82`), and signing
+-  itself is create-only (`AB-SIGNATURE-EXISTS`, `audit-bundle.mjs:68`) so an
++  "cryptographic-binding-only"` (`signAuditBundle`,
++  `verifyAuditBundleSignature`), and signing
++  itself is create-only (`AB-SIGNATURE-EXISTS`, `signAuditBundle`) so an
+   existing signature cannot be silently replaced.
+ - A signature request being forged or re-bound to different bundle content —
+   `signAuditBundle` recomputes the current manifest's own signature request
+   and requires it to canonically equal the caller-supplied request (with
+   only `algorithm`/`signerKeyId` substituted) before signing
+-  (`AB-SIGNATURE-PREIMAGE`, `audit-bundle.mjs:64`).
++  (`AB-SIGNATURE-PREIMAGE`).
+ - An incompatible or altered organization policy entering the bundle —
+   `planAuditBundle` resolves the policy through
+   `resolveEffectiveOrganizationPolicy` (which itself validates every pack;
+   see `docs/organization-policy-packs.md`) and binds
+   `effectivePolicySha256 = canonicalSha256(policy)` into both the plan and
+-  the manifest (`audit-bundle.mjs:23,26,34`).
++  the manifest (`planAuditBundle`, `buildAuditBundle`).
+ 
+ **Out of scope:** filesystem-level access control on the bundle directory
+ (who can read a built bundle) and transport/storage of a bundle once it
+@@ -51,27 +52,38 @@ module enforces.
+ 
+ A bundle's contents are fixed at `planAuditBundle` time from a validated
+ Feature Package's manifest artifacts
+-(`validateFeaturePackage`, `audit-bundle.mjs:22`) — the plan is not something
++(`validateFeaturePackage`, called by `planAuditBundle`) — the plan is not something
+ an operator hand-edits; every `artifacts[].sha256` in the plan comes from the
+ package manifest, and `bundlePath` is deterministically derived as
+ `artifacts/<3-digit-index>-<artifact-class>`
+-(`audit-bundle.mjs:18,25`). `buildAuditBundle` then only ever copies exactly
++(`planAuditBundle`). `buildAuditBundle` then only ever copies exactly
+ those bytes after re-verifying each digest, and writes one `manifest.json`
+ binding `bundleId`, `candidate` (commit/tree), `effectivePolicySha256`, and
+-the artifact list (`audit-bundle.mjs:29-37`). `verifyAuditBundle` is fully
++the artifact list. `verifyAuditBundle` (`verifyAuditBundleSync`) is fully
+ offline and re-derives its own findings from the bundle's own bytes — it
+-does not trust any value it did not itself recompute
+-(`audit-bundle.mjs:39-45`). Signing (`planAuditBundleSignature` /
++does not trust any value it did not itself recompute. Signing (`planAuditBundleSignature` /
+ `signAuditBundle` / `verifyAuditBundleSignature`) is an explicit, separate,
+ provider-neutral step layered on an unchanged, already-built bundle; no key
+-or key location ever enters the bundle content itself
+-(`audit-bundle.mjs:54-83`).
++or key location ever enters the bundle content itself.
++
++`verified` means internally consistent, not complete: the verifier checks only
++what the manifest names (a manifest without an `evidence` key, an item whose
++status is `gap` and an item without a `bundlePath` all verify), and the
++README of a new bundle says so. What the bundle must contain is stored nowhere,
++so an absent approval cannot be told from one that was out of scope.
+ 
+ ## Human approval evidence and the approval trace
+ 
+-A plan may name an optional `evidence` input (keys `traceReportPath`,
+-`proofPaths` (at most 16), `verifyRecordPath`, `securityScanPath`; repository
+-relative paths). The bundle then carries, by path and digest, the approval
++A plan may name an optional `evidence` input; `collectEvidence` in
++`audit-bundle.mjs` is its one reader. A close names `criticReports` (one entry per
++Critic round), an optional `dispatchProjectionPath`, `sbomRecordPath` and
++`gateChangesRecordPath`, and `approvalGaps` (below); the four approval keys
++`traceReportPath`, `proofPaths` (at most 16), `verifyRecordPath` and
++`securityScanPath` (repository relative paths) are named only by a
++hand-built request, because no production close names `traceReportPath`,
++`verifyRecordPath` or `securityScanPath`. The approval block runs only when
++one of those four keys is named, or when no evidence key at all is named. It
++carries, by path and digest, the approval
+ trace report, the detached signature proofs, the release-mode Verify record and
+ the Security scan record, all bound to the candidate the bundle audits (the
+ last close commit itself). An item that is not named, unreadable, bound to
+@@ -82,6 +94,23 @@ candidate differs from the package candidate is refused
+ (`AB-CANDIDATE-MISMATCH`). Without `evidence` the bundle is byte-identical to
+ before.
+ 
++`approvalGaps` (candidate 30k, AC-112 binding) is the one key through which a
++close names the approvals it could not carry: at most 16 `{ kind, code }`
++entries, each turned into an `approval-proofs:<kind>` gap item (item shape
++`{item, status, code, bundlePath}`, `status` `gap`, a null `bundlePath`). The
++close takes them from `collectAuditProofs` through `auditApprovalGaps`
++(`lib/audit-proof-collection.mjs`): a chat-mode plan approval
++(`CHAT-ATTRIBUTION-ONLY`), a human-guard override capability (`CHAT-ATTRIBUTION-ONLY` when
++every capability is a chat attribution, otherwise `PROOF-NOT-RETAINED-IN-CAPABILITY`)
++and a proof that is not carriable (`PROOF-NOT-CARRIABLE`). Only the name of an
++absence is carried, never a record of the private store; nothing blocks, no
++status is stored, and the verifier is unchanged, so a bundle built before this
++key still verifies. A close whose bundle was built before the change and that
++is planned again with a gap present finds a different evidence block and is
++refused `FCA-OUTPUT-COLLISION` by `planFeatureCloseAudit`; the repair is the
++distinct explicit output it names. A close with no gap produces the evidence
++block byte for byte as before.
++
+ The trace itself is `scripts/human-approval-trace.mjs --repo <root> [--commit <oid>] [--format table|json]`,
+ a read-only operator command (`--out` writes the JSON report create-only inside
+ the repository, for the bundle to carry; the guard admits only `--repo`,
+diff --git a/docs/audit-bundles.md b/docs/audit-bundles.md
+index 73819795104c4e1d7d7716202beb33f46800ba6b..86d97b21875670cec42258626420385609c71754 100644
+--- a/docs/audit-bundles.md
++++ b/docs/audit-bundles.md
+@@ -59,7 +59,14 @@ or tampered byte.
+ ## What a successful check means
+ 
+ `verify` confirms that the bundle's present files still match its manifest.
+-It does not prove who created or approved them, when they were produced, or how
++`verified` means consistent, not complete: the check covers only what the
++manifest names, and the generated README says which approvals this bundle type
++does not enumerate. When the one-shot close builds a bundle, an approval it
++could not carry (a chat-mode plan approval, a human-guard override) appears as a
++typed gap item in the manifest; a bundle planned by hand with the commands above
++names no such item, so a missing item is not evidence that none exists. Push and
++release approvals and the final Verify and Security records are added to the
++bundle by later follow-up lists under `proofs/`. It does not prove who created or approved them, when they were produced, or how
+ an exported bundle was stored or transported. Signing and long-term retention
+ are separate operations: a signature can bind bytes but cannot prove legal
+ identity, key custody, trusted time, or external authorization.
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 70a2b83a10519c9577eab73f571d531ca28c91f6..deca35082869fe37e73e3f3761df758149542171 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -75,6 +75,8 @@ The command exits 0 only for \`verified\` and nonzero for \`invalid\` or a comma
+ 
+ This bundle is not a claim that requirements are satisfied, that a review or PO approval occurred, that deployment or a push happened, or that the candidate is suitable for release. The unsigned manifest and its hashes are not independently trusted: an actor who can replace both an artifact and the manifest can preserve internal consistency. A separate optional signature, when present and independently verified through its provider, adds cryptographic binding only; signatures are not implied by this bundle. Supporting reports and state files are evidence supplied by the producer, not intrinsically tamper-proof proof.
+ 
++\`verified\` means consistent, not complete. The verifier checks only what its manifest names, so an approval or gate that the manifest does not list is not shown to be absent, out of scope or skipped. Push approvals, release approvals and the final Verify and Security records reach a bundle only through the follow-up lists under \`proofs/\`, which are added after a push or release approval: a close that no such approval follows carries none of them. When the close that built this bundle found a chat-mode plan approval or a human-guard override, it names each as a typed gap item (\`CHAT-ATTRIBUTION-ONLY\`, or \`PROOF-NOT-RETAINED-IN-CAPABILITY\` for an override capability that keeps no proof); only the name of the absence is carried, never the private record. A bundle built another way names none of them, so the lack of such an item does not show that no such approval or override exists. A model exception and the onboarding consent are neither carried nor named.
++
+ The bundle states no independence of its own for any Critic round. Whether a round ran in a fresh context, without inherited history, is what the \`receipt.json\` exported beside that round's report records (\`freshContext\`, \`historyInherited\`, \`independence\`): a round recorded as \`caller-authored-fallback\` (freshContext false, historyInherited true) was authored by the calling agent and is not an independent review, and the report next to it must be read that way.
+ `;
+ }
+@@ -255,8 +257,11 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
+  */
+ function collectEvidence(root, candidate, evidence, firstIndex) {
+   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
+-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath", "gateChangesRecordPath"]);
++  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath", "gateChangesRecordPath", "approvalGaps"]);
+   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
++  // C30K-K15: the approval gaps a close already computed (lib/audit-proof-collection.mjs `auditApprovalGaps`): at most 16 `{ kind, code }`, each an absence NAMED under an admitted item name, never a record.
++  const approvalGaps = evidence.approvalGaps;
++  if (approvalGaps !== undefined && (!Array.isArray(approvalGaps) || approvalGaps.length > 16 || !approvalGaps.every((entry) => exact(entry, ["kind", "code"]) && PROOF_KIND.test(entry.kind) && /^[A-Z0-9-]{3,48}$/u.test(entry.code)))) fail("AB-EVIDENCE-INPUT");
+   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
+   const reports = evidence.criticReports;
+   if (reports !== undefined && (!Array.isArray(reports) || reports.length > 40 || !reports.every((entry) => exact(entry, ["packetId", "path"]) && /^[a-f0-9]{32}$/u.test(entry.packetId) && (entry.path === null || typeof entry.path === "string")) || new Set(reports.map((entry) => entry.packetId)).size !== reports.length)) fail("AB-EVIDENCE-INPUT");
+@@ -271,7 +276,7 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+   // C28c: the same for the SBOM record the close names.
+   if (evidence.sbomRecordPath !== undefined && typeof evidence.sbomRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
+   if (evidence.gateChangesRecordPath !== undefined && typeof evidence.gateChangesRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
+-  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined && evidence.gateChangesRecordPath === undefined)) {
++  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined && evidence.gateChangesRecordPath === undefined && approvalGaps === undefined)) {
+   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
+   else {
+     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
+@@ -308,6 +313,8 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+     else items.push({ item: "security-scan", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.security, evidence.securityScanPath, file.sha256) });
+   }
+   }
++  // C30K-K15: one gap item per kind under the admitted `approval-proofs:<kind>` name; an item of that name already present (a carried proof, an earlier gap) is never doubled.
++  for (const entry of approvalGaps ?? []) if (!items.some((item) => item.item === `approval-proofs:${entry.kind}`)) gap(`approval-proofs:${entry.kind}`, entry.code);
+   for (const entry of reports ?? []) {
+     const item = `critic-report:${entry.packetId}`;
+     if (entry.path === null) { gap(item, "REPORT-NOT-EXPORTED"); continue; }
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index 6c128ebd6ad3d1f54e35711f1f0097316e670192..ca349ab28e4909baa515d0b3ff3c30be2d5c1df0 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -600,3 +600,103 @@ test("E-AC-20 still builds and verifies a bundle whose export metadata is delibe
+   const verified = await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") });
+   assert.equal(verified.status, "verified");
+ });
++
++// C30K-K15 (AC-112 binding, plan audit-bundle-completeness-table-2026-11-18, stages 0 to 2): the approval gaps the close already computes reach the manifest as typed gap items.
++const CLOSE_PACKET = "1".repeat(32);
++/** The evidence input of a close (finish-feature.mjs writes `criticReports`, `sbomRecordPath` and, when present, `dispatchProjectionPath` and `gateChangesRecordPath`): this fixture keeps `criticReports` and names none of the four approval keys. */
++const closeShapedEvidence = (extra = {}) => ({ criticReports: [{ packetId: CLOSE_PACKET, path: null }], ...extra });
++function approvalCommon({ overrideModes = [] } = {}) {
++  const common = mkdtempSync(join(tmpdir(), "audit-gaps-"));
++  const directory = join(common, "agent-pipeline", "human-guard-overrides", "capabilities"); mkdirSync(directory, { recursive: true });
++  overrideModes.forEach((mode, index) => writeFileSync(join(directory, `cap-${index}.json`), JSON.stringify({ humanApproval: { mode }, authorizedAt: "2026-11-18T10:00:00Z", signedCandidate: { commit: CANDIDATE.commit } })));
++  return common;
++}
++const CHAT_STATE = { planApproved: true, planApproval: { designApproval: { mode: "chat" } } };
++test("C30K-K15 stage 0: a close-shaped evidence input names no approval item by itself, whatever the State and the override store hold", async () => {
++  const { collectAuditProofs } = await import("./audit-proof-collection.mjs"); const input = fixture(); const common = approvalCommon({ overrideModes: ["signed"] });
++  try {
++    assert.ok(collectAuditProofs({ common, candidate: CANDIDATE, state: CHAT_STATE }).proofs.length === 0);
++    const plan = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence() });
++    assert.deepEqual(plan.evidence.items.map((entry) => entry.item), [`critic-report:${CLOSE_PACKET}`], "only what the producer names becomes an item");
++    assert.equal(plan.evidence.items.some((entry) => entry.item.startsWith("approval")), false);
++  } finally { rmSync(common, { recursive: true, force: true }); }
++});
++test("C30K-K15 stage 1: the collector names a chat plan approval and a human-guard override that retains no proof as typed gaps, never their content", async () => {
++  const { collectAuditProofs } = await import("./audit-proof-collection.mjs"); const none = approvalCommon(); const signed = approvalCommon({ overrideModes: ["signed", "chat-attributed-unattested"] }); const chat = approvalCommon({ overrideModes: ["chat-attributed-unattested"] });
++  try {
++    assert.deepEqual(collectAuditProofs({ common: none, candidate: CANDIDATE, state: CHAT_STATE }).gaps, [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }]);
++    assert.deepEqual(collectAuditProofs({ common: none, candidate: CANDIDATE, state: { planApproval: { designApproval: { mode: "signature", proof: signedProof() } } } }).gaps, [], "a signed plan approval and no override: nothing to name");
++    assert.deepEqual(collectAuditProofs({ common: signed, candidate: CANDIDATE, state: CHAT_STATE }).gaps, [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }, { kind: "human-guard-override", code: "PROOF-NOT-RETAINED-IN-CAPABILITY" }], "one gap per override kind; a capability without a retained proof outranks a chat attribution");
++    assert.deepEqual(collectAuditProofs({ common: chat, candidate: CANDIDATE, state: {} }).gaps, [{ kind: "human-guard-override", code: "CHAT-ATTRIBUTION-ONLY" }]);
++    assert.deepEqual(collectAuditProofs({ common: signed, candidate: CANDIDATE, state: {} }).proofs, [], "an override never yields a proof");
++  } finally { for (const common of [none, signed, chat]) rmSync(common, { recursive: true, force: true }); }
++});
++test("C30K-K15 stage 1: the gaps of the collector reach the manifest as approval-proofs items, verify offline, and are listed in the README", async () => {
++  const { collectAuditProofs, auditApprovalGaps } = await import("./audit-proof-collection.mjs"); const input = fixture(); const common = approvalCommon({ overrideModes: ["signed"] });
++  try {
++    const approvalGaps = auditApprovalGaps(collectAuditProofs({ common, candidate: CANDIDATE, state: CHAT_STATE }));
++    const plan = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps }) });
++    assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), [`approval-proofs:plan-approval:gap:CHAT-ATTRIBUTION-ONLY`, `approval-proofs:human-guard-override:gap:PROOF-NOT-RETAINED-IN-CAPABILITY`, `critic-report:${CLOSE_PACKET}:gap:REPORT-NOT-EXPORTED`]);
++    assert.equal(plan.artifacts.length, 5, "a gap carries no artifact"); assert.equal(plan.evidence.traceStatus, null);
++    await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const bundle = join(input.root, "bundle");
++    const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8"));
++    assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "evidence", "readmeSha256", "schema"], "no new manifest key");
++    assert.deepEqual(Object.keys(manifest.evidence).sort(), ["candidateBound", "items", "schema", "traceStatus"], "no new evidence key");
++    const readme = readFileSync(join(bundle, "README.md"), "utf8");
++    assert.match(readme, /approval-proofs:plan-approval: gap \(CHAT-ATTRIBUTION-ONLY\)/u); assert.match(readme, /approval-proofs:human-guard-override: gap \(PROOF-NOT-RETAINED-IN-CAPABILITY\)/u);
++    assert.equal((await verifyAuditBundle({ bundleRoot: bundle })).status, "verified");
++    assert.doesNotMatch(JSON.stringify(manifest), /cap-0|authorizedAt|2026-11-18/u, "only the name of an absence is carried, never a record of the private store");
++  } finally { rmSync(common, { recursive: true, force: true }); }
++});
++test("C30K-K15 stage 1: a gap the collector already returned (PROOF-NOT-CARRIABLE:source) is mapped to the admitted code shape, once per kind, and never overrides a carried proof item", async () => {
++  const { auditApprovalGaps } = await import("./audit-proof-collection.mjs"); const input = fixture();
++  const approvalGaps = auditApprovalGaps({ proofs: [], gaps: [{ kind: "push", code: "PROOF-NOT-CARRIABLE:store:push/a.json" }, { kind: "push", code: "PROOF-NOT-CARRIABLE:store:push/b.json" }, { kind: "plan-approval", code: "PROOF-NOT-CARRIABLE:state:planApproval" }] });
++  assert.deepEqual(approvalGaps, [{ kind: "push", code: "PROOF-NOT-CARRIABLE" }, { kind: "plan-approval", code: "PROOF-NOT-CARRIABLE" }]);
++  const plan = planWith(input, { candidate: CANDIDATE, evidence: { ...evidenceFiles(input.root), approvalGaps } });
++  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:carried:null", "approval-proofs:push:carried:null", "verify-record:carried:null", "security-scan:carried:null", "approval-proofs:plan-approval:gap:PROOF-NOT-CARRIABLE"], "the carried push proof keeps its item; the gap of the same name is not added twice");
++});
++test("C30K-K15 stage 1: a request that names only approval gaps invents no approval-trace, verify or security item", () => {
++  const plan = planWith(fixture(), { candidate: CANDIDATE, evidence: { approvalGaps: [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }] } });
++  assert.deepEqual(plan.evidence.items.map((entry) => entry.item), ["approval-proofs:plan-approval"]);
++});
++test("C30K-K15 stage 1: the new input key is closed: a malformed gap, a foreign key or too many gaps is refused", () => {
++  const input = fixture(); const refuse = (approvalGaps) => assert.throws(() => planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps }) }), (error) => error.code === "AB-EVIDENCE-INPUT");
++  refuse("plan-approval"); refuse([{ kind: "plan-approval" }]); refuse([{ kind: "plan-approval", code: "chat-attribution-only" }]); refuse([{ kind: "Plan Approval", code: "CHAT-ATTRIBUTION-ONLY" }]);
++  refuse([{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY", content: "x" }]); refuse([{ kind: "plan-approval", code: "PROOF-NOT-CARRIABLE:state:planApproval" }]);
++  refuse(Array.from({ length: 17 }, (_, index) => ({ kind: `kind-${String.fromCharCode(97 + index)}`, code: "CHAT-ATTRIBUTION-ONLY" })));
++});
++test("C30K-K15 stage 1: a bundle built before the change still verifies; an empty gap list changes nothing; only a close with a gap sees FCA-OUTPUT-COLLISION's evidence comparison differ", async () => {
++  const { canonicalizeJson } = await import("./governance-event.mjs"); const input = fixture();
++  const before = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence() });
++  const empty = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps: [] }) });
++  const withGap = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps: [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }] }) });
++  // the same comparison lib/feature-close-audit-preflight.mjs makes between the manifest already on disk and the new plan (`same(prior.evidence, bundlePlan.evidence)`)
++  assert.equal(canonicalizeJson(empty.evidence), canonicalizeJson(before.evidence), "no gap: the evidence block is byte-identical, so a resumed close is not refused");
++  assert.notEqual(canonicalizeJson(withGap.evidence), canonicalizeJson(before.evidence), "a gap: the block differs, so a bundle built earlier is refused FCA-OUTPUT-COLLISION and needs the distinct explicit output route");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "old", plan: before });
++  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "old") })).status, "verified");
++  assert.deepEqual(JSON.parse(readFileSync(join(input.root, "old", "manifest.json"), "utf8")).evidence.items.map((entry) => entry.item), [`critic-report:${CLOSE_PACKET}`]);
++});
++test("C30K-K15 stage 1: the build stays create-only for a bundle that carries gap items", async () => {
++  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps: [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }] }) });
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  await assert.rejects(() => buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }), (error) => error.code === "AB-OUTPUT-EXISTS");
++});
++test("C30K-K15 stage 2: the README of a new bundle says verified means consistent, not complete, and names what the manifest does not enumerate and the follow-up route", async () => {
++  const input = fixture(); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan: planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence() }) });
++  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
++  assert.match(readme, /`verified` means consistent, not complete/u);
++  assert.match(readme, /checks only what its manifest names/u);
++  assert.match(readme, /follow-up lists under `proofs\/`/u); assert.match(readme, /final Verify and Security/u);
++  assert.match(readme, /model exception/u); assert.match(readme, /onboarding consent/u); assert.match(readme, /typed gap/u);
++  assert.match(readme, /`CHAT-ATTRIBUTION-ONLY`/u); assert.match(readme, /`PROOF-NOT-RETAINED-IN-CAPABILITY`/u);
++});
++test("C30K-K15 stage 2: the maintainer reference names the close's evidence keys, not the dead approval keys, and cites functions instead of line numbers", () => {
++  const read = (name) => readFileSync(new URL(`../../../docs/${name}`, import.meta.url), "utf8");
++  const technical = read("audit-bundles-technical.md");
++  assert.doesNotMatch(technical, /audit-bundle\.mjs:\d/u, "a line number goes stale; a function name does not");
++  assert.match(technical, /`approvalGaps`/u); assert.match(technical, /`criticReports`/u);
++  assert.match(technical, /no production close names `traceReportPath`/u);
++  const guide = read("audit-bundles.md");
++  assert.match(guide, /consistent, not complete/u);
++});
+diff --git a/plugins/pipeline-core/lib/audit-proof-collection.mjs b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+index a251f381b1d9deb6523fd9a479fe07b35d983c8d..cc9db2d1ba06ca402072604bb591125f7c37e931 100644
+--- a/plugins/pipeline-core/lib/audit-proof-collection.mjs
++++ b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+@@ -8,8 +8,8 @@
+  *   - the plan approval's signed design approval, kept in the State;
+  *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit;
+  *   - the PO's acknowledgement of gate-definition changes (ADR-0096) of the active feature.
+- * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is an
+- * envelope whose proof is not a verifiable public proof object. A gap never blocks the close.
++ * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is a chat-mode plan approval
++ * (CHAT-ATTRIBUTION-ONLY) and an envelope whose proof is not a verifiable public proof object. A gap never blocks the close; `auditApprovalGaps` hands the gaps to the bundle.
+  *
+  * C20E-AP (AC-108): `writeAuditProofFollowUp` / `prepareAuditProofFollowUp` below are the ONE writer of this module: after the push and release
+  * approvals exist they add the approved commit's public proofs to the bundle the close already committed, as NEW files only (see lib/audit-bundle.mjs).
+@@ -38,6 +38,13 @@ export function collectAuditProofs({ common, candidate, state, criticPacketId =
+   };
+   const design = state?.planApproval?.designApproval;
+   if (object(design) && design.mode === "signature") take("plan-approval", design.proof, "state:planApproval");
++  else if (object(design) && design.mode === "chat") gaps.push({ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }); // C30K-K15: a chat approval is an attribution record, never a proof; only the absence is named
++  if (typeof common === "string" && common !== "") {
++    // C30K-K15: a human-guard override capability retains no proof (the trace reports it PROOF-NOT-RETAINED-IN-CAPABILITY, or attribution-only for a chat one). Only the NAME of the absence is carried, one gap for the kind; nothing of the capability is read beyond its approval mode.
++    const modes = []; const directory = join(common, "agent-pipeline", "human-guard-overrides", "capabilities");
++    try { for (const name of readdirSync(directory).filter((entry) => entry.endsWith(".json")).sort().slice(0, 256)) { const mode = readJson(join(directory, name))?.humanApproval?.mode; if (typeof mode === "string") modes.push(mode); } } catch { /* no capability store: nothing to name */ }
++    if (modes.length > 0) gaps.push({ kind: "human-guard-override", code: modes.every((mode) => mode === "chat-attributed-unattested") ? "CHAT-ATTRIBUTION-ONLY" : "PROOF-NOT-RETAINED-IN-CAPABILITY" });
++  }
+   if (typeof common === "string" && common !== "" && object(candidate)) {
+     // C21E: the PO acknowledgement of a caller-authored Critic signs the REVIEWED candidate, which the close candidate has moved past, so it is found by its packet.
+     // ADR-0096: the PO's acknowledgement of gate-definition changes signs the HEAD of its day; the close candidate may have moved past it, so it is found by its feature.
+@@ -58,6 +65,17 @@ export function collectAuditProofs({ common, candidate, state, criticPacketId =
+   return { proofs: proofs.slice(0, 16), gaps };
+ }
+ 
++/**
++ * C30K-K15: the gaps of one `collectAuditProofs` result in the shape the audit bundle's `evidence.approvalGaps` input takes: `{ kind, code }`, one per kind (the first wins), the code without
++ * its `:source` suffix (the suffix names a private-store file and is not an admitted code character). The bundle turns each into an `approval-proofs:<kind>` gap item.
++ * @returns {Array<{kind: string, code: string}>}
++ */
++export function auditApprovalGaps({ gaps = [] } = {}) {
++  const seen = new Set(); const found = [];
++  for (const gap of gaps) { if (object(gap) && !seen.has(gap.kind)) { seen.add(gap.kind); found.push({ kind: gap.kind, code: String(gap.code).split(":")[0] }); } }
++  return found.slice(0, 16);
++}
++
+ const BUNDLE_DIR = /^audit-bundles\/[a-z][a-z0-9-]{2,63}\/(?:[0-9a-f]{40}|[0-9a-f]{64})$/u; const FEATURE_ID = /^[a-z][a-z0-9-]{2,63}$/u;
+ const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u; const KIND = /^[a-z-]{1,40}$/u;
+ const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index b96e55d474863848e2bbc7d5f39201d0b9ed296b..262cab6bec0890fff310c0205ff43f11d1737768 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
+ import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
+ import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
+ import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
+-import { collectAuditProofs } from "../lib/audit-proof-collection.mjs";
++import { auditApprovalGaps, collectAuditProofs } from "../lib/audit-proof-collection.mjs";
+ import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+@@ -789,6 +789,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+       // P3: the signed approval proofs that authorized this candidate travel in the bundle's proofs/ directory (public proof objects only).
+       const collectedProofs = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state });
+       if (collectedProofs.proofs.length > 0) options.proofs = collectedProofs.proofs;
++      // C30K-K15: the gaps the collector computed (a chat plan approval, an override that retains no proof, a proof that is not carriable) are named in the manifest as typed gap items; nothing blocks.
++      const approvalGaps = auditApprovalGaps(collectedProofs);
++      if (approvalGaps.length > 0) options.evidence = { ...(options.evidence ?? {}), approvalGaps };
+       let auditPlan = await planFeatureCloseAudit(options);
+       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+       if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
+@@ -803,8 +806,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+       const acknowledgement = lifecycle.criticIndependence.acknowledgement;
+       if (acknowledgement?.mode === "signature") {
+         const withAcknowledgement = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state, criticPacketId: acknowledgement.packetId });
+-        if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0)) {
+-          options.proofs = withAcknowledgement.proofs;
++        const acknowledgementGaps = auditApprovalGaps(withAcknowledgement); // C30K-K15: a proof of this call that is not carriable is named too
++        const gapsGrew = acknowledgementGaps.length > approvalGaps.length;
++        if (gapsGrew) options.evidence = { ...(options.evidence ?? {}), approvalGaps: acknowledgementGaps };
++        if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0) || gapsGrew) {
++          if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0)) options.proofs = withAcknowledgement.proofs;
+           auditPlan = await planFeatureCloseAudit(options);
+           if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+         }
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index a74e3cac2b019066b3e9b09074caf3bc35c58cf6..47374097f18204d0809dad4d37bcff5d502578f5 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -1186,3 +1186,14 @@ test("process: authorization, failed publication, exact readback and cleanup sta
+   assert.equal(inspected.coordinator.phase, "delivered");
+   rmSync(fixture.root, { recursive: true, force: true });
+ });
++
++// C30K-K15 (AC-112 binding, stage 1): the coordinator no longer drops the gaps of collectAuditProofs. The audit route has no unit seam (it needs a registered package, a Critic/Verify lifecycle
++// and a candidate; the existing audit-lifecycle suite does not reach the gap path), so this pins the hand-over at the source and the behaviour it hands over to is pinned in lib/audit-bundle.test.mjs against the same helper.
++test("C30K-K15: the close hands the gaps of collectAuditProofs on as the audit evidence input key approvalGaps", () => {
++  const source = readFileSync(fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url)), "utf8");
++  assert.match(source, /import \{[^}]*auditApprovalGaps[^}]*collectAuditProofs[^}]*\} from "\.\.\/lib\/audit-proof-collection\.mjs"/u, "the one mapping of a collector gap to an item shape is imported, not re-written here");
++  assert.match(source, /const approvalGaps = auditApprovalGaps\(collectedProofs\);\s*\n\s*if \(approvalGaps\.length > 0\) options\.evidence = \{ \.\.\.\(options\.evidence \?\? \{\}\), approvalGaps \};/u);
++  assert.equal(source.indexOf("auditApprovalGaps(collectedProofs)") < source.indexOf("planFeatureCloseAudit(options)"), true, "the gaps are on the options before the audit plan reads them");
++  // the second collection (with the Critic acknowledgement's packet) hands on a gap it adds, and re-plans when the gap list grew even if the proofs did not
++  assert.match(source, /const acknowledgementGaps = auditApprovalGaps\(withAcknowledgement\);[^\n]*\n\s*const gapsGrew = acknowledgementGaps\.length > approvalGaps\.length;\s*\n\s*if \(gapsGrew\) options\.evidence = \{ \.\.\.\(options\.evidence \?\? \{\}\), approvalGaps: acknowledgementGaps \};\s*\n\s*if \(withAcknowledgement\.proofs\.length > \(options\.proofs\?\.length \?\? 0\) \|\| gapsGrew\) \{/u);
++});

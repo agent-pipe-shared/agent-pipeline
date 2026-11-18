@@ -1,0 +1,38 @@
+diff --git a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+index b4a82765d1cc8b081e83b789568b41154b9e1f84..c284094774f89b9df9731a2f33865ac71edfd1a4 100644
+--- a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+@@ -179,7 +179,9 @@ test("F7: every Dispatch trailer example in the agent obligations is admitted an
+   const examples = [...text.matchAll(/`Dispatch:[ \t]+([^`\n]+)`/gu)]
+     // Evidence-bound bindings (administrative, generated, signed integration) are admitted only with their own
+     // independent evidence; they are not unconditional work-package examples and are pinned elsewhere.
+-    .filter((match) => !/administrative \(elephant\)$|\(elephant-generated\)$|\(integration\)$/u.test(match[1].trim()))
++    // QG-04 restatement (C30K K18): the form list is now derived from the policy export and the exception form
++    // (elephant-exception) is one more evidence-bound binding with its own proof, so it is excluded the same way.
++    .filter((match) => !/administrative \(elephant\)$|\(elephant-generated\)$|\(integration\)$|\(elephant-exception\)$/u.test(match[1].trim()))
+     .map((match) => match[1].trim().replace(/<[A-Za-z_]+>/gu, "ALF-C-P20-12E"));
+   assert.ok(examples.length >= 3, `expected the documented Dispatch examples, found ${JSON.stringify(examples)}`);
+   assert.ok(examples.includes("stage-0 (elephant)"));
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 47374097f18204d0809dad4d37bcff5d502578f5..0b47896b724f6c5dfb8f5255326e2cf80d0b7f89 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -1115,7 +1115,8 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+   });
+   for (const out of [seen.drive, seen.dry]) {
+     // QG-04 restatement (C20 G20-27, AC-108): the five original ids keep their order; the readback gained an appended sixth row, "journey-coverage".
+-    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
++    // QG-04 restatement (C30K K16): the readback gained an appended seventh row, "risk-trace" (report-only, unknown when the Spec cannot be read).
++    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
+     const scan = out.qualityReadback.find((r) => r.id === "security-scan");
+     assert.equal(scan.status, "missing");
+     const ids = out.actions.actions.map((a) => a.id);
+@@ -1129,7 +1130,7 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+   assert.deepEqual(seen.index.entries.map((e) => e.id), ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]);
+   const prd = seen.index.entries.find((e) => e.id === "prd");
+   assert.equal(prd.sha256, digest("# PRD\n"));
+-  assert.equal(seen.index.qualityRows.length, 6); // QG-04 restatement (C20 G20-27): five original rows plus the appended journey-coverage row
++  assert.equal(seen.index.qualityRows.length, 7); // QG-04 restatement (C30K K16): the five original rows plus the appended journey-coverage and risk-trace rows
+   assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
+ });
+ 

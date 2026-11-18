@@ -65,7 +65,7 @@ const lines = [
   ...steps.map((step) => `step ${step.name} ${quote(step.subject)}`),
   "",
   "node scripts/refresh-derived-files.mjs",
-  "git add -A -- docs plugins/pipeline-core backlog",
+  "git add -A -- docs plugins/pipeline-core backlog harness/config",
   `git diff --cached --quiet || git commit --no-verify -m ${quote(`chore(inventory): refresh the derived files after ${label} (ledger, inventory baseline, Reader inputs)`)} -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"`,
   "echo \"derived files refreshed\"",
   "git log --oneline -5",

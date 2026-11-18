@@ -1,0 +1,88 @@
+diff --git a/specs/sprint-alfred-epic/plans/vertical-slice-journey-binding-recon-note-2026-11-18.md b/specs/sprint-alfred-epic/plans/vertical-slice-journey-binding-recon-note-2026-11-18.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..5995cf372097f28cef546de49dbc64cf96ee98e3
+--- /dev/null
++++ b/specs/sprint-alfred-epic/plans/vertical-slice-journey-binding-recon-note-2026-11-18.md
+@@ -0,0 +1,82 @@
++# Recon note: where the journey-criterion binding of a delivered item persists (candidate 30k, lane K17, 2026-11-18)
++
++**Analysis only: nothing was built and no product suite ran.** The only run was the two-case check of the held patch. The Critic is suspended by the PO for this repository's candidates and no Full Verify runs; this note is verified by that check alone. This is stage 0 of `plans/vertical-slice-gate-verdict-2026-11-18.md` section 9 (read-only recon). Criterion binding: AC-112 is the closest existing accepted criterion; the PRD and the Spec are unchanged.
++
++Citation basis: code and tests are read in the integrated 30j tree (the clone); plans in the real checkout. Paths under `plans/` are relative to `specs/sprint-alfred-epic/`. **PROVEN** = read at the cited line; **INFERRED** = reasoned from read lines; **NOT READ** = named so that nothing is claimed. The verdict's cited lines held: `native-goldfish-host-return.mjs:301-307`, `close-quality-readback.mjs:137-148`, `close-coordinator.mjs:1304-1307`. All code paths are under `plugins/pipeline-core/`.
++
++## 1. Short answer
++
++The binding persists, **as stored state, in exactly one durable place: the `delivery` object of the item-owned slice-queue row** (`lib/slice-queue.mjs:592-608`; written at `lib/native-goldfish-host-state.mjs:1613-1614`). It holds the criterion id, the Spec locator and the check list. Whether the item was *integrated* is **not stored anywhere in the row**; it is derived on every read. The per-check pass result is stored elsewhere and carries no readable criterion id. So a derived line "criterion -> bound check -> integrated yes/no" is readable without any new field. A derived line "Verify was green for that check" is **only partly** readable: a join exists for a check bound by registered command id, none for a check bound by file path in a consumer, and it depends on the Verify mode (section 2.3). Verdict: stage 1 stays viable; this recon answers the question stage 0 asked and breaks no premise (section 5); the one scope delta is named in section 6.
++
++## 2. Three facts, kept apart
++
++### 2.1 BOUND (criterion to check): stored, readable
++
++- PROVEN: the row's `delivery` is `{itemId, criteria:[id], baseCommit, criterionLocator, checks, approvalSha256}` (`native-goldfish-host-state.mjs:1613-1614`); the validator accepts exactly that key set and requires `criteria.length===1` and `criteria[0]===criterionLocator.criterionId` (`slice-queue.mjs:596-602`). The locator is `{schema, sourcePath, sourceSha256, criterionId, startByte, endByte, excerptSha256}` (`lib/native-goldfish-host-return.mjs:318-321`); each check carries `id`, `path` and `dependencies` (`:324-326`). The one comparison key the code uses is `itemDeliveryBindingKey` = the criterion id (`:301-307`).
++- PROVEN: the criterion id grammar is shared. The Spec side (`lib/spec-journey-coverage.mjs:63`) reads rows through `scanAcceptedCriterionRows` (`lib/critic-accepted-contract.mjs:158`), whose id grammar `CRITERION_ID_SOURCE` (`:27`) is the source the host return copies (`native-goldfish-host-return.mjs:31`). So `inspectSpecJourneys` ids and queue criterion ids compare directly (INFERRED for the full row-scanner agreement; the grammar equality is read).
++- PROVEN where it lives: the working copy of the queue is under the Git common directory; the tracked `specs/<feature>/slice-queue.json` is the handover copy, exported at push-prepare (`lib/slice-queue-location.mjs:3-24,60,180-181`). A read never writes and falls back to the handover bytes (`:11-14`).
++- PROVEN already read by the close: `close-coordinator.mjs:603` reads the course through the shared reader, validates it and requires `course.feature` to equal the feature (`:611`). `resolveGovernedItemQueue` (`native-goldfish-host-state.mjs:1394-1448`) does the same and returns the validated rows, but only under governance (`:1399`), an approved plan (`:1418-1420`) and a v2 course (`:1437`).
++- The dispatch record schema does **not** carry it: a search of `lib/dispatch-record.mjs` for `criteri` and `itemDelivery` found no match (PROVEN absence in that file; the record writer script was not searched for these terms).
++
++### 2.2 INTEGRATED ("delivered"): derived, never a row state
++
++- PROVEN: the queue states are `ready|hold-po|blocked-external|deferred|cancelled`; there is no done state (`slice-queue.mjs:50`), and `close-coordinator.mjs:643` says an item-owned course takes its done state from integration readiness, not from records.
++- PROVEN, two routes, read on every call by `observeGovernedItemIntegrationReadiness` (`native-goldfish-host-state.mjs:2273-2287`):
++  1. **Native record**: `authority-integration-<pendingSha256>.json` in the Git common directory with `{pendingSha256, bindingSha256, kind, itemId, sliceId, mainCandidate, checkSha256, recordSha256, files}` (`:2257-2259`). It has **no criterion id**; the criterion is reached through `sliceId`/`itemId` to the queue row and the check-source digests (`:2433-2444`). It needs the registry boundary and its lock (`:2281`); an absent registry reads as no native record (`:2282`).
++  2. **Commit evidence** (D40/D40b): a non-merge commit reachable from the candidate whose `Dispatch:` trailer names `<slice> (goldfish)` and which touches the slice's write scope (`:2300-2330`). A pure lock-free git read. It proves a commit, **not that any check ran**.
++- PROVEN: a native integration is written only after the stored targeted-check evidence has `verdict:'passed'` with every result status 0 (`:2245-2246`); retirement moves the pending state aside and retains it, and only when commit evidence derives the same fact (`:2187,2205-2207,2214`); retained rows stay readable (`:2169-2186`).
++
++### 2.3 RUN (a check result): stored, per pending state, no criterion id
++
++- PROVEN: `authority-check-<pendingSha256>.json` in the Git common directory holds `{schema, candidate, contractSha256, files, results[{id, path, status, ...}], verdict}` (`:1348,1961-1962`). `contractSha256` is the digest of the whole item-delivery briefing (`:1870`), so the criterion is bound only through that digest, not as a readable field (INFERRED from the shape; the results rows read carry `id` and `path`).
++- NOT READ: whether `authority-check-*` is among the sibling files moved into the retained aside (`:2210` builds the list from `planSettledPending`, not read). So whether the per-check status stays readable after retirement is **unknown**.
++- PROVEN: Verify evidence is suite-level. The evidence holds `commit`, `tree`, `steps`, `verifyRun` (`scripts/verify-evidence-producer.mjs:640-657`); a step is `{name, exitCode, ...}` with a suite name and, where a receipt exists, `receiptSha256` (`:126,136`). No step carries a criterion id.
++- PROVEN, what a step can be named. In this repository a registry entry is `{name, file}` (`harness/scripts/verify.mjs:965`), so a bound check file that is itself a registered suite file joins to its step. For a consumer the registry is the six baseline suites, `project-<command id>` per configured baseline or area command, and `configured-verify` (`verify-evidence-producer.mjs:521-537`); no entry carries a check path. The selected steps are `registry` filtered by the planned selection (`:549,555-556`), so in an impact-selected mode a registered suite may have no step.
++- Join cases for "Verify green for the bound check": (1) check bound by registered **command id** (`native-goldfish-host-state.mjs:1947-1948`): the id can name the step `project-<id>` (INFERRED: the check registry at `:1948` and the producer's configuration are assumed to be the same list, not compared); (2) check bound by **file path** in a consumer: no step names it, and whether the full configured verify runs that file is not in the evidence; (3) this repository, check file = registered suite: joinable; (4) a joinable step that was not selected in the evidence's mode: absent, to be read as unknown, not as red. The step list of a real consumer run is NOT READ.
++
++## 3. What is NOT persisted (so a derived line must say so, never guess)
++
++- PROVEN: **legacy and basic rows**: `unbound-legacy` rows (`slice-queue.mjs:594`) and basic rows with `criteria` but no `checks` or `criterionLocator` (`:596`) carry no check.
++- PROVEN: **maintenance rows** bind a red check and carry no criterion (`:603-607`; `native-goldfish-host-state.mjs:1612`).
++- PROVEN: **orphan rows** may carry the slice id as `criteria[0]` (`:1791-1793`), so a row whose criterion is not an id of the Spec must be ignored.
++- PROVEN: a project without governance or without an approved plan has no read at all (`:1399,1418-1420`); a course that is absent gives `SQ-DELIVERY-COURSE-ABSENT` (`:1430`).
++- INFERRED: **several rows may bind one criterion** (continuation slices, cancelled rows): the binding check is per slice id (`:1615-1626`); that a criterion can have more than one row follows from the unique key being the slice id. A reader must skip `cancelled` rows.
++- INFERRED: a criterion that never had an item delivery (Spec rows no dispatch named) has no row; "no delivery bound" is the only honest reading.
++- PROVEN: no stored mapping from a **Verify run** to a criterion exists; a derived join exists only in the cases of section 2.3.
++- PROVEN: the working copy and the registry are local to one machine; the handover copy is tracked. INFERRED: on another machine a native integration record is absent while the commit-evidence route (a git read over shared history) still works.
++
++## 4. What a derived line could read
++
++Per user-facing `covered` criterion `AC-n` of the Spec, from rows of the governed queue with `criteria[0]==='AC-n'` and `state!=='cancelled'`:
++
++1. **No such row** (queue read ok): `AC-n: covered, no delivery bound`.
++2. **Row found**: `AC-n: covered, bound check <path>` (every `checks[].path`), plus `integrated` when the route of 2.2 derives it, else `not integrated`.
++3. **Queue unreadable, absent or not governed**: the text stays exactly as today (the readback never claims what it cannot read, `lib/close-quality-readback.mjs:2-3,16-17`).
++
++The row shape is closed `{id,status,evidence,remedy}` and `evidence` is free text (`:37`); status semantics `present|missing|not-applicable|unknown` are computed as today (`:146-147`). The same rows feed `buildAuditIndex` as `qualityRows` (`:202`; coordinator `:1315`), so the evidence text also travels into the audit package index (the field, its shape and no key change; whether anything digest-pins that text is NOT READ).
++
++## 5. Premise check of the verdict
++
++- Verdict section 4, "derivable link is INFERRED": now **PROVEN for bound** (2.1) and for **integrated** (2.2).
++- Verdict section 5.1 item 3 ("run: the last Verify evidence was green for the suite that holds that check"; the verdict itself says "consumer shape unknown", `plans/vertical-slice-gate-verdict-2026-11-18.md:87`, and asks the question at `:169`): this recon answers that question and no premise breaks. Result: derivable only in the join cases of 2.3 (command-id check; check file registered as a suite in this repository), not for a path-bound check of a consumer, and mode-dependent. The only per-check pass proof for every check form is the targeted-check record, local to a machine, without a readable criterion id.
++- Neighbour suites of stage 1: `close-coordinator.test.mjs:1117-1132` pins the row ids and the row count, not the evidence text (INFERRED from those lines); `onboarding-consent-mark.test.mjs:301` matched a search for the row text and is unrelated (an onboarding coverage edge); the verdict's neighbour list stays valid.
++
++## 6. Recommendation for the next stage
++
++**Proceed with stage 1 (not dropped).** The verdict's stage 1 is bound-check-only (`plans/vertical-slice-gate-verdict-2026-11-18.md:173-176`). **The one delta this recon proposes** is R1: an added *integrated yes/no* reading, which is a git scan or a registry read inside a read-only readback; if the PO prefers the narrow stage, take R1 = bound only. In either shape do **not** write "run", "tested" or "Verify green" in that line: the join exists for some check forms only (2.3), so the line would be true for some criteria and silent for others. Wording must make "named in the Spec, bound check <path>" read as a trace, never as proof. The reader is one injected function of the existing reader contract (`close-quality-readback.mjs:16-17`), so a failing read yields today's text. Failing-first case: `lib/close-quality-readback.test.mjs` (a binding reader gives the check path; no binding gives "no delivery bound"; a throwing reader leaves the old text and the same status).
++
++**Stays unchanged** (verdict section 8 and the state-machine DO-NOT-DO list, `plans/state-machine-simplification-analysis-2026-11-17.md:290-303`): the queue row shape and every digest and key byte (list 3); no stored status (12); no gate, refusal or Verify step; `PLR-HANDOFF-NO-JOURNEY` and the journey vocabulary; the status computation of the row; no re-bind of any artifact; no time-based expiry; nothing deleted; no signature step.
++
++## 7. Open decisions (each with a default)
++
++| # | Decision | Default |
++|---|---|---|
++| R1 | Does "delivered" in the line mean *bound* only, or *bound and integrated*? Integration needs the registry lock (native record) or a git read (commit evidence), and commit evidence proves a commit, not a run. | Bound **and** integrated, via the lock-free commit-evidence route first and the native record only when the registry is readable; the line says which route proved it; any fault reads `unknown`. |
++| R2 | Report when the locator's `sourceSha256` differs from the current Spec bytes ("bound to an earlier Spec text")? A derived comparison, no new field. | No (keeps the stage small); revisit when a finding shows stale bindings. |
++| R3 | The evidence text also enters the audit package index. Accept this text change (field and shape unchanged)? | Accept; confirm nothing digest-pins the old text before building (NOT READ here). |
++| R4 | Surface a "Verify green" or per-check pass reading in the line? It joins only for command-id checks and registered-suite check files and depends on the Verify mode; the targeted-check record is local per machine with unknown retention (2.3). | No for stage 1. Revisit as its own stage only if the PO accepts a line that reads `unknown` for path-bound checks of a consumer. |
++| R5 | Show the derived lines in the acceptance question (verdict D3)? | Only after stage 1 is built and accepted; unchanged from the verdict. |
++
++## 8. Not covered by this recon
++
++No product or suite run; the step list of a real consumer Verify run (only the producer's registry construction was read); the 30k plan and the queue were briefed but not opened for this note (the verdict's own citations of them were not re-read); whether `authority-check-*` survives retirement; the digest-pinning of the audit index text; Windows behaviour of the queue working-copy location; whether every consumer Spec row id equals the row scanner's id (only the grammar was compared).

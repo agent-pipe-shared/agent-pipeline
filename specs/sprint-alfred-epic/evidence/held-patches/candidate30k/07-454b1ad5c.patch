@@ -1,0 +1,368 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index eba3830967c029a1cba9c18026f3537bae2a468d..e0d77dbc3c0880dafb3571fe926b1ed9af6dda26 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -13,6 +13,9 @@
+ //   journey-coverage      (G20-27) per user-facing criterion of specs/<feature>/spec.md: covered when it names journeys and an asserted effect, else not covered.
+ //                         The evidence lists every such criterion as `AC-n: covered` / `AC-n: not covered`; present when none is not covered, not-applicable
+ //                         when the Spec has no user-facing criterion, unknown when the Spec cannot be read.
++//   risk-trace            (AC-112, report-only) per row of the Spec's closed risk table (lib/spec-risk-trace.mjs): present when every row is covered,
++//                         residual-stated or not-applicable; missing, with the untraced / stale / malformed ids listed, when any row is not;
++//                         not-applicable when the Spec has no such table; unknown when the Spec or a named path cannot be read.
+ // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
+ // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
+ 
+@@ -20,10 +23,11 @@ import { createHash } from "node:crypto";
+ import { SCANNER_EXCEPTIONS_PATH, closeSecurityScopeNote, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
+ import { LEGACY_CALIBRATION, NEUTRAL_CALIBRATION } from "./project-authority-read.mjs";
+ import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
++import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
+ import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
+ 
+ export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
+-export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
++export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
+ export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
+ export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
+ 
+@@ -147,6 +151,21 @@ function journeyRow(readers, specPath) {
+   return coverage.notCovered.length === 0 ? row(id, "present", `${specPath} (${listing})`) : row(id, "missing", `${specPath} (${listing})`, JOURNEY_REPAIR);
+ }
+ 
++// AC-112 (candidate 30k K16): per row of the Spec's closed risk table, how the accepted risk is traced (covered / residual-stated /
++// not-applicable / untraced / stale / malformed), derived on read from the Spec bytes. Report-only: nothing is stored and nothing refuses.
++const RISK_TRACE_REPAIR = (ids) => `in the Spec's risk table (header \`${RISK_TRACE_HEADER}\`) give row ${ids.join(", ")} a trace: a test path, \`command:<id>\`, \`residual: backlog/items/<item>.md\` or \`not-applicable: <reason>\`; on an approved Spec this is a registered Spec addendum, never an edit of approved bytes`;
++const RISK_TRACE_READ_REPAIR = "restore the Spec as a readable file at its recorded path (check `git status`), commit it, and run the close readback again";
++function riskTraceRow(readers, specPath) {
++  const id = "risk-trace";
++  const bytes = call(readers.readBytes, specPath);
++  if (!bytes.ok) return unknown(id, RISK_TRACE_READ_REPAIR);
++  let trace;
++  try { trace = inspectSpecRiskTrace(Buffer.from(bytes.value).toString("utf8"), { exists: readers.exists }); } catch { return unknown(id, RISK_TRACE_READ_REPAIR); }
++  if (trace.status === "not-applicable") return row(id, "not-applicable");
++  const listing = `${specPath} (${trace.rows.map((entry) => `${entry.id}: ${entry.status}`).join("; ")})`;
++  return trace.open.length === 0 ? row(id, "present", listing) : row(id, "missing", listing, RISK_TRACE_REPAIR(trace.open));
++}
++
+ function handoverRow(readers, handoverPath) {
+   const id = "handover-freshness";
+   const updated = call(readers.handoverUpdatedMs);
+@@ -163,6 +182,7 @@ export function closeQualityReadback({ featureId, handoverPath = "docs/state.md"
+     criticRow(readers, featureId),
+     handoverRow(readers, handoverPath),
+     journeyRow(readers, specPath),
++    riskTraceRow(readers, specPath),
+   ];
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 3129ee508cff170a6828931fee857955fae59340..0d8de6052945fdc982fb800677f27e51819cc4dd 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -41,16 +41,67 @@ test("CGF-23 the architecture-fitness evidence labels the observation and lists
+   assert.equal(rows(full())["architecture-fitness"].status, "present", "a bare projection stays present, typed unobserved");
+ });
+ 
+-test("AC-239: exactly the five ids, in order, with the closed row shape", () => {
++// QG-04 restatement (candidate 30k K16, AC-112): the six ids above keep their order and shape; the readback gained a seventh, appended,
++// report-only row "risk-trace" (cases below). `full()` carries no Spec reader, so journey-coverage and risk-trace are "unknown" here.
++test("AC-239: exactly the seven ids, in order, with the closed row shape", () => {
+   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
+-  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
++  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
+   assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
+   for (const row of list) {
+     assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
+     assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
+   }
+-  assert.ok(list.filter((r) => r.id !== "journey-coverage").every((r) => r.status === "present"), JSON.stringify(list));
++  assert.ok(list.filter((r) => r.id !== "journey-coverage" && r.id !== "risk-trace").every((r) => r.status === "present"), JSON.stringify(list));
+   assert.equal(list.find((r) => r.id === "journey-coverage").status, "unknown");
++  assert.equal(list.find((r) => r.id === "risk-trace").status, "unknown");
++});
++
++// AC-112 (candidate 30k K16, stage S2): the report-only risk-trace row reads the Spec's closed risk table through inspectSpecRiskTrace.
++const SPEC_PATH = `specs/${FEATURE}/spec.md`;
++const TRACE_TEST = "plugins/pipeline-core/lib/x.test.mjs";
++const riskSpec = (...rows) => Buffer.from(`# Spec\n\n| id | source | statement | trace |\n|---|---|---|---|\n${rows.map((r) => `| ${r} |`).join("\n")}\n`);
++const withSpec = (bytes, over = {}) => full({
++  readBytes: (p) => { if (p !== SPEC_PATH) throw new Error("absent"); if (bytes === null) throw new Error("unreadable"); return bytes; },
++  exists: (p) => new Set([SEC, SEC_VERDICT, `${CRITIC_DIR}/pk-1/report.md`, "docs/state.md", TRACE_TEST]).has(p),
++  ...over,
++});
++
++test("AC-112 risk-trace: unknown when the Spec cannot be read or a read throws, never present without a signal", () => {
++  const row = rows(withSpec(null))["risk-trace"];
++  assert.equal(row.status, "unknown");
++  assert.match(row.remedy, /Spec/u);
++  assert.equal(rows(full())["risk-trace"].status, "unknown");
++  const thrown = rows(withSpec(riskSpec(`R-1 | PRD | s | ${TRACE_TEST}`), { exists: () => { throw new Error("boom"); } }))["risk-trace"];
++  assert.equal(thrown.status, "unknown");
++});
++
++test("AC-112 risk-trace: not-applicable when the Spec has no risk table (a Spec older than the table never reads missing)", () => {
++  const row = rows(withSpec(Buffer.from("# Spec\n\nno table\n")))["risk-trace"];
++  assert.equal(row.status, "not-applicable");
++  assert.equal(row.remedy, null);
++});
++
++test("AC-112 risk-trace: a fully traced table is present and the evidence lists each row's status", () => {
++  const row = rows(withSpec(riskSpec(`R-1 | PRD | s | ${TRACE_TEST}`, "R-2 | PRD | s | not-applicable: runner never offers it")))["risk-trace"];
++  assert.equal(row.status, "present");
++  assert.ok(row.evidence.includes(SPEC_PATH) && row.evidence.includes("R-1: covered") && row.evidence.includes("R-2: not-applicable"), row.evidence);
++  assert.equal(row.remedy, null);
++});
++
++test("AC-112 risk-trace: untraced rows make the row missing with the ids listed and a named step; stale and malformed rows too", () => {
++  const untraced = rows(withSpec(riskSpec(`R-1 | PRD | s | ${TRACE_TEST}`, "R-2 | PRD | s | ", "R-3 | PRD | s | gone.test.mjs", "R-4 | PRD | s | see the PRD")))["risk-trace"];
++  assert.equal(untraced.status, "missing");
++  for (const part of ["R-1: covered", "R-2: untraced", "R-3: stale", "R-4: malformed"]) assert.ok(untraced.evidence.includes(part), untraced.evidence);
++  assert.match(untraced.remedy, /R-2, R-3, R-4/u);
++  assert.match(untraced.remedy, /trace/u);
++  assert.doesNotMatch(untraced.remedy, /R-1/u);
++});
++
++test("AC-112 risk-trace: report-only, the six earlier rows are unchanged beside a missing risk-trace row", () => {
++  const withMissing = rows(withSpec(riskSpec("R-1 | PRD | s | ")));
++  const without = rows(withSpec(Buffer.from("no table")));
++  for (const id of QUALITY_ROW_IDS.filter((i) => i !== "risk-trace")) assert.deepEqual(withMissing[id], without[id], id);
++  assert.equal(withMissing["risk-trace"].status, "missing");
+ });
+ 
+ test("AC-239 security-scan: present with the envelope path, missing with the scan command, unknown when unreadable", () => {
+diff --git a/plugins/pipeline-core/lib/spec-risk-trace.mjs b/plugins/pipeline-core/lib/spec-risk-trace.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a888a3d77c94b8a6f30cc8e14336c376d4f83fc5
+--- /dev/null
++++ b/plugins/pipeline-core/lib/spec-risk-trace.mjs
+@@ -0,0 +1,123 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Trace of accepted risks in a Spec (candidate 30k, lane K16; stages S1/S2 of specs/sprint-alfred-epic/plans/accepted-prd-risk-trace-table-2026-11-18.md).
++ *
++ * WHY. A risk accepted in a PRD is prose: nothing names it and nothing fails when it materialises. A PRD is never parsed (that would be a heuristic
++ * gate). The Spec is the approved, digest-bound document, so ONE closed table in the Spec carries one row per accepted risk or assumption.
++ *
++ * WHAT IT READS. Only the Spec text, plus two injected reads. Pure and derive-only: nothing is stored, written, run or fetched; the Spec bytes
++ * are the only state (same shape as spec-journey-coverage.mjs). It reports and never refuses.
++ *
++ * THE CLOSED MARKER. A markdown table, outside any fenced block, whose header row is exactly `| id | source | statement | trace |` (case and
++ * spacing free), then its separator row, then data rows up to the first line that is not a table row. `trace` is exactly one of:
++ *   a test path (`*.test.mjs|cjs|js`)            covered when the file exists, stale when it does not
++ *   `command:<id>`                                 covered (the plan hand-off already requires a named command id to be registered; a supplied
++ *                                                  `deps.isCommandRegistered` makes an unregistered id stale)
++ *   `residual: backlog/items/<item>.md`            residual-stated when the item exists, stale when it does not
++ *   `not-applicable: <reason>`                     not-applicable (a stated reason is the trace)
++ * An empty cell, an unfilled placeholder (`<...>`, `{{...}}`) or a form with no value is `untraced`; any other cell, a row without exactly four
++ * cells, a bad id or a repeated id is `malformed`. No table (or a table without rows) reads `not-applicable`, never missing, so a Spec older than
++ * the table is not flipped.
++ *
++ * deps.exists(rel) -> boolean is called only for a row that names a path; it is required then, and a throwing reader propagates (the caller
++ * maps that to "unknown": the reader never claims what it cannot read). deps.isCommandRegistered(id) -> boolean is optional.
++ */
++
++export const RISK_TRACE_HEADER = '| id | source | statement | trace |';
++
++const HEADER_CELLS = Object.freeze(['id', 'source', 'statement', 'trace']);
++const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/u;
++const SEPARATOR = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/u;
++const ROW_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
++const PLACEHOLDER = /<[^>]*>|\{\{|REPLACE/u;
++const TEST_PATH = /^[A-Za-z0-9_./-]+\.test\.(?:mjs|cjs|js)$/u;
++const BACKLOG_ITEM = /^backlog\/items\/[A-Za-z0-9][A-Za-z0-9._-]*\.md$/u;
++const COMMAND = /^command:([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/u;
++
++/** The cells of one table line (`\|` is a literal pipe); the leading and trailing pipe are not cells. */
++function cellsOf(line) {
++  const text = line.trim();
++  const parts = [];
++  let current = '';
++  for (let index = 0; index < text.length; index++) {
++    if (text[index] === '\\' && text[index + 1] === '|') { current += '|'; index++; } else if (text[index] === '|') { parts.push(current); current = ''; } else current += text[index];
++  }
++  parts.push(current);
++  if (text.startsWith('|')) parts.shift();
++  if (text.endsWith('|') && !text.endsWith('\\|') && parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
++  return parts.map((part) => part.trim());
++}
++
++const unwrap = (cell) => { const match = /^`([^`]*)`$/u.exec(cell); return match === null ? cell : match[1].trim(); };
++const isHeader = (line) => { const cells = cellsOf(line); return line.trim().startsWith('|') && cells.length === HEADER_CELLS.length && cells.every((cell, index) => cell.toLowerCase() === HEADER_CELLS[index]); };
++
++/** The data rows of every closed table outside a fenced block: arrays of raw cells. */
++function tableRows(source) {
++  const rows = [];
++  let fence = null;
++  let state = 'outside'; // outside | separator | rows
++  for (const line of source.split(/\r?\n/u)) {
++    const open = FENCE_OPEN.exec(line);
++    if (fence !== null) {
++      if (open !== null && open[1][0] === fence.char && open[1].length >= fence.length && line.trim() === open[1]) fence = null;
++      continue;
++    }
++    if (open !== null) { fence = { char: open[1][0], length: open[1].length }; state = 'outside'; continue; }
++    if (state === 'separator') {
++      if (SEPARATOR.test(line)) { state = 'rows'; continue; }
++      state = 'outside';
++    } else if (state === 'rows') {
++      if (line.trim().startsWith('|')) { rows.push(cellsOf(line)); continue; }
++      state = 'outside';
++    }
++    if (isHeader(line)) state = 'separator';
++  }
++  return rows;
++}
++
++function classify(trace, deps) {
++  const exists = (rel) => {
++    if (typeof deps?.exists !== 'function') throw new TypeError('inspectSpecRiskTrace needs deps.exists(rel) to resolve a named path');
++    return deps.exists(rel) === true;
++  };
++  const value = unwrap(trace);
++  if (value === '' || PLACEHOLDER.test(value)) return { status: 'untraced', reason: 'the trace cell names nothing' };
++  const form = /^(not-applicable|residual):\s*(.*)$/iu.exec(value);
++  if (form !== null) {
++    const rest = unwrap(form[2].trim());
++    if (rest === '') return { status: 'untraced', reason: `\`${form[1].toLowerCase()}:\` names nothing` };
++    if (form[1].toLowerCase() === 'not-applicable') return { status: 'not-applicable' };
++    if (!BACKLOG_ITEM.test(rest)) return { status: 'malformed', reason: 'a residual names one backlog/items/<item>.md path' };
++    return exists(rest) ? { status: 'residual-stated' } : { status: 'stale', reason: `the backlog item ${rest} does not exist` };
++  }
++  const command = COMMAND.exec(value);
++  if (command !== null) {
++    if (typeof deps?.isCommandRegistered === 'function' && deps.isCommandRegistered(command[1]) !== true) return { status: 'stale', reason: `command ${command[1]} is not registered` };
++    return { status: 'covered' };
++  }
++  if (TEST_PATH.test(value) && !value.split('/').some((part) => part === '' || part === '.' || part === '..')) {
++    return exists(value) ? { status: 'covered' } : { status: 'stale', reason: `the test file ${value} does not exist` };
++  }
++  return { status: 'malformed', reason: 'the trace is none of: a test path, command:<id>, residual: backlog/items/<item>.md, not-applicable: <reason>' };
++}
++
++/**
++ * @param {string} specText the Spec text
++ * @param {{exists?: (rel: string) => boolean, isCommandRegistered?: (id: string) => boolean}} [deps]
++ * @returns {{status: 'not-applicable'|'applicable', rows: {id: string, status: 'covered'|'residual-stated'|'not-applicable'|'untraced'|'stale'|'malformed', trace: string, reason?: string}[], open: string[]}}
++ */
++export function inspectSpecRiskTrace(specText, deps = {}) {
++  const raw = tableRows(String(specText));
++  if (raw.length === 0) return { status: 'not-applicable', rows: [], open: [] };
++  const seen = new Set();
++  const rows = raw.map((cells, index) => {
++    const id = unwrap(cells[0] ?? '') || `#${index + 1}`;
++    const trace = cells.length === HEADER_CELLS.length ? unwrap(cells[3]) : '';
++    if (cells.length !== HEADER_CELLS.length) return { id, status: 'malformed', trace, reason: `a risk row has exactly ${HEADER_CELLS.length} cells (${HEADER_CELLS.join(', ')})` };
++    if (!ROW_ID.test(id)) return { id, status: 'malformed', trace, reason: 'the id is a short token such as R-1' };
++    if (seen.has(id)) return { id, status: 'malformed', trace, reason: 'the id is already used by an earlier row' };
++    seen.add(id);
++    return { id, trace, ...classify(trace, deps) };
++  });
++  return { status: 'applicable', rows, open: rows.filter((row) => ['untraced', 'stale', 'malformed'].includes(row.status)).map((row) => row.id) };
++}
+diff --git a/plugins/pipeline-core/lib/spec-risk-trace.test.mjs b/plugins/pipeline-core/lib/spec-risk-trace.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..f18251db9d6e0353b55bde973f831ee618b859ea
+--- /dev/null
++++ b/plugins/pipeline-core/lib/spec-risk-trace.test.mjs
+@@ -0,0 +1,101 @@
++// SPDX-License-Identifier: SUL-1.0
++// AC-112 (candidate 30k, lane K16, stage S1 of the accepted-risk trace plan): a pure reader derives, per row of one closed Spec table, whether an
++// accepted risk is covered / residual-stated / not-applicable / untraced / stale / malformed. The cases come from the plan's failing-first list
++// (specs/sprint-alfred-epic/plans/accepted-prd-risk-trace-table-2026-11-18.md, stage S1), not from the reader. Nothing is stored, run or fetched.
++
++import test from "node:test";
++import assert from "node:assert/strict";
++import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
++
++const TEST_FILE = "plugins/pipeline-core/lib/x.test.mjs";
++const BACKLOG = "backlog/items/2026-11-18-some-residual.md";
++const present = (...paths) => ({ exists: (rel) => new Set(paths).has(rel) });
++const table = (...rows) => ["| id | source | statement | trace |", "|---|---|---|---|", ...rows.map((r) => `| ${r} |`)].join("\n");
++const spec = (...parts) => `# Spec\n\nSome text.\n\n${parts.join("\n")}\n\n## Next\n`;
++const byId = (result) => Object.fromEntries(result.rows.map((r) => [r.id, r.status]));
++
++test("AC-112 S1: the closed table header is one exported marker", () => {
++  assert.equal(RISK_TRACE_HEADER, "| id | source | statement | trace |");
++});
++
++test("AC-112 S1: a covered row (the named test path resolves) and a residual row (the named backlog item exists)", () => {
++  const result = inspectSpecRiskTrace(spec(table(`R-1 | PRD risks | a thing breaks | ${TEST_FILE}`, `R-2 | PRD risks | a gap we accept | residual: ${BACKLOG}`)), present(TEST_FILE, BACKLOG));
++  assert.equal(result.status, "applicable");
++  assert.deepEqual(byId(result), { "R-1": "covered", "R-2": "residual-stated" });
++  assert.deepEqual(result.open, []);
++  assert.equal(result.rows[0].trace, TEST_FILE);
++});
++
++test("AC-112 S1: an untraced row (the trace cell is empty or names nothing)", () => {
++  const result = inspectSpecRiskTrace(spec(table("R-1 | PRD | s |  ", "R-2 | PRD | s | <test path> ", "R-3 | PRD | s | {{trace}}", "R-4 | PRD | s | not-applicable: ", "R-5 | PRD | s | residual:")), present());
++  assert.deepEqual(byId(result), { "R-1": "untraced", "R-2": "untraced", "R-3": "untraced", "R-4": "untraced", "R-5": "untraced" });
++  assert.deepEqual(result.open, ["R-1", "R-2", "R-3", "R-4", "R-5"]);
++});
++
++test("AC-112 S1: a stale row (a named path or backlog item no longer exists)", () => {
++  const result = inspectSpecRiskTrace(spec(table(`R-1 | PRD | s | ${TEST_FILE}`, `R-2 | PRD | s | residual: ${BACKLOG}`)), present());
++  assert.deepEqual(byId(result), { "R-1": "stale", "R-2": "stale" });
++  assert.deepEqual(result.open, ["R-1", "R-2"]);
++});
++
++test("AC-112 S1: a malformed row (the trace fits no form, a bad shape, a duplicate id) is reported, never thrown", () => {
++  const result = inspectSpecRiskTrace(spec(table(
++    "R-1 | PRD | s | see the PRD",
++    "R-2 | PRD | s | ../outside.test.mjs",
++    "R-3 | PRD | s | /abs/x.test.mjs",
++    "R-4 | PRD | s | residual: docs/state.md",
++    "R-5 | PRD | s",
++    "bad id | PRD | s | x.test.mjs",
++    `R-6 | PRD | s | ${TEST_FILE}`,
++    `R-6 | PRD | s | ${TEST_FILE}`,
++  )), present(TEST_FILE, "docs/state.md"));
++  assert.deepEqual(result.rows.map((r) => r.status), ["malformed", "malformed", "malformed", "malformed", "malformed", "malformed", "covered", "malformed"]);
++  assert.ok(result.rows.every((r) => r.status === "covered" || typeof r.reason === "string" && r.reason !== ""));
++  assert.deepEqual(result.open, ["R-1", "R-2", "R-3", "R-4", "R-5", "bad id", "R-6"]);
++});
++
++test("AC-112 S1: a not-applicable row carries its reason and is traced", () => {
++  const result = inspectSpecRiskTrace(spec(table("R-1 | PRD | s | not-applicable: the runner never offers this")), present());
++  assert.deepEqual(byId(result), { "R-1": "not-applicable" });
++  assert.deepEqual(result.open, []);
++});
++
++test("AC-112 S1: a command:<id> row is covered by form; a supplied registry decides stale", () => {
++  const text = spec(table("R-1 | PRD | s | command:verify-all"));
++  assert.deepEqual(byId(inspectSpecRiskTrace(text, present())), { "R-1": "covered" });
++  assert.deepEqual(byId(inspectSpecRiskTrace(text, { ...present(), isCommandRegistered: (id) => id === "verify-all" })), { "R-1": "covered" });
++  assert.deepEqual(byId(inspectSpecRiskTrace(text, { ...present(), isCommandRegistered: () => false })), { "R-1": "stale" });
++});
++
++test("AC-112 S1: no table at all is not-applicable, never missing; a header-only table traces nothing", () => {
++  assert.deepEqual(inspectSpecRiskTrace("# Spec\n\nno risk table here\n", present()), { status: "not-applicable", rows: [], open: [] });
++  assert.deepEqual(inspectSpecRiskTrace("", present()).status, "not-applicable");
++  assert.equal(inspectSpecRiskTrace(spec(table()), present()).status, "not-applicable");
++  // A table with another header is not this table.
++  assert.equal(inspectSpecRiskTrace(spec("| id | what | test |", "|---|---|---|", "| R-1 | a | b |"), present()).status, "not-applicable");
++});
++
++test("AC-112 S1: a table inside a fenced block is ignored, the real table beside it is read", () => {
++  const fenced = ["```", table(`F-1 | PRD | s | ${TEST_FILE}`), "```"].join("\n");
++  assert.equal(inspectSpecRiskTrace(spec(fenced), present()).status, "not-applicable");
++  assert.equal(inspectSpecRiskTrace(spec(["~~~md", table("F-1 | PRD | s | x"), "~~~"].join("\n")), present()).status, "not-applicable");
++  assert.equal(inspectSpecRiskTrace(spec(["````", "```", table("F-1 | PRD | s | x"), "```", "````"].join("\n")), present()).status, "not-applicable", "a longer fence is not closed by a shorter one");
++  const both = inspectSpecRiskTrace(spec(fenced, "", table(`R-1 | PRD | s | ${TEST_FILE}`)), present(TEST_FILE));
++  assert.deepEqual(byId(both), { "R-1": "covered" });
++});
++
++test("AC-112 S1: the table ends at its first non-table line; backticks and escaped pipes in cells are read", () => {
++  const text = spec(table(`R-1 | PRD | a \\| b | \`${TEST_FILE}\``), "", "| other | table | here | x |", "|---|---|---|---|", "| R-9 | a | b | c |");
++  const result = inspectSpecRiskTrace(text, present(TEST_FILE));
++  assert.deepEqual(byId(result), { "R-1": "covered" });
++});
++
++test("AC-112 S1: the reader never claims what it cannot read, is pure, and leaves its input alone", () => {
++  assert.throws(() => inspectSpecRiskTrace(spec(table(`R-1 | PRD | s | ${TEST_FILE}`)), {}), /exists/u);
++  assert.throws(() => inspectSpecRiskTrace(spec(table(`R-1 | PRD | s | ${TEST_FILE}`)), { exists: () => { throw new Error("boom"); } }), /boom/u);
++  // No path row, so no read is needed: the absent reader is not asked.
++  assert.deepEqual(byId(inspectSpecRiskTrace(spec(table("R-1 | PRD | s | not-applicable: n/a")), {})), { "R-1": "not-applicable" });
++  const text = spec(table(`R-1 | PRD | s | ${TEST_FILE}`));
++  const frozen = Object.freeze({ exists: () => true });
++  assert.deepEqual(inspectSpecRiskTrace(text, frozen), inspectSpecRiskTrace(text, frozen));
++});

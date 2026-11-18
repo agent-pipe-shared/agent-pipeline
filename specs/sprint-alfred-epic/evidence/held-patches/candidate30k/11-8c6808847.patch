@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index c7e809555c0bcb3fddb11a0e786776fdcda6dedd..e1c6b1e199c0e9f05903fce3dabb7ffb4ce0e7b1 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1166,6 +1166,7 @@
+         "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
+         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
++        "verify-phase:harness/scripts/verify.mjs:spec-risk-trace-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-capability-plan-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index e583c83a298092b6a89738f213f0315fc01fe88b..c527e5a9bf5ab05cfe9ac93764e440ff195ca29f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4599,6 +4599,12 @@
+       "invariantPinned": "The close-time quality readback returns one closed, ordered row per quality artefact (security scan, ADR decision, architecture fitness, Critic report file, handover freshness) with a present, missing, not-applicable or unknown status and a remedy, an absent or throwing reader is unknown and never present, and the audit index lists the change's artefacts with their digests without writing anything (C18-10, AC-239)",
+       "nonOverlapNote": "Unique cases: lib/close-quality-readback.mjs; the close coordinator suite pins its drive and audit-index output"
+     },
++    {
++      "name": "spec-risk-trace-tests",
++      "file": "plugins/pipeline-core/lib/spec-risk-trace.test.mjs",
++      "invariantPinned": "The pure reader of the Spec risk table returns per row covered, residual-stated, not-applicable, untraced, stale or malformed, an absent table is not-applicable overall and never missing, a table inside a fenced block is ignored, and a throwing reader propagates; it stores nothing and refuses nothing (C30K, AC-112)",
++      "nonOverlapNote": "Unique cases: lib/spec-risk-trace.mjs; the close quality readback suite pins the report-only row that uses it"
++    },
+     {
+       "name": "session-authority-registry-fsync-tests",
+       "file": "plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs",
