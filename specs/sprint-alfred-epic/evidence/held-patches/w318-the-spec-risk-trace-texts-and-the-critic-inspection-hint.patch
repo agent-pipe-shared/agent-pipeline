@@ -1,0 +1,144 @@
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 4314f5611..3db56609c 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -123,6 +123,15 @@ the design makes such a choice and no module names an ADR path for it in
+ and point to the `architecture-decision` skill. This is a question, never a
+ block; the close only reports which named ADR paths exist.
+ 
++Accepted risks: when the Spec carries the closed risk table (header
++`| id | source | statement | trace |`), read its `trace` cells. A risk row needs a
++test reference (a test path or `command:<id>`) or an explicit residual statement
++(`residual: backlog/items/<item>.md` or `not-applicable: <reason>`). When a row
++names none of these, raise ONE question to the Elephant naming those row ids: what
++test or stated residual covers each. This is a question, never a block, and a Spec
++without the table is not asked. Ask it in the full round; in a delta round only
++when the correction changed that table.
++
+ Return one concise readiness review with references in the report shape above.
+ The host, not this agent, creates the sanitized, dispatch-bound duty and
+ execution receipts; never return or persist raw prompts, answers, paths,
+diff --git a/plugins/pipeline-core/lib/spec-risk-trace.mjs b/plugins/pipeline-core/lib/spec-risk-trace.mjs
+index a888a3d77..a87f357da 100644
+--- a/plugins/pipeline-core/lib/spec-risk-trace.mjs
++++ b/plugins/pipeline-core/lib/spec-risk-trace.mjs
+@@ -24,6 +24,8 @@
+  */
+ 
+ export const RISK_TRACE_HEADER = '| id | source | statement | trace |';
++/** The forms a `trace` cell may take, in prose; the Spec template and the readiness reviewer quote this list (stage S3), so a text and the reader cannot drift. */
++export const RISK_TRACE_FORMS = Object.freeze(['a test path', 'command:<id>', 'residual: backlog/items/<item>.md', 'not-applicable: <reason>']);
+ 
+ const HEADER_CELLS = Object.freeze(['id', 'source', 'statement', 'trace']);
+ const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/u;
+@@ -98,7 +100,7 @@ function classify(trace, deps) {
+   if (TEST_PATH.test(value) && !value.split('/').some((part) => part === '' || part === '.' || part === '..')) {
+     return exists(value) ? { status: 'covered' } : { status: 'stale', reason: `the test file ${value} does not exist` };
+   }
+-  return { status: 'malformed', reason: 'the trace is none of: a test path, command:<id>, residual: backlog/items/<item>.md, not-applicable: <reason>' };
++  return { status: 'malformed', reason: `the trace is none of: ${RISK_TRACE_FORMS.join(', ')}` };
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/spec-risk-trace.test.mjs b/plugins/pipeline-core/lib/spec-risk-trace.test.mjs
+index f18251db9..c4c7e5cf4 100644
+--- a/plugins/pipeline-core/lib/spec-risk-trace.test.mjs
++++ b/plugins/pipeline-core/lib/spec-risk-trace.test.mjs
+@@ -5,7 +5,9 @@
+ 
+ import test from "node:test";
+ import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
+ import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
++import * as reader from "./spec-risk-trace.mjs";
+ 
+ const TEST_FILE = "plugins/pipeline-core/lib/x.test.mjs";
+ const BACKLOG = "backlog/items/2026-11-18-some-residual.md";
+@@ -99,3 +101,43 @@ test("AC-112 S1: the reader never claims what it cannot read, is pure, and leave
+   const frozen = Object.freeze({ exists: () => true });
+   assert.deepEqual(inspectSpecRiskTrace(text, frozen), inspectSpecRiskTrace(text, frozen));
+ });
++
++// AC-112 stage S3 (candidate 31, lane L3): the template texts quote the reader's own constants, so a text and the reader cannot drift. The cases come from
++// the plan's stage S3 row (the Spec template gets the table skeleton, the PRD template an "Assumptions" line, the readiness reviewer ONE question),
++// never from the texts. Text only: no gate, no stored status.
++const root = (rel) => readFileSync(new URL(`../../../${rel}`, import.meta.url), "utf8");
++const count = (text, needle) => text.split(needle).length - 1;
++
++test("AC-112 S3: the accepted trace forms are one exported list the reader's malformed reason quotes", () => {
++  assert.deepEqual(reader.RISK_TRACE_FORMS, ["a test path", "command:<id>", "residual: backlog/items/<item>.md", "not-applicable: <reason>"]);
++  const malformed = inspectSpecRiskTrace(spec(table("R-1 | PRD | s | see the PRD")), present());
++  assert.equal(malformed.rows[0].reason, `the trace is none of: ${reader.RISK_TRACE_FORMS.join(", ")}`);
++});
++
++test("AC-112 S3: the Spec template carries the table skeleton the reader recognises, with the reader's header and forms", () => {
++  const text = root("templates/spec.md");
++  assert.ok(text.includes(RISK_TRACE_HEADER), "the template quotes the reader's header marker");
++  for (const form of reader.RISK_TRACE_FORMS) assert.ok(text.includes(form), `the template names the trace form: ${form}`);
++  const read = inspectSpecRiskTrace(text, present());
++  assert.equal(read.status, "applicable", "the reader finds the skeleton as a closed table outside a fence");
++  assert.ok(read.rows.length >= 1 && read.rows.every((row) => row.status === "untraced"), "an unfilled skeleton row reads untraced, never malformed");
++});
++
++test("AC-112 S3: the PRD template has an Assumptions line that points to the Spec table by the reader's header", () => {
++  const text = root("templates/prd.md");
++  assert.match(text, /^## Assumptions\b/mu);
++  assert.equal(count(text, RISK_TRACE_HEADER), 1, "one technical line names the Spec table");
++  assert.ok(text.indexOf("## Assumptions") < text.indexOf("## Alternatives considered"), "it sits with Non-goals and Risks, before the alternatives");
++});
++
++test("AC-112 S3: the readiness reviewer asks exactly ONE question about untraced accepted risks, never a block, inside its delta contract", () => {
++  const text = root("plugins/pipeline-core/agents/readiness-reviewer.md");
++  assert.equal(count(text, RISK_TRACE_HEADER), 1, "exactly one place names the risk table");
++  const paragraph = text.split(/\n\n/u).find((block) => block.includes(RISK_TRACE_HEADER)) ?? "";
++  for (const form of reader.RISK_TRACE_FORMS) assert.ok(paragraph.includes(form), `the question names the trace form: ${form}`);
++  assert.match(paragraph, /question/u);
++  assert.match(paragraph, /never a block/u);
++  assert.match(paragraph, /full round/u);
++  assert.match(paragraph, /delta round/u, "the delta contract: asked again only when the correction changed the table");
++  assert.equal(count(text.slice(0, text.indexOf("## What to check")), RISK_TRACE_HEADER), 0, "the blocking-finding definition is unchanged");
++});
+diff --git a/templates/prd.md b/templates/prd.md
+index eac8e2a3b..d69b66fdf 100644
+--- a/templates/prd.md
++++ b/templates/prd.md
+@@ -67,6 +67,12 @@ in the running text.>
+ ## Risks & mitigation
+ <The 2–4 most important risks, each with a countermeasure.>
+ 
++## Assumptions
++<What this plan takes for granted and what happens if it turns out wrong; one line each.
++A risk or assumption the PRD accepts gets one row in the Spec's risk table, so it ends
++in a test or a stated residual, not only in this text. Compact italicized technical
++line: *Spec table `| id | source | statement | trace |` (spec.md, section 3a).*>
++
+ ## Alternatives considered
+ <Considered & rejected, each with a one-sentence rationale (solo-memory element).>
+ 
+diff --git a/templates/spec.md b/templates/spec.md
+index 91d63780f..04043c5cd 100644
+--- a/templates/spec.md
++++ b/templates/spec.md
+@@ -120,6 +120,22 @@ guardrails against future hallucinations and repeat debates.}}
+ | {{ALTERNATIVE_1}} | {{REASON}} |
+ | {{ALTERNATIVE_2}} | {{REASON}} |
+ 
++### 3a. Accepted risks and assumptions (when the PRD accepts any)
++
++{{One row per risk or assumption the PRD accepts (its "Risks & mitigation" and
++"Assumptions" blocks), so a risk reaches a test or a stated residual instead of
++staying prose. The `trace` cell is exactly one of: a test path, `command:<id>`,
++`residual: backlog/items/<item>.md`, or `not-applicable: <reason>`. A row whose
++`trace` names nothing is reported as "without behaviour" (the readiness question,
++the close readback row and the Critic inspection hint); it is never a refusal, a
++gate or a stored status. A risk that becomes an acceptance criterion points to its
++`AC-n` in `statement` instead of restating it. Delete this section when the PRD
++accepts no risk.}}
++
++| id | source | statement | trace |
++|---|---|---|---|
++| R-1 | {{PRD section}} | {{the accepted risk or assumption, one sentence}} | {{trace}} |
++
+ ### 4. Detailed Implementation (every file + rationale)
+ 
+ {{Enumerate EACH file to be created/changed/deleted. This list is the contract:
