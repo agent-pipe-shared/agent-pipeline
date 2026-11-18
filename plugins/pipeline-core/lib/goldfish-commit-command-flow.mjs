@@ -48,7 +48,9 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
   // K-32: a path with `[ ]` would be a glob for git; --literal-pathspecs stages and commits exactly the named files.
   const literal = normalized.some((path) => /[[\]]/u.test(path)) ? ["--literal-pathspecs"] : [];
   const stageArgv = [...literal, "add", "--", ...normalized];
-  // Ruling 150: the message-file route. guard-push refuses `-m` with a parenthesised `--trailer`, so the
+  // Ruling 150: the message-file route. After the working cap guard-dispatch-budget admits a closing `git commit` only
+  // without a parenthesis, and the Goldfish trailer `Dispatch: <id> (goldfish)` has one (guard-push itself admits a quoted
+  // parenthesised trailer in one plain printable-ASCII commit), so the
   // producer names the file (the agent writes it with its Write tool) and the commit step reads it with -F.
   const messagePath = `scratch/commit-msg/${taskId}.txt`;
   const commitArgv = [...literal, "commit", "-F", messagePath, "--", ...normalized];

@@ -36,12 +36,24 @@ bounds, so read that list instead of guessing.
 
 The two workarounds that cost the most time before they were written down:
 
-- **A provenance-bearing commit.** Write the message (subject, blank line,
-  body, blank line, then the `AI-Assisted: true` and `Dispatch:` trailers) to a
-  file under `scratch/commit-msg/`. Stage with `git add -- <paths>` as its own
-  call, then commit with `git commit -F <msgfile> -- <paths>`. `-m` with
-  `--trailer` and a parenthesised trailer value such as
-  `Dispatch: <ID> (goldfish)` is refused by guard-push.
+- **A provenance-bearing commit.** Stage with `git add -- <paths>` as its own
+  call. For your own (non-dispatched) commits, then commit in ONE plain command:
+  `git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <ID>" -- <paths>`.
+  One `-m` per paragraph; the two trailers only as `--trailer` flags, never as `-m`
+  (each `-m` adds a blank line). Two Git facts decide whether it is admitted: a body whose
+  last paragraph is plain prose keeps the blank line before the trailers; a last body
+  paragraph made only of `Key: value` lines is read by Git as a trailer block, the
+  trailers are glued under it with no blank line, and the commit is refused
+  (`GIT-03-TRAILERS-GLUED-TO-BODY`). Keep the body prose, or use the file route.
+  For a long or multi-paragraph body, non-ASCII text, a backslash or a newline inside an
+  argument, write the message (subject, blank line, body, blank line, then the
+  `AI-Assisted: true` and `Dispatch:` trailers) to a file under `scratch/commit-msg/` and
+  commit with `git commit -F <msgfile> -- <paths>`. The guard-push limit is exact, not
+  blanket: it admits a quoted parenthesised trailer value such as
+  `Dispatch: <ID> (goldfish)` in the one-command form only for one plain printable-ASCII
+  `git commit` on one line, with no backslash and no global option (`-c`, `-C`); outside
+  that shape the parenthesis is refused. Git itself has no problem with it. A dispatched
+  Goldfish uses the message-file route its briefing names (§6).
 - **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.
   Write the file from Node instead.
 
@@ -250,8 +262,8 @@ gate, and answer an automatic continuation in one line until the human has acted
 
 - Give a native file-read tool an absolute path. A relative path fails in child sessions.
 - Separate a revision from a path with `--`: `git diff <rev> -- <path>`.
-- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a
-  trailer is required.
+- Commit with the one-command form (`-m` paragraphs plus `--trailer` flags, §1) when the
+  body is plain prose; for a long body or the Goldfish route use `git commit -F <file>`.
 - Never commit the output of a close or another Pipeline writer by hand. Run the command
   that the tool printed; it owns that commit.
 - On a run longer than a few minutes, say briefly what is running and what comes next,

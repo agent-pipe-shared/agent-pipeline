@@ -270,3 +270,34 @@ test("AC-1: a hand-maintained line is marked as such, so the boundary is visible
   const marks = document.match(/hand-maintained/gu) ?? [];
   assert.ok(marks.length >= 2, `expected every hand-maintained section to say so; found ${marks.length}`);
 });
+
+// C30-19 / AC-111 (slice C30I-S4B): the commit-route texts say what really holds for the one-command commit with trailers.
+const COMMIT_ROUTE_FILES = [
+  "templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md",
+  "templates/prompts/goldfish-task.md", "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+  "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs", "plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
+];
+test("AC-111: the generated obligations teach the one-command commit first, the file route as the fallback, and the Git glue fact", () => {
+  const document = renderAgentObligations();
+  const oneCommand = document.indexOf('git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <ID>"');
+  assert.ok(oneCommand > 0, "the one-command form is named");
+  assert.ok(oneCommand < document.indexOf("git commit -F <msgfile> -- <paths>"), "the one-command form comes first");
+  assert.match(document, /GIT-03-TRAILERS-GLUED-TO-BODY/u);
+  assert.match(document, /Key: value/u);
+  assert.match(document, /plain printable-ASCII/u, "the guard-push limit is stated exactly");
+  assert.match(document, /commit with `git commit -F <msgfile> -- <paths>`/u, "the AC-106 contract phrase stays");
+});
+test("AC-111: no commit-route text keeps the blanket claim that guard-push refuses -m with --trailer", () => {
+  for (const rel of COMMIT_ROUTE_FILES) {
+    const text = readFileSync(join(REPO_ROOT, rel), "utf8");
+    assert.doesNotMatch(text, /is refused by guard-push/u, rel);
+    assert.doesNotMatch(text, /guard-push refuses it/u, rel);
+    assert.doesNotMatch(text, /guard-push refuses `-m` with a parenthesised/u, rel);
+    assert.doesNotMatch(text, /`-m` is refused where a/u, rel);
+  }
+});
+test("AC-111: the Goldfish route keeps the message file and names the accurate reason", () => {
+  const text = readFileSync(join(REPO_ROOT, "templates/prompts/goldfish-task.md"), "utf8");
+  assert.match(text, /There is exactly one commit route: the message file/u);
+  assert.match(text, /guard-dispatch-budget/u);
+});

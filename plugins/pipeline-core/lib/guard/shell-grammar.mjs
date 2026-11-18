@@ -1676,8 +1676,9 @@ function commitMessageFileRemediation(command) {
   return "Remediation: use separate stage and commit tool calls, naming the same exact paths in both. "
     + "Run \"git add -- <paths>\" first. For marker-free literal content, use "
     + "\"git commit -m 'docs: update guidance' -m 'Explain the change' --trailer 'AI-Assisted: true' -- <paths>\". "
-    + "Keep each -m argument on one line. Parentheses in a scoped subject or required Dispatch role, "
-    + "and other fail-closed shell markers, remain refused even when quoted. Preserve that exact content "
+    + "Keep each -m argument on one line. A quoted parenthesis in a scoped subject or required Dispatch role "
+    + "is admitted by guard-push only in one plain printable-ASCII git commit on one line, with no backslash and no global option; "
+    + "other fail-closed shell markers remain refused even when quoted. Preserve that exact content "
     + "and required trailers in a message file, then use \"git commit -F <msgfile> -- <paths>\". "
     + "Include Dispatch only when the repository requires it; never strip required provenance to fit the file-free form.";
 }
