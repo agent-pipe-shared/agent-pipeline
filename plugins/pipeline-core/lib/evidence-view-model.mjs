@@ -9,13 +9,13 @@
  */
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { validateFeaturePackage } from "./feature-package-topology.mjs";
+import { FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const SHA = /^[a-f0-9]{64}$/u;
 const VIEW_STATUSES = new Set(["pass", "fail", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
 const ARTIFACT_STATES = new Set(["verified", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
-const PACKAGE_STATES = new Set(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
+const PACKAGE_STATES = new Set(FEATURE_STATES);
 const EXPORT_STATES = new Set(["unavailable", "pending", "delivered", "retryable-failure", "quarantined"]);
 const CODE = /^[A-Z][A-Z0-9-]{1,63}$/u;
 // The closed gate vocabulary `gate-estimate.mjs` itself stores and projects

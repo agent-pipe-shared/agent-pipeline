@@ -624,6 +624,8 @@ import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
 import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, abandonCalibrationVerifyCommitTransition, rollbackCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, inspectReplayableCalibrationVerifyLayout, inspectCurrentCalibrationVerifyReady, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
+/** C30J-J1: the one list of the two phases an active feature can be in. */
+const ACTIVE_FEATURE_PHASES = new Set(["design", "implementation"]);
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 export const ARCHITECTURE_IMPACT_VALUES = Object.freeze([
@@ -6464,7 +6466,7 @@ function planLegacyResultRepair(dir, state, manifestPath) {
  * command. The candidate is the current HEAD commit and tree, read the same way the reconcile reads it, so a later
  * commit changes the digest and the printed command has to be taken again from a fresh completion.
  */
-function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
+export function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
   const root = realpathSync(resolve(dir));
   const approvalKind = "feature-package-reconcile";
   const placeholders = [
@@ -7722,7 +7724,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-DECISION-STATE" };
   const state = existing.state;
   if (state.schema !== SCHEMA_ID || state.planApproved !== true || !state.activeFeature
-    || !new Set(["design", "implementation"]).has(state.activeFeature.phase)
+    || !ACTIVE_FEATURE_PHASES.has(state.activeFeature.phase)
     || typeof state.activeFeature.planPath !== "string") return { ok: false, code: "PO-DECISION-STATE" };
   const prd = physicalRebindFile(dir, state.activeFeature.planPath);
   const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
@@ -9163,7 +9165,12 @@ function runFeaturePackageReadCommand(sub, argv) {
     const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root), correctionRoundFeatureId: featurePackageCorrectionFeatureId(root) });
     // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
     // computed before this field is added), so a consumer does not have to re-derive it.
-    console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
+    // C30J-J1: an invalid current package names its route instead of leaving the reader with findings only.
+    const writer = fileURLToPath(import.meta.url);
+    const routed = plan.status === "rejected" && plan.reason === "invalid-current-package"
+      ? { ...plan, nextAction: `read the findings with: node ${writer} feature-package-status --root ${root} --manifest ${manifest}; a stale digest of a MUTABLE-class artifact is repaired with: node ${writer} feature-package-rebind-mutable --root ${root} --manifest ${manifest}; a drifted Result entry is moved by the reconcile route: node ${writer} feature-package-reconcile --root ${root} --manifest ${manifest} --plan-sha256 <digest printed by the bootstrap plan (plan-start) as reconcileCommand> (the PO signs only when the plan changes more than the Result entry; its signatureCommand is printed beside it); an immutable artifact whose bytes changed is never rebound: the package is superseded by the PO instead` }
+      : plan;
+    console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : routed, null, 2));
     return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
   }
   if (flags.proposal === undefined) {
@@ -11944,7 +11951,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
 
     case "set-phase": {
       const phase = flags.phase;
-      if (!new Set(["design", "implementation"]).has(phase)) {
+      if (!ACTIVE_FEATURE_PHASES.has(phase)) {
         console.error('Error: set-phase requires --phase <design|implementation>.');
         return 2;
       }

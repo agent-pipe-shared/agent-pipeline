@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -17,6 +17,12 @@ function packageFixture({ corrupt = false } = {}) {
   writeFileSync(join(base, "lifecycle.json"), `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "completed", artifacts, candidate, supersedes: null })}\n`);
   return { root, manifest: `specs/${id}/lifecycle.json` };
 }
+
+test("C30J-J1: the viewer reads the package states from the topology owner, with no literal copy of the list", () => {
+  const source = readFileSync(new URL("./evidence-view-model.mjs", import.meta.url), "utf8");
+  assert.equal(source.includes('"superseded"'), false);
+  assert.match(source, /FEATURE_STATES/u);
+});
 
 test("renders only candidate-bound non-authoritative explicit evidence", () => {
   const model = buildEvidenceViewModel({ candidate, status: "pass", artifacts: [{ path: "specs/result.md", sha256: "c".repeat(64), state: "verified" }] });

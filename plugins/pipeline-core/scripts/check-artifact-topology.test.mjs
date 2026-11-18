@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_ROOT, checkArtifactTopology, TOPOLOGY_CLASSES, TOPOLOGY_STATES } from "./check-artifact-topology.mjs";
-import { FEATURE_CLASSES } from "../lib/feature-package-topology.mjs";
+import { FEATURE_CLASSES, FEATURE_STATES } from "../lib/feature-package-topology.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "artifact-topology-"));
 try {
@@ -25,6 +25,9 @@ try {
   const shipped = JSON.parse(readFileSync(join(DEFAULT_ROOT, "governance/artifact-topology.json"), "utf8"));
   assert.deepEqual(shipped.classes, [...TOPOLOGY_CLASSES]);
   assert.deepEqual(shipped.states, [...TOPOLOGY_STATES]);
+  // C30J-J1: the nine package states have ONE list (FEATURE_STATES); the topology list is that list, not a copy of it.
+  assert.equal(TOPOLOGY_STATES, FEATURE_STATES);
+  assert.deepEqual([...FEATURE_STATES], ["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
   writeFileSync(join(root, "governance/artifact-topology.json"), JSON.stringify(base));
   assert.equal(checkArtifactTopology(root).ok, true);
   writeFileSync(join(root, "governance/artifact-topology.json"), JSON.stringify({ ...base, states: [...TOPOLOGY_STATES].reverse() }));

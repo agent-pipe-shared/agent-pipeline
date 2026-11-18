@@ -4011,3 +4011,34 @@ assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED"), /push-in
 assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED", " Run this command again."), /has passed, so it cannot be used\. Run this command again\.$/u);
 assert.equal(criticalProofRefusalHint("SOME-OTHER-CODE"), "");
 console.log("C29 R12 expired-proof hint complete.");
+
+// C30J-J1 (SM-1, C30-24): the phase set has one list, and the plan rejection names its route.
+{
+  const source = readFileSync(join(fileURLToPath(new URL(".", import.meta.url)), "pipeline-state.mjs"), "utf8");
+  assert.equal(source.split('new Set(["design", "implementation"])').length - 1, 1, "the two inline phase sets are one named list");
+  const root = mkdtempSync(join(tmpdir(), "c30j-j1-"));
+  try {
+    mkdirSync(join(root, "specs", "j1-pkg"), { recursive: true });
+    const sha = (text) => createHash("sha256").update(text).digest("hex");
+    const manifestRel = "specs/j1-pkg/lifecycle.json";
+    const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "immutable"]].map(([klass, name, authority, mutability]) => {
+      writeFileSync(join(root, "specs", "j1-pkg", name), `# ${klass}\n`);
+      return { class: klass, path: `specs/j1-pkg/${name}`, sha256: sha(`# ${klass}\n`), authority, mutability, retention: "active" };
+    });
+    writeFileSync(join(root, manifestRel), `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "j1-pkg", rigor: 1 }, state: "draft", artifacts: entries, candidate: null, supersedes: null }, null, 2)}\n`);
+    writeFileSync(join(root, "specs", "j1-pkg", "prd.md"), "# prd (edited)\n");
+    const planned = capturedStdout(() => run(["feature-package-plan", "--root", root, "--manifest", manifestRel, "--next-state", "approved"]));
+    assert.equal(planned.result, 2);
+    const plan = JSON.parse(planned.lines.at(-1));
+    assert.equal(plan.reason, "invalid-current-package");
+    assert.equal(typeof plan.nextAction, "string", "the rejection names its route");
+    assert.ok(plan.nextAction.includes(`feature-package-status --root ${root} --manifest ${manifestRel}`), plan.nextAction);
+    assert.ok(plan.nextAction.includes(`feature-package-rebind-mutable --root ${root} --manifest ${manifestRel}`), plan.nextAction);
+    assert.ok(plan.nextAction.includes(`feature-package-reconcile --root ${root} --manifest ${manifestRel}`), plan.nextAction);
+    // a rejection for another reason gains no field
+    writeFileSync(join(root, "specs", "j1-pkg", "prd.md"), "# prd\n");
+    const noop = capturedStdout(() => run(["feature-package-plan", "--root", root, "--manifest", manifestRel, "--next-state", "bogus"]));
+    assert.equal(JSON.parse(noop.lines.at(-1)).nextAction, undefined);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+console.log("C30J-J1 phase list and plan route complete.");
