@@ -179,6 +179,7 @@ const ceremonyPorts = new WeakMap(), ceremonyOperations = new WeakMap(), ceremon
 const ceremonyPortCache = new Map(), ceremonyContext = new AsyncLocalStorage();
 const CEREMONY_SCHEMA = "pipeline.registered-chat-gate-lifetime.v1";
 const CEREMONY_NAMESPACE = "registered-ceremony-lifetimes";
+const CEREMONY_TEMPORARY = /^[a-f0-9]{32}\.(?:reserved|running|terminal-observed)\.json\.\d+\.[a-f0-9]{16}\.tmp$/u;
 const ceremonyHash = bytes => createHash("sha256").update(bytes).digest("hex");
 const ceremonyDigest = value => ceremonyHash(canonical(value));
 const ceremonyEqual = (a,b) => canonical(a) === canonical(b);
@@ -244,7 +245,9 @@ function ceremonyInventory(repo) {
   let directory;try{directory=lstatSync(dir);}catch(error){if(error.code!=="ENOENT")throw error;return {records,groups,memberships:[{namespaceId:CEREMONY_NAMESPACE,rootSha256:ceremonyDigest({commonDir:repo.commonDir,path:dir}),entrySetSha256:ceremonyDigest([]),entryCount:0,sourceFacts:[]}]};}
   if(!directory.isDirectory()||directory.isSymbolicLink()||(process.platform!=="win32"&&(directory.mode&0o077)!==0)
     ||(typeof process.getuid==="function"&&directory.uid!==process.getuid()))ceremonyFail("chat:unsafe-namespace");
-  const names=readdirSync(dir).sort();if(names.length>4096)ceremonyFail("chat:inventory-bound");
+  // C30J-J3: the temporary file of a record write (the exact name `writePrivateFileNoReplaceAtomic` gives it) is not a record; a writer that ended before it
+  // linked the record leaves it behind. It is not read, not trusted and not deleted; every other unexpected name is still refused as a record.
+  const names=readdirSync(dir).filter(name=>!CEREMONY_TEMPORARY.test(name)).sort();if(names.length>4096)ceremonyFail("chat:inventory-bound");
   let total=0;
   for(const name of names){const row=ceremonyRecord(repo,join(dir,name));total+=row.bytes.length;if(total>16777216)ceremonyFail("chat:inventory-bytes");records.push(row);const group=groups.get(row.record.id)??[];group.push(row);groups.set(row.record.id,group);}
   for(const rows of groups.values()){
@@ -344,8 +347,9 @@ export function createChatGateAuthorityProducerPort({repository:input}) {
       for(const member of memberRecords){const rows=inventory.groups.get([...inventory.groups].find(([,values])=>values[0].record.bindingSha256===member.bindingSha256)?.[0]);
         if(!rows){const live=[...ceremonyLiveOperations].find(data=>data.port===port&&data.bindingSha256===member.bindingSha256);if(!live||member.phase!=="reserved"||member.sourceFacts.length!==0||!ceremonyEqual(member.association,live.association)||!ceremonyEqual(member.kinds,["ceremony"]))ceremonyFail("chat:member-without-source");continue;}
         const last=rows.find(x=>x.record.phase==="terminal-observed")??rows.find(x=>x.record.phase==="running")??rows[0];
-        if(!ceremonyEqual(member.association,last.record.association)||!ceremonyEqual(member.kinds,["ceremony"])
-          ||!(member.phase===last.record.phase||member.phase==="released"&&last.record.phase==="terminal-observed")
+        if(!ceremonyEqual(member.association,last.record.association)||!ceremonyEqual(member.kinds,["ceremony"]))ceremonyFail("chat:member-source-drift");
+        if(ceremonyMemberBehindRecords(member,rows,[...ceremonyLiveOperations].some(data=>data.port===port&&data.bindingSha256===member.bindingSha256)))continue;
+        if(!(member.phase===last.record.phase||member.phase==="released"&&last.record.phase==="terminal-observed")
           ||!ceremonyEqual(member.sourceFacts,rows.map(x=>x.fact)))ceremonyFail("chat:member-source-drift");
       }
       for(const release of releaseRecords){const rows=[...inventory.groups.values()].find(values=>values[0].record.bindingSha256===release.bindingSha256),last=rows?.find(x=>x.record.phase==="terminal-observed");if(!last||last.record.terminal!==release.terminal||!ceremonyEqual(release.sourceFacts,rows.map(x=>x.fact)))ceremonyFail("chat:release-source-drift");}
@@ -358,6 +362,19 @@ export function isOwnedChatGateAuthorityProducerPort(port,{repository:input}={})
   const data=port&&ceremonyPorts.get(port);if(!data)return false;try{return ceremonyEqual(data.repository,ceremonyRepository(input));}catch{return false;}
 }
 const ceremonyLiveOperations=new Set();
+/**
+ * C30J-J3: the ceremony's records are the truth and the registry member is the copy. The member is written after the records, inside the same registry
+ * boundary, so a member whose source facts are an exact PREFIX of the record facts, standing at the phase of that prefix, was left behind by a writer that
+ * ended inside its boundary (a reader holding the boundary never sees a live writer between the two writes). Nothing is read as drift then; the next
+ * boundary step (the retirement of an ended ceremony) catches the member up. A member AHEAD of its records, non-prefix facts and a member of an operation
+ * that this very process still runs stay refused by the caller.
+ */
+function ceremonyMemberBehindRecords(member,rows,liveHere){
+  if(liveHere)return false;
+  const facts=rows.map(x=>x.fact),prefix=member.sourceFacts;
+  if(!Array.isArray(prefix)||prefix.length>=facts.length||!prefix.every((fact,index)=>ceremonyEqual(fact,facts[index])))return false;
+  return member.phase===(prefix.length===0?"reserved":rows[prefix.length-1].record.phase);
+}
 function ceremonyExecuteBody(data){
   data.executed=true;data.executing=true;ceremonyLiveOperations.add(data);
   let result,error;
@@ -405,7 +422,12 @@ export function retireAbandonedChatGateCeremonies({repository:input,boundary,jud
     ceremonyOperations.set(operationHandle,data);
     const member=ceremonyRegistry.recoverAbandonedSessionAuthorityMember({boundary,producerPort:port,operationHandle,bindingSha256});
     if(last.record.phase==="terminal-observed"&&member===null)continue;
-    const owner=ceremonyReadOwner(repo,id),verdict=owner===null?null:judge(owner);
+    const owner=ceremonyReadOwner(repo,id);let verdict=owner===null?null:judge(owner);
+    // C30J-J3: a ceremony that recorded no owner (a build before C30I-S6) is still closed when its member is provably BEHIND its records (see `ceremonyMemberBehindRecords`).
+    if(verdict!=="dead"&&owner===null&&member!==null){
+      let record=null;try{record=ceremonyRegistry.inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:member.memberRef}).record;}catch{record=null;}
+      if(record!==null&&ceremonyMemberBehindRecords(record,rows,false))verdict="dead";
+    }
     if(verdict!=="dead"){kept.push({id,why:owner===null?"no process is recorded as its owner":`its owner process is ${verdict}`});continue;}
     for(const next of ["running","terminal-observed"])if(!rows.some(x=>x.record.phase===next))ceremonyPublish(data,next,next==="terminal-observed"?"cancelled":null);
     if(member!==null){

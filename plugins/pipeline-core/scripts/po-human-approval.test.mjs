@@ -6997,10 +6997,11 @@ test("C30I-S6 (3): a half-way ceremony whose owner was never recorded is not ret
   try {
     const repository = c30i6Registry(dirs);
     assert.equal(c30i6Killed(dirs, home).signal, "SIGKILL");
+    // C30J-J3 (QG-04): this case used a terminal record written before the member followed, so the member was BEHIND its records. That state is provably a
+    // writer that ended inside its registry boundary and is now closed without an owner record (lib/chat-gate-ceremony.test.mjs). The state that must stay
+    // refused when no owner was recorded is the one the analysis keeps refusing: the member AHEAD of its records (a record it already saw is gone).
     const dir = join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies");
-    const id = c30i6CeremonyFiles(repository)[0].split(".")[0];
-    const running = JSON.parse(readFileSync(join(dir, `${id}.running.json`), "utf8"));
-    writeFileSync(join(dir, `${id}.terminal-observed.json`), canonical({ ...running, phase: "terminal-observed", terminal: "cancelled" }), { mode: 0o600 });
+    rmSync(join(dir, `${c30i6CeremonyFiles(repository)[0].split(".")[0]}.running.json`));
     rmSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremony-owners"), { recursive: true, force: true });
     assert.throws(() => c30i6Ceremony(dirs, { fail: 0, signCalls: 0 }), (error) => typeof error.repair === "string"
       && /routine-repair\.mjs run move-aside --no-goldfish-running --root /u.test(error.repair) && /owner/u.test(error.repair));
