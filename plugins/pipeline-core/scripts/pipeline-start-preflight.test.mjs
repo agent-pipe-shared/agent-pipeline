@@ -1829,6 +1829,35 @@ test("C30G-D3: a Claude registry that lists another pipeline-core version says s
   assert.equal(scoped.installedPluginAttestation.repair, repair, "advice is not withheld from a Goldfish");
 });
 
+// C30J-J8 (AC-112, fresh bounded attempt): the bootstrap may offer the agent-runnable hook refresh only for a loaded plugin
+// whose attestation is good. A reload that leaves the attestation unresolved keeps its closed, human recovery: stale hooks are
+// still reported, but the hook refresh neither replaces the null action nor leaks an executable.
+test("C30J-J8: stale mandatory hooks beside plugin-attestation-required keep nextAction null and add no hook refresh action", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "preflight-claude-reload-hooks-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const installedRoot = join(base, "cache", "pipeline-core", "loaded");
+  mkdirSync(join(installedRoot, "scripts"), { recursive: true });
+  const scriptUrl = pathToFileURL(join(installedRoot, "scripts", "pipeline-start-preflight.mjs")).href;
+  const staleHooks = () => ({ schema: "pipeline.clone-provisioning-report.v1", status: "ready", checks: [
+    { id: "pre-commit-hook", status: "refresh" }, { id: "commit-msg-hook", status: "refresh" }, { id: "pre-push-hook", status: "current" },
+  ] });
+  for (const role of [undefined, "elephant", "goldfish"]) {
+    const result = preflight({
+      env: { CLAUDECODE: "1" }, pluginList: claudePluginList("0.5.2+claude.previous"),
+      knownMarketplaces: claudeKnownMarketplaces(), read: () => claudeManifest, scriptUrl, checkCloneProvisioningFn: staleHooks,
+      verifyLocalInstalledPluginReceiptFn: () => { throw new Error("no binding means no receipt verification"); },
+      ...(role === undefined ? {} : { role }),
+    });
+    assert.equal(result.status, "plugin-attestation-required", `${role}: the attestation stays the one blocker`);
+    assert.equal(pipelineStartPreflightExitCode(result), 2);
+    assert.equal(result.nextAction, null, `${role}: the deliberate null stays; the hook refresh does not fill it`);
+    assert.deepEqual(executableActionPaths(result.installedPluginAttestation), [], `${role}: nothing executable in the attestation`);
+    assert.equal(typeof result.installedPluginAttestation.repair, "string", `${role}: the human recovery text stays`);
+    assert.deepEqual((result.staleHookSnapshots ?? []).map((entry) => entry.id).sort(), ["commit-msg-hook", "pre-commit-hook"],
+      `${role}: the staleness stays typed and visible`);
+  }
+});
+
 test("C30G-D3: the registry-binding repair text prints 'none' when the snapshot lists no pipeline-core entry, and survives an unreadable snapshot", () => {
   const describe = preflightModule.describeClaudeRegistryBindingRepair;
   assert.equal(typeof describe, "function");
