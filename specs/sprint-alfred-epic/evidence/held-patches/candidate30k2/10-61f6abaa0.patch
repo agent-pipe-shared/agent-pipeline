@@ -1,0 +1,34 @@
+diff --git a/docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md b/docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md
+index e88d73d7485cc674e5cca596aeabb9985efcaa09..eb2738d5636821fe0dbe5b271c5d980efc1382da 100644
+--- a/docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md
++++ b/docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md
+@@ -2,7 +2,9 @@
+ 
+ > Agent-Pipeline · Sprint Alfred · 2026-11-18
+ 
+-**Status:** proposed (2026-11-18). Nothing below is decided. The PO releases or rejects it; until then Option A (today's behaviour) stays in force and no code changes. Origin: PO tile E1-1 ("yes, ADR first") of the state-machine simplification analysis (items C12 and B3, class C7). The closest existing accepted criterion is AC-112; the PRD and the Spec are unchanged by this draft.
++**Status:** accepted (2026-11-18, PO: Option A, the exact-commit binding stays). The PO first released Option B; two build attempts stopped on recon, and the PO then kept Option A. Finding 1: rule 3 (no path of the Verify's input set) cannot be derived, because the registered `pipeline.verify-evidence.v0` record has no input set, the per-suite receipts that list inputs are private, unregistered and machine-local, and every Tier A suite declares the whole tree as its input; rule 3 could only be a path-class policy. Finding 2: rule 2 (written by the owned commit route) cannot be tested from anything committed or registered, because a hand commit reproduces the owned message byte for byte, the close writes its own final output commit through printed git steps and not through `commit-pipeline-owned.mjs`, and the writer-capability store is private and not written for evidence paths. Rule 4 exists only in the weaker form "prior manifest entries byte-identical, digests match the bytes". A future Option B needs a stored provenance field and therefore a new ADR. The original text below is kept as the record of the options. Origin: PO tile E1-1 ("yes, ADR first") of the state-machine simplification analysis (items C12 and B3, class C7). The closest existing accepted criterion is AC-112; the PRD and the Spec are unchanged by this decision.
++
++*Original status line (superseded):* proposed (2026-11-18); until released, Option A stays in force and no code changes. Origin: PO tile E1-1 ("yes, ADR first") of the state-machine simplification analysis (items C12 and B3, class C7). The closest existing accepted criterion is AC-112; the PRD and the Spec are unchanged by this draft.
+ 
+ **Context source:** the Critic diagnostic already accepts a HEAD that is the checked candidate plus evidence-only follower commits (classifier `classifyRegisteredEvidenceOnlyCommits`, 30f wave). The package candidate does not: it is bound to exactly HEAD.
+ 
+@@ -57,4 +59,4 @@ Recommend keeping Option A until the PO weighs the cost against the risk. If the
+ 
+ ## Consequences
+ 
+-- Nothing changes until the PO releases this ADR. The status is proposed, the row in the index says so, and no code, test or check is touched by this draft.
++- Option A stays: no code, test or check changes. The status is accepted, and the row in the index says so. The recommendation above is adopted; a future Option B needs a stored provenance field and its own ADR.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 04a777cbaabff8ab7275f0722cba31288d657144..f691e5c57ba9321195aa1d72ec664f856651ee6c 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -110,7 +110,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0101](0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md) | The stage-0 fast path admits small changes with tests, at any rigor | accepted | 2026-11-14 |
+ | [0102](0102-the-main-session-is-reminded-to-work-in-parallel.md) | The main session is reminded to work in parallel | accepted | 2026-11-14 |
+ | [0103](0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md) | The close scans infrastructure files with Trivy and blocks only new findings | accepted | 2026-11-14 |
+-| [0104](0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md) | An evidence-only follower commit and what a Verify result covers (proposed, PO decision E1-1 pending) | proposed | 2026-11-18 |
++| [0104](0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md) | An evidence-only follower commit and what a Verify result covers (Option A kept: the exact-commit binding stays; Option B needs a stored provenance field and a new ADR) | accepted | 2026-11-18 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |

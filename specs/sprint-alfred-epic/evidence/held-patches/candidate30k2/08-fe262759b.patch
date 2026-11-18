@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index e475e782e361b45b1b08e1c35981d6adc57c8cfb..0b3a514caf5bccb750e3750fdbc3c3115e4e4906 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -693,6 +693,7 @@
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
++        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c527e5a9bf5ab05cfe9ac93764e440ff195ca29f..3009d703539b74bceb54be385fb72e28b1cec835 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4605,6 +4605,12 @@
+       "invariantPinned": "The pure reader of the Spec risk table returns per row covered, residual-stated, not-applicable, untraced, stale or malformed, an absent table is not-applicable overall and never missing, a table inside a fenced block is ignored, and a throwing reader propagates; it stores nothing and refuses nothing (C30K, AC-112)",
+       "nonOverlapNote": "Unique cases: lib/spec-risk-trace.mjs; the close quality readback suite pins the report-only row that uses it"
+     },
++    {
++      "name": "onboarding-consent-scope-tests",
++      "file": "plugins/pipeline-core/lib/onboarding-consent-scope.test.mjs",
++      "invariantPinned": "The first-round consent question keeps every fact it states in English and German within the length caps, the scope ids and the not-covered ids it returns for the consent record are unchanged, and an unknown language falls back to English (C30K, AC-112)",
++      "nonOverlapNote": "Unique cases: lib/onboarding-consent-scope.mjs; the consent mark and preflight suites pin how the question is relayed and recorded"
++    },
+     {
+       "name": "session-authority-registry-fsync-tests",
+       "file": "plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs",

@@ -1,0 +1,115 @@
+diff --git a/specs/sprint-alfred-epic/plans/design-round-improvement-options-2026-11-18.md b/specs/sprint-alfred-epic/plans/design-round-improvement-options-2026-11-18.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6bf03e45a7e8bf1ded4bb0b06126dc30d6a892de
+--- /dev/null
++++ b/specs/sprint-alfred-epic/plans/design-round-improvement-options-2026-11-18.md
+@@ -0,0 +1,109 @@
++# Improving the one-turn design question round without a second round (analysis, 2026-11-18)
++
++Lane C30K-K25. Read-only analysis, no code, no test run. Source: the queue open item "design-round improvement inside the existing one-turn question round (no second round)" (`candidate-30-queue-2026-11-15.md` line 571) and the 30k plan row (`candidate-30k-plan-2026-11-18.md` line 29). Neither gives a specification, so this document fixes the reading first.
++
++Labels: **PROVEN** = read in the named file and line in this tree. **INFERRED** = a reading that no test or run confirms. Paths are repository-relative. Line numbers of plugin code, references, roles, tests and `harness/verify-suites.json` were re-read in the scratch clone of the integrated tree (30i and 30j chains plus the 30k wave 1 lanes), the tree this patch is a delta on. Plan, queue and backlog files were read in the repository checkout and not re-read in the clone.
++
++## 0. Which "round" this is
++
++- **Reading used (INFERRED from wording, PROVEN for the mechanism):** the "one-turn question round" is the one bundled round of design questions of fresh-repository intake. Its text says "exactly ONE bundled round; a second round with different answers is refused" (`plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md` line 54) and "Ask the design questions in one round" (same file line 93). The writer enforces it: a different answer set after the round is refused `INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED` (`plugins/pipeline-core/lib/onboarding-continuity.mjs` line 7318).
++- **Reading excluded:** the independent design REVIEW rounds (one full plus two delta rounds, C30-6, `candidate-30-queue-2026-11-15.md` lines 77 to 148; `design-course.md` lines 97 to 125). Those are already capped by the PO and are not a question round. If the PO meant them, this document does not apply (open decision D1).
++
++## 1. (a) What the round is today, and the defects observed
++
++**The mechanism (PROVEN).**
++
++- Status `intake-design-questions-required`, transaction state `design-questions-pending`, is reached after the first material capture (`plugins/pipeline-core/lib/project-onboarding-v3.mjs` lines 4026 to 4037, call at line 4030).
++- The returned action is one `collect-input` whose whole guidance is: "ask the PO the ONE bundled round of design questions this project still needs answered ... Never invent an answer, reconstruct the command, or ask a second round" (same file lines 3300 to 3317, text on line 3306). It names the answer file route `scratch/design-answers.json`.
++- The guidance carries no question list, no ordering, no default, no shape. The agent authors every question.
++- The writer accepts a JSON array of `{question, answer}` or `{"disposition":"no-open-questions"}`; an empty set is refused; every answer must be non-blank (`onboarding-continuity.mjs` lines 7279 to 7283, entry check lines 6778 to 6783).
++- A wrong set can be replaced only while the state is `ready-to-generate` (`intake-design-questions-replace`, lines 7308 to 7317; `docs/v3-consumer-onboarding.md` lines 125 to 128). That is a correction, not a second question round.
++- Recording: the checkpoint holds question and answer privately; the tracked `design-input.md` lists the question text only; the answers appear only in the git-ignored authoring copy (`onboarding-continuity.mjs` lines 7471 to 7480 and 7906 to 7908; `intake-generate-design.md` lines 124 to 129 and 154 to 165).
++- Turn budget (PROVEN, `intake-generate-design.md` lines 80 to 98): the first round is one PO turn; Claude takes at most 3 PO turns before the first design draft, Codex and Antigravity at most 2. The design questions are one of those turns.
++- When the PO adopts the agent's recommendations, each question is recorded with the adopted answer (`intake-generate-design.md` lines 93 to 96, added by commit `15bc32ddf`).
++
++**Defects observed (each cited; none invented).**
++
++| # | Defect | Evidence | State today |
++|---|---|---|---|
++| F1 | `inspect` at this status returns no question list, so the agent invents questions or answers `no-open-questions`. Proposed default of that day: a small fixed question set per profile (mini none required; feature and epic: users, core flow, constraints, out of scope, success signal), the PO answers in one round, "proceeds with the default unless you veto" | `specs/sprint-alfred-epic/plans/po-list-2026-10-08.md` lines 29 to 34 (greenfield walk of 2026-10-09) | **Open.** PROVEN at `project-onboarding-v3.mjs` line 3306: the guidance still has no list. No later plan or state entry records it as built (searched the queue, the 30k plan, the backlog) |
++| F2 | A zero-question input forced an invented question and answer | `backlog/items/2026-09-27-zero-open-design-questions-force-fabricated-answer.md` | Closed in code (disposition, `onboarding-continuity.mjs` lines 7279 to 7280) |
++| F3 | A wrong test answer became immutable | `backlog/items/2026-09-10-onboarding-design-answers-have-no-pre-generation-correction-path.md` | Closed (replace route) |
++| F4 | An agent asked five or six bootstrap questions one at a time | `backlog/items/2026-08-29-bootstrap-po-questions-asked-sequentially-instead-of-in-one-block.md`; fix was text only, a self-check for the BOOTSTRAP questions (`kickoff-design.md` lines 135 to 142) | Closed for the bootstrap step. **Not carried to the design questions** (PROVEN: the self-check names "language, goal, profile", lines 137 to 139) |
++| F5 | A question that carries an address or e-mail lands unchecked in `design-input.md` | `candidate-19-plan-2026-11-02.md` line 131 (row E5) | The e-mail case is handled in code: question text passes through a path and e-mail projection before it reaches `design-input.md` (`onboarding-continuity.mjs` lines 7457 to 7468 and 7480). INFERRED that this is what row E5 asked for; whether the same check covers other private identifiers is not read |
++
++Two further complaints sit next to the round and are NOT about it, so they are left out: the twelve-module drift came from repeated decomposition questions in the design REVIEW (`candidate-30-queue-2026-11-15.md` lines 173 to 174, C30-6), and the four-round count of the guided init (`backlog/items/2026-08-28-the-guided-init-asks-the-po-four-times-where-three-is-the-floor.md`) is closed by the merged first round.
++
++**Existing rules that already describe a good question and are not applied to this round (PROVEN):**
++
++- Decision questions are numbered and inline, each with a default recommendation; a question-UI tool only for a binary 1 to 2 line gate (`roles/elephant.md` EL-17 (a) and (b), lines 327 to 335).
++- Problem, options, consequence of each, recommendation, in plain language (EL-29, lines 337 to 358).
++- A worked example of the plain-language shape for a profile or language question (`kickoff-design.md` lines 72 to 84 and 123 to 129).
++- Material design choices go to the PO as "concise Chat tiles with options, tradeoffs and a recommendation" (`design-course.md` lines 9 to 11; `skills/architecture-decision/SKILL.md` lines 32 to 34; `templates/prompts/elephant-kickoff.md` lines 151 to 156). INFERRED conflict: EL-17 (b) restricts question-UI tools to binary gates while the design course names "tiles"; the files do not say whether a tile is a UI tool or a chat message.
++
++The round's guidance cites none of these (PROVEN, line 3306), so the shape of the one round is left to the model each time.
++
++## 2. (b) Improvements that stay inside ONE turn
++
++Each is text or a derived read. None adds a stored status, a record field, a digest, a gate or a second question message. "Reader" means an existing function that reads existing state.
++
++| # | Improvement | Change | Cost |
++|---|---|---|---|
++| I1 | **A minimal question set, derived from the stored profile.** The guidance names the topics the agent must cover for `feature` and `epic` (users, core flow, constraints, out of scope, success signal) and says `mini` needs none unless the material leaves a gap. The agent may add questions | A reader: `intakeDesignQuestionsAction` gets the profile from the checkpoint it is already handed (`checkpoint.value.values.profile`, stored at `onboarding-continuity.mjs` lines 6820 and 7129, checkpoint read at `project-onboarding-v3.mjs` line 3951 and in scope at the call, line 4030). Derived at read time, stored nowhere. This is the F1 default, which the PO's list already proceeded with unless vetoed | One function parameter plus a string table. No record, no argv, no digest |
++| I2 | **A recommended default shown with every question.** One line per question: the recommended answer and why | Text of the guidance and of `intake-generate-design.md`. It strengthens an existing sentence ("when the PO adopts your recommendations", `intake-generate-design.md` lines 93 to 96), which presupposes recommendations but never requires them | Text only. Reuses EL-17 (a) and EL-29 |
++| I3 | **A short consequence line per option**, not a table | Text | Text only |
++| I4 | **Order: material gaps first, nice-to-know last, so "adopt all defaults" is one reply.** The PO can answer in one line | Text | Text only |
++| I5 | **Batching self-check for the design questions** (the F4 fix carried over): list every question, confirm the list is complete, send them in ONE message, never one at a time | Text, one paragraph in `intake-generate-design.md` next to line 93 | Text only |
++| I6 | **Do not ask what the captured material already answers**; record that point as a question whose answer cites it ("stated in the material: ...") only when the writer needs a non-blank answer | Text | Text only; the writer already requires non-blank answers (line 6780) |
++| I7 | **Record the answers once, straight from the single reply** into `scratch/design-answers.json`, with an adopted default stored as that default's text (already the rule, `intake-generate-design.md` lines 93 to 96) | Text: say it in the guidance, not only in the reference | Text only |
++| I8 | **Resolve the tile versus message ambiguity** for this round: one numbered chat message with defaults, no question-UI tool (EL-17 (b)) | One sentence | Text only; needs a PO word (D3) |
++
++What each changes: I1 changes a returned guidance string and its input (a reader). I2 to I8 change prose the agent reads. No record, no checkpoint shape, no key bytes, no gate, no signature, no approval, no Critic evidence, no security scan, no audit-bundle semantics change. Nothing is deleted.
++
++## 3. (c) What would need a second round, so is NOT proposed
++
++- A follow-up clarification after the PO's answers, or a "round 2 of design questions". Refused by design (`onboarding-continuity.mjs` line 7318) and by the PO's wish.
++- Asking per-question tiles one at a time. It is a sequence of turns (F4).
++- Moving questions to after generation, or asking the PO to answer questions about the drafted PRD. The PO acknowledgement of the draft is already round 4 of the guided init and must not be automated away (`backlog/items/2026-08-28-the-guided-init-asks-the-po-four-times-where-three-is-the-floor.md` lines 46 to 51).
++- Splitting questions into "ask now" and "ask later" with a status per question. It needs a stored status (banned: DO-NOT-DO 12 of `state-machine-simplification-analysis-2026-11-17.md` line 303).
++- Merging the design-question answers with the later architecture tile selections (`--selection` file, `skills/architecture-decision/SKILL.md` lines 94 to 97). Two records exist for two purposes; merging changes a record shape and a bound digest (DO-NOT-DO 3).
++- An agent-run automatic `replace` after it reads its own draft. The replace route stays a PO-visible correction before generation.
++
++## 4. (d) Smallest first stage, failing-first proof, neighbour suites
++
++**Stage 1 = I1 plus I2 to I7 in the one guidance string and the one reference paragraph.** One Goldfish dispatch, protected plugin source, so a held patch and the PO's apply (the route of `candidate-30-queue-2026-11-15.md` line 145). No file outside:
++
++- `plugins/pipeline-core/lib/project-onboarding-v3.mjs` (`intakeDesignQuestionsAction`, one more parameter, one call site at line 4030);
++- `plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md` (one paragraph);
++- one test file: prefer `lib/project-onboarding-v3-answers-file.test.mjs`, registered in `harness/verify-suites.json` (line 2039); it reaches this status at lines 108 to 119 and already pins the action shape in case R5-12 (lines 181 to 199). If a new file is unavoidable it needs registration in that list.
++
++**Test first (red before any production edit):**
++
++1. For profile `feature`, `inspect` at `intake-design-questions-required` returns guidance that names the five topics and says each question carries a recommended default. Red today: line 3306 names none.
++2. For profile `mini`, the guidance says no question is required and names the explicit no-open-questions disposition. Red today.
++3. The guidance names the one-message batching rule and the answer file route. Red for the batching rule.
++4. Pins of what must not change: `applyAction.argv` and `fileApplyAction.argv` byte for byte (existing assertions: R5-12 in `project-onboarding-v3-answers-file.test.mjs` lines 187 to 199 and `project-onboarding-v3.test.mjs` around line 9636), `expected.statuses`, and `input.name === "answersJson"`.
++5. A replay case: the same answer set twice still returns `mutated: false`; a different set still refuses `INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED`.
++
++**Neighbour suites, each run alone:** `lib/project-onboarding-v3-answers-file.test.mjs`, `lib/project-onboarding-v3.test.mjs` (the coordinator lifecycle case around lines 9552 to 9660), `lib/onboarding-continuity.test.mjs` (the disposition case at line 3730), `lib/pins/design-intake-generator-omits-question-answers.test.mjs`, `hooks/guard-lifecycle-ready.test.mjs` (argv shape, line 9484), the documentation contract check that reads `references/`. Not run here (analysis only).
++
++**Rollback:** revert the commit; no stored record is migrated.
++
++**Not in stage 1:** the F5 detector, any reader of the answers, any change to `design-input.md`.
++
++## 5. (e) Open decisions for the PO, with defaults
++
++| # | Decision | Default |
++|---|---|---|
++| D1 | Is "the existing one-turn question round" the intake design-question round (this reading), not the design review rounds? | Yes. Without an answer this document is the whole result |
++| D2 | Build I1 (the fixed topic set per profile)? The PO list of 2026-10-08 said it proceeds unless vetoed, yet it is not in code | Build it, text and reader only, the agent may add questions |
++| D3 | For this round: a numbered chat message with defaults (EL-17), or "tiles" as `design-course.md` says? | Numbered chat message (EL-17 (b) applies to multi-line questions) |
++| D4 | Is a check for private identifiers other than paths and e-mail addresses in question text in scope later? | Separate lane |
++| D5 | Release stage 1 only, or also ask for a live measurement on the next greenfield run (turn count and whether the agent still invents questions)? | Release stage 1; the greenfield run is the human check, wording is not unit-testable |
++
++## 6. Honest state
++
++- Analysis only; no test was run, no code changed, no second round proposed.
++- Not verified: that the live agent ignores the current guidance in the way F1 says (the report is a 2026-10-09 walk; the guidance of that day is not retrieved here); that `values.profile` is always set when the round is reached (it is required later, `onboarding-continuity.mjs` line 8160, but the merged first round may leave it `null`, so stage 1 must handle a null profile); that the neighbour suites are green at this tree.
++- Critic: suspended by the PO for this repository's candidates. Full Verify: not run.
++- Criterion binding: AC-112 is the closest existing accepted criterion. The PRD and the Spec are unchanged.

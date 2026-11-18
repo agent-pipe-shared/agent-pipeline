@@ -1,0 +1,60 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 0b3a514caf5bccb750e3750fdbc3c3115e4e4906..7aa8ebc0b6848fdb155eada4930442aa69d6a89b 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1,8 +1,8 @@
+ {
+   "schema": "pipeline.product-capability-inventory.v3",
+   "sourceBaseline": {
+-    "commit": "4f219b2984f0ebab789e029cfc7e0f173eee2a57",
+-    "tree": "9e771bb8750c478e5d60796f54f4340027e8c0b5"
++    "commit": "fe262759b720039365f6bc9e3d0740ae41743583",
++    "tree": "b47377d08d990f36e7612fc504e24e6b7b71c8c4"
+   },
+   "criticReview": {
+     "status": "required-before-publication",
+diff --git a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+index 3990bc799167fe27a8fae4456415149d5dc3ed54..ee4c9a5ebf52da715800ffebc0724dcdd544ab4d 100644
+--- a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
++++ b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+@@ -27,8 +27,8 @@ export function blob(root,commit,path,limit=1048576){commitIdentity(root,commit)
+ export const sourcePaths=Object.freeze(['GEMINI.md','PIPELINE_FLOW.de.md','PIPELINE_FLOW.md','README.md','SETUP.md','docs/README.md','docs/audit-and-evidence.md','docs/audit-bundles.md','docs/cost-and-measurement.md','docs/enforcement.md','docs/overview.md','docs/parallel-work.md','docs/security-controls.md','docs/sprint-alfred-completion-report.md','docs/usage.md','docs/v3-consumer-onboarding.md']);
+ export const inputPaths=Object.freeze({capabilityInventorySha256:'docs/product-capability-inventory.json',governanceSha256:'governance/observation-doc-governance.json',readerProtocolSha256:'harness/reader-review-protocol.md'});
+ export const policySha256='e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337';
+-const inputHashes=Object.freeze({capabilityInventorySha256:'577a12f8fbaf8a7e9d115ee71ab961badbeaa89b7108db8785aad25126f2e108',governanceSha256:'e352bd2f515762fdffb6192f35c4c26c147c89804b127a2f2c29a73902e53ecf',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
++const inputHashes=Object.freeze({capabilityInventorySha256:'e8723dcdf18672b46cd1bf6ad6aa6a644aaa73a63747b71a8e10e9edc69a41c2',governanceSha256:'e352bd2f515762fdffb6192f35c4c26c147c89804b127a2f2c29a73902e53ecf',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
+ const pluginRoot=fileURLToPath(new URL('..',import.meta.url));
+ export function sourceIdentity(root){try{const tracked=p=>gitText(root,['ls-files','--error-unmatch','--',p])===p;const a=jsonBytes(physicalBytes(root,'.claude/pipeline.json')),b=jsonBytes(physicalBytes(root,'.claude-plugin/marketplace.json'));return tracked('.claude/pipeline.json')&&tracked('.claude-plugin/marketplace.json')&&a.project==='agent-pipeline'&&b.name==='agent-pipeline'&&b.owner?.name==='agent-pipeline'&&Array.isArray(b.plugins)&&b.plugins.filter(x=>x.name==='pipeline-core').length===1&&b.plugins.find(x=>x.name==='pipeline-core').source==='./plugins/pipeline-core'&&tracked('harness/reader-review-protocol.md')&&tracked('harness/scripts/check-doc-reader-binding.mjs');}catch{return false;}}
+-export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='167440256edb777811a885c6827b506ba1c04fc5d50ea5bd0bd1d8837dd8b3e9');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
++export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='91938b7a2a47951b6d6a35ae539535bb743b18911a7585956c43223c078d870a');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
+ export function snapshotScopedReaderDocumentation({root,candidate,scope,inputBundle=null}){physicalRoot(root);const tree=commitIdentity(root,candidate);requireFact(Array.isArray(scope.documentPaths)&&scope.documentPaths.length>0&&scope.documentPaths.length<=128&&new Set(scope.documentPaths).size===scope.documentPaths.length);let total=0;const coverage=scope.documentPaths.map(path=>{const bytes=blob(root,candidate,path,524288);total+=bytes.length;requireFact(total<=4194304);return{path,sha256:hash(bytes)};});const source=sourceIdentity(root);if(source)requireFact(same(scope.documentPaths,sourcePaths));requireFact(inputBundle===null,'COURSE-REQUEST-INVALID');const inputs=source?Object.fromEntries(Object.entries(inputPaths).map(([k,p])=>[k,hash(blob(root,candidate,p))])):installedInputs();const docsetSha256=hash(`pipeline.doc-reader-docset.v1\0${canonical({coverage:[...coverage].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0),...inputs})}`);requireFact(commitIdentity(root,candidate)===tree);return Object.freeze({commit:candidate,tree,coverage,inputs,docsetSha256});}
+diff --git a/plugins/pipeline-core/reader-inputs/manifest.json b/plugins/pipeline-core/reader-inputs/manifest.json
+index 248abbcf61313a02d5d6176b3da2ce27a4fa3acb..bfc422fb82ce74b6e01e6c1d5152169115feb719 100644
+--- a/plugins/pipeline-core/reader-inputs/manifest.json
++++ b/plugins/pipeline-core/reader-inputs/manifest.json
+@@ -1 +1 @@
+-{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"577a12f8fbaf8a7e9d115ee71ab961badbeaa89b7108db8785aad25126f2e108"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"e352bd2f515762fdffb6192f35c4c26c147c89804b127a2f2c29a73902e53ecf"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
++{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"e8723dcdf18672b46cd1bf6ad6aa6a644aaa73a63747b71a8e10e9edc69a41c2"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"e352bd2f515762fdffb6192f35c4c26c147c89804b127a2f2c29a73902e53ecf"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
+diff --git a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+index e475e782e361b45b1b08e1c35981d6adc57c8cfb..7aa8ebc0b6848fdb155eada4930442aa69d6a89b 100644
+--- a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
++++ b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+@@ -1,8 +1,8 @@
+ {
+   "schema": "pipeline.product-capability-inventory.v3",
+   "sourceBaseline": {
+-    "commit": "4f219b2984f0ebab789e029cfc7e0f173eee2a57",
+-    "tree": "9e771bb8750c478e5d60796f54f4340027e8c0b5"
++    "commit": "fe262759b720039365f6bc9e3d0740ae41743583",
++    "tree": "b47377d08d990f36e7612fc504e24e6b7b71c8c4"
+   },
+   "criticReview": {
+     "status": "required-before-publication",
+@@ -693,6 +693,7 @@
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
++        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",

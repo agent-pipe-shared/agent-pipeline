@@ -1,0 +1,69 @@
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 38f77d646f58e9cf803508562efe0fba51ee77f0..5d2e09e20e902e2dba21f5114f5d79f909bb5a7b 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -138,7 +138,18 @@ export const PUSH_INIT_SCRIPT_PATH = fileURLToPath(import.meta.url);
+ export const RECONCILIATION_SCRIPT_RELATIVE_PATH = "harness/scripts/check-doc-reconciliation.mjs";
+ 
+ export function usage() {
+-  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]] [--transport-kind ssh-key|credential-helper|configured-default [--transport-reference <key path or helper name>]]";
++  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]] [--transport-kind ssh-key|credential-helper|configured-default [--transport-reference <key path or helper name>]]\n--transport-reference value: ssh-key: path of the private key file (never its content); credential-helper: name of the configured Git credential helper; configured-default: none.";
++}
++
++const REFERENCE_HINTS = {
++  "ssh-key": { meaning: "the path of the private key file, never its content", placeholder: "<path-to-private-key-file>" },
++  "credential-helper": { meaning: "the name of the configured Git credential helper", placeholder: "<helper-name>" },
++};
++
++function missingReferenceMessage(kind) {
++  const hint = REFERENCE_HINTS[kind];
++  if (!hint) return `${kind} requires --transport-reference`;
++  return `${kind} requires --transport-reference: the value is ${hint.meaning}. Example: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> --transport-kind ${kind} --transport-reference ${hint.placeholder}`;
+ }
+ 
+ export function parseArgs(argv) {
+@@ -169,7 +180,7 @@ export function parseArgs(argv) {
+     const kind = output["transport-kind"];
+     const reference = output["transport-reference"] ?? null;
+     if (!PUSH_TRANSPORT_KINDS.includes(kind)) return { error: `--transport-kind requires one of: ${PUSH_TRANSPORT_KINDS.join(", ")}` };
+-    if ((kind === "configured-default") !== (reference === null)) return { error: kind === "configured-default" ? "configured-default takes no --transport-reference" : `${kind} requires --transport-reference` };
++    if ((kind === "configured-default") !== (reference === null)) return { error: kind === "configured-default" ? "configured-default takes no --transport-reference" : missingReferenceMessage(kind) };
+     output.transport = { kind, reference };
+   }
+   for (const required of ["root", "by", "remote", "destination"]) {
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index e58d7ca14a77abe86eb253ebfff4a4b3b53fe7c5..25cb7df2af8287865948452d92c8631c6127f05f 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -25,7 +25,7 @@ import { dirname, join, resolve } from "node:path";
+ import { after, test } from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, main, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
++import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, main, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH, usage } from "./push-init.mjs";
+ import { observeCurrentPlanApprovalForCalibration, readState, run as pipelineStateRun } from "./pipeline-state.mjs";
+ import { compileDecisionSummary } from "./architecture-baseline.mjs";
+ import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
+@@ -639,6 +639,22 @@ test("C28-ONBOARDING-QUESTIONS: --transport-kind / --transport-reference parse a
+   assert.deepEqual(seen[0].transport, { kind: "ssh-key", reference: "id_fixture" });
+ });
+ 
++test("C30K-K23: a missing --transport-reference says what the value is per kind and shows one example; usage explains it", () => {
++  const base = ["--root", "/x", "--by", "t", "--remote", "origin", "--destination", "refs/heads/main"];
++  const ssh = parseArgs([...base, "--transport-kind", "ssh-key"]).error;
++  assert.match(ssh, /^ssh-key requires --transport-reference/);
++  assert.match(ssh, /path of the private key file/);
++  assert.match(ssh, /never its content/);
++  assert.match(ssh, /--transport-kind ssh-key --transport-reference <path-to-private-key-file>/);
++  const helper = parseArgs([...base, "--transport-kind", "credential-helper"]).error;
++  assert.match(helper, /^credential-helper requires --transport-reference/);
++  assert.match(helper, /name of the configured Git credential helper/);
++  assert.match(helper, /--transport-kind credential-helper --transport-reference <helper-name>/);
++  assert.equal(parseArgs([...base, "--transport-kind", "configured-default", "--transport-reference", "k"]).error, "configured-default takes no --transport-reference");
++  assert.match(usage(), /ssh-key: path of the private key file/);
++  assert.match(usage(), /credential-helper: name of the configured Git credential helper/);
++});
++
+ test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
+   const { pushPrepareReport: real } = await import("./push-prepare.mjs");
+   const waitAction = { executable: "node", argv: ["proof-wait.mjs"] };

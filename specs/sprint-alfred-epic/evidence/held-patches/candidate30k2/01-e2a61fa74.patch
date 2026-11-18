@@ -1,0 +1,178 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index e1c6b1e199c0e9f05903fce3dabb7ffb4ce0e7b1..3d10b45f8d43a4e06373b3a0b46a8f76292cc1dd 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1,8 +1,8 @@
+ {
+   "schema": "pipeline.product-capability-inventory.v3",
+   "sourceBaseline": {
+-    "commit": "f3a83989c30a4a9f9da6d82750625d4c62551932",
+-    "tree": "29628feb6762a60df8939997d7e6f314fc0836c6"
++    "commit": "159afbc097ac3ad646438f26c9bfdf2129747306",
++    "tree": "51f79cfd6ec16c1d17d09164e90a2c299ab48fb4"
+   },
+   "criticReview": {
+     "status": "required-before-publication",
+diff --git a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+index d1cfd9328aa13f70d0b23ac9e0646308c74da260..ce75a4b91cd4161e7d37f2d9f669eb0cb95b8f2f 100644
+--- a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
++++ b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+@@ -27,8 +27,8 @@ export function blob(root,commit,path,limit=1048576){commitIdentity(root,commit)
+ export const sourcePaths=Object.freeze(['GEMINI.md','PIPELINE_FLOW.de.md','PIPELINE_FLOW.md','README.md','SETUP.md','docs/README.md','docs/audit-and-evidence.md','docs/audit-bundles.md','docs/cost-and-measurement.md','docs/enforcement.md','docs/overview.md','docs/parallel-work.md','docs/security-controls.md','docs/sprint-alfred-completion-report.md','docs/usage.md','docs/v3-consumer-onboarding.md']);
+ export const inputPaths=Object.freeze({capabilityInventorySha256:'docs/product-capability-inventory.json',governanceSha256:'governance/observation-doc-governance.json',readerProtocolSha256:'harness/reader-review-protocol.md'});
+ export const policySha256='e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337';
+-const inputHashes=Object.freeze({capabilityInventorySha256:'00d035a2c244f7e841d37937191a26a2506608f7a634048b9558b43a4ef8c4ea',governanceSha256:'99dbe15573910cb96d7a7bc868e5f78f8543df9b6fac08bb10b1c4c5a402faa3',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
++const inputHashes=Object.freeze({capabilityInventorySha256:'758587a1acec8d1ebf20087e33eff96268dee4f981b79ccd0f276a6d3951c6ad',governanceSha256:'e352bd2f515762fdffb6192f35c4c26c147c89804b127a2f2c29a73902e53ecf',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
+ const pluginRoot=fileURLToPath(new URL('..',import.meta.url));
+ export function sourceIdentity(root){try{const tracked=p=>gitText(root,['ls-files','--error-unmatch','--',p])===p;const a=jsonBytes(physicalBytes(root,'.claude/pipeline.json')),b=jsonBytes(physicalBytes(root,'.claude-plugin/marketplace.json'));return tracked('.claude/pipeline.json')&&tracked('.claude-plugin/marketplace.json')&&a.project==='agent-pipeline'&&b.name==='agent-pipeline'&&b.owner?.name==='agent-pipeline'&&Array.isArray(b.plugins)&&b.plugins.filter(x=>x.name==='pipeline-core').length===1&&b.plugins.find(x=>x.name==='pipeline-core').source==='./plugins/pipeline-core'&&tracked('harness/reader-review-protocol.md')&&tracked('harness/scripts/check-doc-reader-binding.mjs');}catch{return false;}}
+-export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='0a9fd9ce89d6de28c98ea88bdeddaf512b588daeed9fe8bbe6ade1b56c2075f4');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
++export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='8b1672801a21e2edbd4d33491dfbdb26d6952bdf57f571c751689541520136d0');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
+ export function snapshotScopedReaderDocumentation({root,candidate,scope,inputBundle=null}){physicalRoot(root);const tree=commitIdentity(root,candidate);requireFact(Array.isArray(scope.documentPaths)&&scope.documentPaths.length>0&&scope.documentPaths.length<=128&&new Set(scope.documentPaths).size===scope.documentPaths.length);let total=0;const coverage=scope.documentPaths.map(path=>{const bytes=blob(root,candidate,path,524288);total+=bytes.length;requireFact(total<=4194304);return{path,sha256:hash(bytes)};});const source=sourceIdentity(root);if(source)requireFact(same(scope.documentPaths,sourcePaths));requireFact(inputBundle===null,'COURSE-REQUEST-INVALID');const inputs=source?Object.fromEntries(Object.entries(inputPaths).map(([k,p])=>[k,hash(blob(root,candidate,p))])):installedInputs();const docsetSha256=hash(`pipeline.doc-reader-docset.v1\0${canonical({coverage:[...coverage].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0),...inputs})}`);requireFact(commitIdentity(root,candidate)===tree);return Object.freeze({commit:candidate,tree,coverage,inputs,docsetSha256});}
+diff --git a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+index b33eaf84277efa6261059c23865ae06f143bc429..a1655214d3b27a3988cb6ce412fd307997fb93d2 100644
+--- a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+@@ -8,7 +8,7 @@
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { basename, dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -857,7 +857,10 @@ function assertWrittenAndUncommitted(root, outcome, taskIds, head) {
+     assert.ok(existsSync(join(root, entry.addendumPath)) && existsSync(join(root, entry.evidencePath)), `${entry.taskId}: both files are in the working tree`);
+   }
+   for (const path of reported.commitPaths) assert.ok(outcome.body.message.includes(path), `the message names ${path}: ${outcome.body.message}`);
+-  assert.ok(outcome.body.message.includes(`git add -f -- ${reported.commitPaths.join(" ")}`), outcome.body.message);
++  // C30K-K20: no written path is ignored in this fixture, so the staging command is the plain one and every path is named as shown by git status.
++  assert.ok(outcome.body.message.includes(`git add -- ${reported.commitPaths.join(" ")}`), outcome.body.message);
++  assert.ok(!outcome.body.message.includes("git add -f"), outcome.body.message);
++  for (const path of reported.commitPaths) assert.ok(outcome.body.message.includes(`${path} (not ignored: git status shows it)`), outcome.body.message);
+   assert.match(outcome.body.message, /nothing was staged or committed/u);
+   assert.match(outcome.body.message, /plan this transition again after that commit/u);
+   assert.equal(reported.planAgain, true);
+@@ -914,6 +917,44 @@ test("(k1) CFC-3: an addendum for a record no receipt covers stays as it is", ()
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++test("(k20) C30K-K20: an addendum path the ignore rules hide is named as ignored and staged with the forced command; a visible one is named as shown", () => {
++  const fx = w9Course({ label: "k20", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
++  try {
++    const { root } = fx;
++    const hidden = criticDispositionAddendumPath("TASK-ONE");
++    appendFileSync(join(root, ".git", "info", "exclude"), `/${hidden}\n`);
++    const head = git(root, ["rev-parse", "HEAD"]);
++    const first = w9CloseSession(root).planPrepared();
++    assert.equal(first.status, 2, JSON.stringify(first.body));
++    assert.equal(first.body.code, "CLOSE-CRITIC-ADDENDA-WRITTEN", JSON.stringify(first.body));
++    const paths = first.body.criticAddenda.commitPaths;
++    assert.ok(paths.includes(hidden));
++    const message = first.body.message;
++    assert.ok(message.includes(`git add -f -- ${paths.join(" ")}`), message);
++    assert.ok(message.includes(`${hidden} (ignored: git status does not show it)`), message);
++    assert.ok(paths.some((path) => path !== hidden && message.includes(`${path} (not ignored: git status shows it)`)), message);
++    assert.equal(git(root, ["diff", "--cached", "--name-only"]), "");
++    assert.equal(git(root, ["rev-parse", "HEAD"]), head);
++    // the emitted object keeps its shape: the facts live in the message text only
++    assert.deepEqual(Object.keys(first.body.criticAddenda).sort(), ["commitInstruction", "commitPaths", "planAgain", "schema", "written"]);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("(k20b) C30K-K20: the critic-addenda verb object carries the forced command and the ignored wording in its message and keeps its keys", () => {
++  const fx = w9Course({ label: "k20b", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
++  try {
++    const { root } = fx;
++    const hidden = criticDispositionAddendumPath("TASK-TWO");
++    appendFileSync(join(root, ".git", "info", "exclude"), `/${hidden}\n`);
++    const out = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
++    assert.equal(out.status, 0, out.text);
++    assert.equal(out.body.status, "written", out.text);
++    assert.deepEqual(Object.keys(out.body).sort(), ["commitPaths", "message", "schema", "status", "subject"]);
++    assert.ok(out.body.message.includes(`git add -f -- ${out.body.commitPaths.join(" ")}`), out.body.message);
++    assert.ok(out.body.message.includes(`${hidden} (ignored: git status does not show it)`), out.body.message);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("(k) D223 chain: three slices, a three-round Critic course, plan writes the addenda, the agent commits them, the second plan succeeds and applies", () => {
+   const fx = w9Course({ label: "pos", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO", "TASK-THREE"] });
+   try {
+diff --git a/plugins/pipeline-core/reader-inputs/manifest.json b/plugins/pipeline-core/reader-inputs/manifest.json
+index 05c2e361ab102aeadf09d5d51856d37d974535c0..f11e05d9e3c0d93f64721811a862dcba01f35e2e 100644
+--- a/plugins/pipeline-core/reader-inputs/manifest.json
++++ b/plugins/pipeline-core/reader-inputs/manifest.json
+@@ -1 +1 @@
+-{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"00d035a2c244f7e841d37937191a26a2506608f7a634048b9558b43a4ef8c4ea"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"99dbe15573910cb96d7a7bc868e5f78f8543df9b6fac08bb10b1c4c5a402faa3"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
++{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"758587a1acec8d1ebf20087e33eff96268dee4f981b79ccd0f276a6d3951c6ad"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"e352bd2f515762fdffb6192f35c4c26c147c89804b127a2f2c29a73902e53ecf"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
+diff --git a/plugins/pipeline-core/reader-inputs/observation-doc-governance.json b/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
+index b6219337f8ed1254991e5675f300b97c26e0f17b..909e86444708d5399970a057689f31265acae904 100644
+--- a/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
++++ b/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
+@@ -305,6 +305,7 @@
+           "docs/adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md",
+           "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
+           "docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md",
++          "docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md",
+           "docs/adr/README.md"
+         ]
+       },
+diff --git a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+index efe2a73242c565983ab4fad8b2edc2a419b55cd5..3d10b45f8d43a4e06373b3a0b46a8f76292cc1dd 100644
+--- a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
++++ b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+@@ -1,8 +1,8 @@
+ {
+   "schema": "pipeline.product-capability-inventory.v3",
+   "sourceBaseline": {
+-    "commit": "f3a83989c30a4a9f9da6d82750625d4c62551932",
+-    "tree": "29628feb6762a60df8939997d7e6f314fc0836c6"
++    "commit": "159afbc097ac3ad646438f26c9bfdf2129747306",
++    "tree": "51f79cfd6ec16c1d17d09164e90a2c299ab48fb4"
+   },
+   "criticReview": {
+     "status": "required-before-publication",
+@@ -1166,6 +1166,7 @@
+         "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
+         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
++        "verify-phase:harness/scripts/verify.mjs:spec-risk-trace-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-capability-plan-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
+@@ -2755,6 +2756,7 @@
+       "surfaceIds": [
+         "verify-phase:harness/scripts/verify.mjs:chat-gate-ceremony-tests",
+         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-signed-integration-tests",
++        "verify-phase:harness/scripts/verify.mjs:critical-action-approval-card-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-signature-round-trip-tests",
+@@ -2766,6 +2768,7 @@
+         "verify-phase:harness/scripts/verify.mjs:design-review-receipt-tests",
+         "verify-phase:harness/scripts/verify.mjs:design-workflow-package-builder-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-git-signed-integration-tests",
++        "verify-phase:harness/scripts/verify.mjs:human-command-render-tests",
+         "verify-phase:harness/scripts/verify.mjs:model-family-approval-request-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-push-anchor-tests",
+         "verify-phase:harness/scripts/verify.mjs:quality-package-windows-path-tests",
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 262cab6bec0890fff310c0205ff43f11d1737768..f50a81bf2cda507e321ab31c4187cdb71e9cdee2 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -631,7 +631,14 @@ function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = fa
+     const derived = deriveAddenda ? deriveCriticAddenda(root, coverage.requiredTaskIds) : { written: [], commitPaths: [] };
+     if (derived.written.length > 0) {
+       const remaining = coverage.requiredTaskIds.filter((id) => !derived.written.some((entry) => entry.taskId === id));
+-      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Commit exactly these paths in one evidence-only commit: git add -f -- ${derived.commitPaths.join(" ")}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
++      // C30K-K20: derive (never store) which written paths the project's ignore rules hide from git status; the force flag only when one is.
++      // A failing check-ignore must not hide this stop: every path is then treated as possibly ignored (forced staging is always safe).
++      let ignoredPaths;
++      try { ignoredPaths = new Set(derived.commitPaths.length > 0 ? git(root, ["check-ignore", "--", ...derived.commitPaths], { accept: [0, 1] }).split("\n").map((line) => line.trim()).filter(Boolean) : []); }
++      catch { ignoredPaths = new Set(derived.commitPaths); }
++      const visibility = derived.commitPaths.map((path) => `${path} (${ignoredPaths.has(path) ? "ignored: git status does not show it" : "not ignored: git status shows it"})`).join("; ");
++      const stageCommand = `git add ${ignoredPaths.size > 0 ? "-f " : ""}-- ${derived.commitPaths.join(" ")}`;
++      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Written paths: ${visibility}. Commit exactly these paths in one evidence-only commit: ${stageCommand}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
+       const covered = derived.written.map((entry) => `${entry.taskId} (Critic packet ${entry.criticPacketId})`).join(", ");
+       fail("CLOSE-CRITIC-ADDENDA-WRITTEN", `feature close preparation wrote the byte-bound Critic addendum for ${covered}, because exactly one passed, consumed Critic receipt (or one registered Critic course) covers each of these records and no other does. ${commitInstruction}${remaining.length > 0 ? ` Still uncovered after that commit: ${missingMessage(remaining)}` : ""}`,
+         { criticAddenda: { schema: "pipeline.close-critic-addenda-written.v1", written: derived.written, commitPaths: derived.commitPaths, commitInstruction, planAgain: true } });
