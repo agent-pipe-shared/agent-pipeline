@@ -17,6 +17,10 @@ function repo(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   git(["init", "--quiet"]);
+  // Hermetic bytes: a user-level core.autocrlf (input or true) would normalize CRLF fixtures at `git add`, and the line-ending near miss below would
+  // then compare identical blobs. The code under test reads stored blobs, so the fixture repository stores exactly the bytes it is given.
+  git(["config", "core.autocrlf", "false"]);
+  git(["config", "core.safecrlf", "false"]);
   const write = (path, text = "x\n") => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
   const commit = (message) => {
     git(["add", "-A"]);

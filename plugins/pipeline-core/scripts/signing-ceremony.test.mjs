@@ -25,8 +25,8 @@
  *   - exactly one human decision point (never zero): the happy-path test asserts
  *     zero typed prompts and exactly ONE observed signing spawn (the passphrase
  *     entry); the decline test proves a declined passphrase -- a signing spawn that
- *     exits non-zero -- stops the ceremony before install, leaving no window
- *     installed.
+ *     exits non-zero, retried up to three times in one run (C30I-S6) -- stops the
+ *     ceremony before install, leaving no window installed.
  *   - the real OpenSSL signature is never bypassed: the happy-path test verifies
  *     the produced proof cryptographically against the fixture's trust anchor.
  */
@@ -34,7 +34,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
-  mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -310,11 +310,16 @@ test("maintenance-window ceremony aborts before install when the human declines 
         signDependencies,
       },
     ),
-    /openssl failed with exit code [1-9]/,
+    /openssl failed with exit code [1-9] after 3 passphrase attempts; nothing was signed or recorded: run the same command again/,
   );
-  assert.equal(prompts.length, 0, "an encrypted key must reach no typed confirmation, even on decline");
-  assert.equal(signingSpawns.length, 1, "still exactly one decision point even on decline: the one signing spawn");
-  assert.notEqual(signingSpawns[0].status, 0, "the declined passphrase entry must exit non-zero");
+  // QG-04 restatement (C30I-S6, built in the 30i wave): a human may retype a refused passphrase up to three times inside one run. Every attempt is the
+  // same signing spawn over the same already confirmed intent, so the decision point is still the one passphrase entry (no typed confirmation, no second
+  // intent, no proof written); only the number of spawns of that one decision grew from 1 to the attempt bound, and a decline now spends all of them.
+  assert.equal(prompts.length, 0, "an encrypted key must reach no typed confirmation, even on decline and across the retries");
+  assert.equal(signingSpawns.length, 3, "a decline spends exactly the three passphrase attempts of one run, each the same signing spawn");
+  for (const spawned of signingSpawns) assert.notEqual(spawned.status, 0, "every declined passphrase entry must exit non-zero");
+  assert.equal(new Set(signingSpawns.map((spawned) => JSON.stringify(spawned.args))).size, 1, "every attempt signs the same intent with the same arguments: nothing is confirmed or rewritten between attempts");
+  assert.equal(readdirSync(directory).some((name) => name.startsWith("proof-")), false, "a declined run leaves no proof in the external directory");
 
   const status = spawnSync(
     process.execPath,
