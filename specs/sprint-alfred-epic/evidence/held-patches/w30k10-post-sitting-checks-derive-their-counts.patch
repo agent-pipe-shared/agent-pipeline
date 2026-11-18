@@ -1,0 +1,113 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 93c8693fe..9b73b3229 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -84,7 +84,7 @@ Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied
+ 
+ ## Post-sitting check table
+ 
+-`node scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` runs the light end-state checks of the sitting one after the other, each with a private TMPDIR outside every repository and `NODE_TEST_CONTEXT` removed, and prints one row per check (verdict, exit code, seconds, one-line result) and a total. It exits 0 when every selected check is GREEN, 1 otherwise, 2 on bad usage. The checks: `suite-registration` (exit 0 and 1093 registered), `case-completion`, `capability-inventory`, `observation-governance`, `reader-inputs` (`sync-reader-inputs.mjs . --check`, never a rewrite), `backlog-state` (its known-accepted DRIFT lines are tolerated), `architecture-boundary` (the pre-existing `unowned-path` findings keep it at exit 1 and are reported; it is RED on any `over-line-bound` finding), `doc-contracts-test` (76 cases), `consumer-safe-paths-test` (9 cases) and `doc-contracts`. The expected counts are constants at the top of the script; move them when a later commit changes them. `--json <file>` writes the table as JSON and is refused (exit 2) for a path outside `<root>/scratch/`. Heavy suites are not part of it: they belong to the serial count pass above. Before the sitting's protected steps several rows are RED by design (unregistered suites, reader-input drift).
++`node scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` runs the light end-state checks of the sitting one after the other, each with a private TMPDIR outside every repository and `NODE_TEST_CONTEXT` removed, and prints one row per check (verdict, exit code, seconds, one-line result) and a total. It exits 0 when every selected check is GREEN, 1 otherwise, 2 on bad usage. The checks: `suite-registration` (exit 0; prints the registered count), `case-completion`, `capability-inventory`, `observation-governance`, `reader-inputs` (`sync-reader-inputs.mjs . --check`, never a rewrite), `backlog-state` (its known-accepted DRIFT lines are tolerated), `architecture-boundary` (the pre-existing `unowned-path` findings keep it at exit 1 and are reported; it is RED on any `over-line-bound` finding), `doc-contracts-test` (exit 0 and no failing case; prints the counts), `consumer-safe-paths-test` (the same) and `doc-contracts`. No count is stored: each row is judged by its check's exit code (and zero failing cases for the two test rows) and prints the counts it observes; read them from the script output. `--json <file>` writes the table as JSON and is refused (exit 2) for a path outside `<root>/scratch/`. Heavy suites are not part of it: they belong to the serial count pass above. Before the sitting's protected steps several rows are RED by design (unregistered suites, reader-input drift).
+ 
+ ## Held-commit rehearsal
+ 
+diff --git a/scripts/post-sitting-checks.mjs b/scripts/post-sitting-checks.mjs
+index 7b4b0e848..d9f4745d9 100644
+--- a/scripts/post-sitting-checks.mjs
++++ b/scripts/post-sitting-checks.mjs
+@@ -5,8 +5,8 @@
+ //          --json writes the table as JSON, and the file must lie inside <root>/scratch/ (any other path is refused, exit 2).
+ // Checks:  suite-registration, case-completion, capability-inventory, observation-governance, reader-inputs, backlog-state, architecture-boundary,
+ //          doc-contracts-test, consumer-safe-paths-test, doc-contracts. Light checks only; the heavy suites belong to scripts/sitting-count-pass.mjs.
+-// Verdict: a check is GREEN at exit 0 plus its expected count where one is pinned (EXPECT below: 1093 registered suites, 76 and 9 test cases; update
+-//          the constants when a later commit moves them). backlog-state tolerates its known-accepted DRIFT lines (it exits 0 with them).
++// Verdict: a check is GREEN at exit 0 (the two test rows also need zero failing cases and a parsable count); the counts each check observes are printed,
++//          never compared with a stored number. backlog-state tolerates its known-accepted DRIFT lines (it exits 0 with them).
+ //          architecture-boundary exits 1 on the pre-existing unowned-path findings; it is GREEN at exit 0, or at exit 1 with only unowned-path findings,
+ //          and RED on any over-line-bound finding (or any other finding kind, or an exit other than 0 or 1).
+ // Inputs:  the scripts named above, read from <root>. Each child runs with cwd <root>, a private TMPDIR under <home>/pipeline-test-tmp/post-sitting-<n>
+@@ -20,22 +20,21 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { pathToFileURL } from "node:url";
+ import { makeScrubber, parseCounts } from "./sitting-count-pass.mjs";
+ 
+-export const EXPECT = { registered: 1093, docContractsTests: 76, consumerSafeTests: 9 };
+ const TIMEOUT_MS = 600000;
+ const lastLine = (out) => out.trim().split("\n").filter((l) => l.trim() !== "").at(-1) ?? "(no output)";
+ 
+ // Each judge returns { ok, line } from { status, out }.
+ const exitOnly = (okLine) => ({ status, out }) => ({ ok: status === 0, line: okLine ? okLine(out) : lastLine(out) });
+-const testJudge = (expected) => ({ status, out }) => {
++const testJudge = ({ status, out }) => {
+   const c = parseCounts(out);
+-  return { ok: status === 0 && c.fail === 0 && c.pass === expected, line: `pass ${c.pass ?? "?"} of ${c.tests ?? "?"}, fail ${c.fail ?? "?"} (expected ${expected})` };
++  return { ok: status === 0 && c.fail === 0 && c.pass !== null, line: `pass ${c.pass ?? "?"} of ${c.tests ?? "?"}, fail ${c.fail ?? "?"}` };
+ };
+ 
+ export const CHECKS = [
+   { name: "suite-registration", args: ["harness/scripts/check-verify-suite-registration.mjs"], judge: ({ status, out }) => {
+     const n = /(\d+) registered/.exec(out);
+     const count = n ? Number(n[1]) : null;
+-    return { ok: status === 0 && count === EXPECT.registered, line: status === 0 ? `${count ?? "?"} registered (expected ${EXPECT.registered})` : lastLine(out) };
++    return { ok: status === 0, line: status === 0 ? `${count ?? "?"} registered` : lastLine(out) };
+   } },
+   { name: "case-completion", args: ["harness/scripts/check-verify-case-completion.mjs"], judge: exitOnly() },
+   { name: "capability-inventory", args: ["harness/scripts/check-product-capability-inventory.mjs"], judge: exitOnly() },
+@@ -56,8 +55,8 @@ export const CHECKS = [
+     const desc = Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ") || "no findings";
+     return { ok: (status === 0 || status === 1) && over === 0 && other === 0, line: `exit ${status}: ${desc}` };
+   } },
+-  { name: "doc-contracts-test", args: ["--test", "harness/scripts/check-doc-contracts.test.mjs"], judge: testJudge(EXPECT.docContractsTests) },
+-  { name: "consumer-safe-paths-test", args: ["--test", "harness/scripts/check-consumer-safe-paths.test.mjs"], judge: testJudge(EXPECT.consumerSafeTests) },
++  { name: "doc-contracts-test", args: ["--test", "harness/scripts/check-doc-contracts.test.mjs"], judge: testJudge },
++  { name: "consumer-safe-paths-test", args: ["--test", "harness/scripts/check-consumer-safe-paths.test.mjs"], judge: testJudge },
+   { name: "doc-contracts", args: ["harness/scripts/check-doc-contracts.mjs"], judge: exitOnly() },
+ ];
+ 
+diff --git a/scripts/post-sitting-checks.test.mjs b/scripts/post-sitting-checks.test.mjs
+new file mode 100644
+index 000000000..e7b7eef70
+--- /dev/null
++++ b/scripts/post-sitting-checks.test.mjs
+@@ -0,0 +1,42 @@
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: pin that the post-sitting rows are judged by exit code and failing cases, never by a stored count (finding K1-02).
++// Usage:   node --test scripts/post-sitting-checks.test.mjs
++import test from "node:test";
++import assert from "node:assert/strict";
++import * as mod from "./post-sitting-checks.mjs";
++
++const { CHECKS } = mod;
++
++const judge = (name) => CHECKS.find((c) => c.name === name).judge;
++const tapOut = (pass, fail) => `ℹ tests ${pass + fail}\nℹ pass ${pass}\nℹ fail ${fail}\nℹ skipped 0\nℹ todo 0\n`;
++
++test("no literal count is exported any more", () => {
++  assert.equal(mod.EXPECT, undefined);
++});
++
++test("suite-registration: any registered count is GREEN at exit 0 and the count is printed", () => {
++  const v = judge("suite-registration")({ status: 0, out: "1500 registered suites\n" });
++  assert.equal(v.ok, true);
++  assert.match(v.line, /1500 registered/);
++});
++
++test("suite-registration: a non-zero exit is RED", () => {
++  assert.equal(judge("suite-registration")({ status: 1, out: "1093 registered\nunregistered: x\n" }).ok, false);
++});
++
++for (const name of ["doc-contracts-test", "consumer-safe-paths-test"]) {
++  test(`${name}: a different case count is GREEN at exit 0 with no failing case`, () => {
++    const v = judge(name)({ status: 0, out: tapOut(123, 0) });
++    assert.equal(v.ok, true);
++    assert.match(v.line, /pass 123 of 123, fail 0/);
++  });
++  test(`${name}: a failing case is RED even at exit 0`, () => {
++    assert.equal(judge(name)({ status: 0, out: tapOut(75, 1) }).ok, false);
++  });
++  test(`${name}: a non-zero exit is RED`, () => {
++    assert.equal(judge(name)({ status: 1, out: tapOut(76, 0) }).ok, false);
++  });
++  test(`${name}: output with no parsable counts is RED`, () => {
++    assert.equal(judge(name)({ status: 0, out: "nothing\n" }).ok, false);
++  });
++}
