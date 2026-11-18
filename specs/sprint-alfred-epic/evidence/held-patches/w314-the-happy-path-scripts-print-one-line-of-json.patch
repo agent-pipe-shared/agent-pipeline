@@ -1,0 +1,99 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 307addd08..beddb3b9e 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -1714,6 +1714,6 @@ export function runDispatchBriefing(argv, deps = {}) {
+ 
+ if (directInvocation && !cliHelp) {
+   const result = runDispatchBriefing(process.argv.slice(2));
+-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
++  process.stdout.write(`${JSON.stringify(result)}\n`);
+   if (!result.ok) process.exitCode = 2;
+ }
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 2caab8efe..8c26f0665 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -626,6 +626,9 @@ test("the command line prints a typed refusal as JSON and exits 2", () => {
+   const out = JSON.parse(r.stdout);
+   assert.equal(out.ok, false);
+   assert.equal(out.code, "DBG-FLAG-UNKNOWN");
++  // C31-C4 (B2): stdout is exactly one line, the same value as before.
++  assert.equal(r.stdout.slice(0, -1).includes("\n"), false, "stdout must be a single line");
++  assert.equal(r.stdout, `${JSON.stringify(out)}\n`);
+ });
+ 
+ // --- `build`: the complete briefing from a closed package (PO decision D78) ---
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 79effa70d..f66c99065 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -1010,7 +1010,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).
+     const parsed = parseOneShot(process.argv.slice(2));
+     const closed = oneShotClose(parsed);
+     const result = parsed.stage ? stageOneShotCommit(realpathSync(resolve(parsed.rootDir)), closed) : closed;
+-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
++    process.stdout.write(`${JSON.stringify(result)}\n`);
+     if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
+     else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);
+     else if (result.status === "declined") process.stderr.write(`finish-feature --one-shot: the acceptance was declined; the feature returns to a correction round. Next, in order:\n${result.next.map((line, index) => `${index + 1}. ${line}`).join("\n")}\n`);
+@@ -1018,7 +1018,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).
+ } else if (process.argv[1] === fileURLToPath(import.meta.url)) {
+   try {
+     const result = finishFeature(parse(process.argv.slice(2)));
+-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
++    process.stdout.write(`${JSON.stringify(result)}\n`);
+     // G20-66: the exact commit of what the close wrote, as the next step (stderr; stdout stays the one JSON object).
+     if (result.writerCommit?.status === "armed") process.stderr.write(`${formatWriterCommitNextStep({ ...result.writerCommit, id: "per stage, see writerCommit.stages" }).join("\n")}\n`);
+   }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index ad9c11f7c..2bdcab5ac 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -1891,6 +1891,9 @@ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed re
+     const stopped = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--by", "PO", "--architecture-impact", "no-architecture-impact"], { encoding: "utf8" });
+     assert.equal(stopped.status, 2, stopped.stderr);
+     assert.equal(JSON.parse(stopped.stdout).stop.code, "ONESHOT-NO-ACTIVE-FEATURE");
++    // C31-C4 (B2): stdout is exactly one line, the same value as before.
++    assert.equal(stopped.stdout.slice(0, -1).includes("\n"), false, "stdout must be a single line");
++    assert.equal(stopped.stdout, `${JSON.stringify(JSON.parse(stopped.stdout))}\n`);
+     assert.match(stopped.stderr, /ONESHOT-NO-ACTIVE-FEATURE/u); assert.match(stopped.stderr, /^repair: /mu);
+     const usage = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--bogus", "x"], { encoding: "utf8" });
+     assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+index f19f6a43e..13546ca57 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+@@ -100,6 +100,19 @@ test("inspect on a project with no active feature reports an inactive lifecycle
+   assert.equal(stateExistsAfter, false, "inspect must not create a state file as a side effect");
+ });
+ 
++// C31-C4 (B2): the real process prints the inspect payload as exactly one line, the same value as the
++// indented text parsed to.
++test("inspect process stdout is exactly one line of JSON with the same value", () => {
++  const root = freshRoot("oneline");
++  const result = spawnSync(process.execPath, [PIPELINE_STATE_SCRIPT_PATH, "inspect"], { cwd: root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
++  assert.equal(result.status, 0, result.stderr);
++  assert.equal(result.stdout.endsWith("\n"), true);
++  assert.equal(result.stdout.slice(0, -1).includes("\n"), false, "stdout must be a single line");
++  const payload = JSON.parse(result.stdout);
++  assert.equal(payload.schema, "pipeline.inspect.v1");
++  assert.equal(result.stdout, `${JSON.stringify(payload)}\n`);
++});
++
+ test("inspect after set-feature surfaces phase, draft lifecycle, and the live Next-action text", () => {
+   const root = freshRoot("draft");
+   assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 049d006f2..f430d8d9e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -14634,7 +14634,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const inspectPath = payload.phase === "implementation" || payload.status === "approved" ? "implement"
+         : payload.status === "draft" || payload.status === "awaiting-approval" ? "plan" : "start";
+       const inspectRefused = lifecycle.ok === false || payload.nextAction?.kind === "repair-required";
+-      console.log(JSON.stringify(attachRunbookLink(payload, { pathId: inspectPath, step: "inspect", refused: inspectRefused, rootDir: dir }), null, 2));
++      console.log(JSON.stringify(attachRunbookLink(payload, { pathId: inspectPath, step: "inspect", refused: inspectRefused, rootDir: dir })));
+       return 0;
+     }
+ 
