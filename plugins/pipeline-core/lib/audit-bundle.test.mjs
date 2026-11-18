@@ -600,3 +600,103 @@ test("E-AC-20 still builds and verifies a bundle whose export metadata is delibe
   const verified = await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") });
   assert.equal(verified.status, "verified");
 });
+
+// C30K-K15 (AC-112 binding, plan audit-bundle-completeness-table-2026-11-18, stages 0 to 2): the approval gaps the close already computes reach the manifest as typed gap items.
+const CLOSE_PACKET = "1".repeat(32);
+/** The evidence input of a close (finish-feature.mjs writes `criticReports`, `sbomRecordPath` and, when present, `dispatchProjectionPath` and `gateChangesRecordPath`): this fixture keeps `criticReports` and names none of the four approval keys. */
+const closeShapedEvidence = (extra = {}) => ({ criticReports: [{ packetId: CLOSE_PACKET, path: null }], ...extra });
+function approvalCommon({ overrideModes = [] } = {}) {
+  const common = mkdtempSync(join(tmpdir(), "audit-gaps-"));
+  const directory = join(common, "agent-pipeline", "human-guard-overrides", "capabilities"); mkdirSync(directory, { recursive: true });
+  overrideModes.forEach((mode, index) => writeFileSync(join(directory, `cap-${index}.json`), JSON.stringify({ humanApproval: { mode }, authorizedAt: "2026-11-18T10:00:00Z", signedCandidate: { commit: CANDIDATE.commit } })));
+  return common;
+}
+const CHAT_STATE = { planApproved: true, planApproval: { designApproval: { mode: "chat" } } };
+test("C30K-K15 stage 0: a close-shaped evidence input names no approval item by itself, whatever the State and the override store hold", async () => {
+  const { collectAuditProofs } = await import("./audit-proof-collection.mjs"); const input = fixture(); const common = approvalCommon({ overrideModes: ["signed"] });
+  try {
+    assert.ok(collectAuditProofs({ common, candidate: CANDIDATE, state: CHAT_STATE }).proofs.length === 0);
+    const plan = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence() });
+    assert.deepEqual(plan.evidence.items.map((entry) => entry.item), [`critic-report:${CLOSE_PACKET}`], "only what the producer names becomes an item");
+    assert.equal(plan.evidence.items.some((entry) => entry.item.startsWith("approval")), false);
+  } finally { rmSync(common, { recursive: true, force: true }); }
+});
+test("C30K-K15 stage 1: the collector names a chat plan approval and a human-guard override that retains no proof as typed gaps, never their content", async () => {
+  const { collectAuditProofs } = await import("./audit-proof-collection.mjs"); const none = approvalCommon(); const signed = approvalCommon({ overrideModes: ["signed", "chat-attributed-unattested"] }); const chat = approvalCommon({ overrideModes: ["chat-attributed-unattested"] });
+  try {
+    assert.deepEqual(collectAuditProofs({ common: none, candidate: CANDIDATE, state: CHAT_STATE }).gaps, [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }]);
+    assert.deepEqual(collectAuditProofs({ common: none, candidate: CANDIDATE, state: { planApproval: { designApproval: { mode: "signature", proof: signedProof() } } } }).gaps, [], "a signed plan approval and no override: nothing to name");
+    assert.deepEqual(collectAuditProofs({ common: signed, candidate: CANDIDATE, state: CHAT_STATE }).gaps, [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }, { kind: "human-guard-override", code: "PROOF-NOT-RETAINED-IN-CAPABILITY" }], "one gap per override kind; a capability without a retained proof outranks a chat attribution");
+    assert.deepEqual(collectAuditProofs({ common: chat, candidate: CANDIDATE, state: {} }).gaps, [{ kind: "human-guard-override", code: "CHAT-ATTRIBUTION-ONLY" }]);
+    assert.deepEqual(collectAuditProofs({ common: signed, candidate: CANDIDATE, state: {} }).proofs, [], "an override never yields a proof");
+  } finally { for (const common of [none, signed, chat]) rmSync(common, { recursive: true, force: true }); }
+});
+test("C30K-K15 stage 1: the gaps of the collector reach the manifest as approval-proofs items, verify offline, and are listed in the README", async () => {
+  const { collectAuditProofs, auditApprovalGaps } = await import("./audit-proof-collection.mjs"); const input = fixture(); const common = approvalCommon({ overrideModes: ["signed"] });
+  try {
+    const approvalGaps = auditApprovalGaps(collectAuditProofs({ common, candidate: CANDIDATE, state: CHAT_STATE }));
+    const plan = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps }) });
+    assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), [`approval-proofs:plan-approval:gap:CHAT-ATTRIBUTION-ONLY`, `approval-proofs:human-guard-override:gap:PROOF-NOT-RETAINED-IN-CAPABILITY`, `critic-report:${CLOSE_PACKET}:gap:REPORT-NOT-EXPORTED`]);
+    assert.equal(plan.artifacts.length, 5, "a gap carries no artifact"); assert.equal(plan.evidence.traceStatus, null);
+    await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const bundle = join(input.root, "bundle");
+    const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8"));
+    assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "evidence", "readmeSha256", "schema"], "no new manifest key");
+    assert.deepEqual(Object.keys(manifest.evidence).sort(), ["candidateBound", "items", "schema", "traceStatus"], "no new evidence key");
+    const readme = readFileSync(join(bundle, "README.md"), "utf8");
+    assert.match(readme, /approval-proofs:plan-approval: gap \(CHAT-ATTRIBUTION-ONLY\)/u); assert.match(readme, /approval-proofs:human-guard-override: gap \(PROOF-NOT-RETAINED-IN-CAPABILITY\)/u);
+    assert.equal((await verifyAuditBundle({ bundleRoot: bundle })).status, "verified");
+    assert.doesNotMatch(JSON.stringify(manifest), /cap-0|authorizedAt|2026-11-18/u, "only the name of an absence is carried, never a record of the private store");
+  } finally { rmSync(common, { recursive: true, force: true }); }
+});
+test("C30K-K15 stage 1: a gap the collector already returned (PROOF-NOT-CARRIABLE:source) is mapped to the admitted code shape, once per kind, and never overrides a carried proof item", async () => {
+  const { auditApprovalGaps } = await import("./audit-proof-collection.mjs"); const input = fixture();
+  const approvalGaps = auditApprovalGaps({ proofs: [], gaps: [{ kind: "push", code: "PROOF-NOT-CARRIABLE:store:push/a.json" }, { kind: "push", code: "PROOF-NOT-CARRIABLE:store:push/b.json" }, { kind: "plan-approval", code: "PROOF-NOT-CARRIABLE:state:planApproval" }] });
+  assert.deepEqual(approvalGaps, [{ kind: "push", code: "PROOF-NOT-CARRIABLE" }, { kind: "plan-approval", code: "PROOF-NOT-CARRIABLE" }]);
+  const plan = planWith(input, { candidate: CANDIDATE, evidence: { ...evidenceFiles(input.root), approvalGaps } });
+  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:carried:null", "approval-proofs:push:carried:null", "verify-record:carried:null", "security-scan:carried:null", "approval-proofs:plan-approval:gap:PROOF-NOT-CARRIABLE"], "the carried push proof keeps its item; the gap of the same name is not added twice");
+});
+test("C30K-K15 stage 1: a request that names only approval gaps invents no approval-trace, verify or security item", () => {
+  const plan = planWith(fixture(), { candidate: CANDIDATE, evidence: { approvalGaps: [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }] } });
+  assert.deepEqual(plan.evidence.items.map((entry) => entry.item), ["approval-proofs:plan-approval"]);
+});
+test("C30K-K15 stage 1: the new input key is closed: a malformed gap, a foreign key or too many gaps is refused", () => {
+  const input = fixture(); const refuse = (approvalGaps) => assert.throws(() => planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps }) }), (error) => error.code === "AB-EVIDENCE-INPUT");
+  refuse("plan-approval"); refuse([{ kind: "plan-approval" }]); refuse([{ kind: "plan-approval", code: "chat-attribution-only" }]); refuse([{ kind: "Plan Approval", code: "CHAT-ATTRIBUTION-ONLY" }]);
+  refuse([{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY", content: "x" }]); refuse([{ kind: "plan-approval", code: "PROOF-NOT-CARRIABLE:state:planApproval" }]);
+  refuse(Array.from({ length: 17 }, (_, index) => ({ kind: `kind-${String.fromCharCode(97 + index)}`, code: "CHAT-ATTRIBUTION-ONLY" })));
+});
+test("C30K-K15 stage 1: a bundle built before the change still verifies; an empty gap list changes nothing; only a close with a gap sees FCA-OUTPUT-COLLISION's evidence comparison differ", async () => {
+  const { canonicalizeJson } = await import("./governance-event.mjs"); const input = fixture();
+  const before = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence() });
+  const empty = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps: [] }) });
+  const withGap = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps: [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }] }) });
+  // the same comparison lib/feature-close-audit-preflight.mjs makes between the manifest already on disk and the new plan (`same(prior.evidence, bundlePlan.evidence)`)
+  assert.equal(canonicalizeJson(empty.evidence), canonicalizeJson(before.evidence), "no gap: the evidence block is byte-identical, so a resumed close is not refused");
+  assert.notEqual(canonicalizeJson(withGap.evidence), canonicalizeJson(before.evidence), "a gap: the block differs, so a bundle built earlier is refused FCA-OUTPUT-COLLISION and needs the distinct explicit output route");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "old", plan: before });
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "old") })).status, "verified");
+  assert.deepEqual(JSON.parse(readFileSync(join(input.root, "old", "manifest.json"), "utf8")).evidence.items.map((entry) => entry.item), [`critic-report:${CLOSE_PACKET}`]);
+});
+test("C30K-K15 stage 1: the build stays create-only for a bundle that carries gap items", async () => {
+  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence({ approvalGaps: [{ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }] }) });
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  await assert.rejects(() => buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }), (error) => error.code === "AB-OUTPUT-EXISTS");
+});
+test("C30K-K15 stage 2: the README of a new bundle says verified means consistent, not complete, and names what the manifest does not enumerate and the follow-up route", async () => {
+  const input = fixture(); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan: planWith(input, { candidate: CANDIDATE, evidence: closeShapedEvidence() }) });
+  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
+  assert.match(readme, /`verified` means consistent, not complete/u);
+  assert.match(readme, /checks only what its manifest names/u);
+  assert.match(readme, /follow-up lists under `proofs\/`/u); assert.match(readme, /final Verify and Security/u);
+  assert.match(readme, /model exception/u); assert.match(readme, /onboarding consent/u); assert.match(readme, /typed gap/u);
+  assert.match(readme, /`CHAT-ATTRIBUTION-ONLY`/u); assert.match(readme, /`PROOF-NOT-RETAINED-IN-CAPABILITY`/u);
+});
+test("C30K-K15 stage 2: the maintainer reference names the close's evidence keys, not the dead approval keys, and cites functions instead of line numbers", () => {
+  const read = (name) => readFileSync(new URL(`../../../docs/${name}`, import.meta.url), "utf8");
+  const technical = read("audit-bundles-technical.md");
+  assert.doesNotMatch(technical, /audit-bundle\.mjs:\d/u, "a line number goes stale; a function name does not");
+  assert.match(technical, /`approvalGaps`/u); assert.match(technical, /`criticReports`/u);
+  assert.match(technical, /no production close names `traceReportPath`/u);
+  const guide = read("audit-bundles.md");
+  assert.match(guide, /consistent, not complete/u);
+});

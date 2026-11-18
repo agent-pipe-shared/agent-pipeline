@@ -75,6 +75,8 @@ The command exits 0 only for \`verified\` and nonzero for \`invalid\` or a comma
 
 This bundle is not a claim that requirements are satisfied, that a review or PO approval occurred, that deployment or a push happened, or that the candidate is suitable for release. The unsigned manifest and its hashes are not independently trusted: an actor who can replace both an artifact and the manifest can preserve internal consistency. A separate optional signature, when present and independently verified through its provider, adds cryptographic binding only; signatures are not implied by this bundle. Supporting reports and state files are evidence supplied by the producer, not intrinsically tamper-proof proof.
 
+\`verified\` means consistent, not complete. The verifier checks only what its manifest names, so an approval or gate that the manifest does not list is not shown to be absent, out of scope or skipped. Push approvals, release approvals and the final Verify and Security records reach a bundle only through the follow-up lists under \`proofs/\`, which are added after a push or release approval: a close that no such approval follows carries none of them. When the close that built this bundle found a chat-mode plan approval or a human-guard override, it names each as a typed gap item (\`CHAT-ATTRIBUTION-ONLY\`, or \`PROOF-NOT-RETAINED-IN-CAPABILITY\` for an override capability that keeps no proof); only the name of the absence is carried, never the private record. A bundle built another way names none of them, so the lack of such an item does not show that no such approval or override exists. A model exception and the onboarding consent are neither carried nor named.
+
 The bundle states no independence of its own for any Critic round. Whether a round ran in a fresh context, without inherited history, is what the \`receipt.json\` exported beside that round's report records (\`freshContext\`, \`historyInherited\`, \`independence\`): a round recorded as \`caller-authored-fallback\` (freshContext false, historyInherited true) was authored by the calling agent and is not an independent review, and the report next to it must be read that way.
 `;
 }
@@ -255,8 +257,11 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
  */
 function collectEvidence(root, candidate, evidence, firstIndex) {
   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath", "gateChangesRecordPath"]);
+  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath", "gateChangesRecordPath", "approvalGaps"]);
   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
+  // C30K-K15: the approval gaps a close already computed (lib/audit-proof-collection.mjs `auditApprovalGaps`): at most 16 `{ kind, code }`, each an absence NAMED under an admitted item name, never a record.
+  const approvalGaps = evidence.approvalGaps;
+  if (approvalGaps !== undefined && (!Array.isArray(approvalGaps) || approvalGaps.length > 16 || !approvalGaps.every((entry) => exact(entry, ["kind", "code"]) && PROOF_KIND.test(entry.kind) && /^[A-Z0-9-]{3,48}$/u.test(entry.code)))) fail("AB-EVIDENCE-INPUT");
   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
   const reports = evidence.criticReports;
   if (reports !== undefined && (!Array.isArray(reports) || reports.length > 40 || !reports.every((entry) => exact(entry, ["packetId", "path"]) && /^[a-f0-9]{32}$/u.test(entry.packetId) && (entry.path === null || typeof entry.path === "string")) || new Set(reports.map((entry) => entry.packetId)).size !== reports.length)) fail("AB-EVIDENCE-INPUT");
@@ -271,7 +276,7 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
   // C28c: the same for the SBOM record the close names.
   if (evidence.sbomRecordPath !== undefined && typeof evidence.sbomRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
   if (evidence.gateChangesRecordPath !== undefined && typeof evidence.gateChangesRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
-  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined && evidence.gateChangesRecordPath === undefined)) {
+  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined && evidence.gateChangesRecordPath === undefined && approvalGaps === undefined)) {
   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
   else {
     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
@@ -308,6 +313,8 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
     else items.push({ item: "security-scan", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.security, evidence.securityScanPath, file.sha256) });
   }
   }
+  // C30K-K15: one gap item per kind under the admitted `approval-proofs:<kind>` name; an item of that name already present (a carried proof, an earlier gap) is never doubled.
+  for (const entry of approvalGaps ?? []) if (!items.some((item) => item.item === `approval-proofs:${entry.kind}`)) gap(`approval-proofs:${entry.kind}`, entry.code);
   for (const entry of reports ?? []) {
     const item = `critic-report:${entry.packetId}`;
     if (entry.path === null) { gap(item, "REPORT-NOT-EXPORTED"); continue; }

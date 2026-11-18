@@ -13,34 +13,35 @@ bytes, and an optional detached `signature.json`.
 - Path traversal via a crafted `sourcePath`/`bundlePath` — `rootPath` rejects
   an absolute path, a path containing a backslash, or any resolved target
   that escapes the repository root or bundle root
-  (`audit-bundle.mjs:16`), and is applied to every artifact source
-  (`audit-bundle.mjs:33`) and output path (`audit-bundle.mjs:30`).
+  (`rootPath` in `audit-bundle.mjs`), and is applied to every artifact source
+  and the output path (`buildAuditBundle`).
 - Tampered or substituted artifact bytes — `buildAuditBundle` rejects if a
   source file's live SHA-256 no longer matches the plan's recorded
-  `sha256` (`AB-SOURCE-DIGEST`, `audit-bundle.mjs:33`); `verifyAuditBundle`
+  `sha256` (`AB-SOURCE-DIGEST`); `verifyAuditBundle`
   independently rehashes every bundled artifact and reports `AB-DIGEST
   <path>` for a mismatch or `AB-MISSING <path>` for an absent file
-  (`audit-bundle.mjs:43`).
+  (`verifyAuditBundleSync`).
 - Silently overwriting an existing bundle — `buildAuditBundle` is
   create-only: it fails `AB-OUTPUT-EXISTS` if the output directory already
   exists, and writes `manifest.json` with the exclusive `wx` flag
-  (`audit-bundle.mjs:31,35`).
+  (`buildAuditBundle`).
 - A signature being read as legal identity, key custody, trusted time, or
   authorization — every signature record is stamped `assurance:
-  "cryptographic-binding-only"` (`audit-bundle.mjs:67,70,82`), and signing
-  itself is create-only (`AB-SIGNATURE-EXISTS`, `audit-bundle.mjs:68`) so an
+  "cryptographic-binding-only"` (`signAuditBundle`,
+  `verifyAuditBundleSignature`), and signing
+  itself is create-only (`AB-SIGNATURE-EXISTS`, `signAuditBundle`) so an
   existing signature cannot be silently replaced.
 - A signature request being forged or re-bound to different bundle content —
   `signAuditBundle` recomputes the current manifest's own signature request
   and requires it to canonically equal the caller-supplied request (with
   only `algorithm`/`signerKeyId` substituted) before signing
-  (`AB-SIGNATURE-PREIMAGE`, `audit-bundle.mjs:64`).
+  (`AB-SIGNATURE-PREIMAGE`).
 - An incompatible or altered organization policy entering the bundle —
   `planAuditBundle` resolves the policy through
   `resolveEffectiveOrganizationPolicy` (which itself validates every pack;
   see `docs/organization-policy-packs.md`) and binds
   `effectivePolicySha256 = canonicalSha256(policy)` into both the plan and
-  the manifest (`audit-bundle.mjs:23,26,34`).
+  the manifest (`planAuditBundle`, `buildAuditBundle`).
 
 **Out of scope:** filesystem-level access control on the bundle directory
 (who can read a built bundle) and transport/storage of a bundle once it
@@ -51,27 +52,38 @@ module enforces.
 
 A bundle's contents are fixed at `planAuditBundle` time from a validated
 Feature Package's manifest artifacts
-(`validateFeaturePackage`, `audit-bundle.mjs:22`) — the plan is not something
+(`validateFeaturePackage`, called by `planAuditBundle`) — the plan is not something
 an operator hand-edits; every `artifacts[].sha256` in the plan comes from the
 package manifest, and `bundlePath` is deterministically derived as
 `artifacts/<3-digit-index>-<artifact-class>`
-(`audit-bundle.mjs:18,25`). `buildAuditBundle` then only ever copies exactly
+(`planAuditBundle`). `buildAuditBundle` then only ever copies exactly
 those bytes after re-verifying each digest, and writes one `manifest.json`
 binding `bundleId`, `candidate` (commit/tree), `effectivePolicySha256`, and
-the artifact list (`audit-bundle.mjs:29-37`). `verifyAuditBundle` is fully
+the artifact list. `verifyAuditBundle` (`verifyAuditBundleSync`) is fully
 offline and re-derives its own findings from the bundle's own bytes — it
-does not trust any value it did not itself recompute
-(`audit-bundle.mjs:39-45`). Signing (`planAuditBundleSignature` /
+does not trust any value it did not itself recompute. Signing (`planAuditBundleSignature` /
 `signAuditBundle` / `verifyAuditBundleSignature`) is an explicit, separate,
 provider-neutral step layered on an unchanged, already-built bundle; no key
-or key location ever enters the bundle content itself
-(`audit-bundle.mjs:54-83`).
+or key location ever enters the bundle content itself.
+
+`verified` means internally consistent, not complete: the verifier checks only
+what the manifest names (a manifest without an `evidence` key, an item whose
+status is `gap` and an item without a `bundlePath` all verify), and the
+README of a new bundle says so. What the bundle must contain is stored nowhere,
+so an absent approval cannot be told from one that was out of scope.
 
 ## Human approval evidence and the approval trace
 
-A plan may name an optional `evidence` input (keys `traceReportPath`,
-`proofPaths` (at most 16), `verifyRecordPath`, `securityScanPath`; repository
-relative paths). The bundle then carries, by path and digest, the approval
+A plan may name an optional `evidence` input; `collectEvidence` in
+`audit-bundle.mjs` is its one reader. A close names `criticReports` (one entry per
+Critic round), an optional `dispatchProjectionPath`, `sbomRecordPath` and
+`gateChangesRecordPath`, and `approvalGaps` (below); the four approval keys
+`traceReportPath`, `proofPaths` (at most 16), `verifyRecordPath` and
+`securityScanPath` (repository relative paths) are named only by a
+hand-built request, because no production close names `traceReportPath`,
+`verifyRecordPath` or `securityScanPath`. The approval block runs only when
+one of those four keys is named, or when no evidence key at all is named. It
+carries, by path and digest, the approval
 trace report, the detached signature proofs, the release-mode Verify record and
 the Security scan record, all bound to the candidate the bundle audits (the
 last close commit itself). An item that is not named, unreadable, bound to
@@ -81,6 +93,23 @@ in the manifest (`NOT-REFERENCED`, `UNREADABLE`, `OTHER-CANDIDATE`,
 candidate differs from the package candidate is refused
 (`AB-CANDIDATE-MISMATCH`). Without `evidence` the bundle is byte-identical to
 before.
+
+`approvalGaps` (candidate 30k, AC-112 binding) is the one key through which a
+close names the approvals it could not carry: at most 16 `{ kind, code }`
+entries, each turned into an `approval-proofs:<kind>` gap item (item shape
+`{item, status, code, bundlePath}`, `status` `gap`, a null `bundlePath`). The
+close takes them from `collectAuditProofs` through `auditApprovalGaps`
+(`lib/audit-proof-collection.mjs`): a chat-mode plan approval
+(`CHAT-ATTRIBUTION-ONLY`), a human-guard override capability (`CHAT-ATTRIBUTION-ONLY` when
+every capability is a chat attribution, otherwise `PROOF-NOT-RETAINED-IN-CAPABILITY`)
+and a proof that is not carriable (`PROOF-NOT-CARRIABLE`). Only the name of an
+absence is carried, never a record of the private store; nothing blocks, no
+status is stored, and the verifier is unchanged, so a bundle built before this
+key still verifies. A close whose bundle was built before the change and that
+is planned again with a gap present finds a different evidence block and is
+refused `FCA-OUTPUT-COLLISION` by `planFeatureCloseAudit`; the repair is the
+distinct explicit output it names. A close with no gap produces the evidence
+block byte for byte as before.
 
 The trace itself is `scripts/human-approval-trace.mjs --repo <root> [--commit <oid>] [--format table|json]`,
 a read-only operator command (`--out` writes the JSON report create-only inside

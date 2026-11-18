@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
 import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
-import { collectAuditProofs } from "../lib/audit-proof-collection.mjs";
+import { auditApprovalGaps, collectAuditProofs } from "../lib/audit-proof-collection.mjs";
 import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
@@ -789,6 +789,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
       // P3: the signed approval proofs that authorized this candidate travel in the bundle's proofs/ directory (public proof objects only).
       const collectedProofs = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state });
       if (collectedProofs.proofs.length > 0) options.proofs = collectedProofs.proofs;
+      // C30K-K15: the gaps the collector computed (a chat plan approval, an override that retains no proof, a proof that is not carriable) are named in the manifest as typed gap items; nothing blocks.
+      const approvalGaps = auditApprovalGaps(collectedProofs);
+      if (approvalGaps.length > 0) options.evidence = { ...(options.evidence ?? {}), approvalGaps };
       let auditPlan = await planFeatureCloseAudit(options);
       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
       if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
@@ -803,8 +806,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
       const acknowledgement = lifecycle.criticIndependence.acknowledgement;
       if (acknowledgement?.mode === "signature") {
         const withAcknowledgement = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state, criticPacketId: acknowledgement.packetId });
-        if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0)) {
-          options.proofs = withAcknowledgement.proofs;
+        const acknowledgementGaps = auditApprovalGaps(withAcknowledgement); // C30K-K15: a proof of this call that is not carriable is named too
+        const gapsGrew = acknowledgementGaps.length > approvalGaps.length;
+        if (gapsGrew) options.evidence = { ...(options.evidence ?? {}), approvalGaps: acknowledgementGaps };
+        if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0) || gapsGrew) {
+          if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0)) options.proofs = withAcknowledgement.proofs;
           auditPlan = await planFeatureCloseAudit(options);
           if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
         }

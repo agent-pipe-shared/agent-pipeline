@@ -8,8 +8,8 @@
  *   - the plan approval's signed design approval, kept in the State;
  *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit;
  *   - the PO's acknowledgement of gate-definition changes (ADR-0096) of the active feature.
- * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is an
- * envelope whose proof is not a verifiable public proof object. A gap never blocks the close.
+ * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is a chat-mode plan approval
+ * (CHAT-ATTRIBUTION-ONLY) and an envelope whose proof is not a verifiable public proof object. A gap never blocks the close; `auditApprovalGaps` hands the gaps to the bundle.
  *
  * C20E-AP (AC-108): `writeAuditProofFollowUp` / `prepareAuditProofFollowUp` below are the ONE writer of this module: after the push and release
  * approvals exist they add the approved commit's public proofs to the bundle the close already committed, as NEW files only (see lib/audit-bundle.mjs).
@@ -38,6 +38,13 @@ export function collectAuditProofs({ common, candidate, state, criticPacketId = 
   };
   const design = state?.planApproval?.designApproval;
   if (object(design) && design.mode === "signature") take("plan-approval", design.proof, "state:planApproval");
+  else if (object(design) && design.mode === "chat") gaps.push({ kind: "plan-approval", code: "CHAT-ATTRIBUTION-ONLY" }); // C30K-K15: a chat approval is an attribution record, never a proof; only the absence is named
+  if (typeof common === "string" && common !== "") {
+    // C30K-K15: a human-guard override capability retains no proof (the trace reports it PROOF-NOT-RETAINED-IN-CAPABILITY, or attribution-only for a chat one). Only the NAME of the absence is carried, one gap for the kind; nothing of the capability is read beyond its approval mode.
+    const modes = []; const directory = join(common, "agent-pipeline", "human-guard-overrides", "capabilities");
+    try { for (const name of readdirSync(directory).filter((entry) => entry.endsWith(".json")).sort().slice(0, 256)) { const mode = readJson(join(directory, name))?.humanApproval?.mode; if (typeof mode === "string") modes.push(mode); } } catch { /* no capability store: nothing to name */ }
+    if (modes.length > 0) gaps.push({ kind: "human-guard-override", code: modes.every((mode) => mode === "chat-attributed-unattested") ? "CHAT-ATTRIBUTION-ONLY" : "PROOF-NOT-RETAINED-IN-CAPABILITY" });
+  }
   if (typeof common === "string" && common !== "" && object(candidate)) {
     // C21E: the PO acknowledgement of a caller-authored Critic signs the REVIEWED candidate, which the close candidate has moved past, so it is found by its packet.
     // ADR-0096: the PO's acknowledgement of gate-definition changes signs the HEAD of its day; the close candidate may have moved past it, so it is found by its feature.
@@ -56,6 +63,17 @@ export function collectAuditProofs({ common, candidate, state, criticPacketId = 
   }
   proofs.sort((a, b) => (a.kind + a.proof.intentSha256).localeCompare(b.kind + b.proof.intentSha256));
   return { proofs: proofs.slice(0, 16), gaps };
+}
+
+/**
+ * C30K-K15: the gaps of one `collectAuditProofs` result in the shape the audit bundle's `evidence.approvalGaps` input takes: `{ kind, code }`, one per kind (the first wins), the code without
+ * its `:source` suffix (the suffix names a private-store file and is not an admitted code character). The bundle turns each into an `approval-proofs:<kind>` gap item.
+ * @returns {Array<{kind: string, code: string}>}
+ */
+export function auditApprovalGaps({ gaps = [] } = {}) {
+  const seen = new Set(); const found = [];
+  for (const gap of gaps) { if (object(gap) && !seen.has(gap.kind)) { seen.add(gap.kind); found.push({ kind: gap.kind, code: String(gap.code).split(":")[0] }); } }
+  return found.slice(0, 16);
 }
 
 const BUNDLE_DIR = /^audit-bundles\/[a-z][a-z0-9-]{2,63}\/(?:[0-9a-f]{40}|[0-9a-f]{64})$/u; const FEATURE_ID = /^[a-z][a-z0-9-]{2,63}$/u;

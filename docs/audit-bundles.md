@@ -59,7 +59,14 @@ or tampered byte.
 ## What a successful check means
 
 `verify` confirms that the bundle's present files still match its manifest.
-It does not prove who created or approved them, when they were produced, or how
+`verified` means consistent, not complete: the check covers only what the
+manifest names, and the generated README says which approvals this bundle type
+does not enumerate. When the one-shot close builds a bundle, an approval it
+could not carry (a chat-mode plan approval, a human-guard override) appears as a
+typed gap item in the manifest; a bundle planned by hand with the commands above
+names no such item, so a missing item is not evidence that none exists. Push and
+release approvals and the final Verify and Security records are added to the
+bundle by later follow-up lists under `proofs/`. It does not prove who created or approved them, when they were produced, or how
 an exported bundle was stored or transported. Signing and long-term retention
 are separate operations: a signature can bind bytes but cannot prove legal
 identity, key custody, trusted time, or external authorization.

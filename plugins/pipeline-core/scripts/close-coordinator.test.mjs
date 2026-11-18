@@ -1186,3 +1186,14 @@ test("process: authorization, failed publication, exact readback and cleanup sta
   assert.equal(inspected.coordinator.phase, "delivered");
   rmSync(fixture.root, { recursive: true, force: true });
 });
+
+// C30K-K15 (AC-112 binding, stage 1): the coordinator no longer drops the gaps of collectAuditProofs. The audit route has no unit seam (it needs a registered package, a Critic/Verify lifecycle
+// and a candidate; the existing audit-lifecycle suite does not reach the gap path), so this pins the hand-over at the source and the behaviour it hands over to is pinned in lib/audit-bundle.test.mjs against the same helper.
+test("C30K-K15: the close hands the gaps of collectAuditProofs on as the audit evidence input key approvalGaps", () => {
+  const source = readFileSync(fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url)), "utf8");
+  assert.match(source, /import \{[^}]*auditApprovalGaps[^}]*collectAuditProofs[^}]*\} from "\.\.\/lib\/audit-proof-collection\.mjs"/u, "the one mapping of a collector gap to an item shape is imported, not re-written here");
+  assert.match(source, /const approvalGaps = auditApprovalGaps\(collectedProofs\);\s*\n\s*if \(approvalGaps\.length > 0\) options\.evidence = \{ \.\.\.\(options\.evidence \?\? \{\}\), approvalGaps \};/u);
+  assert.equal(source.indexOf("auditApprovalGaps(collectedProofs)") < source.indexOf("planFeatureCloseAudit(options)"), true, "the gaps are on the options before the audit plan reads them");
+  // the second collection (with the Critic acknowledgement's packet) hands on a gap it adds, and re-plans when the gap list grew even if the proofs did not
+  assert.match(source, /const acknowledgementGaps = auditApprovalGaps\(withAcknowledgement\);[^\n]*\n\s*const gapsGrew = acknowledgementGaps\.length > approvalGaps\.length;\s*\n\s*if \(gapsGrew\) options\.evidence = \{ \.\.\.\(options\.evidence \?\? \{\}\), approvalGaps: acknowledgementGaps \};\s*\n\s*if \(withAcknowledgement\.proofs\.length > \(options\.proofs\?\.length \?\? 0\) \|\| gapsGrew\) \{/u);
+});
