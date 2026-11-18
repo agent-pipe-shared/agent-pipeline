@@ -1,0 +1,81 @@
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index dc26b2dcc..ee01d4a75 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -55,8 +55,8 @@
+     {
+       "topic": "Telemetry row at close",
+       "claude": "`usage-ledger.mjs`",
+-      "codex": "not available",
+-      "antigravity": "not available",
++      "codex": "token-only row: `usage-ledger.mjs --row <label> --codex-rollout <file>` (price prints n/a)",
++      "antigravity": "token-only row: `usage-ledger.mjs --row <label> --antigravity-transcript <file>` (no dollar half)",
+       "owner": "skills/close-feature/SKILL.md"
+     },
+     {
+diff --git a/plugins/pipeline-core/scripts/runner-capabilities.test.mjs b/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
+index eec2877cf..f35694048 100644
+--- a/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
+@@ -47,6 +47,27 @@ test("AC-239: the observation-boundary row exists per runner and claims no conta
+   assert.ok(guide.includes(`| ${row.topic} | ${row.claude} | ${row.codex} | ${row.antigravity} |`), "the guide carries the same row");
+ });
+ 
++test("AC-112: the telemetry row names the token-only Antigravity and Codex routes in the data, the guide and the close reference", () => {
++  const row = readRunnerCapabilities().rows.find((candidate) => candidate.topic === "Telemetry row at close");
++  assert.ok(row, "the Telemetry row at close exists");
++  assert.match(row.claude, /usage-ledger\.mjs/u);
++  assert.match(row.antigravity, /--antigravity-transcript/u);
++  assert.match(row.codex, /--codex-rollout/u);
++  for (const runner of ["codex", "antigravity"]) {
++    assert.match(row[runner], /token/iu, `${runner} cell says token`);
++    assert.doesNotMatch(row[runner], /not available|\$\s?\d/u, `${runner} cell neither says not available nor claims a dollar figure`);
++  }
++  const guide = readFileSync(GUIDE, "utf8");
++  const step = guide.split("\n").find((line) => line.startsWith("4. Telemetry row"));
++  assert.ok(step, "the close step 4 telemetry line exists");
++  assert.match(step, /--antigravity-transcript/u);
++  assert.match(step, /--codex-rollout/u);
++  assert.doesNotMatch(step, /skip it/u);
++  const close = readFileSync(join(PLUGIN, "skills", "close-block", "references", "close-light-and-extensions.md"), "utf8");
++  assert.match(close, /--antigravity-transcript/u);
++  assert.match(close, /--codex-rollout/u);
++});
++
+ test("an owner that names a file in this plugin names one that ships", () => {
+   for (const row of readRunnerCapabilities().rows) {
+     for (const owner of row.owner.split(";").map((part) => part.trim())) {
+diff --git a/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md b/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md
+index 0afb61736..2d0ccf386 100644
+--- a/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md
++++ b/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md
+@@ -61,6 +61,7 @@ Rules: extension points not defined by this skill (e.g. a future `newBlockReview
+ 8. **Telemetry line (MP-20), auto-captured via `usage-ledger.mjs`:** `/usage` is a **user command and session-scoped** — numbers are NOT retrievable after the session ends, which is why the token half of this step now runs through `plugins/pipeline-core/scripts/usage-ledger.mjs` instead of a manual paste. New order of operations:
+ 
+    1. **Run the ledger for the CURRENT session** with `--row <block label>`: prefer `--session <own-uuid>` when the session's own UUID is derivable from the environment; otherwise `--latest` (with a sanity check that the printed self-evidence — the chosen session/file — IS the running session before trusting the row). Transcripts root is the mandatory first CLI argument (GL-03, C-4) — invoke via the env-based standard path, never a machine-specific absolute path: `"$HOME/.claude/projects"` (POSIX) resp. `"%USERPROFILE%\.claude\projects"` (Windows), e.g. `node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "<block label>"`.
++   On Antigravity and Codex the same script gives a token-only row (no dollar half) from a transcript path you pass: `usage-ledger.mjs --row "<block label>" --antigravity-transcript <file>` resp. `--codex-rollout <file>`.
+    2. **Append the row** to the project's `telemetry/costs.md` (create the file with the header below if absent) — token half = **collected (script)**, $-half = **estimated** (marked with the `asOf` date of `plugins/pipeline-core/scripts/model-prices.json`); the advisor-model $ estimate is additionally called out on its own in "Notes" (the real-money share when a paid external model is configured). As before, **one row per session/block AND one row per goldfish dispatch** of this block.
+    3. **`/usage` paste stays OPTIONAL**, asked once as before (EL-17c) — now framed as "Limits/reconciliation" (limit standings %, credit %), no longer the data source for the token column. Decline/absence is fine; the row still exists — this replaces "not collected" as the default outcome. "not collected" remains reserved for actual script failure (5. below).
+    4. **Standing addendum rule:** a PO `/usage` paste arriving at ANY later time (any session of this repo) is worked into the NAMED session's existing row as a dated addendum — real numbers OVERRIDE the estimate, the estimate stays visible in parentheses (calibration data for the estimator, MP-21); accompanying PO comments land in "Notes".
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 874b886c1..dee1a5645 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -145,7 +145,7 @@ The single steps below are what it runs; use them for a recovery or when a stop
+    To step through these without composing each pair by hand, `close-coordinator.mjs drive --root <root> --lifecycle <id> --actor <name>` names the phase, the missing input and the remaining chain; with `--apply` it applies exactly one step and writes the cleanup receipt itself. It stops before every human-gate phase.
+ 3. `pipeline-state.mjs close-feature --by "<name>" --architecture-impact "<value>" --coordinator-lifecycle "<id>" --coordinator-sha256 "<sha>"` plus
+    `--continuity-close-request` when the returned argv carries it.
+-4. Telemetry row (Claude only): `usage-ledger.mjs`; on Codex and Antigravity skip it and say so in the close report.
++4. Telemetry row: `usage-ledger.mjs` on Claude; on Antigravity `usage-ledger.mjs --row <label> --antigravity-transcript <file>` and on Codex `usage-ledger.mjs --row <label> --codex-rollout <file>` give a token-only row (the transcript or rollout path is an argument you pass; no dollar figure for either runner).
+ 
+ ## 5. Push
+ 
+@@ -175,7 +175,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
+ | Model exception | a PO-recorded, expiring exception admits one model outside the routing | not applicable (no tool-layer model parameter to admit) | not applicable (the native alias list is fixed) |
+ | Own session descriptor at close | derived for Claude | derived for the closing runner | derived for the closing runner |
+ | Close entry | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` |
+-| Telemetry row at close | `usage-ledger.mjs` | not available | not available |
++| Telemetry row at close | `usage-ledger.mjs` | token-only row: `usage-ledger.mjs --row <label> --codex-rollout <file>` (price prints n/a) | token-only row: `usage-ledger.mjs --row <label> --antigravity-transcript <file>` (no dollar half) |
+ | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
+ | Signing preparation | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's |
+ | Observation boundary | tool-level only: the guard judges the runner's own tool calls, one hook serves the main session and a dispatched subagent alike, and an admitted `node` script can still read outside the repository; not covered: native read tools a runner does not route through the hook, plugin scripts reading their own inputs, and any operating-system boundary (a container, an own user or read-only mounts is the recommendation for teams that need one, not built) | tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured; not covered: native read tools the runner does not route through the hook, plugin scripts reading their own inputs, any operating-system boundary (OS encapsulation is the recommendation, not built) | tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured; not covered: native read tools the runner does not route through the hook, plugin scripts reading their own inputs, any operating-system boundary (OS encapsulation is the recommendation, not built) |
