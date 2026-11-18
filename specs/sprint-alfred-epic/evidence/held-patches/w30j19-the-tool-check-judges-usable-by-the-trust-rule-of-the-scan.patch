@@ -1,0 +1,197 @@
+diff --git a/plugins/pipeline-core/lib/trusted-tool-resolution.mjs b/plugins/pipeline-core/lib/trusted-tool-resolution.mjs
+index 788aa04d1..59960c5f4 100644
+--- a/plugins/pipeline-core/lib/trusted-tool-resolution.mjs
++++ b/plugins/pipeline-core/lib/trusted-tool-resolution.mjs
+@@ -84,6 +84,18 @@ export function trustedToolRepairHint(name, file = trustedToolRootsFilePath()) {
+   return `Add the directory containing ${name} to ${file} as {"schema":"${TRUSTED_TOOL_ROOTS_SCHEMA}","roots":["<absolute directory>"]} (at most ${TTR_MAX_ROOTS} roots, additive to the built-in roots).`;
+ }
+ 
++/** The fix for a tool that IS installed (found at `foundPath`) but that `assessTrustedExecutablePath` refuses (status `untrusted_path`): a direct .exe whose directory the person registers in the roots file. Text only; nothing is written. */
++export function untrustedToolFix(name, foundPath, options = {}) {
++  const platform = options.platform ?? process.platform;
++  const pathMod = platform === "win32" ? winPath : posixPath;
++  const file = trustedToolRootsFilePath(options);
++  const direct = platform !== "win32" || foundPath.toLowerCase().endsWith(".exe");
++  const register = (directory) => `add the directory of the direct ${name}.exe to ${file} as ${JSON.stringify({ schema: TRUSTED_TOOL_ROOTS_SCHEMA, roots: [directory] })} (at most ${TTR_MAX_ROOTS} roots, a directory outside any Git repository), then re-read the preflight`;
++  return direct
++    ? `${name} is installed at ${foundPath}, but that location is not trusted. Human step: ${register(pathMod.dirname(foundPath))}.`
++    : `${name} is installed at ${foundPath}, but the trust rule accepts only a direct ${name}.exe, never a .cmd, .bat or .ps1 wrapper. Human step: install or copy the real ${name}.exe, then ${register("<absolute directory of that .exe>")}.`;
++}
++
+ /** Fixed Windows roots; environment data must never expand the trust boundary. */
+ export const WINDOWS_SYSTEM_TOOL_ROOTS = Object.freeze([
+   "C:\\Program Files\\Git\\cmd",
+diff --git a/plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs b/plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs
+index fc80469f6..b7525f017 100644
+--- a/plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs
++++ b/plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs
+@@ -257,4 +257,22 @@ check("trusted roots (real files): a symlinked root or a symlinked config file i
+     }
+   } finally { rmSync(base, { recursive: true, force: true }); }
+ });
++// C30J-J19: the fix text for a tool that is installed but refused by the trust rule; it is built next to the rule it names.
++import { untrustedToolFix } from "./trusted-tool-resolution.mjs";
++const UT_DIR = "D:\\Tools\\bin"; const UT_EXE = `${UT_DIR}\\osv-scanner.exe`;
++check("untrusted tool fix: a direct .exe names its directory, the roots file and the exact JSON, and that JSON makes the trust rule accept the tool", () => {
++  const fix = untrustedToolFix("osv-scanner", UT_EXE, { platform: "win32", trustedRootsFile: CFG_FILE });
++  assert.ok(fix.includes(UT_EXE) && fix.includes(CFG_FILE) && fix.includes(TRUSTED_TOOL_ROOTS_SCHEMA), fix);
++  const parsed = JSON.parse(fix.match(/\{"schema":.*?\]\}/u)[0]);
++  assert.equal(parsed.schema, TRUSTED_TOOL_ROOTS_SCHEMA); assert.deepEqual(parsed.roots, [UT_DIR]);
++  const base = { platform: "win32", homeDir: "C:\\Users\\none", fsOps: fixture({ [UT_EXE]: file }) };
++  assert.deepEqual(assessTrustedExecutablePath(UT_EXE, { ...base, extraRoots: [] }), { ok: false, status: "untrusted_path" });
++  assert.deepEqual(assessTrustedExecutablePath(UT_EXE, { ...base, extraRoots: parsed.roots }), { ok: true, path: UT_EXE });
++});
++check("untrusted tool fix: a wrapper names the direct .exe requirement before any registration", () => {
++  const wrapper = `${UT_DIR}\\osv-scanner.cmd`;
++  const fix = untrustedToolFix("osv-scanner", wrapper, { platform: "win32", trustedRootsFile: CFG_FILE });
++  assert.ok(fix.includes(wrapper), fix); assert.match(fix, /direct osv-scanner\.exe/u); assert.ok(fix.includes(CFG_FILE), fix);
++  assert.equal(fix.includes(`"roots":["${UT_DIR.replaceAll("\\", "\\\\")}"]`), false, "a wrapper's directory is not offered as the registration");
++});
+ process.stdout.write(`${passed}/${passed} checks passed.\n`);
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index 7d71d05e9..efd9434c1 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -70,7 +70,11 @@ import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
+ import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
+ import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
+ import { probeTrivy, TRIVY_REQUIRED_FLAGS } from "./security-readiness/trivy-readiness.mjs";
+-import { trivyTriggerFiles, triggerCount } from "./security-adapters/trivy.mjs";
++import { trivyTriggerFiles, triggerCount, isInstalled as trivyInstalled } from "./security-adapters/trivy.mjs";
++import { isInstalled as gitleaksInstalled } from "./security-adapters/gitleaks.mjs";
++import { isInstalled as osvScannerInstalled } from "./security-adapters/osv-scanner.mjs";
++import { isInstalled as semgrepInstalled } from "./security-adapters/semgrep.mjs";
++import { assessTrustedExecutablePath, untrustedToolFix } from "../lib/trusted-tool-resolution.mjs";
+ import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { meetsVersionFloor, toolchainDocAnchor, toolchainDocPointer, toolchainEntry } from "../lib/toolchain-registry.mjs";
+@@ -110,7 +114,18 @@ function semver(value) { const match = typeof value === "string" && value.match(
+ function result(tool, status, observed = {}) {
+   return { tool, status, version: observed.handle?.version ?? null, capabilities: observed.handle?.capabilities ?? [], preparedHandleDigest: status === "ready" ? observed.handle.digest : null, guidance: null };
+ }
+-function actionableResult(entry, platform, installers = new Set()) {
++// C30J-J19: the same two steps the scan takes before it reports `SKIPPED untrusted_path` -- the adapter's own PATH discovery, then the one trust rule
++// (assessTrustedExecutablePath). A tool the resolver did not find that the PATH holds at a refused location is installed-but-untrusted, with its fix.
++const ADAPTER_INSTALLED = Object.freeze({ gitleaks: gitleaksInstalled, "osv-scanner": osvScannerInstalled, semgrep: semgrepInstalled, trivy: trivyInstalled });
++function untrustedFixOf(tool, platform, deps) {
++  // A mocked foreign platform never reads this host's PATH.
++  const find = deps.findInstalledFn ?? (platform === process.platform ? (name) => ADAPTER_INSTALLED[name](process.env) : () => ({ installed: false }));
++  const found = find(tool);
++  if (found?.installed !== true || typeof found.path !== "string") return null;
++  const assessed = (deps.assessExecutableFn ?? assessTrustedExecutablePath)(found.path, { platform });
++  return assessed?.ok === false && assessed.status === "untrusted_path" ? untrustedToolFix(tool, found.path, { platform }) : null;
++}
++function actionableResult(entry, platform, installers = new Set(), untrustedFixes = {}) {
+   const prerequisiteMissing = !["ready", "not_required"].includes(entry.status);
+   const hostBoundaryFailure = ["execution_environment", "probe_timeout", "probe_error"].includes(entry.status);
+   const installCommand = null;
+@@ -133,7 +148,7 @@ function actionableResult(entry, platform, installers = new Set()) {
+   const baseGuidance = hostBoundaryFailure
+     ? `Rerun the no-flag setup or self-application preflight through the host-authorized local read-only boundary; do not reinstall ${entry.tool} from this result.`
+     : entry.status === "untrusted_path"
+-      ? `Use a direct .exe for ${entry.tool} in a named Windows system root; wrappers, user, repository, and temporary paths are not accepted.`
++      ? untrustedFixes[entry.tool] ?? `Use a direct .exe for ${entry.tool} in a named Windows system root; wrappers, user, repository, and temporary paths are not accepted.`
+     : prerequisiteMissing
+     ? entry.status === "input_missing"
+       ? `Create the configured project inputs required by ${entry.tool}.`
+@@ -250,6 +265,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
+   const installers = new Set(INSTALLER_NAMES.filter((name) => installerResolver(name, { platform }) !== null));
+   // C29e (ADR-0103): Trivy is needed only where the tracked files hold infrastructure or container files, the same rule the close scan applies
+   // (security-adapters/trivy.mjs trivyTriggerFiles). Without one it stays not_required; a tree whose applicability cannot be decided is a probe error.
++  const untrustedFixes = {};
+   let trivyApplicable = false;
+   if (enabled.includes("trivy")) {
+     const triggers = (deps.trivyTriggerFilesFn ?? trivyTriggerFiles)(root);
+@@ -259,7 +275,11 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
+   for (const tool of ["gitleaks", "osv-scanner", "semgrep", "trivy"]) {
+     if (!enabled.includes(tool)) continue;
+     if (tool === "trivy" && !trivyApplicable) continue;
+-    const trusted = resolvedTool(resolver, tool, platform);
++    let trusted = resolvedTool(resolver, tool, platform);
++    if (!trusted.ok && trusted.status === "binary_missing") {
++      const fix = untrustedFixOf(tool, platform, deps);
++      if (fix !== null) { untrustedFixes[tool] = fix; trusted = { ok: false, status: "untrusted_path" }; }
++    }
+     const observed = !trusted.ok ? trusted : probes[tool]({ executablePath: trusted.path, rootDir: root, tempDir }, { now });
+     baseResults[tool] = readyCompatibility(tool, observed); if (baseResults[tool].status === "ready") handles[tool] = observed.handle;
+   }
+@@ -275,7 +295,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
+     manifest: { status: loaded.status, digest: manifestDigest(root) },
+     securityGate: gateMode,
+     platform: selectedPlatform,
+-    results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform, installers)),
++    results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform, installers, untrustedFixes)),
+     preparedHandles: handles,
+     exitCode,
+   };
+@@ -509,7 +529,10 @@ const scannerProbe = (tool) => (context) => {
+     status: "attended",
+     cause: `${tool} prerequisite status: ${status}${deferral === null ? "" : `; installing it was deferred on this machine (${deferral.deferredAt})`}`,
+     repair: {
+-      ...attendedPrerequisite(`${tool}-installed`, `${GUIDANCE[platformName(context.platform)][tool]} ${toolchainDocPointer(tool) ?? ""}`.trim()),
++      // C30J-J19: an installed tool at a refused location is not told to be installed; the preflight already holds its fix.
++      ...(status === "untrusted_path" && entry?.guidance
++        ? attendedPrerequisite(`${tool}-trusted-location`, entry.guidance)
++        : attendedPrerequisite(`${tool}-installed`, `${GUIDANCE[platformName(context.platform)][tool]} ${toolchainDocPointer(tool) ?? ""}`.trim())),
+       toolClass: toolchainEntry(tool)?.class ?? null,
+       installDoc: toolchainDocAnchor(tool),
+       deferred: deferral !== null,
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index 25bdf96eb..c88c4cade 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -940,4 +940,54 @@ check("W7-2d: the readiness status values are unchanged by the capability contra
+     else assert.equal(result.status, "binary_missing", `${mode}/${result.tool}`);
+   }
+ });
++// C30J-J19: a tool the PATH holds but the trust rule refuses is judged by the rule the scan uses (assessTrustedExecutablePath) and its fix is named.
++import { trustedToolRootsFilePath as j19RootsFile } from "../lib/trusted-tool-resolution.mjs";
++const J19_DIR = "D:\\Tools\\bin";
++const j19Missing = () => ({ ok: false, status: "binary_missing" });
++const j19Run = (repo, platform, deps) => runToolchainPreflight({ rootDir: repo, platform, manifestResult: manifest({ "osv-scanner": { enabled: true } }) }, { probeNodeFn: nodeReady, probeGitFn: gitReady, resolveInstallerFn: () => null, scannerProbes: W7_SCANNER_OBSERVED(), ...deps });
++const j19Osv = (result) => result.results.find(({ tool }) => tool === "osv-scanner");
++check("J19a: installed on the PATH at a location the trust rule refuses is untrusted_path (not missing) and the guidance names the directory, the roots file and the JSON", () => {
++  const repo = root();
++  try {
++    const result = j19Run(repo, "win32", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: true, path: `${J19_DIR}\\osv-scanner.exe` }) });
++    const entry = j19Osv(result);
++    assert.equal(result.code, "TCP-UNTRUSTED-PATH"); assert.equal(result.exitCode, 2); assert.equal(entry.status, "untrusted_path"); assert.equal(entry.installCommand, null);
++    assert.ok(entry.guidance.includes(J19_DIR) && entry.guidance.includes(j19RootsFile()) && entry.guidance.includes("pipeline.trusted-tool-roots.v1"), entry.guidance);
++    assert.ok(entry.guidance.includes(JSON.stringify([J19_DIR])), entry.guidance);
++    assert.match(entry.guidance, /direct osv-scanner\.exe/u);
++    assert.doesNotMatch(entry.guidance, /probe: osv-scanner --version/u, "an installed tool is not told to be installed");
++  } finally { rmSync(repo, { recursive: true, force: true }); }
++});
++check("J19b: an installed wrapper is untrusted_path and the guidance asks for a direct osv-scanner.exe", () => {
++  const repo = root();
++  try {
++    const entry = j19Osv(j19Run(repo, "win32", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: true, path: `${J19_DIR}\\osv-scanner.cmd` }) }));
++    assert.equal(entry.status, "untrusted_path"); assert.match(entry.guidance, /direct osv-scanner\.exe/u); assert.ok(entry.guidance.includes(`${J19_DIR}\\osv-scanner.cmd`), entry.guidance);
++  } finally { rmSync(repo, { recursive: true, force: true }); }
++});
++check("J19c: a missing tool and a tool the trust rule accepts stay exactly as before", () => {
++  const repo = root();
++  try {
++    const bare = j19Run(repo, "win32", { resolveExecutableFn: j19Missing });
++    const notFound = j19Run(repo, "win32", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: false, reason: "not found on PATH" }) });
++    assert.equal(j19Osv(notFound).status, "binary_missing"); assert.deepEqual({ ...notFound, candidate: null }, { ...bare, candidate: null });
++    // The scan's own rule accepts it (the file is not there to refuse on a POSIX path): not untrusted, still the old verdict.
++    const accepted = j19Run(repo, "linux", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: true, path: join(repo, "no-such-dir", "osv-scanner") }) });
++    assert.equal(j19Osv(accepted).status, "binary_missing");
++    const trusted = j19Run(repo, "win32", { resolveExecutableFn: () => ({ ok: true, path: "C:\\Program Files\\OSV-Scanner\\osv-scanner.exe" }), findInstalledFn: () => { throw new Error("a trusted tool must not be searched for on the PATH"); } });
++    assert.equal(j19Osv(trusted).status, "ready"); assert.equal(trusted.ok, true); assert.equal(j19Osv(trusted).guidance, "");
++  } finally { rmSync(repo, { recursive: true, force: true }); }
++});
++check("J19d: the environment readiness finding of an installed but untrusted scanner names the fix, not an install", async () => {
++  await r77WithFixtureRepo(async (repo) => {
++    const deps = { ...w7ScannerDeps(j19Missing), findInstalledFn: (tool) => tool === "osv-scanner" ? { installed: true, path: `${J19_DIR}\\osv-scanner.exe` } : { installed: false } };
++    const report = await toolchainModule.runEnvironmentReadinessReport({ rootDir: repo, platform: "win32" }, deps);
++    const finding = r77Finding(report, "scanner-osv-scanner");
++    r77AssertFinding(finding, "untrusted osv-scanner");
++    assert.equal(finding.status, "attended"); assert.match(finding.cause, /untrusted_path/u);
++    assert.ok(finding.repair.summary.includes(J19_DIR) && finding.repair.summary.includes(j19RootsFile()), finding.repair.summary);
++    assert.doesNotMatch(finding.repair.summary, /^Install /u);
++    assert.equal(r77Finding(report, "scanner-gitleaks").status, "attended");
++  });
++});
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
