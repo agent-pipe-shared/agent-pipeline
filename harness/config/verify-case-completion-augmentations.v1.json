@@ -144,7 +144,11 @@
           "TCP052",
           "TCP053",
           "TCP054",
-          "TCP055"
+          "TCP055",
+          "TCP056",
+          "TCP057",
+          "TCP058",
+          "TCP059"
         ],
         "maxBytes": 65536
       }
@@ -352,6 +356,7 @@
           "NGHS35",
           "NGHS36",
           "NGHS37",
+          "NGHS37K",
           "NGHS38",
           "NGHS39",
           "NGHS40",
@@ -384,7 +389,15 @@
           "NGHS67",
           "NGHS68",
           "NGHS69",
-          "NGHS70"
+          "NGHS70",
+          "NGHS71",
+          "NGHS72",
+          "NGHS73",
+          "NGHS74",
+          "NGHS75",
+          "NGHS76",
+          "NGHS77",
+          "NGHSK14"
         ],
         "maxBytes": 65536
       }
@@ -1407,6 +1420,7 @@
           "SAR02",
           "SAR03",
           "SAR04",
+          "SAR04b",
           "SAR05",
           "SAR06",
           "SAR07",
@@ -3252,7 +3266,10 @@
           "NGSP9C2",
           "NGSP9C3",
           "NGSP9C4",
-          "NGSP9D"
+          "NGSP9D",
+          "NGSP9E",
+          "NGSP9F",
+          "NGSPK14A"
         ],
         "maxBytes": 65536
       }
@@ -3317,6 +3334,20 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "mid-session-hook-refresh-tests",
+      "file": "plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MSH001",
+          "MSH002",
+          "MSH003"
+        ],
+        "maxBytes": 65536
+      },
+      "previousPolicySha256": "c2b85a98ae4ea51d705ccc296a66ed2541c61146a442608fe9a614411afb8cf8"
     }
   ]
 }
