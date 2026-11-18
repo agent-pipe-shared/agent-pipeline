@@ -9,6 +9,7 @@ import {
   CLEANUP_RECOVERY_DEFERRED_MESSAGE,
   expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
+  PROJECT_ONBOARDING_LIFECYCLE_STATUSES,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
@@ -22,64 +23,14 @@ import {
 } from "./session-cleanup-recovery.mjs";
 
 export const PROJECT_ONBOARDING_READY_GATE_SCHEMA = "pipeline.project-onboarding-ready-gate.v1";
-// This list stays hand-maintained -- unlike BASE_RESULT_KEYS/READY_ONLY_RESULT_KEYS above,
-// deriving it structurally from project-onboarding-v3.mjs (Direction option 1,
-// backlog/items/2026-08-28-the-ready-gate-hand-maintains-a-mirror-of-a-shape-it-does-not-own.md)
-// was tried and is genuinely blocked: the ~40 status literals that reach v4Inspection's
-// shared `lifecycleResult()` builder are not all passed as string literals at the call site.
-// At least one (the app-server-* trio, project-onboarding-v3.mjs's `readyLifecycleResult`,
-// around the `status` shorthand bound from a local ternary rather than written inline) is
-// computed a few lines above its `lifecycleResult({ status, ... })` call, so no reliable
-// static or call-site-local extraction of "every status the producer can return" exists
-// without either an AST-level constant-folding pass or a structural rewrite of ~40
-// independent branches spanning ~2500 lines -- out of proportion for this task and outside
-// its own prohibition on changing the producer's actual output shape. Falls back to Direction
-// option 2 instead: project-onboarding-ready-gate.test.mjs's derived-enumeration test drives
-// this exact list against real gate behaviour and fails if a status here goes stale, so
-// drift is still caught mechanically -- just at test time, not import time.
-export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
-  "portable-seed-required",
-  "runtime-initialization-required",
-  "runtime-attestation-required",
-  "restart-required",
-  "kickoff-required",
-  "host-repository-init-required",
-  "enrollment-retirement-required",
-  "enrollment-history-recovery-required",
-  "enrollment-activation-required",
-  "partial",
-  "invalid",
-  "unsafe",
-  "migration-required",
-  "adoption-required",
-  "repository-mount-read-only",
-  "repository-control-path-invalid",
-  "git-capability-unavailable",
-  "project-root-read-only",
-  "repository-mode-unsupported",
-  "session-capability-unavailable",
-  "worktree-capability-unavailable",
-  "runtime-target-read-only",
-  "runtime-readback-unavailable",
-  "projection-drift",
-  "continuity-damaged",
-  "repository-observation-unavailable",
-  "continuity-observation-unavailable",
-  "app-server-execution-denied",
-  "app-server-not-running",
-  "app-server-unavailable",
-  // Wave 4 onboarding coordinator, step 6 (NVA-BL-INTAKEBIND-1, design.md
-  // SSa.4): this allowlist was never updated when step 6 added these three
-  // new v4Inspection statuses, so a repo genuinely sitting at one of them
-  // failed closed with the wrong typed error (PORG-INVALID-OBSERVATION
-  // instead of PORG-NOT-READY) below at line 152's NON_READY_STATUSES.has()
-  // check -- blocking any narrow admission keyed off error.lifecycleStatus
-  // for this window (see guard-lifecycle-ready.mjs's bootstrap-binding-
-  // required staging-authoring admission).
-  "intake-required",
-  "intake-design-questions-required",
-  "bootstrap-binding-required",
-]);
+// The list is the PRODUCER's (project-onboarding-v3.mjs, PROJECT_ONBOARDING_LIFECYCLE_STATUSES; analysis C7 / SM-5): its shared
+// result builder refuses a status outside that closed list, and this gate derives its controlling non-ready statuses from it -- every
+// status but `ready` blocks. It used to be a hand-maintained mirror (a static extraction of the producer's literals was tried and fails,
+// because a status is computed at some call sites); a status the mirror lacked reached the gate as PORG-INVALID-OBSERVATION instead of
+// PORG-NOT-READY (three statuses of the wave 4 onboarding coordinator, NVA-BL-INTAKEBIND-1). Same 33 statuses, same order.
+export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze(
+  PROJECT_ONBOARDING_LIFECYCLE_STATUSES.filter((status) => status !== "ready"),
+);
 
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);

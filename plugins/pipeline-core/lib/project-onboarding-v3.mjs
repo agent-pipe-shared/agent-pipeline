@@ -3482,6 +3482,59 @@ function externalOperatorRestartAction(runner) {
   };
 }
 
+/**
+ * The CLOSED set of statuses a V4 lifecycle observation may carry: `ready` plus every status that blocks (the controlling non-ready ones).
+ * The producer owns it (analysis C7 / SM-5): the shared result builder below refuses any other status, and the ready gate imports the
+ * non-ready part instead of mirroring it by hand. A static extraction of the literals was tried and fails (a status is computed at some
+ * call sites), so the check sits at the one place every status passes through. Adding a status here is the whole change: the gate
+ * derives its blocking list from it, so a new status can no longer reach the gate as an "invalid observation" by omission.
+ */
+export const PROJECT_ONBOARDING_LIFECYCLE_STATUSES = Object.freeze([
+  "ready",
+  "portable-seed-required",
+  "runtime-initialization-required",
+  "runtime-attestation-required",
+  "restart-required",
+  "kickoff-required",
+  "host-repository-init-required",
+  "enrollment-retirement-required",
+  "enrollment-history-recovery-required",
+  "enrollment-activation-required",
+  "partial",
+  "invalid",
+  "unsafe",
+  "migration-required",
+  "adoption-required",
+  "repository-mount-read-only",
+  "repository-control-path-invalid",
+  "git-capability-unavailable",
+  "project-root-read-only",
+  "repository-mode-unsupported",
+  "session-capability-unavailable",
+  "worktree-capability-unavailable",
+  "runtime-target-read-only",
+  "runtime-readback-unavailable",
+  "projection-drift",
+  "continuity-damaged",
+  "repository-observation-unavailable",
+  "continuity-observation-unavailable",
+  "app-server-execution-denied",
+  "app-server-not-running",
+  "app-server-unavailable",
+  "intake-required",
+  "intake-design-questions-required",
+  "bootstrap-binding-required",
+]);
+const LIFECYCLE_STATUS_SET = new Set(PROJECT_ONBOARDING_LIFECYCLE_STATUSES);
+
+/** Returns `status` unchanged when it is in the closed list; throws otherwise, naming the repair. */
+export function requireProjectOnboardingLifecycleStatus(status) {
+  if (typeof status !== "string" || !LIFECYCLE_STATUS_SET.has(status)) {
+    throw new Error(`project onboarding refused a status outside its closed lifecycle status list (${typeof status === "string" ? JSON.stringify(status) : typeof status}); add it to PROJECT_ONBOARDING_LIFECYCLE_STATUSES in plugins/pipeline-core/lib/project-onboarding-v3.mjs (the ready gate then blocks on it without any other change) and run node --test plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs`);
+  }
+  return status;
+}
+
 function lifecycleResult({
   status,
   root,
@@ -3509,7 +3562,7 @@ function lifecycleResult({
   // is already either a validated identity or a deliberate `null`.
   return {
     schema: SCHEMA,
-    status,
+    status: requireProjectOnboardingLifecycleStatus(status),
     root: root ?? null,
     runner,
     intent,
@@ -3533,8 +3586,9 @@ function lifecycleResult({
 // set back is derivation, not restatement: any key added to or removed from
 // `lifecycleResult`'s object literal above changes this automatically, with
 // no second list to keep in sync.
+export { lifecycleResult as buildProjectOnboardingLifecycleResult };
 export const PROJECT_ONBOARDING_BASE_RESULT_KEYS = Object.freeze(Object.keys(lifecycleResult({
-  status: "shape-probe",
+  status: "ready",
   root: null,
   runner: null,
   intent: "onboarding",
@@ -6084,7 +6138,7 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
   let retired;try{retired = readGovernanceEnrollmentRetirement({rootDir: result.root ?? rootDir});}catch(error){
     if(error.code==="GS-RETIREMENT-READBACK-EMPTY"){
       const root=result.root??rootDir;
-      return {...enrollmentResult,status:"enrollment-history-recovery-required",
+      return {...enrollmentResult,status:requireProjectOnboardingLifecycleStatus("enrollment-history-recovery-required"),
         diagnostics:[...result.diagnostics,diagnostic("$.enrollmentRetirement",error.code,"the read-only retirement writer returned no host readback","repeat the exact inspection at the host boundary; do not assume enrollment history is absent")],
         nextAction:{kind:"external-operator",executable:process.execPath,
           argv:[fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs",import.meta.url)),"inspect","--root",root,"--intent",intent,"--runner",runner],
@@ -6093,13 +6147,13 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
           guidance:"Run this exact read-only inspection at the host boundary. A blank nested-process readback cannot prove that enrollment history is absent; do not approve, activate, or skip a gate from this result."}};
     }
     if(!["GS-NONGIT-RETAINED-HISTORY","GS-HOST-MANAGED-RETAINED-HISTORY"].includes(error.code))throw error;
-    return {...enrollmentResult,status:"enrollment-history-recovery-required",nextAction:governanceEnrollmentRecoveryAction({rootDir:result.root??rootDir,runner})};
+    return {...enrollmentResult,status:requireProjectOnboardingLifecycleStatus("enrollment-history-recovery-required"),nextAction:governanceEnrollmentRecoveryAction({rootDir:result.root??rootDir,runner})};
   }
   if (retired !== null && retired.phase !== "active") {
     const checkpoint = readOnboardingIntakeCheckpoint({rootDir: result.root ?? rootDir});
-    if (retired.phase !== "pending") return {...enrollmentResult, status: "enrollment-retirement-required", nextAction: {kind: "command", executable: process.execPath, argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "retire-enrollment", "--root", retired.root, "--scope-key", retired.scopeKey, "--barrier-sha256", retired.barrierSha256, "--by", retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["retired"]}}};
-    if (checkpoint.value?.retiredEnrollmentGenerationSha256 !== retired.generationSha256 || checkpoint.value.consent === null) return {...enrollmentResult, status: "intake-required", nextAction: intakeConsentAction(result.root ?? rootDir, runner, checkpoint, [], null)};
-    if (result.status === "ready") return {...enrollmentResult,status:"enrollment-activation-required",nextAction:{kind:"command",executable:process.execPath,argv:[fileURLToPath(new URL("../scripts/pipeline-state.mjs",import.meta.url)),"activate-enrollment","--root",retired.root,"--scope-key",retired.scopeKey,"--barrier-sha256",retired.barrierSha256,"--by",retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["active"]}}};
+    if (retired.phase !== "pending") return {...enrollmentResult, status: requireProjectOnboardingLifecycleStatus("enrollment-retirement-required"), nextAction: {kind: "command", executable: process.execPath, argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "retire-enrollment", "--root", retired.root, "--scope-key", retired.scopeKey, "--barrier-sha256", retired.barrierSha256, "--by", retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["retired"]}}};
+    if (checkpoint.value?.retiredEnrollmentGenerationSha256 !== retired.generationSha256 || checkpoint.value.consent === null) return {...enrollmentResult, status: requireProjectOnboardingLifecycleStatus("intake-required"), nextAction: intakeConsentAction(result.root ?? rootDir, runner, checkpoint, [], null)};
+    if (result.status === "ready") return {...enrollmentResult,status:requireProjectOnboardingLifecycleStatus("enrollment-activation-required"),nextAction:{kind:"command",executable:process.execPath,argv:[fileURLToPath(new URL("../scripts/pipeline-state.mjs",import.meta.url)),"activate-enrollment","--root",retired.root,"--scope-key",retired.scopeKey,"--barrier-sha256",retired.barrierSha256,"--by",retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["active"]}}};
   }
   if (intent === "session" && result?.status === "ready") {
     try {

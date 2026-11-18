@@ -24,8 +24,11 @@ import {
   expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
+  PROJECT_ONBOARDING_LIFECYCLE_STATUSES,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+  buildProjectOnboardingLifecycleResult,
+  requireProjectOnboardingLifecycleStatus,
 } from "./project-onboarding-v3.mjs";
 
 function root() { return mkdtempSync(join(tmpdir(), "project-ready-gate-")); }
@@ -953,11 +956,10 @@ test("unsupported or missing intents are rejected before inspection", () => {
   }
 });
 
-// pipeline.ready-gate-keys-derived-from-producer, Direction option 2 fallback (backlog:
-// pipeline.ready-gate-hand-maintained-shape-mirror): the accepted STATUS enumeration cannot
-// be derived structurally the way the two key lists above now are (see the comment above
-// PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES in project-onboarding-ready-gate.mjs for
-// the concrete obstacle). This test drives the gate against a REAL, non-stubbed
+// pipeline.ready-gate-keys-derived-from-producer (backlog:
+// pipeline.ready-gate-hand-maintained-shape-mirror): the accepted STATUS enumeration is now the
+// producer's own closed list (PROJECT_ONBOARDING_LIFECYCLE_STATUSES, C30J-J6), checked at the
+// producer's result builder; a static extraction was tried and fails. This test still drives the gate against a REAL, non-stubbed
 // inspectProjectOnboardingV3() result instead -- a genuinely fresh, empty temp root, with no
 // `inspect` override -- so at least one status is proven end to end against actual producer
 // output, not an internally-consistent fixture that only agrees with itself.
@@ -994,6 +996,48 @@ test("a real, non-stubbed inspectProjectOnboardingV3() result is driven straight
       inspect: () => ({ ...real, status: "a-status-this-gate-has-never-heard-of" }),
     }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// C30J-J6 (analysis C7 / SM-5, AC-112): the producer OWNS the closed status list and its shared result builder refuses a status
+// outside it; the gate IMPORTS the list instead of mirroring it. Checking at the builder (not by static extraction, which was tried
+// and failed) means a status the producer starts returning without listing it fails where it is built, with the repair named.
+test("the producer owns the closed lifecycle status list: the gate's controlling list is derived from it, the same 33 in the same order", () => {
+  assert(Array.isArray(PROJECT_ONBOARDING_LIFECYCLE_STATUSES), "the producer must export its closed status list");
+  assert(Object.isFrozen(PROJECT_ONBOARDING_LIFECYCLE_STATUSES));
+  assert.equal(new Set(PROJECT_ONBOARDING_LIFECYCLE_STATUSES).size, PROJECT_ONBOARDING_LIFECYCLE_STATUSES.length, "no duplicate status");
+  assert.equal(PROJECT_ONBOARDING_LIFECYCLE_STATUSES.includes("ready"), true);
+  // Derived, never retyped: the gate's list is exactly the producer's list without the one status that does not control.
+  assert.deepEqual([...PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES], PROJECT_ONBOARDING_LIFECYCLE_STATUSES.filter((status) => status !== "ready"));
+  assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 33);
+});
+
+test("the producer's shared result builder refuses a status outside its closed list and names the repair; every listed status is built unchanged", () => {
+  const input = (status) => ({ status, root: null, runner: null, intent: "onboarding", repository: {}, runtime: {} });
+  assert.throws(() => buildProjectOnboardingLifecycleResult(input("a-status-this-producer-never-listed")), (error) => {
+    assert(error instanceof Error);
+    assert.match(error.message, /a-status-this-producer-never-listed/u);
+    // Hard limit 4 of the candidate: a refusal names a runnable command or a named human step.
+    assert.match(error.message, /PROJECT_ONBOARDING_LIFECYCLE_STATUSES/u);
+    assert.match(error.message, /node --test plugins\/pipeline-core\/lib\/project-onboarding-ready-gate\.test\.mjs/u);
+    return true;
+  });
+  for (const bad of [undefined, null, "", "READY", " ready", 7]) {
+    assert.throws(() => buildProjectOnboardingLifecycleResult(input(bad)), /closed lifecycle status list/u, String(bad));
+  }
+  for (const status of PROJECT_ONBOARDING_LIFECYCLE_STATUSES) {
+    const built = buildProjectOnboardingLifecycleResult(input(status));
+    assert.equal(built.status, status);
+    // The envelope is unchanged by the check: same keys in the same order as the exported base key list.
+    assert.deepEqual(Object.keys(built), [...PROJECT_ONBOARDING_BASE_RESULT_KEYS]);
+  }
+});
+
+test("the status check the builder and the enrollment returns share returns a listed status unchanged and refuses any other", () => {
+  for (const status of PROJECT_ONBOARDING_LIFECYCLE_STATUSES) assert.equal(requireProjectOnboardingLifecycleStatus(status), status);
+  for (const status of ["enrollment-retirement-required", "enrollment-history-recovery-required", "enrollment-activation-required"]) {
+    assert.equal(PROJECT_ONBOARDING_LIFECYCLE_STATUSES.includes(status), true, `${status} is returned by spread, outside the builder`);
+  }
+  assert.throws(() => requireProjectOnboardingLifecycleStatus("enrollment-unlisted-required"), /PROJECT_ONBOARDING_LIFECYCLE_STATUSES/u);
 });
 
 // RF2B (ALFRED-RF2B2-20261004): the one diagnostic a ready observation may carry --
