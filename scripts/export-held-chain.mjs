@@ -20,7 +20,11 @@ if (!clone || !base || !outDir || !scriptName || !label) {
   process.exit(2);
 }
 const git = (...args) => execFileSync("git", ["-C", resolve(clone), ...args], { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
-const shas = git("rev-list", "--reverse", `${base}..HEAD`).split("\n").filter(Boolean);
+// A commit that only refreshes the derived files is left out of the chain: its patch is bound to the exact derived state of the build clone, which differs
+// from the state the PO's tree has after an earlier chain's own refresh (the 30k wave 2 rehearsal failed on exactly that); the apply script refreshes them itself at the end.
+const DERIVED_REFRESH_SUBJECT = /^chore\(inventory\): refresh the derived files/u;
+const shas = git("rev-list", "--reverse", `${base}..HEAD`).split("\n").filter(Boolean)
+  .filter((sha) => !DERIVED_REFRESH_SUBJECT.test(git("log", "-1", "--format=%s", sha).trim()));
 if (shas.length === 0) { console.error(`no commits in ${base}..HEAD`); process.exit(1); }
 mkdirSync(outDir, { recursive: true });
 // At least two digits: a chain that grows past nine patches keeps its file names, so a re-export leaves no second, stale copy of each patch.

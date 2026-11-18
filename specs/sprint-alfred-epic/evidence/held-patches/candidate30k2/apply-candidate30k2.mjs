@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 30k wave 2: 10 held patches exported from the build clone chain 525fab15d..61f6abaa0
+# PO apply script for candidate 30k wave 2: 8 held patches exported from the build clone chain 525fab15d..61f6abaa0
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -19,11 +19,9 @@ step 02-638a8e17a 'fix(approval): the card of the digest-only override route say
 step 03-47c80a1e1 'fix(push-init): a missing transport reference names what the value is for each transport kind and shows an example'
 step 04-34147d56b 'docs(plans): options for a browser smoke step in Verify with the smallest first stage'
 step 05-4f219b298 'docs(plans): options to improve the one-turn design question round without a second round'
-step 06-3f1106be6 'chore(inventory): refresh the derived files after the 30k wave 2 lanes (ledger, inventory baseline, Reader inputs)'
-step 07-c31fcb4af 'refactor(onboarding): the consent question is shorter and keeps every fact it states'
-step 08-fe262759b 'test(verify): register the consent question suite and assign its Verify surface'
-step 09-1afe4e446 'chore(inventory): refresh the derived files after the 30k wave 2 lanes (ledger, inventory baseline, Reader inputs)'
-step 10-61f6abaa0 'docs(adr): accept ADR 0104 with Option A and record why Option B stopped on recon'
+step 06-c31fcb4af 'refactor(onboarding): the consent question is shorter and keeps every fact it states'
+step 07-fe262759b 'test(verify): register the consent question suite and assign its Verify surface'
+step 08-61f6abaa0 'docs(adr): accept ADR 0104 with Option A and record why Option B stopped on recon'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog harness/config
