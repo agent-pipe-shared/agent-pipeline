@@ -1,0 +1,105 @@
+diff --git a/harness/scripts/generate-vendored-canon.mjs b/harness/scripts/generate-vendored-canon.mjs
+index 1a333bdca..4711a7f20 100644
+--- a/harness/scripts/generate-vendored-canon.mjs
++++ b/harness/scripts/generate-vendored-canon.mjs
+@@ -270,6 +270,18 @@ export function computeManifest({
+   return entries;
+ }
+ 
++/**
++ * The vendored dispatch-template pairs (canonical -> vendored) exactly as this
++ * generator would write them: one per file in `templates/prompts`. The
++ * plugin's `check-vendored-template-sync.mjs` reads its pairs from here, so a
++ * template added to that directory is checked without a second list to edit.
++ */
++export function vendoredTemplatePairs(rootDir = REPO_ROOT) {
++  return computeManifest({ rootDir, directories: UNIVERSAL_DIRECTORIES.filter((d) => d.dir === "templates/prompts"), standaloneFiles: [], adrs: [] }).map(
++    (entry) => ({ name: entry.origin.split("/").pop(), canonical: entry.origin, vendored: entry.dest }),
++  );
++}
++
+ /**
+  * Compute the manifest and (by default) write every destination byte-for-byte
+  * from its origin. `write: false` computes without touching disk (used by
+diff --git a/harness/scripts/generate-vendored-canon.test.mjs b/harness/scripts/generate-vendored-canon.test.mjs
+index fc8779ab5..ee3852dc7 100644
+--- a/harness/scripts/generate-vendored-canon.test.mjs
++++ b/harness/scripts/generate-vendored-canon.test.mjs
+@@ -35,8 +35,19 @@ import {
+   checkVendoredCanon,
+   computeManifest,
+   generateVendoredCanon,
++  vendoredTemplatePairs,
+ } from "./generate-vendored-canon.mjs";
+ 
++test("vendoredTemplatePairs lists exactly the templates/prompts entries of the manifest", () => {
++  const pairs = vendoredTemplatePairs(REPO_ROOT);
++  const fromManifest = computeManifest({ rootDir: REPO_ROOT }).filter((e) => e.origin.startsWith("templates/prompts/"));
++  assert.deepEqual(
++    pairs.map((p) => [p.canonical, p.vendored]),
++    fromManifest.map((e) => [e.origin, e.dest]),
++  );
++  assert.ok(pairs.some((p) => p.name === "goldfish-task.md") && pairs.some((p) => p.name === "critic-review.md"));
++});
++
+ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+ 
+ const roots = [];
+diff --git a/plugins/pipeline-core/scripts/check-vendored-template-sync.mjs b/plugins/pipeline-core/scripts/check-vendored-template-sync.mjs
+index 57cb47f9c..e0a95f2c2 100644
+--- a/plugins/pipeline-core/scripts/check-vendored-template-sync.mjs
++++ b/plugins/pipeline-core/scripts/check-vendored-template-sync.mjs
+@@ -43,6 +43,13 @@ export const TEMPLATE_PAIRS = [
+   },
+ ];
+ 
++let deriveTemplatePairs = null;
++try {
++  ({ vendoredTemplatePairs: deriveTemplatePairs } = await import("../../../harness/scripts/generate-vendored-canon.mjs"));
++} catch {
++  deriveTemplatePairs = null;
++}
++
+ /** Reads a file's raw bytes relative to `root`. Returns `{ ok, content, error }`; never throws. */
+ function readRelative(root, relPath) {
+   try {
+@@ -56,7 +63,10 @@ function readRelative(root, relPath) {
+  * Compares each configured canonical/vendored template pair byte-for-byte under `root`
+  * (defaults to the repo root two levels above this script's `scripts/` directory).
+  */
+-export function checkVendoredTemplateSync({ root = REPO_ROOT, pairs = TEMPLATE_PAIRS } = {}) {
++export function checkVendoredTemplateSync({ root = REPO_ROOT, pairs } = {}) {
++  // Pairs come from the generator's own list when it is present (a source checkout); an installed
++  // plugin has no harness/ and keeps the static list above.
++  pairs ??= deriveTemplatePairs ? deriveTemplatePairs(root) : TEMPLATE_PAIRS;
+   const results = pairs.map((pair) => {
+     const canonical = readRelative(root, pair.canonical);
+     const vendored = readRelative(root, pair.vendored);
+diff --git a/plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs b/plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs
+index c85f30ba4..98d524ab8 100644
+--- a/plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs
++++ b/plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs
+@@ -81,6 +81,23 @@ test("reports allInSync=false with a reason when the vendored file is missing",
+   assert.match(missing.reason, /vendored file unreadable/);
+ });
+ 
++test("a template present in the generator's list and absent from the check's static list is reported (AC-112)", () => {
++  writeFileSync(join(fixtureRoot, "templates/prompts/brand-new-template.md"), "new\n");
++  // vendored copy intentionally absent: the generator would write it, the check must notice.
++  const receipt = checkVendoredTemplateSync({ root: fixtureRoot });
++  const entry = receipt.results.find((r) => r.name === "brand-new-template.md");
++  assert.ok(entry, "the check must derive its pairs from the generator's template directory");
++  assert.equal(entry.inSync, false);
++  assert.equal(receipt.allInSync, false);
++});
++
++test("a derived pair that is byte-identical reports in sync", () => {
++  writeFileSync(join(fixtureRoot, "templates/prompts/brand-new-template.md"), "new\n");
++  writeFileSync(join(fixtureRoot, "plugins/pipeline-core/templates/prompts/brand-new-template.md"), "new\n");
++  const receipt = checkVendoredTemplateSync({ root: fixtureRoot });
++  assert.equal(receipt.results.find((r) => r.name === "brand-new-template.md").inSync, true);
++});
++
+ test("real repo templates are byte-identical (guards against actual re-drift)", () => {
+   const receipt = checkVendoredTemplateSync({});
+   assert.equal(receipt.allInSync, true, JSON.stringify(receipt.results, null, 2));
