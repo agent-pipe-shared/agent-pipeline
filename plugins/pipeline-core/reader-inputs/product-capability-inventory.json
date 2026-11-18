@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "01ce4603d14cb56d4eb98177afcdecdb6fe36b53",
-    "tree": "da52068a16055731c33fe60a7738388193bb6d86"
+    "commit": "7beec1918813f9430d5d5f263d91c92fcfff087a",
+    "tree": "1c5d9e62bd2c66673610c5b7bf2133de3a9f44f0"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -693,6 +693,7 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",
@@ -1166,6 +1167,7 @@
         "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-risk-trace-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-capability-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
