@@ -88,16 +88,39 @@ const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
 const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
 export const ELEPHANT_EXCEPTION_DISPATCH = /^D[1-9][0-9]{0,3} \(elephant-exception\)$/u;
 
-function admittedDispatchValue(value) {
-  if (value === "stage-0 (elephant)" || value === "design (elephant)" || value === "administrative (elephant)") return true;
-  if (/^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value)) return true;
-  // D55 (Q12): an Elephant-built commit under a recorded PO exception to EL-01 names that decision.
-  if (ELEPHANT_EXCEPTION_DISPATCH.test(value)) return true;
+const dispatchIdOf = (value, role) => {
   const match = DISPATCH_VALUE.exec(value);
-  if (!match) return false;
-  if (match[2] === "elephant-generated") return /^[A-Za-z0-9._/-]+$/u.test(match[1]) && !match[1].split("/").includes("..");
-  return SAFE_TASK_ID.test(match[1]);
-}
+  return match && match[2] === role ? match[1] : null;
+};
+
+/**
+ * The closed list of `Dispatch:` bindings GIT-03 admits, exported ONCE (duplicated-state analysis K1-03). `value` is the
+ * display form that follows `Dispatch: ` (`<...>` marks the part that varies); `matches` is the one admission test, so the
+ * policy below and the generated section 6 of `templates/prompts/agent-obligations.md` read the same list. Order is the order
+ * the obligations text teaches them. Admission here is the SHAPE of the value only; each binding is verified by its own rule
+ * in `dispatch-authorship-verify`.
+ */
+export const ADMITTED_DISPATCH_FORMS = Object.freeze([
+  Object.freeze({ id: "goldfish", value: "<TASK_ID> (goldfish)", matches: (value) => SAFE_TASK_ID.test(dispatchIdOf(value, "goldfish") ?? "") }),
+  Object.freeze({ id: "stage-0", value: "stage-0 (elephant)", matches: (value) => value === "stage-0 (elephant)" }),
+  Object.freeze({ id: "design", value: "design (elephant)", matches: (value) => value === "design (elephant)" }),
+  Object.freeze({ id: "administrative", value: "administrative (elephant)", matches: (value) => value === "administrative (elephant)" }),
+  Object.freeze({ id: "critic", value: "<TASK_ID> (critic)", matches: (value) => SAFE_TASK_ID.test(dispatchIdOf(value, "critic") ?? "") }),
+  Object.freeze({
+    id: "elephant-generated",
+    value: "<path> (elephant-generated)",
+    matches: (value) => {
+      const path = dispatchIdOf(value, "elephant-generated");
+      return path !== null && /^[A-Za-z0-9._/-]+$/u.test(path) && !path.split("/").includes("..");
+    },
+  }),
+  Object.freeze({ id: "integration", value: "quality-package-<digest> (integration)", matches: (value) => /^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value) }),
+  // D55 (Q12): an Elephant-built commit under a recorded PO exception to EL-01 names that decision.
+  Object.freeze({ id: "elephant-exception", value: "D<n> (elephant-exception)", matches: (value) => ELEPHANT_EXCEPTION_DISPATCH.test(value) }),
+]);
+
+const dispatchForm = (id) => ADMITTED_DISPATCH_FORMS.find((form) => form.id === id).value;
+const admittedDispatchValue = (value) => ADMITTED_DISPATCH_FORMS.some((form) => form.matches(value));
 
 /**
  * Parse only the final contiguous Git trailer block. A matching line in the
@@ -249,7 +272,7 @@ export function finishedCommitMessageFindings(message, {
         code: "GIT-03-DISPATCH-MISSING",
         detail: splitAway
           ? `no \`Dispatch:\` entry in the final Git trailer block: a \`Dispatch:\` line is in the message but a blank line separates it from the last block (each \`-m\` flag starts a new paragraph); commit with \`${ONE_COMMAND_TRAILER_FORM}\` (one \`-m\` per paragraph, the two trailers only as \`--trailer\` flags), or, for a long or multi-paragraph body, write the whole message to a file under scratch/ and commit with \`${MESSAGE_FILE_FORM}\`, both trailers as the last lines with no blank line between them`
-          : `no \`Dispatch:\` entry in the final Git trailer block; end the message with \`AI-Assisted: true\` and one \`Dispatch:\` line (\`Dispatch: <task-id> (goldfish)\` or \`Dispatch: stage-0 (elephant)\`) as the last lines, written with \`${ONE_COMMAND_TRAILER_FORM}\` (or, for a long or multi-paragraph body, \`${MESSAGE_FILE_FORM}\`)`,
+          : `no \`Dispatch:\` entry in the final Git trailer block; end the message with \`AI-Assisted: true\` and one \`Dispatch:\` line (\`Dispatch: ${dispatchForm("goldfish").replace("<TASK_ID>", "<task-id>")}\` or \`Dispatch: ${dispatchForm("stage-0")}\`) as the last lines, written with \`${ONE_COMMAND_TRAILER_FORM}\` (or, for a long or multi-paragraph body, \`${MESSAGE_FILE_FORM}\`)`,
       });
     } else if (dispatches.length > 1) {
       findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
@@ -260,11 +283,11 @@ export function finishedCommitMessageFindings(message, {
       });
     }
   }
-  if (trailers.some((entry) => entry.key === "Dispatch" && entry.value === "administrative (elephant)")) {
+  if (trailers.some((entry) => entry.key === "Dispatch" && entry.value === dispatchForm("administrative"))) {
     const exact = trailers.length === 2 && trailers[0].key === "Dispatch" && trailers[1].key === "AI-Assisted" && trailers[1].value === "true";
     const admitted = exact && administrativeAdmission?.ok === true && administrativeAdmission.schema === "pipeline.administrative-commit-content.v1"
       && administrativeAdmission.code === "GIT-03-ADMINISTRATIVE-VERIFIED" && administrativeAdmission.messageSha256 === messageDigest(text);
-    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`"});
+    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: " + dispatchForm("stage-0") + "` with `AI-Assisted: true`"});
   }
   const integration = trailers.filter((entry) => entry.key === "Dispatch" && entry.value.startsWith("quality-package-"));
   if (integration.length > 0) {

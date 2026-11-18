@@ -168,7 +168,10 @@ deliberately carries no static copy of that; a second copy is the drift.
 ## 6. Commit discipline
 
 <!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index
-     race), not values any guard exports, so no generator can derive them. -->
+     race); the prose stays stated. The one closed list in this section, the
+     admitted `Dispatch:` forms, is read from the exported ADMITTED_DISPATCH_FORMS
+     (plugins/pipeline-core/lib/commit-message-policy.mjs); the text said to each form
+     is kept in the generator (DISPATCH_FORM_PROSE, DISPATCH_FORM_GLOSS). -->
 
 - For an ordinary Goldfish write outside native host-commit mode, generate
   the exact stage and commit commands with the read-only
@@ -207,12 +210,13 @@ deliberately carries no static copy of that; a second copy is the drift.
     protected-source gate.
     Use the current sanctioned source-binding and document-integration actions;
     an unavailable authorship verdict is not permission to bypass a gate.
-  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:
-  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a
-  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed
-  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>
-  (elephant-exception)` for work the PO exempted from EL-01 by a recorded
-  decision; each is verified by its own rule in `dispatch-authorship-verify`.
+  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover,
+  each verified by its own rule in `dispatch-authorship-verify`:
+  - `Dispatch: administrative (elephant)`
+  - `Dispatch: <TASK_ID> (critic)`
+  - `Dispatch: <path> (elephant-generated)` — a verified generator's script path
+  - `Dispatch: quality-package-<digest> (integration)` — the signed quality package
+  - `Dispatch: D<n> (elephant-exception)` — work the PO exempted from EL-01 by a recorded decision
   A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the
   `dispatch-authorship-verify` tool shipped with this plugin
   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the

@@ -315,3 +315,95 @@ test("AC-111: the Goldfish route keeps the message file and names the accurate r
   assert.match(text, /There is exactly one commit route: the message file/u);
   assert.match(text, /guard-dispatch-budget/u);
 });
+
+// C30K-K18 (AC-112, duplicated-state analysis K1-03, stage 5): the closed list of admitted `Dispatch:` forms is exported once by the
+// commit-message policy; the policy texts and the generated section 6 are built from it. These cases are written from the criterion,
+// not from the implementation: they must be red while the export is absent and green when the generator derives from it.
+const K18_SAMPLES = Object.freeze({
+  goldfish: "C30K-K18 (goldfish)",
+  critic: "C30K-K18 (critic)",
+  "elephant-generated": "harness/scripts/generate-agent-obligations.mjs (elephant-generated)",
+  "stage-0": "stage-0 (elephant)",
+  design: "design (elephant)",
+  administrative: "administrative (elephant)",
+  integration: `quality-package-${"a".repeat(64)} (integration)`,
+  "elephant-exception": "D54 (elephant-exception)",
+});
+const K18_REFUSED = Object.freeze([
+  "invented (elephant)", "C30K-K18 (elephant)", "C30K-K18 (invented)", "D0 (elephant-exception)", "x (integration)",
+  "../x (elephant-generated)", "C30K K18 (goldfish)",
+]);
+async function k18Policy() {
+  return import("../../plugins/pipeline-core/lib/commit-message-policy.mjs");
+}
+function k18Section6(document = renderAgentObligations()) {
+  const start = document.indexOf("## 6. Commit discipline");
+  const end = document.indexOf("## 7.");
+  assert.ok(start > 0 && end > start, "section 6 is found");
+  return document.slice(start, end);
+}
+function k18FormsListed(section) {
+  return [...section.replace(/\s+/gu, " ").matchAll(/`Dispatch: ([^`]+)`/gu)].map((match) => match[1]);
+}
+
+test("C30K-K18: the commit-message policy exports the closed list of admitted Dispatch forms, one entry per binding", async () => {
+  const policy = await k18Policy();
+  const forms = policy.ADMITTED_DISPATCH_FORMS;
+  assert.ok(Array.isArray(forms) && Object.isFrozen(forms), "ADMITTED_DISPATCH_FORMS is an exported frozen array");
+  assert.deepEqual(forms.map((form) => form.id).sort(), Object.keys(K18_SAMPLES).sort(), "exactly the eight bindings GIT-03 admits");
+  for (const form of forms) {
+    assert.equal(typeof form.value, "string", form.id);
+    assert.equal(typeof form.matches, "function", form.id);
+    assert.ok(form.matches(K18_SAMPLES[form.id]), `${form.id} admits its sample`);
+  }
+});
+
+test("C30K-K18: the generated section 6 lists every form the policy admits and none it refuses", async () => {
+  const { ADMITTED_DISPATCH_FORMS: forms, finishedCommitMessageFindings } = await k18Policy();
+  assert.ok(Array.isArray(forms), "the export exists");
+  const listed = k18FormsListed(k18Section6());
+  assert.deepEqual([...new Set(listed)].sort(), forms.map((form) => form.value).sort(), "the listed forms are exactly the exported ones");
+  for (const refused of K18_REFUSED) {
+    assert.ok(!listed.includes(refused), `${refused} is not listed`);
+    const message = `feat(x): x\n\nDispatch: ${refused}\nAI-Assisted: true\n`;
+    const codes = finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.map((finding) => finding.code);
+    assert.ok(codes.includes("GIT-03-DISPATCH-MALFORMED"), `${refused} is refused by the policy`);
+  }
+  for (const form of forms) {
+    const message = `feat(x): x\n\nDispatch: ${K18_SAMPLES[form.id]}\nAI-Assisted: true\n`;
+    const codes = finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.map((finding) => finding.code);
+    assert.ok(!codes.includes("GIT-03-DISPATCH-MALFORMED"), `${form.id} is admitted by the policy`);
+  }
+});
+
+test("C30K-K18: the section 6 marker names the exported list as the derived part and keeps the prose hand-maintained", () => {
+  const section = k18Section6();
+  assert.match(section, /ADMITTED_DISPATCH_FORMS/u);
+  assert.match(section, /hand-maintained/u);
+  assert.doesNotMatch(section, /not values any guard exports/u, "the old claim that no component exports the forms is gone");
+});
+
+test("C30K-K18: the policy keeps no inline copy of the admitted forms outside the exported list", () => {
+  const source = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "commit-message-policy.mjs"), "utf8");
+  assert.doesNotMatch(source, /value === "stage-0 \(elephant\)" \|\|/u, "the inline Elephant chain is gone");
+  assert.doesNotMatch(source, /\(\\`Dispatch: <task-id> \(goldfish\)\\` or \\`Dispatch: stage-0 \(elephant\)\\`\)/u, "the refusal text is built from the export");
+});
+
+// Refusal texts and codes stay byte-identical (GIT-03): green before and after the derivation, so a change of bytes shows here.
+test("C30K-K18: the two GIT-03 refusal texts that name forms keep their exact bytes", async () => {
+  const { finishedCommitMessageFindings } = await k18Policy();
+  const opts = { requireMarker: true, requireDispatch: true };
+  const missing = finishedCommitMessageFindings("feat(x): x\n\nAI-Assisted: true\n", opts).findings.find((finding) => finding.code === "GIT-03-DISPATCH-MISSING");
+  assert.equal(
+    missing.detail,
+    "no `Dispatch:` entry in the final Git trailer block; end the message with `AI-Assisted: true` and one `Dispatch:` line (`Dispatch: <task-id> (goldfish)` or `Dispatch: stage-0 (elephant)`) as the last lines, written with `git commit -m <subject> [-m <body>] --trailer \"AI-Assisted: true\" --trailer \"Dispatch: <id>\"` (or, for a long or multi-paragraph body, `git commit -F scratch/<message-file>`)",
+  );
+  const administrative = finishedCommitMessageFindings("feat(x): x\n\nDispatch: administrative (elephant)\nAI-Assisted: true\n", opts).findings
+    .find((finding) => finding.code === "GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED");
+  assert.equal(
+    administrative.detail,
+    "administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`",
+  );
+  const malformed = finishedCommitMessageFindings("feat(x): x\n\nDispatch: invented (elephant)\nAI-Assisted: true\n", opts).findings.find((finding) => finding.code === "GIT-03-DISPATCH-MALFORMED");
+  assert.equal(malformed.detail, "the final `Dispatch: invented (elephant)` entry is not an admitted work-package binding");
+});

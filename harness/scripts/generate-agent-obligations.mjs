@@ -27,7 +27,8 @@
  * WHAT IS DERIVED, AND WHAT IS NOT. Derived: the protected-path table (from
  * `project/guard-config.json`), the draft-phase write prefixes (from
  * `guard-devplan.mjs`'s exported constant), the `&&` chain bound in section 1
- * (from `grammar-denials.mjs`'s exported `MAX_AND_CHAIN_SEGMENTS`), the gate-strength shell exemption
+ * (from `grammar-denials.mjs`'s exported `MAX_AND_CHAIN_SEGMENTS`), the admitted `Dispatch:` forms of
+ * section 6 (from `commit-message-policy.mjs`'s exported `ADMITTED_DISPATCH_FORMS`), the gate-strength shell exemption
  * (from `guard-lifecycle-ready.mjs`'s exported table), and the admitted/refused
  * command shapes (MEASURED by asking the guard's own exported predicates, not by
  * restating its documentation). Hand-maintained lines are marked as such in the
@@ -51,9 +52,63 @@ import {
   retryActionsForDeniedCommand,
 } from "../../plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
 import { MAX_AND_CHAIN_SEGMENTS } from "../../plugins/pipeline-core/lib/guard/grammar-denials.mjs";
+import { ADMITTED_DISPATCH_FORMS } from "../../plugins/pipeline-core/lib/commit-message-policy.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const OBLIGATIONS_PATH = join(REPO_ROOT, "templates", "prompts", "agent-obligations.md");
+
+/**
+ * The text said to each `Dispatch:` form of section 6, keyed by the `id` of `ADMITTED_DISPATCH_FORMS` (the list of forms is read
+ * from the policy, never typed here; the prose around them is hand-maintained). A form with prose renders as a bullet with its
+ * paragraph; every other exported form renders in the "further bindings" list, with its gloss when it has one. An id that is no
+ * longer exported fails the generation instead of rendering a stale bullet. The rendered forms include
+ * `Dispatch: stage-0 (elephant)` and `Dispatch: design (elephant)` (named here because the pin
+ * `installed-design-trailer-example-is-rejected-by-git-guard.test.mjs` still reads this source for them).
+ */
+const DISPATCH_FORM_PROSE = Object.freeze({
+  goldfish: {
+    head: " — a dispatched fresh-context run. This is a",
+    rest: [
+      "    claim about a *specific* dispatch, so it has to survive being checked against",
+      "    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must",
+      "    be terminal rather than `in-progress`, and its `report.changedFiles` must",
+      "    cover the paths the commit touches. Never borrow an ID whose own scope",
+      "    excludes the work — that is the failure this pair exists to make visible.",
+    ],
+  },
+  "stage-0": {
+    head: " — the direct-Elephant trailer for a bounded",
+    rest: [
+      "    fast-path fix. Implementation self-execution still requires every",
+      "    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,",
+      "    at most 60 changed lines, at most 25 of them production logic, tests green.",
+      "    The trailer does not establish those criteria or",
+      "    waive path, phase, signature or protected-source gates.",
+    ],
+  },
+  design: {
+    head: " — the direct-Elephant trailer for",
+    rest: [
+      "    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch",
+      "    record is looked up; the commit may change at most 10 paths (more is",
+      "    `UNVERIFIABLE`, as are unreadable paths). It grants no production",
+      "    implementation authority and waives no path, phase, signature or",
+      "    protected-source gate.",
+      "    Use the current sanctioned source-binding and document-integration actions;",
+      "    an unavailable authorship verdict is not permission to bypass a gate.",
+    ],
+  },
+});
+const DISPATCH_FORM_GLOSS = Object.freeze({
+  "elephant-generated": " — a verified generator's script path",
+  integration: " — the signed quality package",
+  "elephant-exception": " — work the PO exempted from EL-01 by a recorded decision",
+});
+for (const id of [...Object.keys(DISPATCH_FORM_PROSE), ...Object.keys(DISPATCH_FORM_GLOSS)]) {
+  if (!ADMITTED_DISPATCH_FORMS.some((form) => form.id === id)) {
+    throw new Error(`generate-agent-obligations: the text for Dispatch form "${id}" has no entry in ADMITTED_DISPATCH_FORMS (plugins/pipeline-core/lib/commit-message-policy.mjs); remove or rename it in DISPATCH_FORM_PROSE/DISPATCH_FORM_GLOSS`);
+  }
+}
 
 /**
  * The command shapes the document reports on. Nothing here asserts an outcome:
@@ -260,7 +315,10 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("## 6. Commit discipline");
   put();
   put("<!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index");
-  put("     race), not values any guard exports, so no generator can derive them. -->");
+  put("     race); the prose stays stated. The one closed list in this section, the");
+  put("     admitted `Dispatch:` forms, is read from the exported ADMITTED_DISPATCH_FORMS");
+  put("     (plugins/pipeline-core/lib/commit-message-policy.mjs); the text said to each form");
+  put("     is kept in the generator (DISPATCH_FORM_PROSE, DISPATCH_FORM_GLOSS). -->");
   put();
   put("- For an ordinary Goldfish write outside native host-commit mode, generate");
   put("  the exact stage and commit commands with the read-only");
@@ -279,32 +337,18 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("  whether to add them (the host's commit-attribution reminder is such an");
   put("  instruction). There are three forms an Elephant uses for its own commits, and");
   put("  they are not interchangeable:");
-  put("  - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a");
-  put("    claim about a *specific* dispatch, so it has to survive being checked against");
-  put("    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must");
-  put("    be terminal rather than `in-progress`, and its `report.changedFiles` must");
-  put("    cover the paths the commit touches. Never borrow an ID whose own scope");
-  put("    excludes the work — that is the failure this pair exists to make visible.");
-  put("  - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded");
-  put("    fast-path fix. Implementation self-execution still requires every");
-  put("    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,");
-  put("    at most 60 changed lines, at most 25 of them production logic, tests green.");
-  put("    The trailer does not establish those criteria or");
-  put("    waive path, phase, signature or protected-source gates.");
-  put("  - `Dispatch: design (elephant)` — the direct-Elephant trailer for");
-  put("    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch");
-  put("    record is looked up; the commit may change at most 10 paths (more is");
-  put("    `UNVERIFIABLE`, as are unreadable paths). It grants no production");
-  put("    implementation authority and waives no path, phase, signature or");
-  put("    protected-source gate.");
-  put("    Use the current sanctioned source-binding and document-integration actions;");
-  put("    an unavailable authorship verdict is not permission to bypass a gate.");
-  put("  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:");
-  put("  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a");
-  put("  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed");
-  put("  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>");
-  put("  (elephant-exception)` for work the PO exempted from EL-01 by a recorded");
-  put("  decision; each is verified by its own rule in `dispatch-authorship-verify`.");
+  for (const form of ADMITTED_DISPATCH_FORMS) {
+    const prose = DISPATCH_FORM_PROSE[form.id];
+    if (prose === undefined) continue;
+    put(`  - \`Dispatch: ${form.value}\`${prose.head}`);
+    for (const line of prose.rest) put(line);
+  }
+  put("  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover,");
+  put("  each verified by its own rule in `dispatch-authorship-verify`:");
+  for (const form of ADMITTED_DISPATCH_FORMS) {
+    if (DISPATCH_FORM_PROSE[form.id] !== undefined) continue;
+    put(`  - \`Dispatch: ${form.value}\`${DISPATCH_FORM_GLOSS[form.id] ?? ""}`);
+  }
   put("  A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the");
   put("  `dispatch-authorship-verify` tool shipped with this plugin");
   put("  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the");
