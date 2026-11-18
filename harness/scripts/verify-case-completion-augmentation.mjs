@@ -20,6 +20,22 @@ const isStrictMonotoneExtension=(previous,next)=>{
   return true;
 };
 
+// The ONE growth step for a suite whose test file declares ids (the Full Verify way: descriptor 3). It applies the same strict-extension rule as
+// applyVerifyCaseCompletionAugmentations, so what it writes is exactly what the checker accepts: an existing row is extended in place (its
+// previousPolicySha256 and file stay), a suite with only a source policy gets ONE new row bound to that source policy's digest, and anything that is not a
+// strict ordered superset of the current policy (a dropped id, a smaller maxBytes) is returned as 'not-extension' and written nowhere. Mutates `data` only
+// for 'extended' and 'added'. registration = {name, file, sourcePolicy|null}; declaredIds = the ids the suite declared.
+export function growAugmentationRow(data,{name,file,sourcePolicy},declaredIds){
+  const row=data.augmentations.find(r=>r.name===name);
+  const current=row?row.caseCompletion:sourcePolicy;
+  if(!validateVerifyCaseCompletionPolicy(current))return {state:'no-policy'};
+  if(JSON.stringify(current.caseIds)===JSON.stringify(declaredIds))return {state:'in-line',ids:declaredIds.length};
+  const next={schema:current.schema,caseIds:[...declaredIds],maxBytes:current.maxBytes};
+  if(!validateVerifyCaseCompletionPolicy(next)||!isStrictMonotoneExtension(current,next))return {state:'not-extension',policyIds:current.caseIds.length,declaredIds:declaredIds.length};
+  if(row)row.caseCompletion=next;else data.augmentations.push({name,file,caseCompletion:next,previousPolicySha256:policySha256(sourcePolicy)});
+  return {state:row?'extended':'added',from:current.caseIds.length,to:next.caseIds.length};
+}
+
 export function validateVerifyCaseCompletionAugmentations(data){
   if(!exact(data,['schema','augmentations'])||data.schema!==AUGMENTATION_SCHEMA||!Array.isArray(data.augmentations)||data.augmentations.length>2048)return failure('AUG-SCHEMA','closed schema and augmentations array required');
   const names=new Set();

@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { dirname, join, posix, resolve, sep } from "node:path";
+import { closeSync, existsSync, lstatSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, dirname, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../../plugins/pipeline-core/lib/schema-lite.mjs";
 import { validateDeclarativeVerifySuites } from "./check-verify-suite-registration.mjs";
 import { validateVerifyCaseCompletionPolicy } from "../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs";
-import { loadAndApplyVerifyCaseCompletionAugmentations } from "./verify-case-completion-augmentation.mjs";
+import { AUGMENTATION_PATH, applyVerifyCaseCompletionAugmentations, growAugmentationRow, loadAndApplyVerifyCaseCompletionAugmentations, validateVerifyCaseCompletionAugmentations } from "./verify-case-completion-augmentation.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
@@ -648,6 +649,91 @@ export function checkVerifyCaseCompletion({
   return { ok: findings.length === 0, findings, registeredCount: registrations.length, vulnerableCount: vulnerable.length, registryCount: registry.length };
 }
 
+// Ids a suite DECLARES when run the Full Verify way: plain `node <file>`, descriptor 3 a file, the same variables verify-journal.mjs sets. The stream is
+// captured in a private temp directory outside the root, so nothing lands in the working tree.
+function declaredCaseIds(root, path, maxBytes) {
+  const scratch = mkdtempSync(join(tmpdir(), "cc-declared-"));
+  let fd = -1;
+  try {
+    fd = openSync(join(scratch, "stream.out"), "w+");
+    const env = { ...process.env, PATH: `${dirname(realpathSync(process.execPath))}${delimiter}${process.env.PATH ?? ""}`, PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: String(maxBytes) };
+    delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, [path], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600_000, stdio: ["ignore", "pipe", "pipe", fd] });
+    const declared = readFileSync(join(scratch, "stream.out"), "utf8").split("\n").filter(Boolean).map((text) => { try { return JSON.parse(text); } catch { return null; } }).find((event) => event?.event === "DECLARED")?.caseIds;
+    return result.status === 0 && Array.isArray(declared) ? { ok: true, caseIds: declared } : { ok: false, detail: `exit ${result.status}, declared ${Array.isArray(declared) ? declared.length : "none"}` };
+  } finally {
+    if (fd !== -1) closeSync(fd);
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+// The third place of the case-completion list, derived: for every registered suite WITH a policy whose test file changed between `since` and the working
+// tree, run it, read what it declares and extend the augmentation row through growAugmentationRow (growth-only; the existing preimage chain is kept).
+// All or nothing: any problem writes nothing. check=true computes the same and writes nothing. Returns { state: "current"|"refreshed"|"DRIFT", lines, problems }.
+export function syncVerifyCaseCompletionAugmentations({ root = DEFAULT_ROOT, since = null, check = false, verifyPath = DEFAULT_VERIFY } = {}) {
+  root = resolve(root);
+  const lines = [], problems = [];
+  const reader = makeReader(root, null);
+  if (!reader.exists(AUGMENTATION_PATH)) return { state: "current", lines: [`no ${AUGMENTATION_PATH} in this root: nothing to extend`], problems };
+  const text = reader.read(AUGMENTATION_PATH);
+  let data;
+  try { data = JSON.parse(text); } catch (error) { return { state: "FAILED", lines, problems: [`${AUGMENTATION_PATH} is not JSON: ${error.message}`] }; }
+  const valid = validateVerifyCaseCompletionAugmentations(data);
+  if (!valid.ok) return { state: "FAILED", lines, problems: [`${AUGMENTATION_PATH} is invalid (${valid.code}): ${valid.error}`] };
+  if (`${JSON.stringify(data, null, 2)}\n` !== text) return { state: "FAILED", lines, problems: [`${AUGMENTATION_PATH} is not in canonical two-space JSON form; refusing to rewrite the existing rows`] };
+  const hint = "node harness/scripts/check-verify-case-completion.mjs --sync-augmentations --since <ref>";
+  if (typeof since !== "string" || since === "" || runGit(root, ["rev-parse", "--verify", `${since}^{commit}`]).status !== 0) {
+    return { state: "FAILED", lines, problems: [`no usable base commit (${JSON.stringify(since)}); name the commit the suites last matched, then run: ${hint}`] };
+  }
+  const findings = [];
+  const registrations = [...parseVerifyRegistrations(reader.read(toPosix(verifyPath)), findings), ...parseDeclarativeRegistrations(reader, findings, root, null)];
+  if (findings.length > 0) return { state: "FAILED", lines, problems: findings };
+  const diff = runGit(root, ["diff", "--name-only", "-z", "--diff-filter=ACMR", since, "--"]);
+  if (diff.status !== 0) return { state: "FAILED", lines, problems: [`git diff ${since} could not be read; run: ${hint}`] };
+  const changed = new Set(diff.stdout.split("\0").filter(Boolean));
+  const next = structuredClone(data);
+  const seen = new Set();
+  for (const registration of registrations) {
+    if (!registration.path.endsWith(".test.mjs") || !changed.has(registration.path) || seen.has(registration.name)) continue;
+    seen.add(registration.name);
+    const sourcePolicy = registration.caseCompletionPolicy ?? null;
+    const row = next.augmentations.find((entry) => entry.name === registration.name);
+    const effective = row?.caseCompletion ?? sourcePolicy;
+    if (!validateVerifyCaseCompletionPolicy(effective)) continue;
+    const declared = declaredCaseIds(root, registration.path, effective.maxBytes);
+    if (!declared.ok) { problems.push(`${registration.name}: could not be run to read its declared ids (${declared.detail}); run it alone with: node ${registration.path}`); continue; }
+    const grown = growAugmentationRow(next, { name: registration.name, file: registration.path, sourcePolicy }, declared.caseIds);
+    if (grown.state === "not-extension") problems.push(`${registration.name}: NOT AN EXTENSION (policy ${grown.policyIds} ids, declared ${grown.declaredIds}); the growth-only rule refuses it, restore the dropped ids in the suite`);
+    else if (grown.state === "extended" || grown.state === "added") lines.push(`${registration.name}: ${grown.from} -> ${grown.to} ids (${grown.state === "added" ? "new augmentation row" : "augmentation row extended"})`);
+  }
+  if (problems.length > 0) return { state: "FAILED", lines, problems };
+  if (JSON.stringify(next) === JSON.stringify(data)) return { state: "current", lines, problems };
+  const composed = applyVerifyCaseCompletionAugmentations(registrations.map((entry) => ({ name: entry.name, file: entry.path, ...((entry.caseCompletion || entry.caseCompletionPresent) ? { caseCompletion: entry.caseCompletionPolicy } : {}) })), next);
+  if (!composed.ok) return { state: "FAILED", lines, problems: [`the extended rows would be refused by the checker (${composed.code}): ${composed.error}`] };
+  if (check) return { state: "DRIFT", lines, problems };
+  writeFileSync(join(root, AUGMENTATION_PATH), `${JSON.stringify(next, null, 2)}\n`);
+  return { state: "refreshed", lines, problems };
+}
+
+function runSyncCli(argv) {
+  const options = { root: DEFAULT_ROOT, since: null, check: false };
+  for (let index = 0; index < argv.length; index += 1) {
+    const key = argv[index];
+    if (key === "--sync-augmentations") continue;
+    if (key === "--check") { options.check = true; continue; }
+    if (key !== "--root" && key !== "--since") throw new Error(`unknown argument ${key}`);
+    const value = argv[++index];
+    if (value === undefined || value.startsWith("--")) throw new Error(`${key} requires a value`);
+    options[key.slice(2)] = value;
+  }
+  const result = syncVerifyCaseCompletionAugmentations(options);
+  for (const line of result.lines) console.log(line);
+  for (const problem of result.problems) console.error(problem);
+  if (result.state === "FAILED") process.exit(2);
+  console.log(`case-completion-augmentations: ${result.state}`);
+  process.exit(result.state === "DRIFT" ? 1 : 0);
+}
+
 function parseArgs(argv) {
   const options = { root: DEFAULT_ROOT, registryPath: DEFAULT_REGISTRY, schemaPath: DEFAULT_SCHEMA, verifyPath: DEFAULT_VERIFY, base: null, candidate: null };
   for (let index = 0; index < argv.length; index += 1) {
@@ -667,6 +753,10 @@ function parseArgs(argv) {
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   let result;
+  if (process.argv.includes("--sync-augmentations")) {
+    try { runSyncCli(process.argv.slice(2)); }
+    catch (error) { console.error(`VERIFY-CASE-COMPLETION-SYNC ${error.message}`); process.exit(2); }
+  }
   try { result = checkVerifyCaseCompletion(parseArgs(process.argv.slice(2))); }
   catch (error) { console.error(`VERIFY-CASE-COMPLETION-ARGS ${error.message}`); process.exit(2); }
   if (!result.ok) {
