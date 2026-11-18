@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority.mjs";
+import { LEGACY_CALIBRATION } from "./project-authority-read.mjs";
 import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
 import { resolvePoGateRepositoryTopology } from "./po-gate-authority.mjs";
 
@@ -104,7 +105,7 @@ function aliasRefused(stored, current, source) {
 // whose name and owner.name are "agent-pipeline" with exactly one plugin "pipeline-core" at
 // ./plugins/pipeline-core. It never reads the directory name and no calibration field can select it.
 const SOURCE_PROJECT = "agent-pipeline";
-const SOURCE_CALIBRATION_PATH = ".claude/pipeline.json";
+const SOURCE_CALIBRATION_PATH = LEGACY_CALIBRATION; // the source-checkout probe reads the legacy twin alone, on purpose
 const SOURCE_MARKETPLACE_PATH = ".claude-plugin/marketplace.json";
 const SOURCE_PLUGIN_NAME = "pipeline-core";
 const SOURCE_PLUGIN_SOURCE = "./plugins/pipeline-core";

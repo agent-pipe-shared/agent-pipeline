@@ -16,6 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toolchainDocPointer } from "./toolchain-registry.mjs";
+import { CALIBRATION_PATHS } from "./project-authority-read.mjs";
 
 export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
 // C29e (ADR-0103): trivy is the fifth element; it reads "not applicable" for a candidate without infrastructure or container files.
@@ -73,7 +74,7 @@ export function isCriticalStakes(stakes) {
 
 /** The raw `stakes` of the project calibration under `projectDir`, or null when it is absent, unreadable or not a string. */
 export function readCalibrationStakes(projectDir) {
-  for (const rel of ["project/pipeline.json", ".claude/pipeline.json"]) {
+  for (const rel of CALIBRATION_PATHS) {
     const path = join(projectDir, rel);
     if (!existsSync(path)) continue;
     try {

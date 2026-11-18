@@ -14,6 +14,7 @@ import {parseYaml} from './yaml-lite.mjs';
 import {validatePipelineUserV3} from './runner-profiles-v3.mjs';
 import {codexCustomAgentSeed,planRuntimeProjectionV3} from './runtime-projection-v3.mjs';
 import {loadSchema} from './manifest.mjs';
+import {LEGACY_CALIBRATION} from './project-authority-read.mjs';
 import {validateAgainstSchema} from './schema-lite.mjs';
 import {assessWindowsPrivatePath,hardenWindowsPrivateDirectory} from './windows-private-state.mjs';
 
@@ -170,7 +171,7 @@ function legacyObservation(ctx,budget){
   refs.push({path:manifestPath,sha256:manifest.sha256});
   // Only the manifest's owned projection is being observed. Other renderer
   // inputs are inert canonical seeds, not observed agent/runtime assertions.
-  const baselines={'.claude/pipeline.yaml':{status:'present',bytes:manifest.text},'.claude/settings.json':{status:'present',bytes:'{}\n'},'.claude/pipeline.json':{status:'present',bytes:'{}\n'},'.codex/config.toml':{status:'present',bytes:''},'.codex/agents/implementor.toml':{status:'present',bytes:codexCustomAgentSeed('implementor')},'.codex/agents/critic.toml':{status:'present',bytes:codexCustomAgentSeed('critic')},'.codex/agents/critic-high-risk.toml':{status:'present',bytes:codexCustomAgentSeed('critic-high-risk')},'.codex/agents/consult-advisor.toml':{status:'present',bytes:''}};
+  const baselines={'.claude/pipeline.yaml':{status:'present',bytes:manifest.text},'.claude/settings.json':{status:'present',bytes:'{}\n'},[LEGACY_CALIBRATION]:{status:'present',bytes:'{}\n'},'.codex/config.toml':{status:'present',bytes:''},'.codex/agents/implementor.toml':{status:'present',bytes:codexCustomAgentSeed('implementor')},'.codex/agents/critic.toml':{status:'present',bytes:codexCustomAgentSeed('critic')},'.codex/agents/critic-high-risk.toml':{status:'present',bytes:codexCustomAgentSeed('critic-high-risk')},'.codex/agents/consult-advisor.toml':{status:'present',bytes:''}};
   const plan=planRuntimeProjectionV3(intent,{source:'pipeline.user.yaml',baselines});
   const expected=plan.status==='ready'?plan.targets.find(t=>t.path==='.claude/pipeline.yaml')?.after?.bytes:null;
   return {state:typeof expected==='string'&&expected===manifest.text?'active':'unverifiable-active',kind:'legacy-v3-owned-projection',refs};

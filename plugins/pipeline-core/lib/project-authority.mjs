@@ -18,7 +18,7 @@ import { inspectSessionClosure, listActiveSessionDescriptors } from "./worktree-
 import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, sha, absent, present, realRoot, projectPath, image, bytes, readLayer, authority, validatePortablePipelineState } from "./project-authority-read.mjs";
-export { NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, validatePortablePipelineState, readProjectAuthority, resolveProjectAuthorityPaths, AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
+export { NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, CALIBRATION_PATHS, validatePortablePipelineState, readProjectAuthority, resolveProjectAuthorityPaths, AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
 
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";

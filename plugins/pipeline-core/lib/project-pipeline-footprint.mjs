@@ -6,12 +6,13 @@ import {validatePipelineUserV3} from './runner-profiles-v3.mjs';
 import {codexCustomAgentSeed,loadRuntimeProjectionV3OwnedKeys,planRuntimeProjectionV3} from './runtime-projection-v3.mjs';
 import {planRuntimeProjectionOwnedRemoval} from './runtime-projection-removal.mjs';
 import {derivePlanLifecycle} from './plan-spec-state-v2.mjs';
+import {LEGACY_CALIBRATION} from './project-authority-read.mjs';
 import {footprintSha256,readPhysicalFootprint} from './git-hook-footprint.mjs';
 const strictUtf8=row=>new TextDecoder('utf-8',{fatal:true}).decode(row.bytes);
 export function deriveContentPreservingPipelineFootprint({rootDir}){
  const budget={used:0,max:33554432},source=readPhysicalFootprint(join(rootDir,'pipeline.user.yaml'),{budget}),owned=loadRuntimeProjectionV3OwnedKeys(),observations=[],actions=[],conflicts=[],preserve=['AGENTS.md','CLAUDE.md','architecture/','docs/','specs/','backlog/','Git history','user-scope stores'];let intent=null;
  if(source)try{const v=parseYaml(strictUtf8(source));if(validatePipelineUserV3(v).ok)intent=v;}catch{}
- const defaultBytes={'.claude/settings.json':'{}\n','.claude/pipeline.json':'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/critic-high-risk.toml':codexCustomAgentSeed('critic-high-risk'),'.codex/agents/consult-advisor.toml':''};
+ const defaultBytes={'.claude/settings.json':'{}\n',[LEGACY_CALIBRATION]:'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/critic-high-risk.toml':codexCustomAgentSeed('critic-high-risk'),'.codex/agents/consult-advisor.toml':''};
  const baselines={},rows=new Map();for(const target of owned.targets){const row=readPhysicalFootprint(join(rootDir,target.path),{budget});rows.set(target.path,row);baselines[target.path]={status:'present',bytes:row?strictUtf8(row):defaultBytes[target.path]??'schema: pipeline.manifest.v0\n'};}
  const neutralManifest=readPhysicalFootprint(join(rootDir,'project','pipeline.yaml'),{budget});if(!rows.get('.claude/pipeline.yaml')&&neutralManifest)baselines['.claude/pipeline.yaml']={status:'present',bytes:strictUtf8(neutralManifest)};
  const projected=intent?planRuntimeProjectionV3(intent,{source:'pipeline.user.yaml',baselines}):null;

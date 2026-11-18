@@ -17,6 +17,10 @@ export const LEGACY_STATE = ".claude/pipeline-state.json";
 export const LEGACY_CALIBRATION = ".claude/pipeline.json";
 export const LEGACY_GUARD_CONFIG = ".claude/guard-config.json";
 export const LEGACY_GUARD_AUDIT = ".claude/guard-override.log.jsonl";
+// The two calibration files (byte-identical twins), neutral first. A module that must look at both files imports this list instead of keeping a
+// private copy of the pair, so no two lists can come to disagree about which file comes first. It is only the list: whether a reader stops at
+// the first file that exists, at the first one that carries a field, or follows the manifest tier stays that reader's own rule.
+export const CALIBRATION_PATHS = Object.freeze([NEUTRAL_CALIBRATION, LEGACY_CALIBRATION]);
 // A fresh Claude-runner project onboarded by project-onboarding-v3.mjs
 // legitimately WRITES exactly two of these five legacy paths on day one --
 // LEGACY_MANIFEST and LEGACY_CALIBRATION, byte-identical to their NEUTRAL_*

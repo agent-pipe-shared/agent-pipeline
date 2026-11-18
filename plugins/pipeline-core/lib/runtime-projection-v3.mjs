@@ -27,6 +27,7 @@ import {
   validatePipelineUserV3Json,
 } from "./runner-profiles-v3.mjs";
 import { criticExportPolicyDigest } from "./critic-export-policy.mjs";
+import { LEGACY_CALIBRATION } from "./project-authority-read.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OWNED_KEYS_PATH = join(HERE, "..", "config", "runtime-projection-v3-owned-keys.json");
@@ -800,9 +801,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
       targets.push(replaceAddedCodexAgentTarget(manifestTarget, intent, baselines?.[manifestTarget.path]));
     }
     targets.push(replaceHumanRoleCalibrationTarget(
-      manifestTargets[".claude/pipeline.json"],
+      manifestTargets[LEGACY_CALIBRATION],
       intent,
-      baselineBytes(baselines?.[".claude/pipeline.json"]),
+      baselineBytes(baselines?.[LEGACY_CALIBRATION]),
     ));
     // ADR-0054 step 3: keep the neutral authority tier (`project/*`) in sync
     // with whatever the compiler already owns at the legacy tier, but ONLY
@@ -836,7 +837,7 @@ function projectValidatedIntent(intent, { source, baselines }) {
     }
   } catch (error) {
     return emptyPlan("invalid-baseline", source, [{
-      path: ".claude/pipeline.json:humanRoles.po.displayLabel",
+      path: `${LEGACY_CALIBRATION}:humanRoles.po.displayLabel`,
       code: "v3_projection_error",
       message: error.message,
       repair: "repair the baseline or committed V3 projection boundary before activation planning",
@@ -919,7 +920,7 @@ export function planRuntimeProjectionV3Json(text, options = {}) {
 export function readRuntimeProjectionV3Baselines(rootDir) {
   const baselines = readRuntimeProjectionV2Baselines(rootDir);
   const ownedTargets = frozenOwnedKeys().manifest.targets;
-  const target = ownedTargets.find((entry) => entry.path === ".claude/pipeline.json");
+  const target = ownedTargets.find((entry) => entry.path === LEGACY_CALIBRATION);
   const advisor = ownedTargets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
   const criticHighRisk = ownedTargets.find((entry) => entry.path === ".codex/agents/critic-high-risk.toml");
   if (!target || !advisor || !criticHighRisk) throw new Error("V3 owned target is missing");

@@ -18,6 +18,7 @@
 
 import { createHash } from "node:crypto";
 import { SCANNER_EXCEPTIONS_PATH, closeSecurityScopeNote, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
+import { LEGACY_CALIBRATION, NEUTRAL_CALIBRATION } from "./project-authority-read.mjs";
 import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
 import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
 
@@ -57,7 +58,7 @@ function securityRow(readers) {
       // cannot supply the calibration or the exception file leaves the non-critical reading, which the readback never claims beyond).
       const text = (rel) => { const read = call(readers.readBytes, rel); return read.ok ? Buffer.from(read.value).toString("utf8") : null; };
       const stakesOf = (rel) => { try { const stakes = JSON.parse(text(rel))?.stakes; return typeof stakes === "string" ? stakes : null; } catch { return null; } };
-      const critical = isCriticalStakes(stakesOf("project/pipeline.json") ?? stakesOf(".claude/pipeline.json"));
+      const critical = isCriticalStakes(stakesOf(NEUTRAL_CALIBRATION) ?? stakesOf(LEGACY_CALIBRATION));
       const exceptions = critical ? parseScannerExceptions(text(SCANNER_EXCEPTIONS_PATH)) : null;
       const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners, { critical, exceptions })).map((line) => line.split(" -- ")[0]);
       // C29 (Codex run 3, C3): an empty or unreadable v2 capability plan travels beside the scanner states, so "present" never reads like every control passed.

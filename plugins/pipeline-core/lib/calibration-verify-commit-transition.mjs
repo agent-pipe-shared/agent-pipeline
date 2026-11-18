@@ -20,7 +20,7 @@ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { readPrivateApprovals } from "./critical-action-authorization.mjs";
 import { VERIFY_REPLACEMENT_KIND } from "./critical-action-approval-request.mjs";
 
-const PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
+import { CALIBRATION_PATHS as PATHS } from "./project-authority-read.mjs";
 const SCHEMA = "pipeline.calibration-verify-commit-transition.v1";
 const MAX_BYTES = 1_048_576;
 const HELD = new WeakMap();

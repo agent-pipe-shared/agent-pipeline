@@ -76,6 +76,7 @@ import { parseArchitectureDesign } from "./architecture-design.mjs";
 import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder } from "./design-authoring.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
+  CALIBRATION_PATHS,
   LEGACY_CALIBRATION,
   LEGACY_MANIFEST,
   LEGACY_STATE,
@@ -6864,7 +6865,7 @@ export function readOnboardingIntakeCheckpoint({
 /** Read-only first-enrollment boundary; missing history never creates a retirement generation. */
 export function observeOnboardingEnrollmentHistory({rootDir,repositoryCapability="local",spawn=defaultGitSpawn}={}) {
   const root=physicalRoot(rootDir),paths=[];
-  for(const path of [NEUTRAL_STATE,LEGACY_STATE,"pipeline.user.yaml",NEUTRAL_MANIFEST,".claude/pipeline.yaml",".claude/pipeline.json",".agent-pipeline/onboarding-consent.json",".agent-pipeline/enrollment-git-creation-barrier.json",".agent-pipeline/enrollment-git-creation.json",".claude/.runtime/agent-pipeline/onboarding"]){
+  for(const path of [NEUTRAL_STATE,LEGACY_STATE,"pipeline.user.yaml",NEUTRAL_MANIFEST,".claude/pipeline.yaml",LEGACY_CALIBRATION,".agent-pipeline/onboarding-consent.json",".agent-pipeline/enrollment-git-creation-barrier.json",".agent-pipeline/enrollment-git-creation.json",".claude/.runtime/agent-pipeline/onboarding"]){
     const full=absoluteProjectPath(root,path,"enrollment history");assertPhysicalChain(root,full);
     if(existsSync(full)){const info=lstatSync(full);if(info.isSymbolicLink()||(!info.isFile()&&!info.isDirectory()))fail("ER-HISTORY-UNSAFE","retained enrollment history is not physical");paths.push(path);}
   }
@@ -11806,7 +11807,7 @@ export function prepareControlledMethodContinuityArtifacts({rootDir,fixtureRoot,
   continuityMethodGit(repository,['add','-f','--',accepted.path]);
   continuityMethodGit(repository,['-c','user.name=AUTH Unit','-c','user.email=auth@example.invalid','commit','-q','-m',"test(pipeline): register controlled continuity package\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true"]);
   // Bind only the existing calibration tiers the sanctioned transition writes.
-  const calibrationInputs=['project/pipeline.json','.claude/pipeline.json']
+  const calibrationInputs=CALIBRATION_PATHS
     .filter(path=>existsSync(join(repository.primaryRoot,path))).map(path=>{
       const ref=continuityMethodPublicRef(repository.primaryRoot,path);
       const value=JSON.parse(readFileSync(continuityMethodPhysicalSource(repository.primaryRoot,path)));
