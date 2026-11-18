@@ -1,0 +1,77 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 93c8693fe..0668c7833 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -92,7 +92,7 @@ Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied
+ 
+ ## Clone-slice route
+ 
+-Candidate 18 was built as held patches from scratch clones (`git clone --shared`, never links, see below). The tools are one plain `node` command each, because the shell grammar refuses `git apply`, cross-directory git and pipelines. Tracked sources: `scripts/clone-slice/`. The route runs them from `scratch/agent-out/` (the Goldfish shell guard admits that path), so on a fresh machine copy `scripts/clone-slice/*.mjs` there first (`rehearse.mjs` to `scratch/agent-out/w24reh/`, its repository-root arithmetic counts three levels).
++Candidate 18 was built as held patches from scratch clones (`git clone --shared`, never links, see below). The tools are one plain `node` command each, because the shell grammar refuses `git apply`, cross-directory git and pipelines. Tracked sources: `scripts/clone-slice/`. The route runs them from `scratch/agent-out/` (the Goldfish shell guard admits that path), so on a fresh machine copy `scripts/clone-slice/*.mjs` there first (`rehearse.mjs` to `scratch/agent-out/w24reh/`, its repository-root arithmetic counts three levels). The governed admission, the baseline-dirty refusal, the sibling-commit exception and the admission budget are steps of the shared-tree host-commit route that a clone-slice lane pays too when its three deliverables land in the real tree; they are not part of the clone-slice route, which adds only the patch export and the chain steps (`workflow-dispatch.md`, "Recovery commits, the host-commit route and the overlap rule").
+ 
+ | Tool | Purpose |
+ |---|---|
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 0e8fa98dd..a57e1c708 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -2187,6 +2187,20 @@ const cases = [
+     assert.throws(() => runtime.run(baseline), (error) => /native-authority-missing-pending/u.test(`${error.code} ${error.reason} ${error.message}`), "no retained aside names it, so the fault stays");
+   }) },
+ 
++  // C30K-K14 stage 0 (AC-112, closest accepted criterion): the dispatch reference states the Coordinator rule for a recovery commit against a running sibling,
++  // the corrected premise of the clone-slice route and the overlap-rule note; the operating tools document carries the premise correction in one sentence.
++  { id: "NGHSK14", name: "C30K-K14: workflow-dispatch.md names the recovery-commit rule with its inspection command, the host-commit premise correction and the isolated-call overlap note; operating-tools.md carries the premise correction", run: () => {
++    const dispatch = readFileSync(new URL("../skills/pipeline-start/references/workflow-dispatch.md", import.meta.url), "utf8").replace(/\s+/gu, " ");
++    assert.match(dispatch, /recovery commit[^.]*only while[^.]*session-authority-repair\.mjs inspect[^.]*in flight/iu, "the rule: land a recovery commit only while the read-only inspection shows nothing in flight");
++    assert.match(dispatch, /admission[^.]*baseline-dirty[^.]*sibling-commit exception[^.]*admission budget[^.]*host[- ]commit route/iu, "the premise: these steps belong to the host-commit route");
++    assert.match(dispatch, /clone-slice route adds only[^.]*patch export[^.]*chain/iu, "the clone-slice route adds only the patch export and chain steps");
++    assert.match(dispatch, /skips the overlap check for an isolated call[^.]*queue reservation[^.]*governed/iu, "the overlap-rule note: the guard skips the check for an isolated call and the queue reservation covers governed items");
++    const tools = readFileSync(new URL("../../../docs/operating-tools.md", import.meta.url), "utf8"), start = tools.indexOf("## Clone-slice route");
++    assert.ok(start >= 0, "the Clone-slice route section exists");
++    const section = tools.slice(start, tools.indexOf("\n## ", start + 1)).replace(/\s+/gu, " ");
++    assert.match(section, /admission[^.]*baseline-dirty[^.]*sibling-commit exception[^.]*host[- ]commit route[^.]*not (?:of|part of) the clone-slice route/iu, "the premise correction sits in the Clone-slice route section");
++  } },
++
+ ];
+ 
+ /** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+index e2bb73803..643da8444 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+@@ -472,6 +472,21 @@ const cases = [
+     assert.match(message, new RegExp(`host commit of ${first.id} \\(host commit ${failed.commit.slice(0, 12)}\\)`), message);
+     assert.match(message, /Recover that sibling first/u, message);
+   }) },
++
++  // C30K-K14 (AC-112, closest accepted criterion): a recovery commit of the Coordinator on a path of a lane that is still unsettled (no integrated or cancelled queue row)
++  // stays refused for a running sibling's host commit: it may be that lane's own host commit whose proof is not written yet (the settle rule of C19K-W246).
++  { id: "NGSPK14A", name: "C30K-K14 (AC-112): a sibling that is still unsettled keeps refusing an ordinary commit on its paths by name, and nothing is committed", run: () => fixture(({ root }) => {
++    const { runtime, launch } = setup(root);
++    const [first, second] = [launch(0), launch(1)];
++    for (const one of [first, second]) assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true, one.id);
++    writeFileSync(join(root, first.file), first.content); git(root, "add", "--", first.file); git(root, "commit", "-q", "-m", "docs: a commit on the running lane's path");
++    const head = git(root, "rev-parse", "HEAD");
++    writeFileSync(join(root, second.file), second.content);
++    const refused = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: second.returned }, { lockWait: { budgetMs: 0 } }));
++    assert.notEqual(refused.status, "authored-commit-recorded", JSON.stringify(refused));
++    assert.equal(refused.detail?.reason, "native-concurrent-unowned-head", JSON.stringify(refused));
++    assert.equal(git(root, "rev-parse", "HEAD"), head, "nothing was committed on top of the commit");
++  }) },
+ ];
+ 
+ const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index ebb13c768..4e2247854 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -149,6 +149,8 @@ that overlaps a running dispatch (`DBG-SCOPE-OVERLAP`), naming that dispatch,
+ the overlapping paths and the repair (narrow the scope, wait for the other
+ dispatch, finalize an abandoned record, or use a worktree).
+ 
++**Recovery commits, the host-commit route and the overlap rule (candidate 30k, C30K-K14).** Coordinator rule: land a recovery commit only while `node <plugin-root>/scripts/session-authority-repair.mjs inspect --root <root>` (read-only) shows no native item reservation of another lane still in flight; otherwise wait until that lane ends. A running lane's own host commit refuses an ordinary commit on a path of a lane it still counts as in flight (`native-concurrent-unowned-head`), because that commit may be the lane's host commit whose proof is not written yet, so the rule holds even for a lane that is finished but not yet released. Premise correction: the governed admission, the baseline-dirty refusal (`AGY-HOST-BASELINE-DIRTY`), the sibling-commit exception and the admission budget are steps of the shared-tree host-commit route, paid whether the lane edits the real tree or a scratch clone; the clone-slice route adds only the patch export and the chain steps (held patch, chain apply by the PO). Overlap note: the guard skips the overlap check for an isolated call (`isolation: "worktree"`), and the queue reservation covers that gap for governed items, so the text rule above that a planned path overlap waits stays the Elephant's duty for any other work.
++
+ **Recon before a re-dispatch after a wrong-premise stop (PO decision D75 (A)).**
+ When the governed slice queue holds a slice cancelled with `--class wrong-premise`
+ for the same item, the briefing generator refuses a new briefing for that item
