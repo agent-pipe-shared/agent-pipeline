@@ -830,6 +830,66 @@ test("PF-100 the generated briefing names the readable copy of the obligations f
   assert.match(fallback, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
 });
 
+// C30J-J18 (AC-112; consumer report: ~30 shell-guard refusals in a main run and ~70 in subagents, the admitted spellings unknown beforehand).
+// The generated briefing carries ONE block of the admitted shell shapes. Every line of it is read from the guard's own exported constants
+// (lib/guard/grammar-denials.mjs) and never typed a second time; the block is part of the briefing bytes and therefore of its digest.
+const SHAPES_HEADING = "**Admitted shell shapes (read from the guard's own grammar; the text its refusals print):**";
+const guardGrammar = () => import("../lib/guard/grammar-denials.mjs");
+
+test("C30J-J18 the generated briefing carries the admitted shell shapes once, every line read from the guard's exports", async () => {
+  const { runDispatchBriefing } = await lib();
+  const g = await guardGrammar();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  const once = (needle, label) => assert.equal(text.split(needle).length, 2, `${label} appears exactly once`);
+  once(SHAPES_HEADING, "the block heading");
+  for (const line of g.GRAMMAR_DENIAL_REMEDY) once(line, `grammar line: ${line.slice(0, 50)}`);
+  for (const shape of g.ADMITTED_GRAMMAR_SHAPES) {
+    once(shape.spelling, `shape: ${shape.example}`);
+    assert.ok(text.includes(shape.example), shape.example);
+  }
+  for (const line of g.READ_SCOPE_DENIAL_REMEDY) once(line, `read-scope line: ${line.slice(0, 50)}`);
+  once(g.READ_COMMAND_UNSUPPORTED_NOTE, "unsupported-command note");
+  once(g.READ_TARGET_EXACT_FILE_ADVICE, "exact-file advice");
+  for (const code of [...Object.keys(g.GRAMMAR_DENIAL_GUIDANCE), g.READ_COMMAND_UNSUPPORTED_CODE, g.READ_SCOPE_DENIAL_CODE]) {
+    assert.ok(text.includes(`\`${code}\``), `the refusal ${code} is named`);
+  }
+  assert.ok(text.includes(`up to ${g.MAX_AND_CHAIN_SEGMENTS} "&&"-chained segments`), "the && bound comes from the exported constant");
+  assert.ok(text.indexOf(SHAPES_HEADING) < text.indexOf("## Briefing ALF-T1"), "the block precedes the six fields");
+  const first = text.split("\n").find((l) => l.startsWith("Read `")) ?? "";
+  assert.match(first, /follow it: it carries the closed shell grammar/u, "the obligations sentence stays the first Read line");
+});
+
+test("C30J-J18 two builds are byte-identical, the block is covered by the digest, and one changed block byte fails the verification", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const { fx, argv } = packageFixture();
+  const one = runDispatchBriefing(argv, depsOf(fx));
+  const two = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(one.text, two.text);
+  assert.equal(one.sha256, two.sha256);
+  assert.deepEqual(verifyGeneratedBriefing(one.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  const g = await guardGrammar();
+  const edited = one.text.replace(g.READ_TARGET_EXACT_FILE_ADVICE, g.READ_TARGET_EXACT_FILE_ADVICE.replace("Name one", "Name two"));
+  assert.notEqual(edited, one.text);
+  assert.equal(verifyGeneratedBriefing(edited).code, "DBG-GENERATED-DIGEST-MISMATCH");
+  assert.equal(parseNativeGoldfishBriefing(one.text).ok, true, "the host parser still reads the binding");
+});
+
+test("C30J-J18 pin: the builder reads the grammar from the guard module and types none of it", async () => {
+  const g = await guardGrammar();
+  const source = readFileSync(join(HERE, "..", "lib", "dispatch-briefing-build.mjs"), "utf8");
+  assert.match(source, /from "\.\/guard\/grammar-denials\.mjs"/u);
+  for (const shape of g.ADMITTED_GRAMMAR_SHAPES) {
+    assert.ok(!source.includes(shape.spelling.slice(0, 40)), `no typed copy of: ${shape.spelling.slice(0, 40)}`);
+    assert.ok(!source.includes(shape.example), `no typed copy of: ${shape.example}`);
+  }
+  for (const code of [...Object.keys(g.GRAMMAR_DENIAL_GUIDANCE), g.READ_COMMAND_UNSUPPORTED_CODE, g.READ_SCOPE_DENIAL_CODE]) {
+    assert.ok(!source.includes(code), `the code ${code} is read from its export, not typed`);
+  }
+  assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the one code without an exported constant is not typed either");
+});
+
 // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
 // check routes in the order targeted -> quick -> final Verify, never invents a quick command, and leaves the final
 // Verify to the Coordinator. The template wording is pinned in lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs;

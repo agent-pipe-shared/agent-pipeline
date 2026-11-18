@@ -18,6 +18,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
 import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
+import {
+  GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE,
+  READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY, READ_TARGET_EXACT_FILE_ADVICE,
+} from "./guard/grammar-denials.mjs";
 
 export const BRIEFING_PACKAGE_SCHEMA = "pipeline.dispatch-briefing-package.v1";
 export const BRIEFING_BUILD_SCHEMA = "pipeline.dispatch-briefing.build.v1";
@@ -321,6 +325,27 @@ export function obligationsReadSentence(obligationsPath) {
     : "Read `templates/prompts/agent-obligations.md` at the repository root first (a project that has no such file reads the identical copy at `${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md`)";
 }
 
+// C30J-J18 (consumer report: ~30 shell-guard refusals in a main run, ~70 in subagents; the admitted spellings were unknown beforehand).
+// ONE block, read from the guard's own exports (lib/guard/grammar-denials.mjs) so that it prints exactly what a refusal prints and can
+// never be typed a second time. The native read-tool refusal of the exact-file advice has no exported code constant, so its entry is led by
+// that exported advice alone and its code name is not typed here (the wanted export is named in the held patch's notes). Pure: no input.
+export function admittedShellShapesBlock() {
+  return [
+    "**Admitted shell shapes (read from the guard's own grammar; the text its refusals print):**",
+    "",
+    `- \`${READ_COMMAND_UNSUPPORTED_CODE}\`: ${READ_COMMAND_UNSUPPORTED_GUIDANCE} ${READ_COMMAND_UNSUPPORTED_NOTE}`,
+    ...Object.entries(GRAMMAR_DENIAL_GUIDANCE).map(([code, guidance]) => `- \`${code}\`: ${guidance}`),
+    "",
+    "What every shell grammar refusal prints (repair and the complete list of admitted shapes):",
+    ...GRAMMAR_DENIAL_REMEDY,
+    "",
+    `- \`${READ_SCOPE_DENIAL_CODE}\`: ${READ_SCOPE_DENIAL_GUIDANCE}`,
+    ...READ_SCOPE_DENIAL_REMEDY.map((line) => `  - ${line}`),
+    "",
+    `- A refused native Read, Glob or Grep call (the guard prints this advice): ${READ_TARGET_EXACT_FILE_ADVICE}`,
+  ].join("\n");
+}
+
 export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }, obligationsPath = null) {
   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
     `- Estimated tool calls for the whole test-first cycle: ${pkg.estimatedToolCalls}${budget.raised ? ` (above the requested tier's cap, so this dispatch is bound to ${generated.binding.agentType})` : ""}.`,
@@ -333,6 +358,8 @@ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { r
     ? "- Final integrated Verify: this project calibrates no Verify command."
     : `- Final integrated Verify — Coordinator owner, after the local candidate exists: \`${calibration.verify}\`; not yours to run.`;
   const body = `${obligationsReadSentence(obligationsPath)} and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+${admittedShellShapesBlock()}
 
 ${generated.block}
 
