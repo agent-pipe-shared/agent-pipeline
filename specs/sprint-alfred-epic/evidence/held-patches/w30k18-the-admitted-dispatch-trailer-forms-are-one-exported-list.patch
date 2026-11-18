@@ -1,0 +1,384 @@
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index 30ff49e05..0d23e95d5 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -27,7 +27,8 @@
+  * WHAT IS DERIVED, AND WHAT IS NOT. Derived: the protected-path table (from
+  * `project/guard-config.json`), the draft-phase write prefixes (from
+  * `guard-devplan.mjs`'s exported constant), the `&&` chain bound in section 1
+- * (from `grammar-denials.mjs`'s exported `MAX_AND_CHAIN_SEGMENTS`), the gate-strength shell exemption
++ * (from `grammar-denials.mjs`'s exported `MAX_AND_CHAIN_SEGMENTS`), the admitted `Dispatch:` forms of
++ * section 6 (from `commit-message-policy.mjs`'s exported `ADMITTED_DISPATCH_FORMS`), the gate-strength shell exemption
+  * (from `guard-lifecycle-ready.mjs`'s exported table), and the admitted/refused
+  * command shapes (MEASURED by asking the guard's own exported predicates, not by
+  * restating its documentation). Hand-maintained lines are marked as such in the
+@@ -51,10 +52,64 @@ import {
+   retryActionsForDeniedCommand,
+ } from "../../plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
+ import { MAX_AND_CHAIN_SEGMENTS } from "../../plugins/pipeline-core/lib/guard/grammar-denials.mjs";
++import { ADMITTED_DISPATCH_FORMS } from "../../plugins/pipeline-core/lib/commit-message-policy.mjs";
+ 
+ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+ export const OBLIGATIONS_PATH = join(REPO_ROOT, "templates", "prompts", "agent-obligations.md");
+ 
++/**
++ * The text said to each `Dispatch:` form of section 6, keyed by the `id` of `ADMITTED_DISPATCH_FORMS` (the list of forms is read
++ * from the policy, never typed here; the prose around them is hand-maintained). A form with prose renders as a bullet with its
++ * paragraph; every other exported form renders in the "further bindings" list, with its gloss when it has one. An id that is no
++ * longer exported fails the generation instead of rendering a stale bullet. The rendered forms include
++ * `Dispatch: stage-0 (elephant)` and `Dispatch: design (elephant)` (named here because the pin
++ * `installed-design-trailer-example-is-rejected-by-git-guard.test.mjs` still reads this source for them).
++ */
++const DISPATCH_FORM_PROSE = Object.freeze({
++  goldfish: {
++    head: " — a dispatched fresh-context run. This is a",
++    rest: [
++      "    claim about a *specific* dispatch, so it has to survive being checked against",
++      "    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must",
++      "    be terminal rather than `in-progress`, and its `report.changedFiles` must",
++      "    cover the paths the commit touches. Never borrow an ID whose own scope",
++      "    excludes the work — that is the failure this pair exists to make visible.",
++    ],
++  },
++  "stage-0": {
++    head: " — the direct-Elephant trailer for a bounded",
++    rest: [
++      "    fast-path fix. Implementation self-execution still requires every",
++      "    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,",
++      "    at most 60 changed lines, at most 25 of them production logic, tests green.",
++      "    The trailer does not establish those criteria or",
++      "    waive path, phase, signature or protected-source gates.",
++    ],
++  },
++  design: {
++    head: " — the direct-Elephant trailer for",
++    rest: [
++      "    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch",
++      "    record is looked up; the commit may change at most 10 paths (more is",
++      "    `UNVERIFIABLE`, as are unreadable paths). It grants no production",
++      "    implementation authority and waives no path, phase, signature or",
++      "    protected-source gate.",
++      "    Use the current sanctioned source-binding and document-integration actions;",
++      "    an unavailable authorship verdict is not permission to bypass a gate.",
++    ],
++  },
++});
++const DISPATCH_FORM_GLOSS = Object.freeze({
++  "elephant-generated": " — a verified generator's script path",
++  integration: " — the signed quality package",
++  "elephant-exception": " — work the PO exempted from EL-01 by a recorded decision",
++});
++for (const id of [...Object.keys(DISPATCH_FORM_PROSE), ...Object.keys(DISPATCH_FORM_GLOSS)]) {
++  if (!ADMITTED_DISPATCH_FORMS.some((form) => form.id === id)) {
++    throw new Error(`generate-agent-obligations: the text for Dispatch form "${id}" has no entry in ADMITTED_DISPATCH_FORMS (plugins/pipeline-core/lib/commit-message-policy.mjs); remove or rename it in DISPATCH_FORM_PROSE/DISPATCH_FORM_GLOSS`);
++  }
++}
++
+ /**
+  * The command shapes the document reports on. Nothing here asserts an outcome:
+  * the outcome is asked of the guard below, so a grammar change rewrites the
+@@ -260,7 +315,10 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put("## 6. Commit discipline");
+   put();
+   put("<!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index");
+-  put("     race), not values any guard exports, so no generator can derive them. -->");
++  put("     race); the prose stays stated. The one closed list in this section, the");
++  put("     admitted `Dispatch:` forms, is read from the exported ADMITTED_DISPATCH_FORMS");
++  put("     (plugins/pipeline-core/lib/commit-message-policy.mjs); the text said to each form");
++  put("     is kept in the generator (DISPATCH_FORM_PROSE, DISPATCH_FORM_GLOSS). -->");
+   put();
+   put("- For an ordinary Goldfish write outside native host-commit mode, generate");
+   put("  the exact stage and commit commands with the read-only");
+@@ -279,32 +337,18 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put("  whether to add them (the host's commit-attribution reminder is such an");
+   put("  instruction). There are three forms an Elephant uses for its own commits, and");
+   put("  they are not interchangeable:");
+-  put("  - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a");
+-  put("    claim about a *specific* dispatch, so it has to survive being checked against");
+-  put("    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must");
+-  put("    be terminal rather than `in-progress`, and its `report.changedFiles` must");
+-  put("    cover the paths the commit touches. Never borrow an ID whose own scope");
+-  put("    excludes the work — that is the failure this pair exists to make visible.");
+-  put("  - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded");
+-  put("    fast-path fix. Implementation self-execution still requires every");
+-  put("    fast-path criterion in operating-model §3.3, at any rigor: at most 3 files,");
+-  put("    at most 60 changed lines, at most 25 of them production logic, tests green.");
+-  put("    The trailer does not establish those criteria or");
+-  put("    waive path, phase, signature or protected-source gates.");
+-  put("  - `Dispatch: design (elephant)` — the direct-Elephant trailer for");
+-  put("    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch");
+-  put("    record is looked up; the commit may change at most 10 paths (more is");
+-  put("    `UNVERIFIABLE`, as are unreadable paths). It grants no production");
+-  put("    implementation authority and waives no path, phase, signature or");
+-  put("    protected-source gate.");
+-  put("    Use the current sanctioned source-binding and document-integration actions;");
+-  put("    an unavailable authorship verdict is not permission to bypass a gate.");
+-  put("  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:");
+-  put("  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a");
+-  put("  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed");
+-  put("  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>");
+-  put("  (elephant-exception)` for work the PO exempted from EL-01 by a recorded");
+-  put("  decision; each is verified by its own rule in `dispatch-authorship-verify`.");
++  for (const form of ADMITTED_DISPATCH_FORMS) {
++    const prose = DISPATCH_FORM_PROSE[form.id];
++    if (prose === undefined) continue;
++    put(`  - \`Dispatch: ${form.value}\`${prose.head}`);
++    for (const line of prose.rest) put(line);
++  }
++  put("  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover,");
++  put("  each verified by its own rule in `dispatch-authorship-verify`:");
++  for (const form of ADMITTED_DISPATCH_FORMS) {
++    if (DISPATCH_FORM_PROSE[form.id] !== undefined) continue;
++    put(`  - \`Dispatch: ${form.value}\`${DISPATCH_FORM_GLOSS[form.id] ?? ""}`);
++  }
+   put("  A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the");
+   put("  `dispatch-authorship-verify` tool shipped with this plugin");
+   put("  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the");
+diff --git a/harness/scripts/generate-agent-obligations.test.mjs b/harness/scripts/generate-agent-obligations.test.mjs
+index c9afc8824..9ec009fd0 100644
+--- a/harness/scripts/generate-agent-obligations.test.mjs
++++ b/harness/scripts/generate-agent-obligations.test.mjs
+@@ -315,3 +315,95 @@ test("AC-111: the Goldfish route keeps the message file and names the accurate r
+   assert.match(text, /There is exactly one commit route: the message file/u);
+   assert.match(text, /guard-dispatch-budget/u);
+ });
++
++// C30K-K18 (AC-112, duplicated-state analysis K1-03, stage 5): the closed list of admitted `Dispatch:` forms is exported once by the
++// commit-message policy; the policy texts and the generated section 6 are built from it. These cases are written from the criterion,
++// not from the implementation: they must be red while the export is absent and green when the generator derives from it.
++const K18_SAMPLES = Object.freeze({
++  goldfish: "C30K-K18 (goldfish)",
++  critic: "C30K-K18 (critic)",
++  "elephant-generated": "harness/scripts/generate-agent-obligations.mjs (elephant-generated)",
++  "stage-0": "stage-0 (elephant)",
++  design: "design (elephant)",
++  administrative: "administrative (elephant)",
++  integration: `quality-package-${"a".repeat(64)} (integration)`,
++  "elephant-exception": "D54 (elephant-exception)",
++});
++const K18_REFUSED = Object.freeze([
++  "invented (elephant)", "C30K-K18 (elephant)", "C30K-K18 (invented)", "D0 (elephant-exception)", "x (integration)",
++  "../x (elephant-generated)", "C30K K18 (goldfish)",
++]);
++async function k18Policy() {
++  return import("../../plugins/pipeline-core/lib/commit-message-policy.mjs");
++}
++function k18Section6(document = renderAgentObligations()) {
++  const start = document.indexOf("## 6. Commit discipline");
++  const end = document.indexOf("## 7.");
++  assert.ok(start > 0 && end > start, "section 6 is found");
++  return document.slice(start, end);
++}
++function k18FormsListed(section) {
++  return [...section.replace(/\s+/gu, " ").matchAll(/`Dispatch: ([^`]+)`/gu)].map((match) => match[1]);
++}
++
++test("C30K-K18: the commit-message policy exports the closed list of admitted Dispatch forms, one entry per binding", async () => {
++  const policy = await k18Policy();
++  const forms = policy.ADMITTED_DISPATCH_FORMS;
++  assert.ok(Array.isArray(forms) && Object.isFrozen(forms), "ADMITTED_DISPATCH_FORMS is an exported frozen array");
++  assert.deepEqual(forms.map((form) => form.id).sort(), Object.keys(K18_SAMPLES).sort(), "exactly the eight bindings GIT-03 admits");
++  for (const form of forms) {
++    assert.equal(typeof form.value, "string", form.id);
++    assert.equal(typeof form.matches, "function", form.id);
++    assert.ok(form.matches(K18_SAMPLES[form.id]), `${form.id} admits its sample`);
++  }
++});
++
++test("C30K-K18: the generated section 6 lists every form the policy admits and none it refuses", async () => {
++  const { ADMITTED_DISPATCH_FORMS: forms, finishedCommitMessageFindings } = await k18Policy();
++  assert.ok(Array.isArray(forms), "the export exists");
++  const listed = k18FormsListed(k18Section6());
++  assert.deepEqual([...new Set(listed)].sort(), forms.map((form) => form.value).sort(), "the listed forms are exactly the exported ones");
++  for (const refused of K18_REFUSED) {
++    assert.ok(!listed.includes(refused), `${refused} is not listed`);
++    const message = `feat(x): x\n\nDispatch: ${refused}\nAI-Assisted: true\n`;
++    const codes = finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.map((finding) => finding.code);
++    assert.ok(codes.includes("GIT-03-DISPATCH-MALFORMED"), `${refused} is refused by the policy`);
++  }
++  for (const form of forms) {
++    const message = `feat(x): x\n\nDispatch: ${K18_SAMPLES[form.id]}\nAI-Assisted: true\n`;
++    const codes = finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.map((finding) => finding.code);
++    assert.ok(!codes.includes("GIT-03-DISPATCH-MALFORMED"), `${form.id} is admitted by the policy`);
++  }
++});
++
++test("C30K-K18: the section 6 marker names the exported list as the derived part and keeps the prose hand-maintained", () => {
++  const section = k18Section6();
++  assert.match(section, /ADMITTED_DISPATCH_FORMS/u);
++  assert.match(section, /hand-maintained/u);
++  assert.doesNotMatch(section, /not values any guard exports/u, "the old claim that no component exports the forms is gone");
++});
++
++test("C30K-K18: the policy keeps no inline copy of the admitted forms outside the exported list", () => {
++  const source = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "commit-message-policy.mjs"), "utf8");
++  assert.doesNotMatch(source, /value === "stage-0 \(elephant\)" \|\|/u, "the inline Elephant chain is gone");
++  assert.doesNotMatch(source, /\(\\`Dispatch: <task-id> \(goldfish\)\\` or \\`Dispatch: stage-0 \(elephant\)\\`\)/u, "the refusal text is built from the export");
++});
++
++// Refusal texts and codes stay byte-identical (GIT-03): green before and after the derivation, so a change of bytes shows here.
++test("C30K-K18: the two GIT-03 refusal texts that name forms keep their exact bytes", async () => {
++  const { finishedCommitMessageFindings } = await k18Policy();
++  const opts = { requireMarker: true, requireDispatch: true };
++  const missing = finishedCommitMessageFindings("feat(x): x\n\nAI-Assisted: true\n", opts).findings.find((finding) => finding.code === "GIT-03-DISPATCH-MISSING");
++  assert.equal(
++    missing.detail,
++    "no `Dispatch:` entry in the final Git trailer block; end the message with `AI-Assisted: true` and one `Dispatch:` line (`Dispatch: <task-id> (goldfish)` or `Dispatch: stage-0 (elephant)`) as the last lines, written with `git commit -m <subject> [-m <body>] --trailer \"AI-Assisted: true\" --trailer \"Dispatch: <id>\"` (or, for a long or multi-paragraph body, `git commit -F scratch/<message-file>`)",
++  );
++  const administrative = finishedCommitMessageFindings("feat(x): x\n\nDispatch: administrative (elephant)\nAI-Assisted: true\n", opts).findings
++    .find((finding) => finding.code === "GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED");
++  assert.equal(
++    administrative.detail,
++    "administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`",
++  );
++  const malformed = finishedCommitMessageFindings("feat(x): x\n\nDispatch: invented (elephant)\nAI-Assisted: true\n", opts).findings.find((finding) => finding.code === "GIT-03-DISPATCH-MALFORMED");
++  assert.equal(malformed.detail, "the final `Dispatch: invented (elephant)` entry is not an admitted work-package binding");
++});
+diff --git a/plugins/pipeline-core/lib/commit-message-policy.mjs b/plugins/pipeline-core/lib/commit-message-policy.mjs
+index 475bcd27c..e43c8f2b8 100644
+--- a/plugins/pipeline-core/lib/commit-message-policy.mjs
++++ b/plugins/pipeline-core/lib/commit-message-policy.mjs
+@@ -88,16 +88,39 @@ const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
+ const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
+ export const ELEPHANT_EXCEPTION_DISPATCH = /^D[1-9][0-9]{0,3} \(elephant-exception\)$/u;
+ 
+-function admittedDispatchValue(value) {
+-  if (value === "stage-0 (elephant)" || value === "design (elephant)" || value === "administrative (elephant)") return true;
+-  if (/^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value)) return true;
+-  // D55 (Q12): an Elephant-built commit under a recorded PO exception to EL-01 names that decision.
+-  if (ELEPHANT_EXCEPTION_DISPATCH.test(value)) return true;
++const dispatchIdOf = (value, role) => {
+   const match = DISPATCH_VALUE.exec(value);
+-  if (!match) return false;
+-  if (match[2] === "elephant-generated") return /^[A-Za-z0-9._/-]+$/u.test(match[1]) && !match[1].split("/").includes("..");
+-  return SAFE_TASK_ID.test(match[1]);
+-}
++  return match && match[2] === role ? match[1] : null;
++};
++
++/**
++ * The closed list of `Dispatch:` bindings GIT-03 admits, exported ONCE (duplicated-state analysis K1-03). `value` is the
++ * display form that follows `Dispatch: ` (`<...>` marks the part that varies); `matches` is the one admission test, so the
++ * policy below and the generated section 6 of `templates/prompts/agent-obligations.md` read the same list. Order is the order
++ * the obligations text teaches them. Admission here is the SHAPE of the value only; each binding is verified by its own rule
++ * in `dispatch-authorship-verify`.
++ */
++export const ADMITTED_DISPATCH_FORMS = Object.freeze([
++  Object.freeze({ id: "goldfish", value: "<TASK_ID> (goldfish)", matches: (value) => SAFE_TASK_ID.test(dispatchIdOf(value, "goldfish") ?? "") }),
++  Object.freeze({ id: "stage-0", value: "stage-0 (elephant)", matches: (value) => value === "stage-0 (elephant)" }),
++  Object.freeze({ id: "design", value: "design (elephant)", matches: (value) => value === "design (elephant)" }),
++  Object.freeze({ id: "administrative", value: "administrative (elephant)", matches: (value) => value === "administrative (elephant)" }),
++  Object.freeze({ id: "critic", value: "<TASK_ID> (critic)", matches: (value) => SAFE_TASK_ID.test(dispatchIdOf(value, "critic") ?? "") }),
++  Object.freeze({
++    id: "elephant-generated",
++    value: "<path> (elephant-generated)",
++    matches: (value) => {
++      const path = dispatchIdOf(value, "elephant-generated");
++      return path !== null && /^[A-Za-z0-9._/-]+$/u.test(path) && !path.split("/").includes("..");
++    },
++  }),
++  Object.freeze({ id: "integration", value: "quality-package-<digest> (integration)", matches: (value) => /^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value) }),
++  // D55 (Q12): an Elephant-built commit under a recorded PO exception to EL-01 names that decision.
++  Object.freeze({ id: "elephant-exception", value: "D<n> (elephant-exception)", matches: (value) => ELEPHANT_EXCEPTION_DISPATCH.test(value) }),
++]);
++
++const dispatchForm = (id) => ADMITTED_DISPATCH_FORMS.find((form) => form.id === id).value;
++const admittedDispatchValue = (value) => ADMITTED_DISPATCH_FORMS.some((form) => form.matches(value));
+ 
+ /**
+  * Parse only the final contiguous Git trailer block. A matching line in the
+@@ -249,7 +272,7 @@ export function finishedCommitMessageFindings(message, {
+         code: "GIT-03-DISPATCH-MISSING",
+         detail: splitAway
+           ? `no \`Dispatch:\` entry in the final Git trailer block: a \`Dispatch:\` line is in the message but a blank line separates it from the last block (each \`-m\` flag starts a new paragraph); commit with \`${ONE_COMMAND_TRAILER_FORM}\` (one \`-m\` per paragraph, the two trailers only as \`--trailer\` flags), or, for a long or multi-paragraph body, write the whole message to a file under scratch/ and commit with \`${MESSAGE_FILE_FORM}\`, both trailers as the last lines with no blank line between them`
+-          : `no \`Dispatch:\` entry in the final Git trailer block; end the message with \`AI-Assisted: true\` and one \`Dispatch:\` line (\`Dispatch: <task-id> (goldfish)\` or \`Dispatch: stage-0 (elephant)\`) as the last lines, written with \`${ONE_COMMAND_TRAILER_FORM}\` (or, for a long or multi-paragraph body, \`${MESSAGE_FILE_FORM}\`)`,
++          : `no \`Dispatch:\` entry in the final Git trailer block; end the message with \`AI-Assisted: true\` and one \`Dispatch:\` line (\`Dispatch: ${dispatchForm("goldfish").replace("<TASK_ID>", "<task-id>")}\` or \`Dispatch: ${dispatchForm("stage-0")}\`) as the last lines, written with \`${ONE_COMMAND_TRAILER_FORM}\` (or, for a long or multi-paragraph body, \`${MESSAGE_FILE_FORM}\`)`,
+       });
+     } else if (dispatches.length > 1) {
+       findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
+@@ -260,11 +283,11 @@ export function finishedCommitMessageFindings(message, {
+       });
+     }
+   }
+-  if (trailers.some((entry) => entry.key === "Dispatch" && entry.value === "administrative (elephant)")) {
++  if (trailers.some((entry) => entry.key === "Dispatch" && entry.value === dispatchForm("administrative"))) {
+     const exact = trailers.length === 2 && trailers[0].key === "Dispatch" && trailers[1].key === "AI-Assisted" && trailers[1].value === "true";
+     const admitted = exact && administrativeAdmission?.ok === true && administrativeAdmission.schema === "pipeline.administrative-commit-content.v1"
+       && administrativeAdmission.code === "GIT-03-ADMINISTRATIVE-VERIFIED" && administrativeAdmission.messageSha256 === messageDigest(text);
+-    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`"});
++    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: " + dispatchForm("stage-0") + "` with `AI-Assisted: true`"});
+   }
+   const integration = trailers.filter((entry) => entry.key === "Dispatch" && entry.value.startsWith("quality-package-"));
+   if (integration.length > 0) {
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 66c9f8d4c..91104bef1 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -168,7 +168,10 @@ deliberately carries no static copy of that; a second copy is the drift.
+ ## 6. Commit discipline
+ 
+ <!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index
+-     race), not values any guard exports, so no generator can derive them. -->
++     race); the prose stays stated. The one closed list in this section, the
++     admitted `Dispatch:` forms, is read from the exported ADMITTED_DISPATCH_FORMS
++     (plugins/pipeline-core/lib/commit-message-policy.mjs); the text said to each form
++     is kept in the generator (DISPATCH_FORM_PROSE, DISPATCH_FORM_GLOSS). -->
+ 
+ - For an ordinary Goldfish write outside native host-commit mode, generate
+   the exact stage and commit commands with the read-only
+@@ -207,12 +210,13 @@ deliberately carries no static copy of that; a second copy is the drift.
+     protected-source gate.
+     Use the current sanctioned source-binding and document-integration actions;
+     an unavailable authorship verdict is not permission to bypass a gate.
+-  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:
+-  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a
+-  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed
+-  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>
+-  (elephant-exception)` for work the PO exempted from EL-01 by a recorded
+-  decision; each is verified by its own rule in `dispatch-authorship-verify`.
++  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover,
++  each verified by its own rule in `dispatch-authorship-verify`:
++  - `Dispatch: administrative (elephant)`
++  - `Dispatch: <TASK_ID> (critic)`
++  - `Dispatch: <path> (elephant-generated)` — a verified generator's script path
++  - `Dispatch: quality-package-<digest> (integration)` — the signed quality package
++  - `Dispatch: D<n> (elephant-exception)` — work the PO exempted from EL-01 by a recorded decision
+   A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the
+   `dispatch-authorship-verify` tool shipped with this plugin
+   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 66c9f8d4c..91104bef1 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -168,7 +168,10 @@ deliberately carries no static copy of that; a second copy is the drift.
+ ## 6. Commit discipline
+ 
+ <!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index
+-     race), not values any guard exports, so no generator can derive them. -->
++     race); the prose stays stated. The one closed list in this section, the
++     admitted `Dispatch:` forms, is read from the exported ADMITTED_DISPATCH_FORMS
++     (plugins/pipeline-core/lib/commit-message-policy.mjs); the text said to each form
++     is kept in the generator (DISPATCH_FORM_PROSE, DISPATCH_FORM_GLOSS). -->
+ 
+ - For an ordinary Goldfish write outside native host-commit mode, generate
+   the exact stage and commit commands with the read-only
+@@ -207,12 +210,13 @@ deliberately carries no static copy of that; a second copy is the drift.
+     protected-source gate.
+     Use the current sanctioned source-binding and document-integration actions;
+     an unavailable authorship verdict is not permission to bypass a gate.
+-  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:
+-  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a
+-  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed
+-  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>
+-  (elephant-exception)` for work the PO exempted from EL-01 by a recorded
+-  decision; each is verified by its own rule in `dispatch-authorship-verify`.
++  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover,
++  each verified by its own rule in `dispatch-authorship-verify`:
++  - `Dispatch: administrative (elephant)`
++  - `Dispatch: <TASK_ID> (critic)`
++  - `Dispatch: <path> (elephant-generated)` — a verified generator's script path
++  - `Dispatch: quality-package-<digest> (integration)` — the signed quality package
++  - `Dispatch: D<n> (elephant-exception)` — work the PO exempted from EL-01 by a recorded decision
+   A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the
+   `dispatch-authorship-verify` tool shipped with this plugin
+   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the
