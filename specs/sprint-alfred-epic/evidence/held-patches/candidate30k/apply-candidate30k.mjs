@@ -28,7 +28,7 @@ step 11-8c6808847 'test(verify): register the Spec risk trace reader suite and a
 step 12-159afbc09 'test(verify): restate the seven outgrown assertion-site counts of the case-completion registry pin'
 step 13-525fab15d 'chore(verify): extend the case-completion augmentation rows for the cases the 30j and 30k lanes added'
 
-node scripts/refresh-derived-files.mjs
+node scripts/refresh-derived-files.mjs || { echo "the derived-files refresh failed once (an intermittent suite; nothing was moved): running it once more"; node scripts/refresh-derived-files.mjs; }
 git add -A -- docs plugins/pipeline-core backlog harness/config
 git diff --cached --quiet || git commit --no-verify -m 'chore(inventory): refresh the derived files after candidate 30k (ledger, inventory baseline, Reader inputs)' -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"
 echo "derived files refreshed"

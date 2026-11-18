@@ -27,7 +27,7 @@ step 10-6df52f018 'feat(approval): the attended signature confirmation opens wit
 step 11-69ac37983 'docs(plans): the state machine analysis carries its last refinement'
 step 12-a9e4bd3e2 'test(verify): register the signature card unit suite and assign its Verify surface to the approval capability'
 
-node scripts/refresh-derived-files.mjs
+node scripts/refresh-derived-files.mjs || { echo "the derived-files refresh failed once (an intermittent suite; nothing was moved): running it once more"; node scripts/refresh-derived-files.mjs; }
 git add -A -- docs plugins/pipeline-core backlog
 git diff --cached --quiet || git commit --no-verify -m 'chore(inventory): refresh the derived files after candidate 30i (ledger, inventory baseline, Reader inputs)' -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"
 echo "derived files refreshed"

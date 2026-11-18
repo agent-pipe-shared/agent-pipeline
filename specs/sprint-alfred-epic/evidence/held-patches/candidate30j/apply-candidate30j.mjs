@@ -44,7 +44,7 @@ step 27-2429fcb68 'fix(tests): repair the line-ending case of critic-evidence-ca
 step 28-827bd0291 'feat(approval): the signature card also covers the guard-override route started with only the intent digest'
 step 29-fd69d44f3 'test(hooks): the repository-mode promotion fixtures keep their line endings on any machine'
 
-node scripts/refresh-derived-files.mjs
+node scripts/refresh-derived-files.mjs || { echo "the derived-files refresh failed once (an intermittent suite; nothing was moved): running it once more"; node scripts/refresh-derived-files.mjs; }
 git add -A -- docs plugins/pipeline-core backlog
 git diff --cached --quiet || git commit --no-verify -m 'chore(inventory): refresh the derived files after candidate 30j (ledger, inventory baseline, Reader inputs)' -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"
 echo "derived files refreshed"

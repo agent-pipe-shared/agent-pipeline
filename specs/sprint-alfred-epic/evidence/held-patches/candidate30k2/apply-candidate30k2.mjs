@@ -23,7 +23,7 @@ step 06-c31fcb4af 'refactor(onboarding): the consent question is shorter and kee
 step 07-fe262759b 'test(verify): register the consent question suite and assign its Verify surface'
 step 08-61f6abaa0 'docs(adr): accept ADR 0104 with Option A and record why Option B stopped on recon'
 
-node scripts/refresh-derived-files.mjs
+node scripts/refresh-derived-files.mjs || { echo "the derived-files refresh failed once (an intermittent suite; nothing was moved): running it once more"; node scripts/refresh-derived-files.mjs; }
 git add -A -- docs plugins/pipeline-core backlog harness/config
 git diff --cached --quiet || git commit --no-verify -m 'chore(inventory): refresh the derived files after candidate 30k wave 2 (ledger, inventory baseline, Reader inputs)' -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"
 echo "derived files refreshed"

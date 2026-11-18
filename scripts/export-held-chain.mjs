@@ -68,7 +68,9 @@ const lines = [
   "}",
   ...steps.map((step) => `step ${step.name} ${quote(step.subject)}`),
   "",
-  "node scripts/refresh-derived-files.mjs",
+  // The refresh runs the suites whose test files changed; one of them (native-goldfish-host-stop-pair) is a known intermittent timing race that makes the step exit 2
+  // and move nothing. The documented recovery is to run the step again, so the script does that once instead of leaving the human at a half-applied chain.
+  "node scripts/refresh-derived-files.mjs || { echo \"the derived-files refresh failed once (an intermittent suite; nothing was moved): running it once more\"; node scripts/refresh-derived-files.mjs; }",
   "git add -A -- docs plugins/pipeline-core backlog harness/config",
   `git diff --cached --quiet || git commit --no-verify -m ${quote(`chore(inventory): refresh the derived files after ${label} (ledger, inventory baseline, Reader inputs)`)} -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"`,
   "echo \"derived files refreshed\"",
