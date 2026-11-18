@@ -10,7 +10,9 @@ import { fileURLToPath } from "node:url";
 import { appendEvent } from "../../lib/fanout-ledger.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SKILL = readFileSync(join(HERE, "SKILL.md"), "utf8");
+// C30I-S1A: step 7 (Learn + measure) moved to references/close-light-and-extensions.md so the skill body fits the Antigravity 24000-byte
+// limit; the step text is asserted unchanged over the skill plus that reference.
+const SKILL = `${readFileSync(join(HERE, "SKILL.md"), "utf8")}\n${readFileSync(join(HERE, "references", "close-light-and-extensions.md"), "utf8")}`;
 const CLI = resolve(HERE, "..", "..", "scripts", "slice-queue.mjs");
 const SCRATCH = resolve(HERE, "..", "..", "..", "..", "scratch", "FANOUT-S11");
 const NOW = "2026-10-05T12:00:00.000Z";

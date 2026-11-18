@@ -666,3 +666,40 @@ test("Agy marketplace sync replaces the copy with path APIs and refuses an unsaf
   assert.deepEqual(readdirSync(to), ["plugin.json"]);
   assert.throws(() => installerModule.syncMarketplaceCopy({ from, to: join(root, "elsewhere") }), /Unsafe marketplace copy target/u);
 });
+
+// C30I-S1A (AC-108): the Antigravity runner loads only the first 24000 bytes of a skill body (measured, `agy plugin validate
+// --strict`). Every shipped skill keeps its body (everything after the closing `---` of the frontmatter, in UTF-8 bytes) at
+// most 22500 bytes, the 24000 limit minus a margin; longer detail lives in the skill's own `references/` files.
+const SKILL_BODY_LIMIT_BYTES = 22500;
+const SKILLS_DIR = fileURLToPath(new URL("./skills/", import.meta.url));
+function skillBodyBytes(file) {
+  const text = readFileSync(file, "utf8").replace(/\r\n/gu, "\n");
+  const front = /^---\n[\s\S]*?\n---\n/u.exec(text);
+  return Buffer.byteLength(front ? text.slice(front[0].length) : text, "utf8");
+}
+
+test("C30I-S1A every shipped skill body fits the Antigravity body limit with a margin of 1500 bytes", () => {
+  const over = [];
+  for (const entry of readdirSync(SKILLS_DIR, { withFileTypes: true })) {
+    const file = join(SKILLS_DIR, entry.name, "SKILL.md");
+    if (!entry.isDirectory() || !existsSync(file)) continue;
+    const bytes = skillBodyBytes(file);
+    if (bytes > SKILL_BODY_LIMIT_BYTES) over.push(`skills/${entry.name}/SKILL.md body is ${bytes} bytes, more than ${SKILL_BODY_LIMIT_BYTES}`);
+  }
+  assert.deepEqual(over, []);
+});
+
+test("C30I-S1A the three split skills name every reference file they depend on, each reference exists, and the Critic protocol is named MANDATORY in the opening lines", () => {
+  for (const name of ["critic-review", "close-block", "close-feature"]) {
+    const dir = join(SKILLS_DIR, name);
+    const skill = readFileSync(join(dir, "SKILL.md"), "utf8");
+    const named = [...new Set([...skill.matchAll(/references\/([A-Za-z0-9._-]+\.md)/gu)].map((m) => m[1]))];
+    assert.ok(named.length > 0, `${name} names at least one references/ file`);
+    for (const ref of named) assert.ok(existsSync(join(dir, "references", ref)), `${name} names references/${ref} and it exists`);
+    for (const ref of readdirSync(join(dir, "references"))) assert.ok(skill.includes(`references/${ref}`), `${name} names its reference ${ref}`);
+  }
+  const critic = readFileSync(join(SKILLS_DIR, "critic-review", "SKILL.md"), "utf8");
+  const opening = critic.slice(critic.indexOf("# critic-review"), critic.indexOf("# critic-review") + 4000);
+  assert.match(opening, /MANDATORY[^\n]*dispatched Critic[^\n]*references\/critic-protocol\.md|references\/critic-protocol\.md[^\n]*MANDATORY/u, "the dispatched Critic is told in the opening lines to read the protocol reference");
+  assert.match(opening, /references\/coordinator-course\.md/u, "the Coordinator reference is named in the opening lines");
+});

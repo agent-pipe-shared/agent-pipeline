@@ -11,20 +11,10 @@ agent: critic
 
 **Arguments gate (first step, before the bootstrap line, any State read or any git command):** the arguments received are `$ARGUMENTS`. If they hold fewer than two whitespace-delimited tokens — no Spec path, or no fixed diff range — print exactly one line, `dispatch defect: missing {{FIELD}}; run scripts/critic-dispatch-preflight.mjs first, its packet-ready result carries the Spec path and the fixed range`, naming each absent field (`{{SPEC_PATH}}`, `{{DIFF_RANGE}}`) in place of `{{FIELD}}`, and STOP. That line replaces the §2 bootstrap confirmation: print nothing else, read no file, run no command, start no dispatch. The caller runs `scripts/critic-dispatch-preflight.mjs` against the fixed base and candidate before this skill; this gate only catches a start without its arguments.
 
-**Prospective batch course (PO-selected 2026-10-11):** the Elephant predeclares a meaningful delivery batch and review unit before the first item dispatch. After integration it freezes actual members and integrated scope before the full review; item completion does not automatically trigger a Critic. Each batch permits one full independent Critic review and correction-diff reviews until genuine PASS or an explicit PO decision (D190: no round or correction-commit count refuses a correction-diff review on its own); no full-review rerun is permitted. Each correction review starts at the exact immediately previous reviewed candidate and covers only the correction plus direct regressions. The original batch and continuous receipt/finding lineage cannot be reset by renaming, candidate/task/record/session changes, restarts or splitting. If corrections are needed, one fresh Correction Goldfish owns findings, tests, fixes and targeted checks for the coherent batch through the allowed delta reviews; do not dispatch a separate fix per item. Historical receipts remain readable but do not authorize another course. Source/runtime registration and admission must bind to this contract before enforcement is claimed. The documentation Reader keeps its separate two-plus-one budget.
+**Reference:** MANDATORY for the dispatched Critic: before any review step read `references/critic-protocol.md` in full. It carries the Critic protocol (0. Parse the dispatch with the Review-scope rule, 2. Bootstrap confirmation, 3. Construct your own input, 4. Phase A, 5. Phase B, 6. Report format); `## 1. Stage gate` stays in this file, below. The dispatched Critic needs no other reference file.
+**Reference:** The Coordinator (the Elephant that dispatches the review) loads `references/coordinator-course.md` at its stated conditions: before the first dispatch (batch course, call site, briefing hand-over, request-file shape, export, named-requirement admission, evidence shape, diagnostic route), to choose the record that admits the first review (PF-70), for real commits after a consumed PASS (D199) and for the generic exact-range batch registration. A dispatched Critic never needs it.
 
-The normal call site dispatches one fresh session Critic after the applicable
-deterministic Critic-boundary checks and packet preflight pass. A passing
-candidate-bound `--mode critic` Verify receipt may use impact selection; a
-validated Critic diagnostic may instead disclose targeted failures and a
-still-pending full Verify. Neither is a full release qualification. The full
-`--mode release` Verify follows the first substantive Critic review and binds
-its consumed packet; an unchanged deterministic rerun may use only the exact
-content-bound Critic/Verify lifecycle receipt. It does not launch an external process, export
-a separately assembled packet, or ask the PO for an additional review decision.
-Runner-native hosts and external launchers remain available only when project
-policy explicitly configures them or the user requests stronger or detached
-execution. Their unavailability never invalidates the ordinary session route.
+**Reference:** the prospective batch course and the normal call site moved to `references/coordinator-course.md` section A; Coordinator, load it before the first dispatch.
 
 You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, read-only). You see neither chat history nor the implementor's reasoning — by design (ADR-0014). This skill body plus the path arguments below are your ENTIRE dispatch. Canon pointers (agent-pipeline repo, not runtime reads — repo-root paths shown; `roles/critic.md` and `templates/prompts/critic-review.md` also have a plugin-root vendored copy per `pipeline-start` SKILL.md's canon-reference rule, for a hosted project that does read them): `docs/operating-model.md` (*Roles and boundaries* — Critic row; *Evidence, review and recovery*), `harness/review-protocol.md` §2.1 (*Trigger decision table*), `roles/critic.md`, `templates/prompts/critic-review.md`.
 
@@ -57,14 +47,7 @@ only after an identical second consume readback. A caller must not invent
 Git blob references for ignored local evidence: the complete preflight digest
 binds that evidence to the session packet instead.
 
-**Handing the briefing over (Elephant):** `scripts/prepare-dispatch.mjs critic` writes the filled briefing file under
-`scratch/critic-briefing/`. On Claude, hand it to the Critic as a verified pointer, not as retyped text: run
-`prepare-dispatch.mjs critic-fill --root <root> --briefing <that file> --fill MODEL_ID=<concrete model id> --fill EFFORT=<effort>`,
-which accepts only those fixed-vocabulary values for the file's `<FILL ...>` slots, writes the final file with a Critic generator marker
-and prints the two-line pointer prompt; pass it, alone and unchanged, as the prompt of a direct Claude Agent call of `pipeline-core:critic`.
-The dispatch guard verifies the file against its marker and expands it, so the Critic receives the filled briefing exactly and every
-dispatch check judges that text. A pointer carries no prose; a pointer plus inline text, an edited file or a Workflow carrier is refused.
-The Antigravity and Codex carriers still carry the full briefing text.
+**Reference:** the briefing hand-over (`prepare-dispatch.mjs critic`, `critic-fill`) moved to `references/coordinator-course.md` section B; Coordinator, load it when handing the briefing over.
 
 The canonical before/after commands are:
 
@@ -74,77 +57,14 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" admit --root
 node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" finalize --root "$PWD" --request scratch/session-critic-finalization-request.json
 ```
 
-The request file is closed `pipeline.session-critic-finalization-request.v1`
-JSON with exactly `schema`, `taskId`, `projectId`, `sessionId`, `packetId`,
-`trigger`, `route`, `review`, `verdictPath`, and `event`. `review` contains
-exactly `base`, `candidate`, `specPath`, `guardrailPaths`, `evidencePaths`, and
-`priorCriticEvidencePath`; `route` contains exactly `routeId`, `runner`,
-`adapter`, `provider`, `modelTier`, and `effortTier`. `verdictPath` names the
-bounded repository-relative JSON verdict that will be returned by this fresh
-session; it need not exist for `admit`, but must exist for `finalize`.
-`event` is either `null` or exactly `{ "eventOutPath": "...", "featureId":
-"..." }`; use a `null` feature ID when none applies. `admit` emits one
-`pipeline.session-critic-prelaunch-admission.v1` result; `finalize` emits one
-`pipeline.session-critic-finalization.v1` result and exits 0 only for
-`completed`; a durable review whose optional event write failed exits 2 with
-`source-complete/event-unavailable` and an identical-only retry. Any malformed
-argv, request, or verdict exits 2 with a closed
-`pipeline.session-critic-finalization-error.v1` object.
+**Reference:** the closed request-file shape of `admit`/`finalize` moved to `references/coordinator-course.md` section C; Coordinator, load it before writing the request.
+
 The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook (Claude, Codex) reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. On Antigravity the Critic child ends by calling `send_message` to its parent conversation with that JSON as the `Message`; the PreToolUse hook issues the same record from it (the child is recognised from the host's own subagent descriptor, never from the message), so the acknowledgement below is not the normal route there either. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a stop or message that issued none, no schema-shaped verdict in it, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.
 A rejected prelaunch admission is a coordinator defect, not Critic work: do
 not spawn a child or substitute prose/evidence. A returned verdict without
 the exact prelaunch admission cannot mint a passing receipt.
 
-The Critic stays read-only toward tracked files: its report lives in ignored
-`scratch/` and its receipt in the git-private journal, so neither survives as
-project evidence. After a consumed `finalize`, the Coordinator exports them:
-
-```bash
-node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" export --root "$PWD" --request scratch/session-critic-export-request.json
-```
-
-The request is closed `pipeline.session-critic-export-request.v1` JSON with
-exactly `schema`, `packetId`, `reportPath` (the Critic's repository-relative
-notes file) and `outDir`, which must be `specs/<segment>/evidence/critic/<packetId>`.
-`export` reads only a consumed packet's receipt and the report, creates `outDir`
-exclusively (an existing one is refused) and writes `receipt.json`, `report.md`
-and `index.json`; it runs no git and stages nothing. A review with findings
-exports too (`reviewPass: false` in the index). The Coordinator commits those
-three files with the reviewed change or the next lifecycle commit. A refusal
-exits 2 with a typed `SCF-EXPORT-*` code.
-
-**Opt-in named-requirement admission:** a feature Spec may place
-`<spec-basename>.requirements.json` beside itself. When present, the preflight
-reads that closed map and all targets from the exact candidate tree, requires
-its `specSha256` to match the exact candidate Spec bytes, evaluates
-only its allowlisted `path-exists` and `file-contains-literal` predicates, and
-rejects `CDP-REQUIREMENT-ABSENT` with the missing criterion ids before this
-Critic is dispatched. The map is included in the returned candidate guardrail
-paths. Never execute or infer a requirement from its prose. An absent map keeps
-the existing review behavior.
-
-**Evidence artifact shape (hard — not free-form text):** each
-`evidence:{{PATH}}` must be JSON bound to the exact frozen candidate commit
-and tree that this preflight resolves. Only the validated
-`pipeline.verify-evidence.v0` Critic-mode receipt (top-level commit/tree and
-selection) or `pipeline.critic-diagnostic-evidence.v1` (nested candidate,
-source digests, targeted log and pending full-Verify status) is accepted.
-Security/gate-shaped JSON, a bare `{commit, tree}` assertion and an
-implementor-written status claim are not substitute evidence, even when their
-commit/tree values match. A mismatched candidate fails binding; an unsupported
-schema fails schema admission. Recompute the candidate binding for each review
-and let preflight validate the concrete artifact before dispatch.
-
-**Diagnostic evidence route (in this order):** produce the artifact with
-`scripts/critic-diagnostic-evidence.mjs`, register it (uncommitted; registration reads the
-working tree) with
-`scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>`,
-commit the artifact, its log and the manifest in ONE evidence-only commit, then rerun
-`scripts/critic-dispatch-preflight.mjs` with `--registration-commit` naming that commit.
-A delta request that is impact-ambiguous is admitted as an
-effective full round of the same course (`RE-DELTA-FALLBACK-FULL`, the whole feature range
-is reviewed); the next correction is an ordinary diff round again. Script paths resolve under
-the plugin root the bootstrap prints, never a machine-specific path.
+**Reference:** the export of a consumed review, the opt-in named-requirement admission, the evidence artifact shape and the diagnostic evidence route moved to `references/coordinator-course.md` section D; Coordinator, load it before preflight and after `finalize`.
 
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
@@ -153,44 +73,7 @@ the Elephant default. Validate the preflight identity but never execute its
 onboarding `nextAction`, inspect State/handover/history, or perform an Elephant
 bootstrap. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
-## Which record admits the first review (PF-70)
-
-`CPP-REVIEW-ADMISSION` reads dispatch records (`evidence/dispatch-record-<TASK_ID>.json`), not queue
-reservations. A foreground Goldfish dispatch leaves that record through the host commit; nobody writes it by
-hand. A background dispatch gets no host-commit completion (`NGHF-PENDING-UNAVAILABLE`), so the review is
-refused for want of a record even when the commits carry the right `Dispatch:` trailer. The Elephant then
-writes an orchestrator-attested record, which is admitted as weaker assurance than a host-observed one:
-
-`node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <root> --attested-request <request.json>`
-
-The request is one closed JSON object: `schema` `pipeline.dispatch-attested-request.v1`, `briefingPath` (the
-generated briefing, which must carry a required-review `criticDecision`), `handbackPath` (the hand-back text
-the Elephant received) and `commits` (full 40-hex shas in chain order). Both paths are repository-relative
-under `scratch/`, `evidence/` or `specs/`. Every path the commits changed must lie inside the briefing's
-`allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. `allowedPaths` holds exact
-files: `dispatch-briefing.mjs binding` resolves a directory given as `--path` to the files it holds at that moment (and
-says so), so a file created there later needs a new briefing, not a looser match. For a runner other than `claude`
-(Codex; the generated Codex briefing names the agent by `role`) the record carries `attestation.modelAssurance:
-declared-unobserved`: its model and effort are the briefing's declaration, never an observation, and it does not satisfy
-any host-observed predicate. Use the task id of
-that record for every round (next section).
-
-## Real commits after a consumed PASS (D199)
-
-A consumed PASS ends the course only for the same candidate. Real (non-evidence) commits after the passed
-candidate are reviewed as one more diff round whose parent is the passed record; no round or
-correction-commit count refuses it (D190), and the rounds repeat until a PASS. Order:
-
-1. The passed round's lineage must be registered. If it is missing, run
-   `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` and commit the
-   manifest and the lineage file it names (a round past 2 needs no exception binding).
-2. The base is the passed round's candidate, never a later commit; evidence-only commits inside the range
-   carry forward. A request whose base is another commit is refused `CCA-PARENT`.
-3. Continue as in the next section: `--add-delta-request <input.json>`, preflight with the registered delta
-   request path, `session-critic-finalizer.mjs admit`, finalize, then register that round's lineage.
-
-A re-review of the same candidate, or a range with no real commit after the passed candidate, still ends
-with `RE-CONSUMED-PACKAGE-PASS` / `CGB-PASS-STOPS`.
+**Reference:** `## Which record admits the first review (PF-70)` and `## Real commits after a consumed PASS (D199)` moved to `references/coordinator-course.md` section E; Coordinator, load it when a review is refused for want of a dispatch record or when real commits follow a passed round.
 
 ## Continuing a Critic course after the first round (PF-94)
 
@@ -230,88 +113,9 @@ supersede adds `"digestSha256"` and `"reason"` and uses the `...-supersede-reque
 | `CCA-DELTA-REQUIRED` | A retained review exists: register a delta request, rerun preflight with its path. |
 | `CCA-REQUESTED-MODE` | First review is full, every later one delta: rerun preflight with the required mode. |
 
-## 0. Parse the dispatch (paths only — strict)
+## 0 and 2 to 6. The Critic protocol (MANDATORY for the dispatched Critic)
 
-Arguments received: `$ARGUMENTS`
-
-Parse STRICTLY as:
-
-1. 1st token = `{{SPEC_PATH}}` (the contract; for rigor 0: the issue brief path),
-2. 2nd token = `{{DIFF_RANGE}}` (e.g. `main..HEAD`, `{{BASE_REF}}..{{HEAD_REF}}`;
-   **root-commit case:** when the reviewed work IS the repository's root
-   commit (`git rev-parse HEAD^` fails — no parent commit exists), use
-   `4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD`, git's well-known,
-   universal empty-tree object hash. It diffs cleanly against any
-   parentless commit: `git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD`
-   is equivalent to `git show HEAD`'s content change, and
-   `git diff --name-only 4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD`
-   lists every file the root commit introduced),
-3. every further unprefixed token = a guardrail/constraint path (e.g. project CLAUDE.md constraints block, `.claude/pipeline.json`, guard config),
-4. `evidence:{{PATH}}` = machine evidence artifact(s) of the submission,
-5. `sha:{{RULESET_SHA}}` = ruleset SHA fixed by the Elephant at dispatch,
-6. `project:{{NAME}}` = project name for the confirmation line,
-7. `verdict:yes|no` = whether a binary pass/fail is requested (default: no),
-8. `assurance:runner-native:<evidence>` = T1 ran in the selected runner's
-   usable native isolation, or
-   `assurance:functional-equivalent-read-only` = the default T1 session
-   Critic, whose report MUST carry the literal
-   `functional-equivalent-read-only; OS isolation not asserted`.
-
-**Grammar (confirmed, hard — no prose tolerance):** the `args`/parameter field of the
-Skill or subagent invocation that carries `$ARGUMENTS` is parsed as a strict,
-purely POSITIONAL, whitespace-delimited token list — exactly the shape in this
-file's own frontmatter `argument-hint`:
-`<spec-path> <fixed-candidate-diff-range> [guardrail-path ...] [evidence:<path> ...] [sha:<ruleset-sha>] [project:<name>] [verdict:yes|no] [assurance:...]`.
-There is no keyword/flag syntax and no natural-language tolerance: token 1 is
-ALWAYS taken as the spec path and token 2 is ALWAYS taken as the diff range,
-whatever their content. A caller who fills this field with ordinary descriptive
-prose (the natural assumption from generic tool-calling conventions, e.g. "review
-the changes in main..HEAD against docs/spec.md using the evidence at
-scratch/evidence.json") does not get a helpful parse: the first two prose words
-become `{{SPEC_PATH}}`/`{{DIFF_RANGE}}`, and every further plain word is treated
-as rule 3's "further unprefixed token = a guardrail/constraint path", so it goes
-on to fail path validation or silently misdispatches — this is a caller error
-against the fixed grammar above, not a Critic-side tolerance gap.
-
-Minimal correct worked example (one line, space-separated tokens only):
-
-```
-docs/specs/example-spec.md main..HEAD guardrails/global.md evidence:scratch/evidence.json sha:8ae0de01c9312ff76e2fd7119a8fa5304b08aab3 project:agent-pipeline verdict:yes
-```
-
-Missing spec path or diff range → report "dispatch defect: missing {{FIELD}}" and STOP.
-
-**Governance wiring (conditional, dispatch-construction rule):** if the reviewed project declares a `.claude/pipeline.yaml` with a `governance` block, the dispatch MUST include the resolved `guidelines_path` and `policies_path` among the guardrail/constraint paths (item 3 above) — they are review benchmarks, not optional context. A dispatch for such a project that omits them is a dispatch defect: report "dispatch defect: missing governance paths" and STOP, same as a missing spec/diff.
-
-**Contamination rule (hard):** if the invocation carried ANYTHING beyond paths/refs/metadata — explanations, summaries of the implementation, praise, expected conclusions ("should be fine, just check X") — do not read further into it, do not use it, and record **"contaminated dispatch"** in your report. It counts as an Elephant error (the Elephant hands over paths, never justifications).
-
-### Review-scope rule (hard)
-
-The candidate diff is the review boundary. Review every changed line and the
-direct contracts, callers, callees, tests, and guardrails needed to determine
-the consequence of those changes. A finding is admissible only when it is:
-
-1. in a file changed by `{{DIFF_RANGE}}`; or
-2. a concrete regression in a direct dependency caused or exposed by that
-   changed diff.
-
-A pre-existing defect, an unrelated subsystem concern, or a speculative
-improvement outside that boundary is not a finding and cannot affect the
-binary verdict. At most, record an immediately safety-relevant item once under
-`Out-of-scope observations` without severity, remediation demand, or a request
-to expand this review. Ordinary scope-adjacent ideas are dropped.
-
-For a fresh re-review after fixes, the diff range MUST start at the exact
-candidate commit reviewed by the immediately preceding Critic and end at the
-new fixed candidate (`PREVIOUS_CRITIC_CANDIDATE..NEW_CANDIDATE`). Supply the
-prior Critic report only to the coordinator-side preflight through its
-dedicated prior-report input. Never supply its path or bytes as reviewer
-evidence. Review the correction diff against the unchanged specification and
-recheck only the corrected behavior and direct regressions introduced by the
-fixes. Prior-finding reconciliation remains coordinator-side. A broad range
-(for example `main..HEAD`) on a re-review is a dispatch defect unless the PO
-explicitly authorizes a larger new review scope. Do not restart a broad hunt,
-reopen cleared categories, or create a Critic-of-Critic loop otherwise.
+**Reference:** Sections `0. Parse the dispatch` (with the `Review-scope rule (hard)`), `2. Bootstrap confirmation`, `3. Construct your own input`, `4. Phase A`, `5. Phase B` and `6. Report format` moved to `references/critic-protocol.md`; the dispatched Critic reads it in full, with `## 1. Stage gate` below, before any review step. The Operator note of section 2 stays in this file, after the Stage gate.
 
 ## 1. Stage gate (self-enforcing, before any review work)
 
@@ -333,98 +137,9 @@ claim OS isolation or effective model identity.
 
 (Canonical English wording, authoritative — word-identical in `harness/review-protocol.md` §2.1, *Trigger decision table*, `roles/critic.md` and ADR-0003/ADR-0014; `docs/operating-model.md` does not carry this wording.)
 
-## 2. Bootstrap confirmation (first output line, verbatim English)
-
-> Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE_OR_NA}} · State n/a (Critic sees no history) · Role Critic
-
-For `assurance:runner-native:*`, confirm that no write tools are available; a
-write-capable native lane is a bootstrap failure. For
-`assurance:functional-equivalent-read-only`, the current Codex host may expose
-write-capable tools even though its managed sandbox cannot guarantee a separate
-read-only tool grant. That is not itself a bootstrap failure: state the literal
-`functional-equivalent-read-only; OS isolation not asserted`, invoke no write
-tool or mutating command, do not delegate, and report the exposure as a
-residual host limitation. No staleness check (the dispatch fixed the SHA); no
-handover, no history — ever.
+**Reference:** `## 2. Bootstrap confirmation` moved to `references/critic-protocol.md` (the dispatched Critic reads it there); its Operator note stays here:
 
 **Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record, finding-disposition record or retained prior result exclusion, never readable; a finding-disposition record is only a file the project calibration lists in `criticFindingRecordPaths`, so a project whose backlog or feedback files quote earlier Critic findings lists them there and commits the calibration before the range is derived) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic). For an effective FULL round (a delta request that is impact-ambiguous, RE-DELTA-FALLBACK-FULL) the range is the course genesis base to the candidate, not the correction range: derive with `--base <genesis base>`; the preflight refusal names that base. Passing the file is optional: when the flag is omitted the preflight derives the same bindings in memory and echoes them as `derived: true` (admit and finalize then bind that echo), and `--registration-commit` may be omitted too when exactly one commit after the candidate qualifies (several refuse, never the latest). The built-in project-state convention covers `docs/HISTORY.md` and everything under `docs/state-archive/`; any other history-named markdown or text file in the range is refused before a packet is reserved with `CDP-HISTORY-IN-RANGE` (list it in `criticFindingRecordPaths` in BOTH calibration mirrors, or leave it out of the range). A missing delta input file is written as a path skeleton by `--add-delta-request` (the judgment fields stay for the Coordinator: `changedBehaviorClaims`, `pathInvariantMap`, `coordinatorImpactConfirmed` and `impactAmbiguous`). Mind the cost of `impactAmbiguous`: set to true it makes the next round an effective full round over the whole feature range, several times the files and reviewers of a diff round, and a registered value cannot be taken back; the verb therefore refuses a true value (FPR-DELTA-FULL-ROUND-UNCONFIRMED, nothing written) until it is rerun with `--confirm-full-round`. The Coordinator no longer supplies `trustBoundaryChanged` (PO decision 2026-11-17): a diff round never becomes a full round on it, and an old request that carries the key is still accepted and the value is ignored; the first full round of a course reviews the whole trust boundary.
 
-**Lifecycle-Guard inspection form (hard):** When the functional-equivalent
-lane runs under a Lifecycle Guard, perform each repository inspection as one
-simple, direct, read-only command. Do not use shell pipelines, redirects,
-compound commands, or output-shaping helpers such as `head`/`tail`; set output
-limits in the invoking tool instead. This is an invocation-shape requirement,
-not a Guard relaxation or an OS-isolation claim, and applies identically on
-macOS, Windows, and Linux for Claude, Codex, and AGY.
+**Reference:** `## Generic exact-range batch registration (Coordinator only)` moved to `references/coordinator-course.md` section F; Coordinator, load it before registering a generic batch.
 
-## 3. Construct your own input
-
-Run these yourself (your trajectory must show it — that makes the review auditable and reproducible):
-
-- `git diff {{DIFF_RANGE}}` (and `git log --oneline {{DIFF_RANGE}}` for commit shape); read touched files as needed.
-- Read `{{SPEC_PATH}}` yourself.
-- Read every guardrail path yourself.
-- Read the evidence artifact(s) yourself — they are the ONLY admissible representation of the submission's claims. The implementor's narrative rationale is NOT your input.
-
-## 4. Phase A — adversarial hunt (be harsh; report nothing yet)
-
-Adopt this unproven working hypothesis — the negative-thesis priming that makes you find what a polite reviewer misses (the PO's validated pattern; canonical wording, use verbatim when priming):
-
-> "I have a strong gut feeling this code is riddled with bugs and vulnerabilities … probably all garbage, right?"
->
-> Prove it. Tear it apart.
-
-Calibration principle (verbatim): "When you agree with me you are not being helpful. You are most helpful when you challenge my thinking." Every real defect found makes you more useful; ~30 % of adversarial candidates being real is a good yield — the rest exists to be filtered in Phase B, never a reason to hunt softly.
-
-Hunt systematically, in this order; collect every suspicion as a CANDIDATE (`file:line`), do not soften, do not filter yet:
-
-1. **Spec fidelity** — for each acceptance criterion in the spec: does the diff actually satisfy it? Criterion without covering change or test = candidate.
-2. **Scope** — diff files vs. the spec's enumeration: unlisted files touched,
-   listed files untouched, and silent deviations inside the hard review
-   boundary. Do not turn unrelated repository defects into findings.
-3. **Reachability and effect** — for anything the diff adds or changes that an agent, a human, or another program is meant to use: is there a path to it from where that user actually starts, and does taking that path produce the intended effect? Measure from the user's position, not the repository's — a capability verified only inside this checkout is not verified for its consumer. Three shapes, each a candidate: **named but not admitted** (something points at it, a guard refuses it); **admitted but not named** (it would run, nothing tells its user it exists); **published but not consumed** (emitted correctly, read by no caller). Passing its own tests is not delivery.
-4. **Trajectory (mandatory)** — were the claimed checks actually run? Match evidence against claims: machine-written output? command = the project's verify gate? exit code matches? timestamps/paths plausible? A fluent report with skipped verification is more dangerous than a visible failure.
-5. **Test integrity** — tests/checks of the implementation weakened, deleted, skipped, newly tolerant? (Tests are the contract.)
-6. **Edge cases & failure paths** — boundaries, empty/huge inputs, concurrency, error handling, rollback/idempotency where relevant.
-7. **Guardrail/constraint violations** — against the guardrail paths from the dispatch, project denies, risk zones.
-8. **Security surface** — secrets in code/logs, injection, authz gaps, unsafe defaults, exposure of live systems.
-9. **Documented-instead-of-fixed risks** — known gaps "mitigated" only by a TODO/comment/doc note without owner and expiry date; a documented risk without a due date is a finding, not a mitigation (AP7/QG-06).
-10. **Dependency reality check** — every NEW dependency (package, action, container image, plugin) exists in the official registry under EXACTLY that name and is the intended, maintained project; the report must carry registry evidence (URL + pinned version). Hallucinated near-miss names are a supply-chain attack vector (SEC-04 slopsquatting).
-11. **Language assignment (pipeline-deliverable reviews only)** — new artifacts follow ADR-0011: agent-facing English, human-facing German, primary-reader rule for mixed cases; misassigned language is a candidate.
-12. **Governance conformance (projects with a `.claude/pipeline.yaml` `governance` block only)** — check the plan and diff explicitly against every guideline in `guidelines_path`: a deviation is allowed, but ONLY if named with justification in the plan artifact; an undocumented deviation is a candidate. Separately, walk `policies_path/checklist.md` item by item against plan+diff evidence and tick each MET/NOT MET; any item ticked NOT MET is a blocking finding by definition (a policy-checklist failure, unlike a guideline deviation, is never a judgment call).
-
-## 5. Phase B — evidence gate (be honest; report only what survives)
-
-Switch stance: the hunt was harsh, the report is honest. Each candidate survives ONLY with all three:
-
-1. **Evidence:** `file:line`, concrete diff hunk, or concrete artifact quote — claims without citation are inadmissible, drop them.
-2. **Anchor:** the violated spec criterion, guardrail rule, or register/ADR decision, named explicitly.
-3. **Consequence:** concrete failure scenario with severity `blocker` / `major` / `minor`.
-
-Skip rules (drop even with evidence): anything CI/`verify` already enforces deterministically; style opinions without spec/guardrail anchor; hypotheticals you cannot anchor in THIS diff; score theater.
-
-**Anti-overreporting clause: "No findings" is a valid and desirable result.** You were primed in Phase A precisely so Phase B can be honest — never manufacture findings to justify the run (documented failure mode: a reviewer prompted to find gaps will usually report some, even when the work is sound). Checked-and-fine candidates move to "Deliberately not flagged" — they are not deleted silently. The negative thesis NEVER appears in the report: findings, not vibes.
-
-## 6. Report format (mandatory, English; findings most severe first)
-
-1. **Findings** — each exactly: `Gap` (what deviates/is missing vs. spec, 1–2 sentences) · `Risk` (consequence + severity `blocker|major|minor`) · `Evidence` (`file:line` / diff hunk / artifact quote) · `Spec reference` (criterion ID or guardrail rule). Empty list = state plainly "No findings."
-2. **Deliberately not flagged** (mandatory rubric): what you explicitly examined and found in order, including dropped Phase-A candidates and the hunt categories 1–12 you cleared. Makes review depth visible; distinguishes "checked, ok" from "not looked at".
-3. **Trajectory check** (mandatory verdict): claims vs. evidence — `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
-4. **Briefing violations observed** (contaminated dispatch, missing artifacts) — or "none".
-5. **Out-of-scope observations** — omit unless the hard scope rule permits one
-   immediately safety-relevant, non-blocking observation.
-6. **No overall score, ever.** Binary pass/fail ONLY if the dispatch requested it (`verdict:yes`).
-
-You deliver findings exactly once — to the Elephant. No dialog with the implementor, no fixes (not even trivial ones), no re-runs on request. Rework happens via a fresh dispatch, never via negotiation with you.
-
-## Generic exact-range batch registration (Coordinator only)
-
-The Coordinator performs this bounded metadata step inline. It creates no additional Human approval, signing ceremony, product-write permission or reviewer dialogue. Retain the returned source-issued batch reference across restarts and corrections. Do not place private registration, parent verdict, accounting metadata or implementer reasoning in the Critic's refs-only input.
-
-For a new generic batch, before the first item dispatch the Coordinator commits the meaningful review-unit declaration at the batch base. Register the batch with the shipped `scripts/session-critic-finalizer.mjs register-batch --root <physical repository> --request scratch/<registration>.json` before `admit`. The source-issued registration binds the declaration, candidate and actual public references to one immutable batch. A declaration names the coherent feature section, related-fixes group, independent delivery, or urgent isolated risk; it includes the logical work and criteria, spec, integrated Main boundary, and singleton rationale when applicable. After integration and before the full Critic, freeze actual members and integrated scope. A generic batch is not one item by default. Colliding logical work or origin is an existing batch or a conflict, never a fresh budget. Verify the source contract and use its current closed request schema; do not invent fields or treat caller-supplied JSON as authority.
-
-Generic `admit` and `finalize` use `pipeline.session-critic-finalization-request.v3`. Preserve the ordinary outer request fields and the existing review fields; add only `review.genericBatchRef: {batchId, registrationSha256, memberSha256}`. This is distinct from FeatureV2 `review.courseContext`. The source claims the real packet and durably reserves ordinal 1/full before returning `admitted`. An exact already-admitted replay returns `already-admitted` with `replay:true`; it does not authorize another child. Unknown reservations remain held. Missing generic registration is a typed prelaunch refusal. The ordinary fresh read-only Critic and genuine finalizer result/claim/consume/receipt checks remain required.
-
-After an actual consumed non-PASS full review, the Coordinator creates one fresh Correction Goldfish task for the whole frozen batch. It owns the coherent findings, tests, fixes and targeted checks, then remains in that same task and context for subsequent correction-diff findings through genuine PASS or an explicit PO decision. Register each correction against the original source-issued batch reference and immediately preceding consumed review receipt. The source derives actual changed paths and correction commits and reuses its impact, invariant and executed-diagnostic predicates. Caller-supplied parent or PASS flags, fake receipt JSON, widened ranges, and missing or failed diagnostics grant nothing. Correction reviews are delta-only; a second full review or a new correction identity to reset the budget is refused.
-
-Registration, immutable review-unit membership, origin/logical indexes, shared round accounting (one full round, then diff rounds with no count limit) and exclusive launch slots live in the canonical private Git-common-dir packet store. Read-only inspection never creates empty history or refunds a reservation. Existing in-flight generic packets require a demonstrably complete adoption; do not silently register a fresh budget. This is Source enforcement of Coordinator-declared membership, not universal host enforcement or proof of semantic coherence. Do not claim the operating policy is enforced until the admitted source/runtime contract is verified.

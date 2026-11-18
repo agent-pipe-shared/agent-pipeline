@@ -73,7 +73,9 @@ check("F1 inventory records full lowercase SHA-256 values", () => {
 });
 
 check("D41 the Critic skill states the diagnostic evidence route (producer, registrar flag, preflight flag)", () => {
-  const skill = readFileSync(join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review", "SKILL.md"), "utf8");
+  // C30I-S1A: the route text moved to the Coordinator reference of the same skill (Antigravity body limit); read the skill plus it.
+  const skillDir = join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review");
+  const skill = `${readFileSync(join(skillDir, "SKILL.md"), "utf8")}\n${readFileSync(join(skillDir, "references", "coordinator-course.md"), "utf8")}`;
   const flat = skill.replace(/\s+/g, " ");
   const anchor = flat.indexOf("Diagnostic evidence route");
   assert.equal(anchor >= 0, true, "the Diagnostic evidence route heading is present");
@@ -88,6 +90,19 @@ check("D41 the Critic skill states the diagnostic evidence route (producer, regi
   assert.equal(addFlag > registrar, true, "registrar flag --add-diagnostic-evidence follows the registrar");
   assert.equal(preflight > addFlag, true, "preflight script follows the registration step");
   assert.equal(regCommit > preflight, true, "preflight flag --registration-commit follows the preflight script");
+});
+
+check("C30I-S1A the pinned Critic skill names its protocol reference MANDATORY, keeps the Stage gate, and the reference carries the protocol sections 0, 2 to 6", () => {
+  const skillDir = join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review");
+  const skill = readFileSync(join(skillDir, "SKILL.md"), "utf8");
+  const protocol = readFileSync(join(skillDir, "references", "critic-protocol.md"), "utf8");
+  const opening = skill.slice(skill.indexOf("# critic-review"), skill.indexOf("## Continuing a Critic course"));
+  assert.match(opening, /MANDATORY for the dispatched Critic[^\n]*references\/critic-protocol\.md/u, "the opening lines name the protocol reference MANDATORY");
+  assert.equal(skill.includes("## 1. Stage gate (self-enforcing, before any review work)"), true, "the Stage gate stays in the skill");
+  for (const heading of ["## 0. Parse the dispatch (paths only — strict)", "### Review-scope rule (hard)", "## 2. Bootstrap confirmation (first output line, verbatim English)", "## 3. Construct your own input", "## 4. Phase A — adversarial hunt (be harsh; report nothing yet)", "## 5. Phase B — evidence gate (be honest; report only what survives)", "## 6. Report format (mandatory, English; findings most severe first)"]) {
+    assert.equal(protocol.includes(heading), true, `the protocol reference carries ${heading}`);
+    assert.equal(skill.includes(heading), false, `${heading} is not duplicated in the skill`);
+  }
 });
 
 process.stdout.write(`1..${passed}\n`);

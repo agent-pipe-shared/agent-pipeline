@@ -7,7 +7,10 @@ import test from "node:test";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const skill = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "SKILL.md"), "utf8");
+// C30I-S1A: the Critic protocol (with the Review-scope rule) moved to references/critic-protocol.md so the skill body fits the Antigravity
+// 24000-byte limit; the rule text is asserted unchanged over the skill plus that reference.
+const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
+const skill = `${readFileSync(join(SKILL_DIR, "SKILL.md"), "utf8")}\n${readFileSync(join(SKILL_DIR, "references", "critic-protocol.md"), "utf8")}`;
 
 test("Critic findings stay bound to the candidate diff and direct regressions", () => {
   assert.match(skill, /The candidate diff is the review boundary\./u);
