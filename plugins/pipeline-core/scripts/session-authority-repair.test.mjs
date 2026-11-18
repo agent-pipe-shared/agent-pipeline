@@ -600,6 +600,22 @@ const cases = [
     assert.ok(aside, JSON.stringify(found.next));
     assert.match(aside.why, /does not clear a finalizer stop-failure record/u, aside.why);
   }) },
+  // C30I-S6 (queue C30-21): the PO's move-aside removed the catalogue, and the later close silently ran on the direct route instead of the owner route.
+  { id: "SAR22", name: "C30I-S6 move-aside rebuilds the catalogue it moved away while a Close lifecycle exists (the one-shot close decides its owner-route mode from it) and says so; without one the registry stays absent as before", run: () => fixture(({ root }) => {
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const catalogue = join(repository.commonDir, "agent-pipeline/session-authority/catalogue.json");
+    assert.equal(existsSync(catalogue), true, "the first governed dispatch initialized the registry");
+    mkdirSync(join(repository.commonDir, "agent-pipeline/publication-close/lifecycle-a"), { recursive: true, mode: 0o700 });
+    const moved = repair("move-aside", "--root", root, "--no-goldfish-running", "--reason", "the ceremony namespace changed under a stopped ceremony");
+    assert.equal(moved.code, 0, JSON.stringify(moved.result));
+    assert.equal(moved.result.status, "moved-aside");
+    assert.deepEqual(moved.result.registryRebuilt, { status: "initialized" });
+    assert.equal(existsSync(catalogue), true, "the owner-route catalogue is back: the open close keeps its mode");
+    assert.equal(moved.result.registry.read.status, "readable", JSON.stringify(moved.result.registry));
+    const aside = moved.result.retained.find((name) => name.endsWith("-repair-move-aside"));
+    assert.equal(existsSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", aside, "catalogue.json")), true, "the old registry is still retained, not deleted");
+  }) },
   // ---- SAD diag: the state authority refusal names an untyped cause after the code parenthesis, its elapsed time, and an opt-in trace ----
   { id: "SAS01", name: "SAD diag (1) a typed refusal keeps its text and ends with the elapsed time", run: () => {
     const typed = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 });

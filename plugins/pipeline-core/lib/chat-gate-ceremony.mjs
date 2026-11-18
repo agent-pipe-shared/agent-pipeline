@@ -163,8 +163,9 @@ export function requireAttendedChatGateConfirmation({ summaryLines = [], expecte
 // Declaration-only imports: the two owners exchange opaque handles, not callbacks.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
 import { canonical } from "./po-approval-proof.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
@@ -373,6 +374,56 @@ function ceremonyExecuteBody(data){
   data.executionHandle=Object.freeze({});ceremonyLiveOperations.delete(data);
   if(error)throw error;return {status:"executed",executionHandle:data.executionHandle,memberRef:data.memberRef===null?null:Object.freeze({...data.memberRef}),ownerResult:result,sourceRefs:ceremonyInventory(data.repository).groups.get(data.id).map(x=>x.ref)};
 }
+// C30I-S6: the ceremony body (a passphrase prompt) runs outside the registry lock, so nothing else says whether the process that started a ceremony still
+// runs. Each ceremony therefore records that process once, in the registry's own lock-owner identity, next to (never inside) its closed records, and a later
+// start judges it with the registry's own judge: only a provably gone owner lets the ceremony be retired; no record, a live or an unjudgeable owner never does.
+const CEREMONY_OWNER_SCHEMA="pipeline.chat-gate-ceremony-owner.v1";
+const ceremonyOwnerDirectory=repo=>join(repo.commonDir,"agent-pipeline","chat-gate-ceremony-owners");
+const ceremonyOwnerFile=(repo,id)=>join(ceremonyOwnerDirectory(repo),`${id}.json`);
+const ROUTINE_REPAIR_SCRIPT=fileURLToPath(new URL("../scripts/routine-repair.mjs",import.meta.url));
+function ceremonyWriteOwner(data){
+  ensureHardenedPrivateDirectory(data.repository.commonDir,ceremonyOwnerDirectory(data.repository));
+  writePrivateFileNoReplaceAtomic(ceremonyOwnerFile(data.repository,data.id),Buffer.from(canonical({schema:CEREMONY_OWNER_SCHEMA,id:data.id,owner:ceremonyRegistry.sessionAuthorityLockOwner()})));
+}
+function ceremonyReadOwner(repo,id){
+  try{const value=JSON.parse(readFileSync(ceremonyOwnerFile(repo,id),"utf8"));return value?.schema===CEREMONY_OWNER_SCHEMA&&value.id===id?value:null;}catch{return null;}
+}
+/**
+ * C30I-S6: finishes, as `cancelled`, every ceremony an earlier process left half-way (records short of a terminal, or a registry member that lags the
+ * records or was never released) whose owner process is provably gone, through the registry's own advance and release. A ceremony of this process, one
+ * whose owner is live or cannot be judged, and one that recorded no owner are kept and named (`kept`), never retired. Runs inside the boundary.
+ */
+export function retireAbandonedChatGateCeremonies({repository:input,boundary,judge=ceremonyRegistry.judgeSessionAuthorityLockOwner}){
+  const repo=ceremonyRepository(input),retired=[],kept=[];
+  try{lstatSync(join(repo.commonDir,"agent-pipeline","session-authority","catalogue.json"));}catch(error){if(error.code==="ENOENT")return {retired,kept};throw error;}
+  const port=createChatGateAuthorityProducerPort({repository:repo});
+  for(const [id,rows] of ceremonyInventory(repo).groups){
+    if([...ceremonyLiveOperations].some(live=>live.id===id))continue;
+    const first=rows.find(x=>x.record.phase==="reserved"),last=rows.find(x=>x.record.phase==="terminal-observed")??rows.find(x=>x.record.phase==="running")??rows[0];
+    const {phase,terminal,bindingSha256,...core}=first.record,operationHandle=Object.freeze({});
+    const data={port,repository:repo,id,core,association:core.association,entry:core.entry,bindingSha256,phase:last.record.phase,executing:false,terminal:last.record.terminal??"cancelled",operationHandle};
+    ceremonyOperations.set(operationHandle,data);
+    const member=ceremonyRegistry.recoverAbandonedSessionAuthorityMember({boundary,producerPort:port,operationHandle,bindingSha256});
+    if(last.record.phase==="terminal-observed"&&member===null)continue;
+    const owner=ceremonyReadOwner(repo,id),verdict=owner===null?null:judge(owner);
+    if(verdict!=="dead"){kept.push({id,why:owner===null?"no process is recorded as its owner":`its owner process is ${verdict}`});continue;}
+    for(const next of ["running","terminal-observed"])if(!rows.some(x=>x.record.phase===next))ceremonyPublish(data,next,next==="terminal-observed"?"cancelled":null);
+    if(member!==null){
+      const advanced=ceremonyRegistry.advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:member.memberHandle,expectedMemberRef:member.memberRef,operationHandle});
+      const terminalHandle=Object.freeze({});ceremonyTerminals.set(terminalHandle,{port,data});
+      ceremonyRegistry.releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:member.memberHandle,expectedMemberRef:advanced.memberRef,terminalHandle});
+    }
+    rmSync(ceremonyOwnerFile(repo,id),{force:true});retired.push(id);
+  }
+  return {retired,kept};
+}
+/** A refusal the ceremony's own records cause names the runnable repair, instead of the bare `chat:` reason. */
+function ceremonyRepairable(error,repo,kept){
+  if(typeof error?.message!=="string"||!error.message.startsWith("chat:"))return error;
+  const why=kept.length?kept.map(row=>`${row.id.slice(0,8)}: ${row.why}`).join("; "):"its records and the registry disagree";
+  error.repair=`an earlier PO ceremony was left half-way and this start cannot retire it (${why}). If no PO ceremony runs in another terminal, run: node ${ROUTINE_REPAIR_SCRIPT} run move-aside --no-goldfish-running --root ${repo.primaryRoot} --reason "<why>" (the registry is retained aside, nothing is deleted); otherwise finish that ceremony first`;
+  return error;
+}
 /** Source-owner adapter: no callable operation argument and no caller terminal verdict. */
 function runRegisteredCeremony({repository:input,entry,input:ownerInput}){
   const repo=ceremonyRepository(input),port=createChatGateAuthorityProducerPort({repository:repo});
@@ -381,7 +432,13 @@ function runRegisteredCeremony({repository:input,entry,input:ownerInput}){
   let cataloguePresent=false;
   ceremonyRegistry.withSessionAuthorityBoundary({repository:repo},boundary=>{
     try{lstatSync(join(repo.commonDir,"agent-pipeline","session-authority","catalogue.json"));cataloguePresent=true;}catch(error){if(error.code!=="ENOENT")throw error;}
-    if(cataloguePresent){const reserved=ceremonyRegistry.reserveSessionAuthorityMember({boundary,producerPort:port,association:data.association,operationHandle:prepared.operationHandle});data.memberHandle=reserved.memberHandle;data.memberRef=reserved.memberRef;}
+    let kept=[];
+    if(cataloguePresent){
+      const settled=retireAbandonedChatGateCeremonies({repository:repo,boundary});kept=settled.kept;
+      if(settled.retired.length)process.stderr.write(`Retired ${settled.retired.length} earlier PO ceremony(ies) left half-way by a process that has ended: ${settled.retired.map(id=>id.slice(0,8)).join(", ")}.\n`);
+    }
+    ceremonyWriteOwner(data);
+    if(cataloguePresent){let reserved;try{reserved=ceremonyRegistry.reserveSessionAuthorityMember({boundary,producerPort:port,association:data.association,operationHandle:prepared.operationHandle});}catch(error){throw ceremonyRepairable(error,repo,kept);}data.memberHandle=reserved.memberHandle;data.memberRef=reserved.memberRef;}
     ceremonyPublish(data,"reserved");ceremonyPublish(data,"running");
     if(data.memberHandle)data.memberRef=ceremonyRegistry.advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:data.memberHandle,expectedMemberRef:data.memberRef,operationHandle:prepared.operationHandle}).memberRef;
   });
@@ -389,6 +446,7 @@ function runRegisteredCeremony({repository:input,entry,input:ownerInput}){
   try{executed=ceremonyExecuteBody(data);}catch(caught){error=caught;}
   if(data.phase==="terminal-observed")ceremonyRegistry.withSessionAuthorityBoundary({repository:repo},boundary=>{
     if(data.memberHandle){const finished=port.finishOperation({operationHandle:prepared.operationHandle,executionHandle:data.executionHandle,entry:"prompt-return",input:{},expectedMemberRef:data.memberRef});ceremonyRegistry.releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:data.memberHandle,expectedMemberRef:data.memberRef,terminalHandle:finished.terminalHandle});}
+    rmSync(ceremonyOwnerFile(repo,data.id),{force:true});
   });
   if(error)throw error;return executed.ownerResult;
 }

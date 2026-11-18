@@ -1323,7 +1323,31 @@ export { spawnOpenssl };
  * the PO key directory. It reports its exit code only -- it has no stderr to read. */
 function runOpenssl(args, cwd, dependencies) {
   const result = spawnOpenssl(args, { cwd, stdio: "inherit" }, dependencies);
-  if (result?.status !== 0) fail(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
+  if (result?.status !== 0) {
+    const error = new Error(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
+    // C30I-S6: only a process that ran and exited non-zero can be a refused passphrase; the signing retry below reads this.
+    error.opensslExitCode = Number.isSafeInteger(result?.status) ? result.status : null;
+    throw error;
+  }
+}
+
+/** C30I-S6: the passphrase a human types for a protected key may be retyped up to three times inside one run. Every attempt is the SAME spawn over the
+ * same already confirmed intent file: nothing is written or confirmed again between attempts, and after the last refusal the run ends with one line. */
+const PASSPHRASE_ATTEMPTS = 3;
+function runSigningOpenssl(args, cwd, dependencies, passphraseKey) {
+  for (let attempt = 1; ; attempt += 1) {
+    try { return runOpenssl(args, cwd, dependencies); }
+    catch (error) {
+      if (!passphraseKey || error?.opensslExitCode == null) throw error;
+      if (attempt >= PASSPHRASE_ATTEMPTS) fail(`openssl failed with exit code ${error.opensslExitCode} after ${PASSPHRASE_ATTEMPTS} passphrase attempts; nothing was signed or recorded: run the same command again to retype the passphrase`);
+      process.stderr.write(`The passphrase was not accepted (attempt ${attempt} of ${PASSPHRASE_ATTEMPTS}); type it again.\n`);
+    }
+  }
+}
+
+/** C30I-S6: the one printed failure line of a ceremony, plus the repair a refusal carries (a registry or ceremony refusal sets `repair`; before, it was dropped). */
+export function formatHumanApprovalFailure(error) {
+  return `PO-HUMAN-APPROVAL-FAILED: ${error.message}\n${typeof error?.repair === "string" && error.repair !== "" ? `Repair: ${error.repair}\n` : ""}`;
 }
 
 /** The absolute directories this process itself works in: the OS user's home and temporary directories
@@ -2415,7 +2439,7 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies, 
   io.write(artifacts.intent, intentSha256, { mode: 0o600 });
   // The signing spawn runs from the PO key directory (it already receives the key path there), never
   // from the process's inherited working directory, which may be a repository.
-  try { runOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dirname(keys.privateKey), dependencies); }
+  try { runSigningOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dirname(keys.privateKey), dependencies, isPrivateKeyPassphraseProtected(keys.privateKey, dependencies)); }
   finally { rmSync(artifacts.intent, { force: true }); }
   try {
     const authority = json(keys.authority); const publicKey = io.read(keys.publicKey, "utf8");
@@ -3262,6 +3286,6 @@ if (isDirectInvocation(import.meta.url)) {
     try {
       const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
       process.stdout.write(formatHumanApprovalCliResult(result));
-    } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
+    } catch (error) { process.stderr.write(formatHumanApprovalFailure(error)); process.exitCode = 2; }
   }
 }

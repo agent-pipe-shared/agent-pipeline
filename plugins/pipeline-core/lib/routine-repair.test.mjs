@@ -502,6 +502,19 @@ test("classifyInspectFindings allows only the two named findings", () => {
   assert.deepEqual(classifyInspectFindings({ ...emptyInspect, reservations: [{ sliceId: "S", settled: null }] }).map((r) => r.allowed), [false]);
 });
 
+// C30I-S6 (queue C30-21, PO report 2026-11-17): the registry read of a half-way PO ceremony refuses `chat:member-source-drift`, named by the module's
+// short prefix while the producer is `chat-gate`; move-aside answered RR-OUTSIDE-LIST for it, so only the human's own command could clear it.
+test("C30I-S6: the chat-gate ceremony refusal (short prefix chat:, producer chat-gate) is classified as a reconcile-refused producer, exactly like the other producers", () => {
+  const stuck = { ...emptyInspect, registry: { status: "present", producers: [{ producerId: "chat-gate", status: "reconcile-refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "chat:member-source-drift", inFlight: 0 }],
+    read: { status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "chat:member-source-drift" } } };
+  const rows = classifyInspectFindings(stuck);
+  assert.deepEqual(rows.map((row) => row.source), ["producer:chat-gate", "registry-read"]);
+  assert.deepEqual(rows.map((row) => row.reconcileRefused), [true, true], "the read refusal names that producer through its prefix, so move-aside heals first and moves aside only what heal did not resolve");
+  // The prefix is a match, not a wildcard: a refusal whose prefix is no producer's first segment stays outside the list.
+  const other = { ...stuck, registry: { ...stuck.registry, read: { status: "refused", code: "SDC-AUTHORITY-UNAVAILABLE", reason: "chatty:member-source-drift" } } };
+  assert.deepEqual(classifyInspectFindings(other).map((row) => row.reconcileRefused), [true, undefined]);
+});
+
 test("CLI: list prints the closed list, an unknown kind is refused outside the list, and a real run writes the ledger", () => withRepo((root, ap) => {
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8", shell: false });
   const listed = run("list");

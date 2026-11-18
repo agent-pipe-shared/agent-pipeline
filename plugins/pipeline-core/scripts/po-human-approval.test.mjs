@@ -4024,7 +4024,8 @@ function treeListing(root) {
  * Only the repository-root snapshots use this; the git-common-dir, home and key-directory listings still use
  * the unfiltered treeListing.
  */
-const CEREMONY_OWNED_PRIVATE_STATE = Object.freeze([".git/agent-pipeline/chat-gate-ceremonies", ".git/agent-pipeline/session-authority"]);
+// C30I-S6: the ceremony also records its owner process beside its records (.git/agent-pipeline/chat-gate-ceremony-owners), the same kind of wrapper-owned private state.
+const CEREMONY_OWNED_PRIVATE_STATE = Object.freeze([".git/agent-pipeline/chat-gate-ceremonies", ".git/agent-pipeline/chat-gate-ceremony-owners", ".git/agent-pipeline/session-authority"]);
 function repositoryTreeListing(root) {
   return treeListing(root).filter((entry) => entry !== ".git/agent-pipeline"
     && !CEREMONY_OWNED_PRIVATE_STATE.some((owned) => entry === owned || entry.startsWith(owned + "/")));
@@ -6678,3 +6679,194 @@ for (const [label, schema] of M2_SIGN_KINDS) {
     } finally { cleanup(dirs); }
   });
 }
+
+/* ------------------------------------------------------------------------- *
+ * C30I-S6 (queue C30-21, criterion AC-109): a signing step that fails (a mistyped
+ * passphrase makes OpenSSL exit non-zero) ends the ceremony cleanly, so the next
+ * entry works at once. The fixture repository carries an initialized session-authority
+ * registry (catalogue present), which is what makes every ceremony hold a registry
+ * member; without a catalogue no member exists and the defect cannot show.
+ * ------------------------------------------------------------------------- */
+import { inspectSessionAuthorityRegistryRead } from "../lib/session-authority-registry.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
+
+function c30i6Registry(dirs) {
+  return prepareSessionAuthorityRegistryFixture({ root: realpathSync(dirs.repoRoot) }).repository;
+}
+/** A spawn that answers the readiness probe like the healthy stub and the signing call like OpenSSL: a non-zero exit while `state.fail` is above zero. */
+function c30i6Spawn(state) {
+  return (executable, args, options) => {
+    const signing = executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private\.pem$/u.test(String(entry)));
+    if (!signing) return executable === "openssl" ? answerOpensslProbe(executable, args) : spawnSync(executable, args, { stdio: "pipe" });
+    state.signCalls += 1;
+    if (state.fail > 0) { state.fail -= 1; return { status: 1 }; }
+    const key = createPrivateKey({ key: readFileSync(args[args.indexOf("-inkey") + 1], "utf8"), format: "pem", passphrase: LEVER_PASSPHRASE });
+    writeFileSync(args[args.indexOf("-out") + 1], sign(null, readFileSync(args[args.indexOf("-in") + 1]), key));
+    return { status: 0 };
+  };
+}
+function c30i6Ceremony(dirs, state) {
+  const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+  return runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: "a".repeat(64) })],
+    { observeCandidate: () => observed, readConfirmation: () => "approve", spawn: c30i6Spawn(state) });
+}
+function c30i6Fixture() {
+  const dirs = fixtureDirs();
+  writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+  writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+  keyFixture(dirs.directory);
+  return dirs;
+}
+
+test("C30I-S6: a failed signing (a mistyped passphrase) ends the ceremony cleanly and the very next entry works at once", () => {
+  const dirs = c30i6Fixture();
+  try {
+    const repository = c30i6Registry(dirs);
+    const state = { fail: 3, signCalls: 0 };
+    assert.throws(() => c30i6Ceremony(dirs, state), /openssl failed/u);
+    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" }, "the registry reads after the failed signing: nothing is left half-way");
+    assert.deepEqual(c30i6CeremonyFiles(repository).filter((name) => name.endsWith(".terminal-observed.json")).length, 1, "the failed ceremony ended with its terminal record");
+    const second = c30i6Ceremony(dirs, state);
+    assert.equal(second.ok, true);
+    assert.equal(second.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+    assert.equal(state.signCalls, 4);
+  } finally { cleanup(dirs); }
+});
+
+function c30i6Confirming(dirs, state, confirmations) {
+  const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+  return runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: "a".repeat(64) })],
+    { observeCandidate: () => observed, readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; }, spawn: c30i6Spawn(state) });
+}
+
+test("C30I-S6 (4): a mistyped passphrase may be retyped inside the same run; every attempt signs the same confirmed intent and the confirmation is not repeated", () => {
+  const dirs = c30i6Fixture();
+  try {
+    c30i6Registry(dirs);
+    const state = { fail: 2, signCalls: 0 }, confirmations = [];
+    const result = c30i6Confirming(dirs, state, confirmations);
+    assert.equal(result.ok, true);
+    assert.equal(state.signCalls, 3, "two refused passphrases and the accepted one");
+    assert.equal(confirmations.length, 1, "the confirmation is asked once, not once per attempt");
+    const artifacts = criticalArtifacts(dirs);
+    assert.equal(JSON.parse(readFileSync(artifacts.proof, "utf8")).schema, "pipeline.po-approval-proof.v1");
+    assert.equal(existsSync(artifacts.intent), false, "the temporary intent file is gone");
+    assert.equal(existsSync(artifacts.signature), false, "the temporary signature file is gone");
+  } finally { cleanup(dirs); }
+});
+
+test("C30I-S6 (2)+(4): three refused passphrases end the run cleanly with one line that says to run the same command again, nothing is written, and the rerun needs no repair", () => {
+  const dirs = c30i6Fixture();
+  try {
+    const repository = c30i6Registry(dirs);
+    const state = { fail: 3, signCalls: 0 }, confirmations = [];
+    assert.throws(() => c30i6Confirming(dirs, state, confirmations), (error) => /3 passphrase attempts/u.test(error.message) && /run the same command again/u.test(error.message) && !/\n/u.test(error.message));
+    assert.equal(state.signCalls, 3);
+    assert.equal(confirmations.length, 1);
+    const artifacts = criticalArtifacts(dirs);
+    assert.equal(existsSync(artifacts.proof), false, "a refused signing records no proof");
+    assert.equal(existsSync(artifacts.signer), false);
+    assert.equal(existsSync(artifacts.intent), false);
+    assert.equal(existsSync(artifacts.signature), false);
+    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" });
+    assert.equal(c30i6Confirming(dirs, state, confirmations).ok, true, "the same command, run again, signs at once");
+  } finally { cleanup(dirs); }
+});
+
+test("C30I-S6: the printed failure of a ceremony carries the repair a refusal names, on its own line, and stays one line when there is none", async () => {
+  const { formatHumanApprovalFailure } = await import("./po-human-approval.mjs");
+  assert.equal(formatHumanApprovalFailure(new Error("plain refusal")), "PO-HUMAN-APPROVAL-FAILED: plain refusal\n");
+  const withRepair = Object.assign(new Error("chat:member-source-drift"), { repair: "run node x/routine-repair.mjs run move-aside --no-goldfish-running --root <root> --reason \"<why>\"" });
+  assert.equal(formatHumanApprovalFailure(withRepair), "PO-HUMAN-APPROVAL-FAILED: chat:member-source-drift\nRepair: run node x/routine-repair.mjs run move-aside --no-goldfish-running --root <root> --reason \"<why>\"\n");
+  assert.equal(formatHumanApprovalFailure(Object.assign(new Error("x"), { repair: 5 })), "PO-HUMAN-APPROVAL-FAILED: x\n", "only a text repair is printed");
+});
+
+/** Runs one ceremony in a child process that ends (SIGKILL) at the signing step, so the ceremony is left half-way by a process that is gone. */
+function c30i6Killed(dirs, home) {
+  const pem = readFileSync(join(dirs.directory, "po-private.pem"), "utf8");
+  if (pem.includes("-----BEGIN PRIVATE KEY-----")) writeFileSync(join(dirs.directory, "po-private.pem"), createPrivateKey(pem).export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: LEVER_PASSPHRASE }));
+  const code = `
+    import { spawnSync } from "node:child_process";
+    const { runHumanApproval } = await import(process.env.C30I6_MODULE);
+    const repoRoot = process.env.C30I6_REPO, directory = process.env.C30I6_DIR, home = process.env.C30I6_HOME;
+    runHumanApproval(["authorize-critical", "--repo-root", repoRoot, "--directory", directory, "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md", "--kind", "push", "--subject-sha256", "${"a".repeat(64)}", "--expires-at", "2999-01-01T00:00:00.000Z"],
+      { observeCandidate: () => ({ commit: "${"d".repeat(40)}", tree: "${"e".repeat(40)}" }), readConfirmation: () => "approve", isTTY: true, homedirFn: () => home,
+        spawn: (executable, args, options) => {
+          if (executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private[.]pem$/u.test(String(entry)))) process.kill(process.pid, "SIGKILL");
+          const run = spawnSync(executable, args, { stdio: "pipe", cwd: options?.cwd });
+          return { status: run.status, stdout: run.stdout, stderr: run.stderr, error: run.error };
+        } });`;
+  return spawnSync(process.execPath, ["--input-type=module", "-e", code],
+    { encoding: "utf8", env: { ...process.env, C30I6_MODULE: new URL("./po-human-approval.mjs", import.meta.url).href, C30I6_REPO: dirs.repoRoot, C30I6_DIR: dirs.directory, C30I6_HOME: home } });
+}
+const c30i6CeremonyFiles = (repository) => {
+  const dir = join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies");
+  return existsSync(dir) ? readdirSync(dir).sort() : [];
+};
+
+for (const variant of ["the process ended while signing (member and records agree, owner gone)", "the process ended after the terminal record was written and before the registry member followed (member lags the records)"]) {
+  test(`C30I-S6 (1)+(3): ${variant} -- the next ceremony start retires it with a note and then succeeds`, { skip: REQUIRES_OPENSSL }, () => {
+    const dirs = c30i6Fixture(), home = outsideRepositoryTemp("po-c30i6-home-");
+    try {
+      const repository = c30i6Registry(dirs);
+      const killed = c30i6Killed(dirs, home);
+      assert.equal(killed.signal, "SIGKILL", `the child must end at the signing step: ${killed.stderr}`);
+      const before = c30i6CeremonyFiles(repository);
+      assert.equal(before.length, 2, `reserved and running, no terminal: ${before.join(", ")}`);
+      const id = before[0].split(".")[0];
+      if (variant.includes("lags")) {
+        // The terminal record exists on disk while the registry member still says it runs: the exact state a process that ended between the two writes leaves.
+        const running = JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", `${id}.running.json`), "utf8"));
+        writeFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", `${id}.terminal-observed.json`), canonical({ ...running, phase: "terminal-observed", terminal: "cancelled" }), { mode: 0o600 });
+      }
+      const state = { fail: 0, signCalls: 0 };
+      const result = c30i6Ceremony(dirs, state);
+      assert.equal(result.ok, true, "the next entry works at once, with no repair");
+      const after = c30i6CeremonyFiles(repository);
+      assert.ok(after.includes(`${id}.terminal-observed.json`), "the abandoned ceremony now has its terminal record");
+      assert.equal(JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", `${id}.terminal-observed.json`), "utf8")).terminal, "cancelled");
+      assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" });
+    } finally { cleanup(dirs); rmSync(home, { recursive: true, force: true }); }
+  });
+}
+
+test("C30I-S6 (3): a half-way ceremony whose owner was never recorded is not retired on a guess; the refusal names the runnable repair", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = c30i6Fixture(), home = outsideRepositoryTemp("po-c30i6-home-");
+  try {
+    const repository = c30i6Registry(dirs);
+    assert.equal(c30i6Killed(dirs, home).signal, "SIGKILL");
+    const dir = join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies");
+    const id = c30i6CeremonyFiles(repository)[0].split(".")[0];
+    const running = JSON.parse(readFileSync(join(dir, `${id}.running.json`), "utf8"));
+    writeFileSync(join(dir, `${id}.terminal-observed.json`), canonical({ ...running, phase: "terminal-observed", terminal: "cancelled" }), { mode: 0o600 });
+    rmSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremony-owners"), { recursive: true, force: true });
+    assert.throws(() => c30i6Ceremony(dirs, { fail: 0, signCalls: 0 }), (error) => typeof error.repair === "string"
+      && /routine-repair\.mjs run move-aside --no-goldfish-running --root /u.test(error.repair) && /owner/u.test(error.repair));
+  } finally { cleanup(dirs); rmSync(home, { recursive: true, force: true }); }
+});
+
+test("C30I-S6 (3): a ceremony that is still running in this process is never retired by a ceremony that starts meanwhile", () => {
+  const dirs = c30i6Fixture();
+  try {
+    const repository = c30i6Registry(dirs);
+    const state = { fail: 0, signCalls: 0 };
+    let nested = null;
+    const inner = c30i6Spawn(state);
+    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+    const outerSpawn = (executable, args, options) => {
+      const signing = executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private\.pem$/u.test(String(entry)));
+      if (signing && nested === null) {
+        nested = "started";
+        try { runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { kind: "publication", subjectSha256: "a".repeat(64) })], { observeCandidate: () => observed, readConfirmation: () => "approve", spawn: c30i6Spawn({ fail: 0, signCalls: 0 }) }); nested = "completed"; }
+        catch (error) { nested = `refused: ${error.message}`; }
+        const terminals = c30i6CeremonyFiles(repository).filter((name) => name.endsWith(".terminal-observed.json"));
+        const cancelled = terminals.filter((name) => JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline", "chat-gate-ceremonies", name), "utf8")).terminal === "cancelled");
+        assert.deepEqual(cancelled, [], "no ceremony of a running owner is ever cancelled by someone else");
+      }
+      return inner(executable, args, options);
+    };
+    const result = runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: "a".repeat(64) })], { observeCandidate: () => observed, readConfirmation: () => "approve", spawn: outerSpawn });
+    assert.equal(result.ok, true, `the outer ceremony still completes (nested: ${nested})`);
+  } finally { cleanup(dirs); }
+});
+

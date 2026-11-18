@@ -47,7 +47,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
 import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
-import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+import { retireAbandonedChatGateCeremonies } from "../lib/chat-gate-ceremony.mjs";
+import { healSessionAuthorityDrift, initializeSessionAuthorityRegistry, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedCommits, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
@@ -411,9 +412,27 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
     catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a legacy stop-failure record could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
   }
   const stopFields = { ...(stopFailures?.retired.length ? { retiredStopFailures: stopFailures.retired } : {}), ...(stopFailures?.kept.length ? { keptStopFailures: stopFailures.kept } : {}) };
+  // C30I-S6: heal retires a PO ceremony that a process which has since ended left half-way (the registry's own owner judge; a live or unrecorded owner is
+  // kept and named); move-aside rebuilds the catalogue it moved away while a Close lifecycle exists, because the one-shot close decides its owner-route
+  // mode from that catalogue and would silently switch to the direct route without it; with no Close lifecycle the registry stays absent until the next
+  // governed dispatch initializes it (D44), as before. `registryRebuilt` says what happened; the status is never silent.
+  let ceremonies = null, registryRebuilt = null;
+  const closeLifecycleExists = (() => { try { return readdirSync(join(repository.commonDir, "agent-pipeline", "publication-close")).length > 0; } catch { return false; } })();
+  const hadCatalogue = closeLifecycleExists && existsSync(join(repository.commonDir, "agent-pipeline", "session-authority", "catalogue.json"));
   try {
-    if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => { entered.value = true; return healSessionAuthorityDrift({ boundary }); }));
-    else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
+    if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => {
+      entered.value = true;
+      try { ceremonies = retireAbandonedChatGateCeremonies({ repository, boundary }); }
+      catch (error) { ceremonies = { retired: [], kept: [], refused: short(error) }; }
+      return healSessionAuthorityDrift({ boundary });
+    }));
+    else {
+      const moved = retryWhileSessionAuthorityLockHeld((entered) => moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }));
+      if (hadCatalogue && moved?.status === "moved-aside") {
+        const rebuilt = initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
+        registryRebuilt = { status: rebuilt.status, ...(rebuilt.status === "initialized" ? {} : { reason: rebuilt.reason ?? rebuilt.code ?? null, note: "the registry stays without a catalogue until the next governed dispatch initializes it fresh" }) };
+      }
+    }
   } catch (error) {
     const heal = typeof error?.repair === "string" ? { repair: error.repair } : parsed.verb === "heal" ? { repair: sessionAuthorityRepairCommand(root, "inspect") } : {};
     return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal, ...stopFields }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
@@ -423,7 +442,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   // is not reported healed; inspect names what holds it.
   if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained, ...stopFields,
     ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { scratch }) }, 2);
-  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...stopFields, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
+  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(registryRebuilt === null ? {} : { registryRebuilt }), ...(ceremonies === null || (!ceremonies.retired.length && !ceremonies.kept.length && ceremonies.refused === undefined) ? {} : { chatGateCeremonies: ceremonies }), ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...stopFields, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
 }
 
 if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2), undefined, { env: process.env });

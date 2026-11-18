@@ -253,7 +253,9 @@ export function classifyInspectFindings(inspect) {
   if (inspect?.registry?.read?.status === "refused") {
     add("registry-read", text(inspect.registry.read.code, inspect.registry.read.reason));
     const named = /^([a-z0-9-]+):/u.exec(String(inspect.registry.read.reason ?? ""))?.[1];
-    if (named !== undefined && healFirstProducers.has(named)) rows.at(-1).reconcileRefused = true;
+    // C30I-S6: a producer names its refusals by the module's short prefix (`chat:member-source-drift` for producer chat-gate), so the prefix
+    // matches the producer id or its first segment; the exact-name match alone left that refusal outside the list (RR-OUTSIDE-LIST).
+    if (named !== undefined && [...healFirstProducers].some((producerId) => producerId === named || producerId.startsWith(`${named}-`))) rows.at(-1).reconcileRefused = true;
   }
   return rows;
 }
