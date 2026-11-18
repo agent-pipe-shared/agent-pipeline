@@ -1,0 +1,36 @@
+# w30k28 — the first-round consent question is shorter and keeps every fact (candidate 30k, PO queue item "shorten the consent question"; corrected re-brief of K22/K26)
+
+Applies AFTER the integrated 30j tree (the 30i chain plus every 30j lane and the 30k wave 1 lanes): the patch is the delta `3f1106be6..HEAD` of a clone that starts there, and it edits a file other lanes may also touch. It applies cleanly to that tree (`apply --check` exit 0); against the real checkout before that tree it is expected not to apply. Protected plugin source: the PO applies the chain (the plugin-source commit route). Criterion binding: AC-112 is the closest existing accepted criterion (fresh bounded attempt under its unchanged Spec text); the PRD and the Spec are unchanged.
+
+## What it changes
+
+- `plugins/pipeline-core/lib/onboarding-consent-scope.mjs` (the ONE source of the wording; the preflight, the start skill and the Codex hint only relay `consentQuestion.text`, and no production code outside this module reads the step texts, only their ids): `QUESTION_FRAME` (en/de), the `en`/`de` strings of the covered steps, the tool-check `bullets` lead/tail, the Advisor step and the `design-approval` exclusion. Length: en 1543 -> 1294 (84 percent), de 1740 -> 1499 (86 percent); hard caps en 1300, de 1500 (the German text has 1 character of headroom).
+  - Decision first: the opening is the question itself ("Should this project use Agent Pipeline, a structured, verifiable delivery workflow?" / "Soll dieses Projekt Agent Pipeline nutzen, ...?").
+  - Each fact once: the clause "up to presenting the design for your approval" is no longer repeated in the lead-in (it is stated by the `present-plan` bullet and by the first exclusion, "your design approval").
+  - The German Advisor sentence had a grammar slip ("... zeigen" without "zu"); it now reads "erlaubt außerdem dem Advisor ... einzusehen". The Advisor `en`/`de` strings are now fragments completed by the frame ("Your yes also lets ..."); they are used nowhere else.
+  - Kept on purpose after a review: "the NEW project folder" (Windows rights are for the folder this install creates), the German missing-tool route "den Installationsweg, den wir gemeinsam gehen" (a route run together, not a shared route), and "on this machine" / "auf diesem Rechner" for the tool check (the queue item words it that way; "here" was ambiguous).
+  - Structure, ids, routes, the bracketed command names in `step.en` (so the escalation justification line keeps its content), the sub-bullet per tool plus the closing one, and the exclusions as closing bullets are unchanged.
+- New `plugins/pipeline-core/lib/onboarding-consent-scope.test.mjs` (3 cases): a closed fact list per language asserted against the text plus the four closing exclusion bullets, the hard length caps with a note of the measured current lengths (1543/1740) plus "one question, decision first", and the record shape (the 11 scope ids, the 4 `notCovered` ids, the key order of the returned object) byte-identical to before.
+- `plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs`: one pin restated (QG-04): the `present-plan` escalation justification regexp pinned the old words "present the design to you for approval"; it now pins "present the design for your approval" (same content; the step text is the justification line's source).
+
+## Fact checklist of the CURRENT text (before the change)
+
+Purpose; the question; no re-asking; install (authority seed, runtime initialization, readbacks, Windows rights for you alone); hooks (git hooks plus the runner's own refresh step); seven tools (Node.js, Git, gitleaks, osv-scanner, semgrep, Trivy where the project has infrastructure or container files, OpenSSL where you sign) on this machine; the missing-tool route (install route shown to run together, or recorded for later); onboarding commits; intake and kickoff artifacts; bind PRD and Spec as an unsealed draft (two command names); design review, readiness and advisor rounds with receipts; register the feature and submit the plan (two command names); seal plan; present the design for approval; the Advisor consent (same runner, scoped material, concrete consultation, part of using the Pipeline, not asked separately); the four exclusions. The commit-author question, the decline sentence and the escalation justification line are NOT part of this text and were not added.
+
+## Why
+
+PO tile 2026-11-18: the consent question was too long for a first round. Two thirds was unreachable with every fact kept; about 85 percent with hard caps is the decided target.
+
+## Checks (tests only; the Critic is suspended by the PO for candidates of this repository and no Full Verify ran)
+
+- Red first: the new test file, 3 cases, 2 pass (facts, record shape: both hold before and after) and 1 fails (the length case, "en: 1543 characters (cap 1300)"), before any production edit. The facts case was written from the current text and is not red on the old wording.
+- Phrases checked against the NEW wording only (the old text does not contain them): the contiguous "die Pipeline installieren (", the en "not asked separately", the kept Windows/gemeinsam/machine phrases and the closing exclusion bullets. They tie to the criterion by pinning a fact, not a mood: they were tightened after the first implementation (a loose phrase such as "installieren" would still pass with the install bullet deleted); no case was weakened.
+- Green on the final state, each run alone in the clone: `onboarding-consent-scope.test.mjs` 3 of 3, `onboarding-consent-mark.test.mjs` 16 of 16, `toolchain-registry.test.mjs` 11 of 11, `pipeline-start-preflight.test.mjs` 107 of 107, `codex-session-start-hint.test.mjs` 9 of 9, `bootstrap-payload-measure.test.mjs` 5 of 5 (the bootstrap payload byte budget stays green), `onboarding-init.test.mjs` 71 of 71 (final-state run). The `.check.test.mjs` of this patch (patch non-empty, touches only the write list) is green, 2 of 2.
+- Journey: one function renders the question for the preflight result, the start skill and the Codex hint; those pins read it by data, not by words, and are green. Covered: both languages, the default language, an unknown language falling back to English.
+
+## Not changed / not proven
+
+- `toolchain-registry.test.mjs` and `onboarding-consent-mark.test.mjs` still carry the loose `text.length <= 2600` cap; the new test file pins the tight caps, so those lines were left as they are (they pass and pin nothing about words). `pipeline-start-preflight.test.mjs`, `onboarding-init.test.mjs`, `codex-session-start-hint.test.mjs` and `onboarding-recovery.md` restate no word of the text and are untouched. `references/happy-path.md` restates the covered scope in its own words (not the question text) and is outside the write list.
+- No consent record, scope id, hook, decline handling or status was touched; no stored status, record shape, digest or gate.
+- The new test file `plugins/pipeline-core/lib/onboarding-consent-scope.test.mjs` is not run by Verify until it is registered in the project's Verify suite list (harness/verify-suites.json is a protected path, outside this slice): it needs registration with the chain.
+- The German wording was not read by a native speaker beyond the author; the facts are pinned, the phrasing is not. Not run: Full Verify, the Critic.
