@@ -1,0 +1,105 @@
+diff --git a/plugins/pipeline-core/lib/analysis-run.mjs b/plugins/pipeline-core/lib/analysis-run.mjs
+index d45e0afea..b14ebccbf 100644
+--- a/plugins/pipeline-core/lib/analysis-run.mjs
++++ b/plugins/pipeline-core/lib/analysis-run.mjs
+@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync
+ import { isAbsolute, join, resolve } from 'node:path';
+ import { spawnSync as realSpawnSync } from 'node:child_process';
+ import { classifyVerifyCommand } from '../scripts/pipeline-state.mjs';
++import { CALIBRATION_PATHS } from './project-authority-read.mjs';
+ 
+ export const ANALYSIS_RESULT_SCHEMA = 'pipeline.analysis-run.v1';
+ export const OUTPUT_LIMIT_BYTES = 65536;
+@@ -25,7 +26,6 @@ export const KEEP_DAYS = 7;
+ export const TREE_CHANGED_REPAIR = 'review and revert the change in the working tree';
+ 
+ const RUN_ID = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-[0-9a-f]{8}$/u;
+-const CALIBRATION_PATHS = ['project/pipeline.json', '.claude/pipeline.json'];
+ 
+ const refuse = (code, detail) => ({ status: 'refused', code, ...(detail ? { detail } : {}) });
+ const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+index a6286109b..9c965d656 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+@@ -100,6 +100,17 @@ test("no module that used a private calibration path list names either calibrati
+   assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import the constants of project-authority-read.mjs");
+ });
+ 
++// C30J-J17: the four modules J9 could not reach take the same list.
++const CALIBRATION_LIST_MODULES_J17 = ["critic-evidence-carry.mjs", "analysis-run.mjs", "maintenance-delivery.mjs", "push-threat-model-materialize.mjs"];
++
++test("the four remaining calibration path lists use the shared one: no quoted calibration literal is left in their sources", () => {
++  const here = dirname(fileURLToPath(import.meta.url));
++  const literal = /["'`](?:project|\.claude)\/pipeline\.json(?::[^"'`]*)?["'`]/u;
++  const offenders = CALIBRATION_LIST_MODULES_J17.filter((name) => readFileSync(join(here, name), "utf8").split("\n")
++    .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/u.test(line)).some((line) => literal.test(line)));
++  assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import CALIBRATION_PATHS of project-authority-read.mjs");
++});
++
+ test("the calibration read orders stay what each reader did: neutral first, and the file resolver is not the same rule", () => {
+   const put = (base, rel, text) => { mkdirSync(dirname(join(base, rel)), { recursive: true }); writeFileSync(join(base, rel), text); };
+   const fresh = () => { const dir = join(WORK, `order-${counter += 1}`); mkdirSync(dir, { recursive: true }); return dir; };
+diff --git a/plugins/pipeline-core/lib/critic-evidence-carry.mjs b/plugins/pipeline-core/lib/critic-evidence-carry.mjs
+index 26fb7b95e..2475659b8 100644
+--- a/plugins/pipeline-core/lib/critic-evidence-carry.mjs
++++ b/plugins/pipeline-core/lib/critic-evidence-carry.mjs
+@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
+ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
++import { CALIBRATION_PATHS } from "./project-authority-read.mjs";
+ import { administrationDocumentationClassOf } from "./administration-documentation-paths.mjs";
+ import { promoteRepositoryModeBytes } from "../scripts/repository-mode-promote.mjs";
+ 
+@@ -51,7 +52,7 @@ function changedEntries(root, from, to) {
+   return entries;
+ }
+ 
+-const CALIBRATION_TWINS = new Set(["project/pipeline.json", ".claude/pipeline.json"]);
++const CALIBRATION_TWINS = new Set(CALIBRATION_PATHS);
+ const GIT_ENV = { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
+   GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" };
+ 
+diff --git a/plugins/pipeline-core/lib/maintenance-delivery.mjs b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+index 37e5930f6..6d639715a 100644
+--- a/plugins/pipeline-core/lib/maintenance-delivery.mjs
++++ b/plugins/pipeline-core/lib/maintenance-delivery.mjs
+@@ -25,7 +25,7 @@ import { GATE_STRENGTH_PATHS } from "../hooks/guard-gate-strength.mjs";
+ import { MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
+ import { readPrivateApprovals } from "./critical-action-authorization.mjs";
+ import { validateVerifySuiteReceipt } from "./verify-resume.mjs";
+-import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
++import { CALIBRATION_PATHS, resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
+ import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+ 
+ export { MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND };
+@@ -254,7 +254,7 @@ export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit,
+ 
+ /** The committed verify command of the calibration at `commit` (project tier first), or null when none reads. */
+ function calibratedVerifyAt(git, commit) {
+-  for (const path of ["project/pipeline.json", ".claude/pipeline.json"]) {
++  for (const path of CALIBRATION_PATHS) {
+     const shown = git(["show", `${commit}:${path}`]);
+     if (!gitOk(shown)) continue;
+     try { const value = JSON.parse(String(shown.stdout)); return typeof value?.verify === "string" ? value.verify : null; } catch { return null; }
+diff --git a/plugins/pipeline-core/lib/push-threat-model-materialize.mjs b/plugins/pipeline-core/lib/push-threat-model-materialize.mjs
+index 79b62d67d..a3e23f810 100644
+--- a/plugins/pipeline-core/lib/push-threat-model-materialize.mjs
++++ b/plugins/pipeline-core/lib/push-threat-model-materialize.mjs
+@@ -17,13 +17,14 @@ import { join } from "node:path";
+ 
+ import { readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
+ import { gateConfig, loadManifestSafe } from "./manifest.mjs";
++import { CALIBRATION_PATHS } from "./project-authority-read.mjs";
+ 
+ export const PUSH_THREAT_MODEL_UNCHANGED_MARKER = "<!-- push-threat-model: project judgement pending; delete this whole line once the questions below are answered for this project -->";
+ 
+ const lf = (text) => String(text).replace(/\r\n/gu, "\n");
+ 
+ function readCalibration(root) {
+-  for (const rel of ["project/pipeline.json", ".claude/pipeline.json"]) {
++  for (const rel of CALIBRATION_PATHS) {
+     const path = join(root, rel);
+     if (!existsSync(path)) continue;
+     try { const parsed = JSON.parse(readFileSync(path, "utf8")); return parsed !== null && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
