@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -857,7 +857,10 @@ function assertWrittenAndUncommitted(root, outcome, taskIds, head) {
     assert.ok(existsSync(join(root, entry.addendumPath)) && existsSync(join(root, entry.evidencePath)), `${entry.taskId}: both files are in the working tree`);
   }
   for (const path of reported.commitPaths) assert.ok(outcome.body.message.includes(path), `the message names ${path}: ${outcome.body.message}`);
-  assert.ok(outcome.body.message.includes(`git add -f -- ${reported.commitPaths.join(" ")}`), outcome.body.message);
+  // C30K-K20: no written path is ignored in this fixture, so the staging command is the plain one and every path is named as shown by git status.
+  assert.ok(outcome.body.message.includes(`git add -- ${reported.commitPaths.join(" ")}`), outcome.body.message);
+  assert.ok(!outcome.body.message.includes("git add -f"), outcome.body.message);
+  for (const path of reported.commitPaths) assert.ok(outcome.body.message.includes(`${path} (not ignored: git status shows it)`), outcome.body.message);
   assert.match(outcome.body.message, /nothing was staged or committed/u);
   assert.match(outcome.body.message, /plan this transition again after that commit/u);
   assert.equal(reported.planAgain, true);
@@ -911,6 +914,44 @@ test("(k1) CFC-3: an addendum for a record no receipt covers stays as it is", ()
     writeFileSync(stale, `${JSON.stringify({ stale: true })}\n`);
     assert.notEqual(w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]).body.status, "written");
     assert.equal(readFileSync(stale, "utf8"), `${JSON.stringify({ stale: true })}\n`);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("(k20) C30K-K20: an addendum path the ignore rules hide is named as ignored and staged with the forced command; a visible one is named as shown", () => {
+  const fx = w9Course({ label: "k20", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
+  try {
+    const { root } = fx;
+    const hidden = criticDispositionAddendumPath("TASK-ONE");
+    appendFileSync(join(root, ".git", "info", "exclude"), `/${hidden}\n`);
+    const head = git(root, ["rev-parse", "HEAD"]);
+    const first = w9CloseSession(root).planPrepared();
+    assert.equal(first.status, 2, JSON.stringify(first.body));
+    assert.equal(first.body.code, "CLOSE-CRITIC-ADDENDA-WRITTEN", JSON.stringify(first.body));
+    const paths = first.body.criticAddenda.commitPaths;
+    assert.ok(paths.includes(hidden));
+    const message = first.body.message;
+    assert.ok(message.includes(`git add -f -- ${paths.join(" ")}`), message);
+    assert.ok(message.includes(`${hidden} (ignored: git status does not show it)`), message);
+    assert.ok(paths.some((path) => path !== hidden && message.includes(`${path} (not ignored: git status shows it)`)), message);
+    assert.equal(git(root, ["diff", "--cached", "--name-only"]), "");
+    assert.equal(git(root, ["rev-parse", "HEAD"]), head);
+    // the emitted object keeps its shape: the facts live in the message text only
+    assert.deepEqual(Object.keys(first.body.criticAddenda).sort(), ["commitInstruction", "commitPaths", "planAgain", "schema", "written"]);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("(k20b) C30K-K20: the critic-addenda verb object carries the forced command and the ignored wording in its message and keeps its keys", () => {
+  const fx = w9Course({ label: "k20b", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
+  try {
+    const { root } = fx;
+    const hidden = criticDispositionAddendumPath("TASK-TWO");
+    appendFileSync(join(root, ".git", "info", "exclude"), `/${hidden}\n`);
+    const out = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
+    assert.equal(out.status, 0, out.text);
+    assert.equal(out.body.status, "written", out.text);
+    assert.deepEqual(Object.keys(out.body).sort(), ["commitPaths", "message", "schema", "status", "subject"]);
+    assert.ok(out.body.message.includes(`git add -f -- ${out.body.commitPaths.join(" ")}`), out.body.message);
+    assert.ok(out.body.message.includes(`${hidden} (ignored: git status does not show it)`), out.body.message);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 

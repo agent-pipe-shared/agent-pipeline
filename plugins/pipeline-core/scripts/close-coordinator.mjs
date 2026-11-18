@@ -631,7 +631,14 @@ function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = fa
     const derived = deriveAddenda ? deriveCriticAddenda(root, coverage.requiredTaskIds) : { written: [], commitPaths: [] };
     if (derived.written.length > 0) {
       const remaining = coverage.requiredTaskIds.filter((id) => !derived.written.some((entry) => entry.taskId === id));
-      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Commit exactly these paths in one evidence-only commit: git add -f -- ${derived.commitPaths.join(" ")}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
+      // C30K-K20: derive (never store) which written paths the project's ignore rules hide from git status; the force flag only when one is.
+      // A failing check-ignore must not hide this stop: every path is then treated as possibly ignored (forced staging is always safe).
+      let ignoredPaths;
+      try { ignoredPaths = new Set(derived.commitPaths.length > 0 ? git(root, ["check-ignore", "--", ...derived.commitPaths], { accept: [0, 1] }).split("\n").map((line) => line.trim()).filter(Boolean) : []); }
+      catch { ignoredPaths = new Set(derived.commitPaths); }
+      const visibility = derived.commitPaths.map((path) => `${path} (${ignoredPaths.has(path) ? "ignored: git status does not show it" : "not ignored: git status shows it"})`).join("; ");
+      const stageCommand = `git add ${ignoredPaths.size > 0 ? "-f " : ""}-- ${derived.commitPaths.join(" ")}`;
+      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Written paths: ${visibility}. Commit exactly these paths in one evidence-only commit: ${stageCommand}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
       const covered = derived.written.map((entry) => `${entry.taskId} (Critic packet ${entry.criticPacketId})`).join(", ");
       fail("CLOSE-CRITIC-ADDENDA-WRITTEN", `feature close preparation wrote the byte-bound Critic addendum for ${covered}, because exactly one passed, consumed Critic receipt (or one registered Critic course) covers each of these records and no other does. ${commitInstruction}${remaining.length > 0 ? ` Still uncovered after that commit: ${missingMessage(remaining)}` : ""}`,
         { criticAddenda: { schema: "pipeline.close-critic-addenda-written.v1", written: derived.written, commitPaths: derived.commitPaths, commitInstruction, planAgain: true } });
