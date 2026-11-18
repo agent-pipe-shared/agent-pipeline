@@ -4085,6 +4085,12 @@
       "nonOverlapNote": "Unique unit witness of the pure card builder; po-human-approval-tests pins the integration into the authorize-critical confirmation."
     },
     {
+      "name": "human-command-render-tests",
+      "file": "plugins/pipeline-core/lib/human-command-render.test.mjs",
+      "invariantPinned": "A command printed for the human is rendered from one function that takes the target shell and path style: absolute Windows paths become forward-slash paths for a bash terminal, relative values, arguments, digests and signing subjects are untouched, and the approve-push mirror paths stay byte-exact.",
+      "nonOverlapNote": "Unique unit witness of the renderer; the po-human-approval and push-prepare suites pin the two adopting sites."
+    },
+    {
       "name": "security-remote-identity-tests",
       "file": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
       "invariantPinned": "Security evidence follows the effective push destination and the push guard refuses evidence bound to another destination.",
