@@ -956,8 +956,8 @@ function decideCriticLineageCommit(rootInput) {
   const tracked = new Set(listing.stdout.split("\0").filter((path) => path !== ""));
   const features = [...tracked].map((path) => /^specs\/([a-z0-9-]+)\/lifecycle\.json$/u.exec(path)?.[1]).filter((id) => id !== undefined && SAFE_ID.test(id) && tracked.has(criticReviewUnitPath(id)));
   if (features.length === 0) return lineageCheckAllow("no-critic-course");
-  if (features.length > 1) return lineageCheckAllow("not-decidable", { detail: "more than one feature has a Critic review unit" });
-  const featureId = features[0];
+  // C30J-J16: with several features (for example a retained discarded predecessor) the feature of a round is not chosen here: the dry run below
+  // runs the registration verb's own derivation (the consumed claim binds exactly one feature), so the guard and the verb can never disagree.
   const common = gitOut(root, ["rev-parse", "--git-common-dir"]);
   if (!common) return lineageCheckAllow("not-decidable");
   let controlRoot, names;
@@ -969,12 +969,19 @@ function decideCriticLineageCommit(rootInput) {
     try { if (readConsumedCandidateResult({ controlRoot, packetId: name })?.receipt) consumed.push(name); } catch { /* not consumed or unreadable: not a finished round */ }
   }
   if (consumed.length === 0) return lineageCheckAllow("no-consumed-round");
-  let headRegistered = false, indexRegistered = false;
+  let headRegistered = false, indexRegistered = false, undecidable = null;
   for (const packetId of consumed) {
-    if (lineageRowRegisteredAt(root, "HEAD:", featureId, packetId)) { headRegistered = true; continue; }
-    if (lineageRowRegisteredAt(root, ":0:", featureId, packetId)) { indexRegistered = true; continue; }
+    if (features.some((id) => lineageRowRegisteredAt(root, "HEAD:", id, packetId))) { headRegistered = true; continue; }
+    if (features.some((id) => lineageRowRegisteredAt(root, ":0:", id, packetId))) { indexRegistered = true; continue; }
     const probe = addCriticReviewLineage({ root, packetId, dryRun: true });
+    if (probe.code === "FPR-LINEAGE-FEATURE-AMBIGUOUS" && features.length > 1) {
+      // The only fail-open case of several features: the consumed claim binds none of them or more than one (the verb refuses the same way). It is named, with one runnable command per feature.
+      const named = Array.isArray(probe.features) ? probe.features : features;
+      undecidable ??= { packetId, detail: `more than one feature has a Critic review unit and the course claim of packet ${packetId} does not bind exactly one of them, so the guard cannot tell which lineage to require; register the lineage of that round with the feature named: ${named.map((id) => `node <plugin-root>/scripts/register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId} --feature ${id}`).join(" | ")}` };
+      continue;
+    }
     if (probe.status !== "lineage-registrable" && probe.status !== "already-registered") continue;
+    const featureId = /^specs\/([a-z0-9-]+)\/lifecycle\.json$/u.exec(String(probe.manifestPath))?.[1] ?? features[0];
     const written = probe.status === "already-registered";
     const manifestPath = `specs/${featureId}/lifecycle.json`;
     const commitPaths = [manifestPath, probe.lineagePath];
@@ -986,6 +993,7 @@ function decideCriticLineageCommit(rootInput) {
     return { schema: CRITIC_LINEAGE_COMMIT_CHECK_SCHEMA, decision: "refuse", code: CRITIC_LINEAGE_UNREGISTERED, packetId, reviewId: probe.reviewId ?? null, featureId, written, commitPaths,
       detail: `the finished Critic round of packet ${packetId} has no registered lineage at HEAD and this commit does not carry it`, repair };
   }
+  if (undecidable !== null && !indexRegistered && !headRegistered) return lineageCheckAllow("not-decidable", { detail: undecidable.detail });
   return lineageCheckAllow(indexRegistered ? "registration-commit" : headRegistered ? "lineage-registered" : "not-registrable");
 }
 export function checkCriticLineageBeforeCommit({ root: rootInput } = {}) {

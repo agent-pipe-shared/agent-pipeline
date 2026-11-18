@@ -16,7 +16,7 @@ import { spawnSync } from "node:child_process";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
-import { addCriticDeltaRequest, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticDeltaRequest, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, checkCriticLineageBeforeCommit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import { PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { REGISTER_FEATURE_PACKAGE_HELP, pushThreatModelReadback, runRegisterFeaturePackage } from "./register-feature-package.mjs";
@@ -599,4 +599,89 @@ test("J13-7: the CLI accepts a trailing --feature <id> on the lineage and delta 
   }
   assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--add-review-lineage --packet <packetId> \[--feature <feature id>\]/u);
   assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--add-delta-request <input\.json> \[--confirm-full-round\] \[--feature <feature id>\]/u);
+});
+
+// C30J-J16: the commit-time lineage guard (the commit-msg hook's core predicate) names its feature the same way the registration verb does (the verb's dry run is the derivation).
+const stageCorrection = (root) => { put(root, "src/correction.mjs", "export const correction = 1;\n"); git(root, ["add", "-f", "--", "src/correction.mjs"]); };
+
+test("J16-1: a retained discarded predecessor no longer lets a correction commit through before the lineage is registered; the registration commit and every later commit are allowed", () => {
+  const f = consumedRound();
+  unregisterLineage(f);
+  stageCorrection(f.root);
+  const refused = checkCriticLineageBeforeCommit({ root: f.root });
+  assert.equal(refused.decision, "refuse", JSON.stringify(refused));
+  assert.equal(refused.code, "CRL-LINEAGE-UNREGISTERED");
+  assert.equal(refused.featureId, SUCCESSOR, "the guard names the feature the consumed claim binds, not the retained predecessor");
+  assert.equal(refused.packetId, f.packetId);
+  assert.equal(refused.written, false);
+  assert.deepEqual(refused.commitPaths.slice(0, 1), [`specs/${SUCCESSOR}/lifecycle.json`]);
+  assert.ok(refused.repair.includes(`--add-review-lineage --packet ${f.packetId}`), refused.repair);
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "the guard writes nothing");
+  // Following the printed repair: register, stage the registration, and the same guard allows.
+  const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId });
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  git(f.root, ["add", "-f", "--", ...added.commitPaths]);
+  assert.deepEqual([checkCriticLineageBeforeCommit({ root: f.root }).decision, checkCriticLineageBeforeCommit({ root: f.root }).reason], ["allow", "registration-commit"]);
+  git(f.root, ["commit", "-qm", "register the lineage together with the correction"]);
+  put(f.root, "src/next.mjs", "export const next = 1;\n"); git(f.root, ["add", "-f", "--", "src/next.mjs"]);
+  assert.deepEqual([checkCriticLineageBeforeCommit({ root: f.root }).decision, checkCriticLineageBeforeCommit({ root: f.root }).reason], ["allow", "lineage-registered"]);
+});
+
+test("J16-2: with the lineage written in the working tree but neither committed nor staged the guard refuses naming the written files; committing them allows", () => {
+  const f = consumedRound();
+  stageCorrection(f.root);
+  const refused = checkCriticLineageBeforeCommit({ root: f.root });
+  assert.equal(refused.code, "CRL-LINEAGE-UNREGISTERED", JSON.stringify(refused));
+  assert.equal(refused.featureId, SUCCESSOR);
+  assert.equal(refused.written, true);
+  assert.deepEqual(refused.commitPaths, f.finalized.lineage.commitPaths);
+  git(f.root, ["add", "-f", "--", ...f.finalized.lineage.commitPaths]);
+  assert.equal(checkCriticLineageBeforeCommit({ root: f.root }).reason, "registration-commit");
+});
+
+test("J16-3: single-feature behaviour is unchanged: the same refusal and the same allow reasons without a predecessor", () => {
+  const f = consumedRound({ withPredecessor: false });
+  unregisterLineage(f);
+  stageCorrection(f.root);
+  const refused = checkCriticLineageBeforeCommit({ root: f.root });
+  assert.deepEqual([refused.decision, refused.code, refused.featureId, refused.written], ["refuse", "CRL-LINEAGE-UNREGISTERED", SUCCESSOR, false], JSON.stringify(refused));
+  const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId });
+  git(f.root, ["add", "-f", "--", ...added.commitPaths]);
+  assert.equal(checkCriticLineageBeforeCommit({ root: f.root }).reason, "registration-commit");
+});
+
+test("J16-5: two features that both still qualify after the derivation (the same round recorded under both, in the working tree only): the guard stays open and names the reason and the commands; it writes nothing", () => {
+  const f = consumedRound();
+  // The lineage the finalizer wrote under the successor is mirrored under the predecessor (a manifest row plus the same record bytes), so the verb's replay rule matches both features.
+  const lineageBytes = readFileSync(join(f.root, f.finalized.lineage.lineagePath));
+  const mirrored = f.finalized.lineage.lineagePath.replace(`specs/${SUCCESSOR}/`, `specs/${PREDECESSOR}/`);
+  put(f.root, mirrored, lineageBytes);
+  const predecessorManifest = `specs/${PREDECESSOR}/lifecycle.json`;
+  const manifest = JSON.parse(readFileSync(join(f.root, predecessorManifest), "utf8"));
+  manifest.artifacts.push({ class: "candidate-evidence", path: mirrored, sha256: sha(lineageBytes), authority: false, mutability: "immutable", retention: "retain" });
+  put(f.root, predecessorManifest, JSON.stringify(manifest));
+  assert.equal(addCriticReviewLineage({ root: f.root, packetId: f.packetId, dryRun: true }).code, "FPR-LINEAGE-FEATURE-AMBIGUOUS", "the verb itself cannot choose between the two features");
+  stageCorrection(f.root);
+  const status = git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]);
+  const verdict = checkCriticLineageBeforeCommit({ root: f.root });
+  assert.deepEqual([verdict.decision, verdict.reason], ["allow", "not-decidable"], JSON.stringify(verdict));
+  for (const id of [PREDECESSOR, SUCCESSOR]) assert.ok(verdict.detail.includes(`--add-review-lineage --packet ${f.packetId} --feature ${id}`), `${id}: ${verdict.detail}`);
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), status, "the guard writes nothing");
+});
+
+test("J16-4: where the claim binds none of the several features the guard stays open and says so by name, with one runnable command per feature; it writes nothing", () => {
+  const f = consumedRound();
+  unregisterLineage(f);
+  // The successor loses its review unit and a third feature gains one, committed: no feature at HEAD is the one the consumed claim binds.
+  git(f.root, ["rm", "-q", "--", `specs/${SUCCESSOR}/design/critic-review-unit.json`]);
+  featurePackage(f.root, "feature-c");
+  git(f.root, ["add", "-f", "--", "specs/feature-c"]);
+  git(f.root, ["commit", "-qm", "the claim binds no feature that holds a review unit"]);
+  stageCorrection(f.root);
+  const verdict = checkCriticLineageBeforeCommit({ root: f.root });
+  assert.deepEqual([verdict.decision, verdict.reason], ["allow", "not-decidable"], JSON.stringify(verdict));
+  assert.match(verdict.detail, /more than one feature has a Critic review unit/u);
+  assert.ok(verdict.detail.includes(f.packetId), verdict.detail);
+  for (const id of [PREDECESSOR, "feature-c"]) assert.ok(verdict.detail.includes(`register-feature-package.mjs --root <root> --add-review-lineage --packet ${f.packetId} --feature ${id}`), `${id}: ${verdict.detail}`);
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "the guard writes nothing");
 });
