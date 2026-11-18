@@ -31,6 +31,7 @@ import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-ga
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { criticalActionApprovalCard } from "../lib/critical-action-approval-card.mjs";
 import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
@@ -2784,6 +2785,8 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
     const intentSha256 = request.approvalIntent.sha256;
     requireExplicitConfirmation([
+      // C30I-S5 (AC-112): the plain-language card, built only from what the request above already holds; every line after it is unchanged.
+      ...criticalActionApprovalCard({ kind: request.action.kind, candidate: request.candidate, expiresAt: request.action.expiresAt, featureId, subject: subjectPreimage, language: humanFacingLanguage }),
       `action kind: ${request.action.kind}`,
       `candidate commit: ${request.candidate.commit}`,
       `candidate tree: ${request.candidate.tree}`,

@@ -307,6 +307,7 @@ import {
   prepareHumanGuardOverrideForSignature,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { CARD_END_LINE } from "../lib/critical-action-approval-card.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 // Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
@@ -3147,6 +3148,167 @@ test("authorize-critical still requires the literal word approve: anything else 
     } finally {
       cleanup(dirs);
     }
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * C30I-S5 (AC-112, queue C30-20): the attended confirmation opens with a plain-language card (what, why now, what it
+ * allows until when, what it does not allow, what a decline does, how to read the lines below) above the UNCHANGED
+ * evidence lines. Each case declines at the prompt ("nope"), so no key is used and nothing is signed.
+ * ------------------------------------------------------------------ */
+
+const C30I5_EN_LABELS = ["WHAT YOU ARE SIGNING:", "WHY YOU ARE ASKED NOW:", "WHAT THIS ALLOWS, AND UNTIL WHEN:", "WHAT THIS DOES NOT ALLOW:", "IF YOU DECLINE:", "HOW TO READ THE LINES BELOW:"];
+
+/** Runs `argv` and declines at the prompt; returns the one prompt the human saw plus the request the command wrote. */
+function c30i5DeclinedPrompt(dirs, argv, dependencies = {}) {
+  const prompts = [];
+  assert.throws(() => runHumanApproval(argv, {
+    observeCandidate: () => ({ ...CANDIDATE }),
+    readConfirmation: (prompt) => { prompts.push(prompt); return "nope"; },
+    spawn: () => { throw new Error("a declined confirmation must never reach OpenSSL"); },
+    ...dependencies,
+  }), /approval cancelled: explicit confirmation was not given/u);
+  assert.equal(prompts.length, 1);
+  return prompts[0];
+}
+
+/** The prompt minus the card block: everything up to and including the delimiter line after the first header line is dropped. */
+function c30i5SplitCard(prompt) {
+  const delimiter = `  ${CARD_END_LINE}\n`;
+  const end = prompt.indexOf(delimiter);
+  assert.ok(end > 0, "the card must end in its delimiter line");
+  const firstLineEnd = prompt.indexOf("\n") + 1;
+  return { header: prompt.slice(0, firstLineEnd), card: prompt.slice(firstLineEnd, end + delimiter.length), rest: prompt.slice(end + delimiter.length) };
+}
+
+test("C30I-S5: authorize-critical (push) opens with the plain-language card and the lines after it are byte-identical to the output before the card existed", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const expiresAt = futureExpiry();
+    const subjectSha256 = subjectDigest("c30i5-push-bare");
+    const prompt = c30i5DeclinedPrompt(dirs, criticalArgv("authorize-critical", dirs, { subjectSha256, expiresAt }));
+    const { header, card, rest } = c30i5SplitCard(prompt);
+    assert.equal(header, "PO APPROVAL CONFIRMATION -- read before you enter your passphrase:\n");
+    for (const label of C30I5_EN_LABELS) assert.ok(card.includes(label), `the card must carry ${label}`);
+    assert.ok(card.includes(CANDIDATE.commit.slice(0, 12)) && card.includes(expiresAt) && card.includes(FEATURE_ID));
+    const intentSha256 = JSON.parse(readFileSync(criticalArtifacts(dirs).request, "utf8")).approvalIntent.sha256;
+    // The expected text is spelled out from fixture literals, never produced by the code under test.
+    const before = [
+      "  action kind: push",
+      `  candidate commit: ${CANDIDATE.commit}`,
+      `  candidate tree: ${CANDIDATE.tree}`,
+      `  action subject sha256: ${subjectSha256} (the exact destination/subject this approval is bound to)`,
+      `  action expires at: ${expiresAt}`,
+      `  feature id: ${FEATURE_ID}`,
+      `  approval intent sha256: ${intentSha256}`,
+      "  this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
+      "This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.",
+      "Type exactly \"approve\" to continue; anything else cancels: ",
+    ].join("\n");
+    assert.equal(rest, before);
+    // A bare digest holds no remote, destination or counts: the card says so instead of guessing.
+    assert.match(card, /does not show the remote or the destination ref/u);
+    assert.ok(!/origin|refs\/heads|\b\d+ (commits?|files?)\b/u.test(card));
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C30I-S5: a push with --subject names the remote and destination ref the request holds, and the digest and the lines after the card stay what they were", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const pushSubject = { sourceCommit: CANDIDATE.commit, remote: "origin", destination: "refs/heads/feature-a", threatModel: { path: "project/push-threat-model.md", sha256: "1".repeat(64) } };
+    writeFileSync(join(dirs.repoRoot, "push-subject.json"), `${JSON.stringify(pushSubject, null, 2)}\n`);
+    const expected = criticalActionSubjectSha256({ kind: "push", candidate: CANDIDATE, subject: pushSubject });
+    const prompt = c30i5DeclinedPrompt(dirs, [
+      "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+      "--kind", "push", "--subject", "push-subject.json", "--expires-at", futureExpiry(),
+    ]);
+    const { card, rest } = c30i5SplitCard(prompt);
+    assert.ok(card.includes("origin") && card.includes("refs/heads/feature-a"));
+    assert.ok(!/does not show the remote or the destination ref/u.test(card));
+    assert.ok(rest.includes(`action subject sha256: ${expected}`), "the bound digest is still the one computed from the preimage");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C30I-S5: release-preflight with --subject states the version and lifecycle feature of the preimage in the card, and the existing decoded lines follow unchanged", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    writeFileSync(join(dirs.repoRoot, "subject.json"), `${JSON.stringify(RELEASE_PREFLIGHT_SUBJECT, null, 2)}\n`);
+    const prompt = c30i5DeclinedPrompt(dirs, [
+      "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+      "--kind", "release-preflight", "--subject", "subject.json", "--expires-at", futureExpiry(),
+    ]);
+    const { card, rest } = c30i5SplitCard(prompt);
+    assert.ok(card.includes("1.4.0") && card.includes("nova-a6") && card.includes("ADR-0064"));
+    assert.ok(!/undefined|\bnull\b|NaN|\[object/u.test(card));
+    for (const line of [`release version: ${RELEASE_PREFLIGHT_SUBJECT.version}`, `lifecycle feature id: ${RELEASE_PREFLIGHT_SUBJECT.lifecycle.featureId}`, `retention policy sha256: ${RELEASE_PREFLIGHT_SUBJECT.retentionPolicySha256}`]) {
+      assert.ok(rest.includes(`  ${line}\n`), `the existing line stays: ${line}`);
+    }
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C30I-S5: release-preflight without --subject has a card with no version and the old no-decoded-lines behaviour", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const prompt = c30i5DeclinedPrompt(dirs, criticalArgv("authorize-critical", dirs, { kind: "release-preflight", subjectSha256: subjectDigest("c30i5-bare-release"), expiresAt: futureExpiry() }));
+    const { card, rest } = c30i5SplitCard(prompt);
+    assert.ok(!/version/iu.test(card.split("\n").find((line) => line.includes("WHAT YOU ARE SIGNING:"))));
+    assert.ok(!rest.includes("release version:"));
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C30I-S5: acknowledge-gate-definition-changes states the counts of the range it holds; the card follows the configured German and leaves the lines after it identical to English", () => {
+  const subject = { featureId: FEATURE_ID, rangeBase: "9".repeat(40), changesSha256: "9".repeat(64),
+    changes: [{ path: "harness/a.json", change: "M", commit: "1".repeat(40) }, { path: "harness/b.json", change: "D", commit: "2".repeat(40) }] };
+  const run = (language) => {
+    const dirs = criticalDirs();
+    try {
+      keyFixture(dirs.directory);
+      if (language !== null) stateFixture(dirs.repoRoot, { language });
+      return c30i5DeclinedPrompt(dirs, ["authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+        "--kind", "acknowledge-gate-definition-changes", "--expires-at", "2999-01-01T00:00:00.000Z"], {
+        buildGateChangeAcknowledgementSubjectFn: () => ({ ok: true, candidate: { ...CANDIDATE }, subject }),
+      });
+    } finally {
+      cleanup(dirs);
+    }
+  };
+  const english = run(null);
+  const german = run("de");
+  const en = c30i5SplitCard(english);
+  const de = c30i5SplitCard(german);
+  assert.ok(en.card.includes("2 gate-definition changes") && en.card.includes("2 files") && en.card.includes("2 commits") && en.card.includes("ADR-0096"));
+  assert.ok(de.card.includes("WAS SIE UNTERSCHREIBEN:") && de.card.includes("2 Änderungen") && de.card.includes("2999-01-01T00:00:00.000Z"));
+  assert.match(de.header, GERMAN_FRAME);
+  assert.doesNotMatch(en.card, /WAS SIE UNTERSCHREIBEN/u);
+  // Only the frame is localized by the existing mechanism; the lines after the card are the same bytes in both languages.
+  const dataLines = (rest) => rest.split("\n").slice(0, -2);
+  assert.deepEqual(dataLines(de.rest), dataLines(en.rest));
+  assert.ok(en.rest.includes("gate-definition change without a proof: harness/b.json deleted in 222222222222"));
+});
+
+test("C30I-S5: an unreadable language setting leaves the English card, never no card", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const prompt = c30i5DeclinedPrompt(dirs, criticalArgv("authorize-critical", dirs, { subjectSha256: subjectDigest("c30i5-lang"), expiresAt: futureExpiry() }), {
+      resolveHumanFacingLanguageFn: () => { throw new Error("locale lookup exploded"); },
+    });
+    assert.match(prompt, ENGLISH_FRAME);
+    assert.ok(prompt.includes("WHAT YOU ARE SIGNING:"));
+  } finally {
+    cleanup(dirs);
   }
 });
 
