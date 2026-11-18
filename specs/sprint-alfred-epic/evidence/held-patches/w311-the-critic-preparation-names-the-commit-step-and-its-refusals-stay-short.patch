@@ -1,0 +1,282 @@
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+index a4a9b4fa4..10dc17903 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+@@ -103,6 +103,32 @@ test("Codex report: an owned manifest is committed together with the untracked e
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// C31-C1 (L14, AC-112): the Critic preparation names this command as the one commit step of a diagnostic registration. The registration lists the diagnostic JSON and its member
++// (the targeted log) as candidate-evidence entries of the manifest, all left uncommitted; whether this route then carries BOTH was inferred, here it is measured with real Git.
++test("C31-C1: a manifest that lists a diagnostic JSON and its log as candidate evidence is committed with both, and the dry-run names exactly those paths without writing", () => {
++  const { root, run, put, evidencePath } = featureRepo("diagnostic");
++  try {
++    const sha = (text) => createHash("sha256").update(text).digest("hex");
++    const diagnostic = "specs/feat-1/evidence/suite.json", log = "specs/feat-1/evidence/suite.log";
++    const logText = "ok 1 - suite\n", diagnosticText = `${JSON.stringify({ schema: "pipeline.critic-diagnostic.v1", targeted: { log: { path: log } } })}\n`;
++    put(log, logText); put(diagnostic, diagnosticText);
++    const entry = (path, text) => ({ class: "candidate-evidence", path, sha256: sha(text), authority: false, mutability: "immutable", retention: "retain" });
++    const manifest = JSON.parse(readFileSync(join(root, "specs/feat-1/lifecycle.json"), "utf8"));
++    put("specs/feat-1/lifecycle.json", `${JSON.stringify({ ...manifest, artifacts: [entry(diagnostic, diagnosticText), entry(log, logText)] }, null, 2)}\n`);
++    rmSync(join(root, evidencePath)); // the fixture's own single evidence file is not part of this case
++    const head = run("rev-parse", "HEAD").trim();
++    const dry = commitPipelineOwned(["--root", root, "--agent", "--dry-run"]);
++    assert.equal(dry.status, "dry-run", JSON.stringify(dry));
++    assert.deepEqual([...dry.owned, ...dry.carried].sort(), ["specs/feat-1/lifecycle.json", diagnostic, log].sort());
++    assert.equal(run("rev-parse", "HEAD").trim(), head, "the dry-run commits nothing");
++    assert.match(run("status", "--porcelain"), /\?\? specs\/feat-1\/evidence\//u, "and stages nothing");
++    const done = commitPipelineOwned(["--root", root, "--agent"]);
++    assert.equal(done.status, "committed", JSON.stringify(done));
++    assert.deepEqual(run("show", "--name-only", "--format=", "HEAD").trim().split("\n").sort(), [diagnostic, log, "specs/feat-1/lifecycle.json"].sort());
++    assert.equal(run("status", "--porcelain").trim(), "");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("Codex report: the manifest committed alone is the gap the course reader cannot pass (control for the test above)", () => {
+   const { root, run } = featureRepo("control");
+   try {
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index 6ab1a4ffc..b69fac93b 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
+ import { fillCriticBriefing, renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
+ import { CRITIC_BRIEFING_ROLE, renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
+ import { criticRunnerFromEnv } from "../lib/critic-route-assurance.mjs";
++import { writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ 
+ export const DISPATCH_PREPARATION_SCHEMA = "pipeline.dispatch-preparation.v1";
+ const HERE = dirname(fileURLToPath(import.meta.url));
+@@ -53,6 +54,17 @@ critic-fill: the Claude route to hand a Critic its briefing as a verified pointe
+   Antigravity and Codex carriers still carry the full text; a Workflow carrier refuses a pointer.
+ `;
+ 
++const HELP_COMMAND = "node <plugin-root>/scripts/prepare-dispatch.mjs --help";
++/** C31-C1 (B3): an argument refusal shows the usage line of the failed verb and the runnable help command, never the whole help (a 3.9 KB text repeated in the context per refusal). */
++function usageRepair(verb) {
++  const lines = PREPARE_DISPATCH_HELP.split("\n");
++  const at = lines.findIndex((line) => line.startsWith(`  node <plugin-root>/scripts/prepare-dispatch.mjs ${verb} `));
++  if (at < 0) return `every verb and flag: ${HELP_COMMAND}`;
++  let end = at + 1;
++  while (lines[end]?.startsWith("       [")) end += 1;
++  return `usage: ${lines.slice(at, end).map((line) => line.trim()).join(" ")} ; every verb and flag: ${HELP_COMMAND}`;
++}
++
+ const lastJson = (text) => {
+   const trimmed = String(text ?? "").trim();
+   if (trimmed === "") return null;
+@@ -88,7 +100,7 @@ function healCommand(warning) { return /\bnode\s+\S*routine-repair\.mjs\b.*$/u.e
+ 
+ export function prepareGoldfishDispatch({ root, packagePath, out = null, noGoldfishRunning = false }, deps = {}) {
+   const verb = "goldfish";
+-  if (typeof packagePath !== "string" || packagePath === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--package is required", repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
++  if (typeof packagePath !== "string" || packagePath === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--package is required", repair: usageRepair("goldfish") }, "PREP-ARGUMENT");
+   const run = deps.runCommand ?? defaultRunner(root);
+   const step = stepOf(run);
+   const probeArgv = ["probe", "--package", packagePath, "--root", root];
+@@ -138,15 +150,31 @@ function setAsideFilledRequest(target, deps) {
+   return aside;
+ }
+ 
++const shellWord = (word) => (/^[\w./@+=:\\-]+$/u.test(word) ? word : JSON.stringify(word));
++const sameSet = (left, right) => left.length === right.length && [...left].sort().join("\0") === [...right].sort().join("\0");
++
++/**
++ * C31-C1 (L14): the ONE commit step of `commit-required`, derived and never run here. The owned commit route (commit-pipeline-owned.mjs) commits a feature manifest
++ * together with the untracked evidence it lists; its own read-only dry-run says which paths it would commit. Only when that is exactly commitPaths is it named;
++ * every other answer (a refusal, other paths, nothing, no usable output) falls back to the printed steps for exactly commitPaths. This preparation still never commits.
++ */
++function commitStepFor({ root, commitPaths, step }) {
++  const dry = step("commit-pipeline-owned.mjs", ["--root", root, "--agent", "--dry-run"]);
++  const wouldCommit = dry.value?.status === "dry-run" ? [...(Array.isArray(dry.value.owned) ? dry.value.owned : []), ...(Array.isArray(dry.value.carried) ? dry.value.carried : [])] : null;
++  if (wouldCommit !== null && sameSet(wouldCommit, commitPaths)) return { route: "owned-commit", executable: process.execPath, argv: [scriptPath("commit-pipeline-owned.mjs"), "--root", root, "--agent"] };
++  const why = dry.value?.code ?? (dry.value?.status === "dry-run" ? "covers-other-paths" : dry.value?.status ?? "no-answer");
++  return { route: "explicit-steps", ownedRoute: why, steps: writerCommitSteps(commitPaths, "chore(pipeline): commit the Critic diagnostic evidence") };
++}
++
+ export function prepareCriticDispatch(input, deps = {}) {
+   const verb = "critic";
+   const { root, spec, base, candidate, guardrails = [], evidence = [], taskId = null, priorCritic = null, deltaRequest = null, correctionInputBindings = null, registrationCommit = null, successorOf = null, label = null, command = [] } = input;
+   for (const [flag, value] of [["--spec", spec], ["--base", base], ["--candidate", candidate]]) {
+-    if (typeof value !== "string" || value === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: `${flag} is required`, repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
++    if (typeof value !== "string" || value === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: `${flag} is required`, repair: usageRepair(verb) }, "PREP-ARGUMENT");
+   }
+   if (!COMMIT.test(candidate)) return stopped(verb, "arguments", { code: "PREP-CANDIDATE-NOT-COMMIT", reason: `--candidate must be the full commit id, got ${candidate}`, repair: "pass the output of a rev-parse of the reviewed commit: the evidence commit moves HEAD, so a symbolic name would point at the wrong commit on the rerun" }, "PREP-CANDIDATE-NOT-COMMIT");
+-  if ((label === null) !== (command.length === 0)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label and the check command after -- come together", repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
+-  if (label !== null && !LABEL.test(label)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label takes letters, digits, dot, underscore and hyphen", repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
++  if ((label === null) !== (command.length === 0)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label and the check command after -- come together", repair: usageRepair(verb) }, "PREP-ARGUMENT");
++  if (label !== null && !LABEL.test(label)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label takes letters, digits, dot, underscore and hyphen", repair: usageRepair(verb) }, "PREP-ARGUMENT");
+   const run = deps.runCommand ?? defaultRunner(root);
+   const step = stepOf(run);
+   const exists = deps.exists ?? existsSync;
+@@ -165,8 +193,9 @@ export function prepareCriticDispatch(input, deps = {}) {
+       const registered = step("register-feature-package.mjs", ["--root", root, "--add-diagnostic-evidence", out]);
+       if (registered.exit !== 0 || registered.value?.status === "refused") return stopped(verb, "register", asReason(registered), "PREP-REGISTER-FAILED");
+       const commitPaths = [...new Set([out, log, ...(registered.value?.commitPaths ?? [])])];
+-      return outcome(verb, "commit-required", { commitPaths, rerun: { executable: process.execPath, argv: [SELF, ...criticArgv(input)] },
+-        next: "Commit exactly commitPaths in one evidence-only commit under this project's commit rules, then run the identical command again. Change nothing else first." });
++      const commit = commitStepFor({ root, commitPaths, step });
++      return outcome(verb, "commit-required", { commitPaths, commit, rerun: { executable: process.execPath, argv: [SELF, ...criticArgv(input)] },
++        next: `${commit.route === "owned-commit" ? `Run this one command, it commits exactly commitPaths (the manifest together with the evidence it lists): ${commit.argv.map(shellWord).join(" ")}` : "Run the steps of commit in order, they stage and commit exactly commitPaths in one evidence-only commit"}; then run the identical command again (rerun). Change nothing else first.` });
+     }
+     evidencePaths.push(out);
+   }
+@@ -213,7 +242,7 @@ const CRITIC_DRAFT_PATH = /^scratch\/critic-briefing\/([A-Za-z0-9][A-Za-z0-9._-]
+ 
+ export function prepareCriticFill({ root, briefing, fills = [] }, deps = {}) {
+   const verb = "critic-fill";
+-  const refuse = (code, reason, repair = PREPARE_DISPATCH_HELP) => stopped(verb, code.startsWith("PREP-") ? "arguments" : "fill", { code, reason, repair }, code);
++  const refuse = (code, reason, repair = usageRepair(verb)) => stopped(verb, code.startsWith("PREP-") ? "arguments" : "fill", { code, reason, repair }, code);
+   const match = typeof briefing === "string" ? CRITIC_DRAFT_PATH.exec(briefing.replace(/\\/gu, "/")) : null;
+   if (match === null) return refuse("PREP-FILL-PATH", "--briefing must be a generated draft: scratch/critic-briefing/<folder>/critic[-<part>].briefing.md, the file `prepare-dispatch.mjs critic` wrote", "pass the path printed in next.briefings of the critic verb");
+   const values = new Map();
+@@ -319,7 +348,7 @@ export function parsePrepareDispatchArgv(argv) {
+ 
+ export function runPrepareDispatch(argv, deps = {}) {
+   const parsed = parsePrepareDispatchArgv(argv);
+-  if (parsed.error !== undefined) return stopped(["critic", "critic-fill"].includes(argv[0]) ? argv[0] : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: "run prepare-dispatch.mjs --help for every verb and flag" }, "PREP-ARGUMENT");
++  if (parsed.error !== undefined) return stopped(["critic", "critic-fill"].includes(argv[0]) ? argv[0] : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: usageRepair(argv[0]) }, "PREP-ARGUMENT");
+   if (parsed.options.verb === "critic-fill") return prepareCriticFill(parsed.options, deps);
+   return parsed.options.verb === "goldfish" ? prepareGoldfishDispatch(parsed.options, deps) : prepareCriticDispatch(parsed.options, deps);
+ }
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index 93dd68e18..8cfb5579f 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
+ import { tmpdir } from "node:os";
+ import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { PREPARE_DISPATCH_HELP, parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
++import { PREPARE_DISPATCH_HELP, parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch, runPrepareDispatch } from "./prepare-dispatch.mjs";
+ import * as prepareFill from "./prepare-dispatch.mjs";
+ import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
+ import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+@@ -126,7 +126,9 @@ const SAME_CANDIDATE = JSON.stringify({ candidate: { commit: CANDIDATE } });
+ 
+ test("the first Critic call produces and registers evidence, stops once with the exact paths and commits nothing", () => {
+   const steps = stub({ "git log": { status: 0, stdout: "\n", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({ path: "x" }),
+-    "register-feature-package.mjs": ok({ status: "registered", commitPaths: ["specs/f/manifest.json"] }) });
++    "register-feature-package.mjs": ok({ status: "registered", commitPaths: ["specs/f/manifest.json"] }),
++    // C31-C1 (QG-04, restated stub): commit-required now asks the read-only dry-run of the owned commit route for its one commit step.
++    "commit-pipeline-owned.mjs": no({ status: "refused", code: "CPO-FOREIGN-CHANGES" }) });
+   const result = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: steps.runCommand });
+   assert.equal(result.status, "commit-required");
+   assert.deepEqual(result.commitPaths, ["specs/f/evidence/suite.json", "specs/f/evidence/suite.log", "specs/f/manifest.json"]);
+@@ -136,10 +138,11 @@ test("the first Critic call produces and registers evidence, stops once with the
+ });
+ 
+ test("a registered evidence that is still uncommitted is registered again and asks for the same commit, without producing it twice", () => {
+-  const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }) });
++  const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }), "commit-pipeline-owned.mjs": no({ status: "refused", code: "CPO-FOREIGN-CHANGES" }) });
+   const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
+   assert.equal(result.status, "commit-required");
+-  assert.deepEqual(steps.keys(), ["git log", "register-feature-package.mjs"]);
++  // C31-C1 (QG-04, restated list): the read-only dry-run of the owned commit route is the only step added; evidence is still not produced twice.
++  assert.deepEqual(steps.keys(), ["git log", "register-feature-package.mjs", "commit-pipeline-owned.mjs"]);
+ });
+ 
+ test("a label that recorded another candidate is refused before anything runs", () => {
+@@ -227,7 +230,7 @@ test("C30F-G4B --successor-of passes through to the preflight and into the rerun
+   assert.equal(parsed.options.successorOf, "feature-a");
+   assert.match(parsePrepareDispatchArgv(["critic", "--root", ROOT, "--successor-of", "a", "--successor-of", "b"]).error, /twice/u);
+   assert.match(parsePrepareDispatchArgv(["goldfish", "--root", ROOT, "--successor-of", "a"]).error, /unknown flag/u);
+-  const commit = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({}), "register-feature-package.mjs": ok({ commitPaths: [] }) });
++  const commit = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({}), "register-feature-package.mjs": ok({ commitPaths: [] }), "commit-pipeline-owned.mjs": no({ status: "refused", code: "CPO-FOREIGN-CHANGES" }) });
+   const stopped = prepareCriticDispatch({ ...CRITIC, successorOf: "feature-a" }, { ...noFiles, runCommand: commit.runCommand });
+   assert.ok(stopped.rerun.argv.includes("--successor-of") && stopped.rerun.argv[stopped.rerun.argv.indexOf("--successor-of") + 1] === "feature-a", "the identical rerun keeps the flag");
+ });
+@@ -573,3 +576,93 @@ test("--help works in an empty directory and names both verbs", () => {
+     }
+   } finally { rmSync(empty, { recursive: true, force: true }); }
+ });
++
++// --- C31-C1 (L14, AC-112): `commit-required` names the ONE commit step; the preparation still never commits. ---
++
++const EVIDENCE = ["specs/f/evidence/suite.json", "specs/f/evidence/suite.log"], MANIFEST = "specs/f/manifest.json";
++const FIRST_CALL = (extra = {}) => ({ "git log": { status: 0, stdout: "\n", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({ path: "x" }),
++  "register-feature-package.mjs": ok({ status: "registered", commitPaths: [MANIFEST, ...EVIDENCE] }), ...extra });
++const gitWrites = (steps) => steps.keys().filter((key) => /^git (add|commit)/u.test(key));
++
++test("C31-C1 L14: when the owned commit route covers exactly commitPaths, commit-required names that one command, derived from its own dry-run, and the identical rerun", () => {
++  const steps = stub(FIRST_CALL({ "commit-pipeline-owned.mjs": ok({ schema: "pipeline.commit-pipeline-owned.v1", status: "dry-run", owned: [MANIFEST], carried: EVIDENCE }) }));
++  const result = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: steps.runCommand });
++  assert.equal(result.status, "commit-required");
++  assert.equal(result.commit.route, "owned-commit");
++  assert.equal(basename(result.commit.argv[0]), "commit-pipeline-owned.mjs");
++  assert.deepEqual(result.commit.argv.slice(1), ["--root", ROOT, "--agent"], "the printed command is the dry-run without --dry-run");
++  assert.equal(result.commit.executable, process.execPath);
++  const dry = steps.calls.find((call) => call.key === "commit-pipeline-owned.mjs").argv;
++  assert.deepEqual(dry.slice(1), ["--root", ROOT, "--agent", "--dry-run"], "the preparation only asks the read-only dry-run");
++  assert.match(result.next, /commit-pipeline-owned\.mjs/u);
++  assert.match(result.next, /identical command again/u);
++  assert.deepEqual(gitWrites(steps), [], "the preparation never stages or commits");
++  assert.deepEqual(result.rerun.argv.slice(1, 3), ["critic", "--root"], "the identical rerun stays");
++});
++
++test("C31-C1 L14: when the owned route refuses, covers other paths, or answers nothing usable, commit-required prints the explicit steps for exactly commitPaths", () => {
++  const list = [...EVIDENCE, MANIFEST].join(" ");
++  const answers = [
++    no({ schema: "pipeline.commit-pipeline-owned.v1", status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted" }),
++    ok({ status: "dry-run", owned: [MANIFEST, "specs/f/slice-queue.json"], carried: EVIDENCE }),
++    ok({ status: "dry-run", owned: [MANIFEST], carried: [EVIDENCE[0]] }),
++    ok({ status: "nothing-to-commit", owned: [] }),
++    { status: 1, stdout: "not json", stderr: "" },
++  ];
++  for (const answer of answers) {
++    const steps = stub(FIRST_CALL({ "commit-pipeline-owned.mjs": answer }));
++    const result = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: steps.runCommand });
++    assert.equal(result.status, "commit-required", JSON.stringify(answer));
++    assert.equal(result.commit.route, "explicit-steps", JSON.stringify(answer));
++    assert.equal(result.commit.steps[0], `git add -- ${list}`, "git add of exactly the listed paths");
++    assert.equal(result.commit.steps.at(-1), `git commit -F scratch/commit-msg/writer-output.txt -- ${list}`, "the one commit command, scoped to the same paths");
++    assert.ok(result.commit.steps.some((line) => line.includes("AI-Assisted: true") && line.includes("Dispatch: stage-0 (elephant)")), "the message file carries the trailers");
++    assert.match(result.next, /identical command again/u);
++    assert.deepEqual(gitWrites(steps), [], "the preparation never stages or commits");
++  }
++  const refused = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: stub(FIRST_CALL({ "commit-pipeline-owned.mjs": answers[0] })).runCommand });
++  assert.equal(refused.commit.ownedRoute, "CPO-FOREIGN-CHANGES", "the reason the owned route was not offered is named");
++});
++
++test("C31-C1 L14: the second round of the same evidence (registered, still uncommitted) names the same step", () => {
++  const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }),
++    "commit-pipeline-owned.mjs": ok({ status: "dry-run", owned: [], carried: [] }) });
++  const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
++  assert.equal(result.status, "commit-required");
++  assert.equal(result.commit.route, "explicit-steps", "an empty dry-run covers no listed path");
++  assert.equal(result.commit.steps[0], `git add -- ${EVIDENCE.join(" ")}`);
++});
++
++// --- C31-C1 B3 (R4): an argument refusal names the usage line of the failed verb, not the whole help. ---
++
++const REPAIR_LIMIT = 600;
++const bytes = (text) => Buffer.byteLength(String(text), "utf8");
++const usageLineOf = (verb) => PREPARE_DISPATCH_HELP.split("\n").filter((line) => line.startsWith(`  node <plugin-root>/scripts/prepare-dispatch.mjs ${verb} `))[0];
++
++test("C31-C1 B3: every argument refusal repairs with the usage line of the failed verb plus --help, under 600 bytes, never the whole help", () => {
++  const refusals = [
++    ["goldfish", prepareGoldfishDispatch({ root: ROOT }, {})],
++    ["critic", prepareCriticDispatch({ root: ROOT }, {})],
++    ["critic", prepareCriticDispatch({ ...CRITIC, command: [] }, {})],
++    ["critic", prepareCriticDispatch({ ...CRITIC, label: "bad label" }, {})],
++    ["critic-fill", prepareFill.prepareCriticFill({ root: ROOT, briefing: DRAFT_PATH, fills: ["MODEL_ID"] }, { readFile: () => "" })],
++    ["goldfish", runPrepareDispatch(["goldfish"], {})],
++    ["critic", runPrepareDispatch(["critic", "--root", ROOT, "--bogus", "x"], {})],
++    ["critic-fill", runPrepareDispatch(["critic-fill", "--root"], {})],
++  ];
++  for (const [verb, result] of refusals) {
++    assert.equal(result.status, "stopped", verb);
++    const repair = result.stop.repair;
++    assert.ok(bytes(repair) < REPAIR_LIMIT, `${verb}: the repair is ${bytes(repair)} bytes`);
++    assert.ok(repair.includes(usageLineOf(verb).trim().split("\n")[0]), `${verb}: the repair holds the verb's usage line`);
++    assert.match(repair, /prepare-dispatch\.mjs --help/u, `${verb}: the runnable help command stays`);
++    assert.notEqual(repair, PREPARE_DISPATCH_HELP);
++  }
++});
++
++test("C31-C1 B3: an unknown verb has no usage line to show and still names the runnable help command", () => {
++  const result = runPrepareDispatch(["bogus", "--root", ROOT], {});
++  assert.equal(result.stop.code, "PREP-ARGUMENT");
++  assert.ok(bytes(result.stop.repair) < REPAIR_LIMIT);
++  assert.match(result.stop.repair, /node <plugin-root>\/scripts\/prepare-dispatch\.mjs --help/u);
++});
