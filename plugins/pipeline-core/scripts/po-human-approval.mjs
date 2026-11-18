@@ -31,7 +31,7 @@ import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-ga
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
-import { criticalActionApprovalCard } from "../lib/critical-action-approval-card.mjs";
+import { criticalActionApprovalCard, signingCeremonyCard } from "../lib/critical-action-approval-card.mjs";
 import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
@@ -530,6 +530,31 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
     ...(source.length > facts.length || (record?.lines?.length ?? 0) > source.length ? [materialArtifact === null ? "additional review details omitted: full review material is unavailable" : "additional validated review material is retained at the bound artifact"] : []),
     "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
   ];
+}
+/**
+ * C30J-J12 (queue C30-20 gap): the plain-language card that opens the `sign-intent` confirmation for the two ceremonies that are not
+ * `authorize-critical`: the guard-override signature digest and the design approval. Pure and read-only: the facts come ONLY from values
+ * the ceremony already holds (the structured plan the signature request resolved to, or the validated request binding); it reads nothing,
+ * changes no request, digest or proof, and the evidence lines printed after the card are not its business. Any other request (the bare
+ * `--intent-sha256` route included, which resolves display lines only) gets no card rather than facts parsed out of display text.
+ */
+export function signingConfirmationCard({ requestSchema, request, record, language } = {}) {
+  if (requestSchema === "pipeline.human-guard-override-signature-digest.v1") {
+    if (record?.resolved !== true) return [];
+    const planned = record.fullReviewMaterial;
+    return signingCeremonyCard({ kind: "guard-override", language,
+      facts: { toolName: planned?.toolName, commandClass: planned?.commandClass, expiresAt: planned?.expiresAt, pathCount: Array.isArray(planned?.eligiblePaths) ? planned.eligiblePaths.length : undefined } });
+  }
+  if (requestSchema === DESIGN_APPROVAL_REQUEST_SCHEMA) {
+    const binding = request?.binding;
+    return signingCeremonyCard({ kind: "design-approval", language,
+      facts: { featureId: binding?.featureId, prdPath: binding?.sources?.prd?.path, specPath: binding?.sources?.spec?.path,
+        companionCount: Array.isArray(binding?.sources?.companions) ? binding.sources.companions.length : undefined,
+        receiptCount: Array.isArray(binding?.reviewReceipts) ? binding.reviewReceipts.length : undefined,
+        verdict: binding?.verdict, openFindingCount: Array.isArray(binding?.openFindingIds) ? binding.openFindingIds.length : undefined,
+        candidateCommit: request?.approvalIntent?.value?.candidate?.commit } });
+  }
+  return [];
 }
 function nonPushCriticalHandoff(result) {
   return { proofPath: result.externalPaths?.proof ?? null,
@@ -3010,6 +3035,9 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       }
     };
     const disclosureLines = compactSigningDisclosure({ intentSha256, record, materialArtifact });
+    // C30J-J12: the plain-language card (guard-override and design-approval requests only) opens the confirmation; the evidence lines
+    // after it are exactly the compact disclosure above, byte for byte, and nothing bound by the signature changes.
+    const confirmationLines = [...signingConfirmationCard({ requestSchema, request: scratchRequestRecord, record, language: humanFacingLanguage }), ...disclosureLines];
     // NVA-SIGNONCE-1: one human decision, not two. When the private key about to
     // sign is passphrase-protected, entering that passphrase at the OpenSSL
     // prompt below IS the deliberate human act, so the typed confirmation this
@@ -3021,9 +3049,9 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     // would leave none.
     revalidateSigningDisclosure();
     if (isPrivateKeyPassphraseProtected(paths.privateKey, dependencies)) {
-      printDisclosureOnly(disclosureLines, humanFacingLanguage);
+      printDisclosureOnly(confirmationLines, humanFacingLanguage);
     } else {
-      requireExplicitConfirmation(disclosureLines, dependencies, humanFacingLanguage);
+      requireExplicitConfirmation(confirmationLines, dependencies, humanFacingLanguage);
     }
     // A shared external key directory is normal: it must never make one
     // ceremony overwrite the proof returned by an earlier ceremony.  The

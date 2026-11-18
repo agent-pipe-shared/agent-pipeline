@@ -435,6 +435,18 @@ test("AC-264: signing through that command discloses the design purpose: no HGO-
   assert.ok(disclosure.includes(f.candidate), "the disclosure names the candidate commit");
   assert.doesNotMatch(disclosure, /HGO-/u, "no guard-override (HGO-) code reaches the PO");
   assert.doesNotMatch(disclosure, /no recorded request resolves|purpose unavailable/u, "the unresolved-request fallback is never shown for a design approval");
+  // C30J-J12 (AC-112 closest accepted criterion, queue C30-20): the fixture's configured human-facing language is German, so the one
+  // signing command opens with the six-part plain-language card in German, built from the request's own binding, and every evidence
+  // line the PO saw before is still there after the card's end line, in the same order (QG-04: an added assertion, none weakened).
+  const cardEnd = disclosure.indexOf("\n  -----\n");
+  assert.ok(cardEnd > 0, "the card ends in its fixed delimiter line before the evidence lines");
+  const cardText = disclosure.slice(0, cardEnd);
+  for (const label of ["WAS SIE UNTERSCHREIBEN:", "WARUM JETZT GEFRAGT WIRD:", "WAS DAS ERLAUBT, UND BIS WANN:", "WAS DAS NICHT ERLAUBT:", "WENN SIE ABLEHNEN:", "SO LESEN SIE DIE ZEILEN DARUNTER:"]) assert.ok(cardText.includes(label), `card part ${label}`);
+  assert.ok(cardText.includes(f.request.binding.featureId) && cardText.includes(f.request.binding.sources.prd.path) && cardText.includes(f.request.binding.sources.spec.path), "the card names the feature, the PRD and the Spec the request binds");
+  assert.ok(cardText.includes(f.candidate.slice(0, 12)), "the card names the candidate commit");
+  const evidence = disclosure.slice(cardEnd + "\n  -----\n".length);
+  assert.ok(evidence.startsWith(`  intent sha256: ${f.request.approvalIntent.sha256}\n  action: approve the exact reviewed design-to-implementation plan decision\n`), "the evidence lines follow the card unchanged, digest first");
+  assert.ok(disclosure.indexOf("PO-FREIGABE BESTÄTIGEN") < disclosure.indexOf("WAS SIE UNTERSCHREIBEN:"), "the card sits inside the confirmation frame, under its header");
 });
 
 test("G20-30: the proof is awaited and imported by the agent after the PO signs, with no reply from the PO", () => {

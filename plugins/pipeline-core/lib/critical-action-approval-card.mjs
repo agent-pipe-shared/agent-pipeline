@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
  * C30I-S5 (AC-112, queue C30-20): the plain-language card that opens the attended signature confirmation of
- * `po-human-approval.mjs authorize-critical`, above the unchanged evidence lines and hashes.
+ * `po-human-approval.mjs authorize-critical`, above the unchanged evidence lines and hashes. C30J-J12 adds the same card for the two
+ * ceremonies that go through `sign-intent` (the guard-override signature digest and the design approval) as `signingCeremonyCard`.
  *
  * Pure and read-only: it is built ONLY from values the request already holds (the kind, the candidate commit and tree, the expiry, the
  * feature id and the subject preimage when `--subject` or a kind builder supplied one). It reads nothing, runs no git command and changes no
@@ -192,6 +193,90 @@ const SPECS = Object.freeze({
 
 /** The kinds `authorize-critical` accepts; each has a card. A test pins this list to the command's own kind list. */
 export const CARD_KINDS = Object.freeze(Object.keys(SPECS));
+
+// C30J-J12 (queue C30-20 gap): the two ceremonies that go through `sign-intent` instead of `authorize-critical`. They have their own table so the
+// twelve kinds above stay exactly as they were. Each entry is (facts, de) -> { what, why, allows, limits, closed }, and `facts` holds only what the
+// request already carries: a fact that is absent or malformed is left out, never guessed. A count must be a positive safe integer to be stated.
+const count = (value) => (Number.isSafeInteger(value) && value > 0 ? value : null);
+
+const CEREMONY_SPECS = Object.freeze({
+  // The signature digest of a guard override: facts { toolName, commandClass, expiresAt, pathCount } from the structured plan the request resolves to.
+  "guard-override": (f, de, language) => {
+    const tool = line(f.toolName); const klass = line(f.commandClass); const paths = count(f.pathCount); const expiry = line(f.expiresAt);
+    const call = [tool === null ? null : (de ? `Werkzeug "${tool}"` : `tool "${tool}"`), klass === null ? null : (de ? `Befehlsklasse "${klass}"` : `command class "${klass}"`)].filter(Boolean).join(", ");
+    const until = expiry === null
+      ? (de ? "Diese Bestätigung zeigt den Ablauf nicht an." : "This confirmation does not show the expiry.")
+      : (de ? `Das gilt bis ${expiryText(language, expiry)}; danach ist eine neue Anfrage mit neuer Signatur nötig.` : `This holds until ${expiryText(language, expiry)}; after that a new request and a new signature are needed.`);
+    return {
+      what: de
+        ? `Ihre Signatur unter eine Freigabe, mit der der Agent genau einen von einem Guard abgelehnten Werkzeugaufruf${call === "" ? "" : ` (${call})`} wiederholen darf${paths === null ? "" : `; ${paths} ${plural(paths, "zulässiger Pfad", "zulässige Pfade")} stehen unten`}.`
+        : `Your signature on an authorization that lets the agent retry exactly one tool call that a guard denied${call === "" ? "" : ` (${call})`}${paths === null ? "" : `; ${paths} eligible ${plural(paths, "path is", "paths are")} listed below`}.`,
+      why: de ? "Eine Ablehnung durch einen Guard lässt sich nur mit Ihrer Signatur unter genau diese Anfrage aufheben (ADR-0059, ADR-0061)." : "A guard denial can be lifted only by your signature on exactly this request (ADR-0059, ADR-0061).",
+      allows: de
+        ? `Danach darf der Agent authorize-by-signature ausführen; das schaltet die Freigabe für eine einzige Verwendung genau dieses Aufrufs in identischen Bytes scharf, und die erste Verwendung verbraucht sie. ${until}`
+        : `After you sign, the agent may run authorize-by-signature, which arms the override for one use of that byte-identical call; the first use consumes it. ${until}`,
+      limits: de ? "Ein anderer Werkzeugaufruf, eine andere Befehlsklasse, eine zweite Verwendung oder ein Aufruf nach dem Ablauf ist nicht abgedeckt; es ist keine Push-, Release- oder Design-Freigabe." : "A different tool call, another command class, a second use or a call after the expiry is not covered; it is not a push, release or design approval.",
+      closed: de ? "die Ablehnung des Guards und der blockierte Aufruf bleiben bestehen" : "the guard denial and the blocked call stay as they are",
+      reading: de
+        ? "Die Zeilen oben sind die Bedeutung. Die Zeilen darunter sind der Beleg, an den die Signatur gebunden ist: der Intent-Digest, den Ihr Schlüssel signiert, die aufgezeichnete Anfrage, die zulässigen Pfade, die Begründung des ablehnenden Guards und der signierte Ablauf sowie Pfad und Digest des vollständigen Prüfmaterials."
+        : "The lines above are the meaning. The lines below are the evidence this signature is bound to: the intent digest your key signs, the recorded request, the eligible paths, the denying guard's rationale and the signed expiry, and the path and digest of the full review material.",
+    };
+  },
+  // The design approval: facts { featureId, prdPath, specPath, companionCount, receiptCount, verdict, openFindingCount, candidateCommit } from its binding.
+  "design-approval": (f, de) => {
+    const feature = line(f.featureId); const prd = line(f.prdPath); const spec = line(f.specPath); const commit = line(f.candidateCommit);
+    const companions = count(f.companionCount); const receipts = count(f.receiptCount); const open = f.verdict === "open-findings" ? count(f.openFindingCount) : null;
+    const package_ = [prd === null ? null : `PRD ${prd}`, spec === null ? null : `Spec ${spec}`].filter(Boolean).join(de ? " und " : " and ");
+    const extras = [
+      companions === null ? null : (de ? `${companions} ${plural(companions, "Begleitdatei", "Begleitdateien")}` : `${companions} ${plural(companions, "companion file", "companion files")}`),
+      receipts === null ? null : (de ? `${receipts} ${plural(receipts, "Bereitschafts-Prüfrunde", "Bereitschafts-Prüfrunden")}` : `${receipts} readiness ${plural(receipts, "review round", "review rounds")}`),
+      commit === null ? null : (de ? `Commit ${short(commit)}` : `commit ${short(commit)}`),
+    ].filter(Boolean).join(", ");
+    return {
+      what: de
+        ? `Ihre Freigabe des geprüften Designs${feature === null ? "" : ` von Feature ${feature}`}${package_ === "" ? "" : `: ${package_}`}${extras === "" ? "" : ` (${extras})`}.`
+        : `Your approval of the reviewed design${feature === null ? "" : ` of feature ${feature}`}${package_ === "" ? "" : `: ${package_}`}${extras === "" ? "" : ` (${extras})`}.`,
+      why: de ? "Der Schritt vom Design zur Umsetzung braucht Ihre Signatur unter genau das geprüfte Paket (ADR-0085); kein Agent kann sie für Sie geben." : "The step from design to implementation needs your signature on exactly the reviewed package (ADR-0085); no agent can give it for you.",
+      allows: (de
+        ? "Der Agent darf diese signierte Entscheidung zu approve-plan bringen, das sie unabhängig verbrauchen muss, damit die Umsetzung unter dem unten gebundenen Paket beginnen kann. Die Anfrage trägt keinen Ablauf; sie gilt genau für diese Quellen, Prüfberichte und diesen Commit, und jede Änderung daran braucht eine neue Freigabe."
+        : "The agent may take this signed decision to approve-plan, which must consume it independently, so that implementation can start under the package bound below. The request carries no expiry; it holds for exactly these sources, reviews and this commit, and a change of any of them needs a new approval.")
+        + (open === null ? "" : (de ? ` Sie signieren über ${open} blockierende ${plural(open, "Feststellung", "Feststellungen")}, die nach der letzten erlaubten Prüfrunde offen ${plural(open, "ist", "sind")}; die Signatur nimmt sie wissentlich hin.` : ` You sign over ${open} blocking ${plural(open, "finding", "findings")} still open after the last allowed review round; signing accepts ${plural(open, "it", "them")} knowingly.`)),
+      limits: de ? "Es ist keine Push-, Release- oder Veröffentlichungs-Freigabe und keine Guard-Freigabe, und es ändert weder PRD noch Spec." : "It is not a push, release or publication approval and not a guard override, and it changes neither the PRD nor the Spec.",
+      closed: de ? "der Plan bleibt ohne Freigabe und approve-plan hat keine signierte Entscheidung zu verbrauchen" : "the plan stays unapproved and approve-plan has no signed decision to consume",
+      reading: de
+        ? "Die Zeilen oben sind die Bedeutung. Die Zeilen darunter sind der Beleg, an den die Signatur gebunden ist: der Intent-Digest, den Ihr Schlüssel signiert, Commit und Tree des Kandidaten, der Digest der Design-Bindung, die Prüfberichte und die vollständige begrenzte Design-Bindung."
+        : "The lines above are the meaning. The lines below are the evidence this signature is bound to: the intent digest your key signs, the candidate commit and tree, the design binding digest, the review reports and the complete bounded design binding.",
+    };
+  },
+});
+
+/** The ceremony kinds `sign-intent` can open with a card; kept apart from CARD_KINDS (the twelve `authorize-critical` kinds). */
+export const CEREMONY_CARD_KINDS = Object.freeze(Object.keys(CEREMONY_SPECS));
+
+/**
+ * The card for a `sign-intent` ceremony, as lines ending in CARD_END_LINE; an unknown kind has no card (empty list). `facts` is what the request
+ * holds for that kind (see CEREMONY_SPECS); the decline part covers both ways of saying no, since a passphrase-protected key has no typed token.
+ */
+export function signingCeremonyCard({ kind, facts, language } = {}) {
+  const spec = Object.hasOwn(CEREMONY_SPECS, kind) ? CEREMONY_SPECS[kind] : null;
+  if (spec === null) return [];
+  const lang = Object.hasOwn(LABELS, language) ? language : "en";
+  const de = lang === "de";
+  const labels = LABELS[lang];
+  const parts = spec(isObject(facts) ? facts : {}, de, lang);
+  const decline = de
+    ? `Nichts wird signiert und kein Nachweis geschrieben, solange Sie nicht bestätigen (bei einem passphrasengeschützten Schlüssel: solange Sie die Passphrase nicht eingeben). Die Anfrage bleibt ohne Signatur in scratch/ und gewährt nichts; ${parts.closed}.`
+    : `Nothing is signed and no proof is written unless you confirm (with a passphrase-protected key: unless you enter the passphrase). The request file stays in scratch/ without a signature and grants nothing; ${parts.closed}.`;
+  return [
+    `${labels[0]} ${parts.what}`,
+    `${labels[1]} ${parts.why}`,
+    `${labels[2]} ${parts.allows}`,
+    `${labels[3]} ${parts.limits}`,
+    `${labels[4]} ${decline}`,
+    `${labels[5]} ${parts.reading}`,
+    CARD_END_LINE,
+  ];
+}
 
 /**
  * The card as lines (without indentation), ending in CARD_END_LINE. An unknown kind has no card (empty list).
