@@ -2755,6 +2755,7 @@
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:chat-gate-ceremony-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-signed-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-approval-card-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-action-signature-round-trip-tests",

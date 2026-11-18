@@ -4079,6 +4079,12 @@
       }
     },
     {
+      "name": "critical-action-approval-card-tests",
+      "file": "plugins/pipeline-core/lib/critical-action-approval-card.test.mjs",
+      "invariantPinned": "The attended signature confirmation opens with a plain-language card of what is signed, in English and the configured human-facing language, built only from facts the request holds, for every critical action kind.",
+      "nonOverlapNote": "Unique unit witness of the pure card builder; po-human-approval-tests pins the integration into the authorize-critical confirmation."
+    },
+    {
       "name": "security-remote-identity-tests",
       "file": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
       "invariantPinned": "Security evidence follows the effective push destination and the push guard refuses evidence bound to another destination.",
