@@ -1,0 +1,216 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index e0d77dbc3..2d91bea1b 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -74,17 +74,59 @@ function securityRow(readers) {
+   return row(id, "present", SECURITY_ENVELOPE_PATH);
+ }
+ 
++// AC-112 (candidate 31 lane L4, stage 1): the design names `docs/adr/<NNNN>-<slug>.md` before bind-adr-proposals assigns the final number, so a promised
++// path is matched by its slug too (an accepted record with the same slug and another number counts present); per absent slug the remedy names the
++// runnable create-adr command with a title derived from the slug; an optionally injected reader (adrDraftStates) shows what became of each draft.
++const PROMISED_ADR_SLUG = /^docs\/adr\/\d{4}-([a-z0-9][a-z0-9-]{0,63})\.md$/u;
++const ADR_DRAFT_STATE_LABELS = new Set(["unbound", "bound", "discarded", "materialized"]);
++const titleOfSlug = (slug) => { const words = slug.replace(/-+/gu, " ").trim(); return words.charAt(0).toUpperCase() + words.slice(1); };
++function adrDraftStates(readers) {
++  const read = call(readers.adrDraftStates);
++  if (!read.ok || !Array.isArray(read.value)) return [];
++  return read.value.filter((entry) => typeof entry?.slug === "string" && typeof entry.path === "string" && ADR_DRAFT_STATE_LABELS.has(entry.state));
++}
++const withDraftStates = (entries, text) => (entries.length === 0 ? text : `${text === null ? "" : `${text}; `}drafts: ${entries.map((entry) => `${entry.path}: ${entry.state}`).join("; ")}`);
++// The next step for a slug whose draft already exists: create-adr refuses an existing draft, so the remedy names the draft and what to do with its state.
++const DRAFT_NEXT_STEP = {
++  unbound: "finish it and bind it with node <plugin-root>/scripts/bind-adr-proposals.mjs (architecture-decision skill), or discard it with node <plugin-root>/scripts/create-adr.mjs --root <root> --slug <slug> --discard --reason \"<why>\"",
++  bound: "it is bound to the design and becomes accepted through the design approval (materialize-architecture)",
++  discarded: "it was discarded: remove the path from the module's adrReferences or promise a new slug",
++};
++function adrRemedy(absent, drafts) {
++  const steps = [];
++  for (const path of absent) {
++    const slug = PROMISED_ADR_SLUG.exec(path)?.[1];
++    const draft = slug === undefined ? undefined : drafts.find((entry) => entry.slug === slug && entry.state !== "materialized");
++    if (slug === undefined) continue;
++    steps.push(draft === undefined
++      ? `node <plugin-root>/scripts/create-adr.mjs --root <root> --slug ${slug} --title "${titleOfSlug(slug)}"`
++      : `${draft.path} exists (${draft.state}): ${DRAFT_NEXT_STEP[draft.state].replaceAll("<slug>", slug)}`);
++  }
++  return `The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill${steps.length === 0 ? "." : `; one step per slug: ${steps.join("; ")}.`}`;
++}
++
+ function adrRow(readers) {
+   const id = "adr-decision";
++  const drafts = adrDraftStates(readers);
+   const promised = call(readers.promisedAdrPaths);
+   if (promised.ok && Array.isArray(promised.value) && promised.value.length > 0) {
+     const checks = promised.value.map((path) => ({ path, found: call(readers.exists, path) }));
+     if (checks.every((c) => c.found.ok)) {
+-      const absent = checks.filter((c) => c.found.value !== true).map((c) => c.path);
+-      const listing = checks.map((c) => `${c.path}: ${c.found.value === true ? "exists" : "missing"}`).join(", ");
++      const accepted = call(readers.listDir, ADR_DIR);
++      const sameSlug = (path) => {
++        const slug = PROMISED_ADR_SLUG.exec(path)?.[1];
++        if (slug === undefined) return null;
++        const record = accepted.ok && Array.isArray(accepted.value) ? accepted.value.find((name) => new RegExp(`^\\d{4}-${slug}\\.md$`, "u").test(name)) : undefined;
++        if (record !== undefined) return `${ADR_DIR}/${record}`;
++        const materialized = drafts.find((entry) => entry.slug === slug && entry.state === "materialized");
++        return materialized === undefined ? null : `${ADR_DIR}/${materialized.acceptedId ?? slug}.md`;
++      };
++      for (const c of checks) if (c.found.value !== true) c.match = sameSlug(c.path);
++      const absent = checks.filter((c) => c.found.value !== true && !c.match).map((c) => c.path);
++      const listing = checks.map((c) => `${c.path}: ${c.found.value === true ? "exists" : c.match ? `exists as ${c.match}` : "missing"}`).join(", ");
+       return absent.length === 0
+-        ? row(id, "present", listing)
+-        : row(id, "missing", listing,`The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
++        ? row(id, "present", withDraftStates(drafts, listing))
++        : row(id, "missing", withDraftStates(drafts, listing), adrRemedy(absent, drafts));
+     }
+   }
+   const impact = call(readers.architectureImpact);
+@@ -93,7 +135,7 @@ function adrRow(readers) {
+   if (!DECISION_IMPACTS.has(impact.value)) return unknown(id);
+   const listing = call(readers.listDir, ADR_DIR);
+   if (!listing.ok || !Array.isArray(listing.value)) return unknown(id);
+-  return listing.value.length > 0 ? row(id, "present", ADR_DIR) : row(id, "missing");
++  return listing.value.length > 0 ? row(id, "present", withDraftStates(drafts, ADR_DIR)) : row(id, "missing", withDraftStates(drafts, null));
+ }
+ 
+ function fitnessRow(readers, featureId) {
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 0d8de6052..df15db62b 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -175,6 +175,60 @@ test("AC-239 adr-decision: the evidence lists every named ADR path with whether
+   assert.equal(rows(full({ promisedAdrPaths: () => promised, exists: () => false }))["security-scan"].status, "missing");
+ });
+ 
++// AC-112 (candidate 31 lane L4, stage 1), QG-04 restatement of the two AC-239 cases above: the exact-path rule stays (a promised path that exists is
++// present) and the old remedy text stays (it still names the architecture-decision skill), but a promised path is now ALSO matched by slug, because the
++// design names a number that bind-adr-proposals assigns later, and each absent slug gets a runnable create-adr command (the old remedy named none).
++const adrLayout = (files) => ({ exists: (p) => p === "docs/adr/0001-storage.md" && files.includes("0001-storage.md"), listDir: (p) => (p === "docs/adr" ? files : []) });
++const adrPromise = (paths, files, over = {}) => rows(full({ architectureImpact: () => "no-architecture-impact", promisedAdrPaths: () => paths, ...adrLayout(files), ...over }))["adr-decision"];
++test("AC-112 adr-decision: a promised path counts present when an accepted record with the same slug and another number exists", () => {
++  const present = adrPromise(["docs/adr/0003-storage.md"], ["0001-storage.md", "0001-storage.json"]);
++  assert.equal(present.status, "present");
++  assert.match(String(present.evidence), /docs\/adr\/0003-storage\.md: exists as docs\/adr\/0001-storage\.md/u);
++  assert.equal(present.remedy, null);
++  // A draft (draft-<slug>) is not an accepted record; another slug is not a match either.
++  assert.equal(adrPromise(["docs/adr/0003-storage.md"], ["draft-storage.md", "draft-storage.json"]).status, "missing");
++  assert.equal(adrPromise(["docs/adr/0003-storage.md"], ["0001-storage-layer.md"]).status, "missing");
++  assert.equal(adrPromise(["docs/adr/0003-storage.md"], ["0001-storage.json"]).status, "missing");
++});
++
++test("AC-112 adr-decision: per absent slug the remedy names the runnable create-adr command with a title derived from the slug", () => {
++  const gap = adrPromise(["docs/adr/0003-storage.md", "docs/adr/0004-event-bus-choice.md", "docs/adr/0005-other.md"], ["0001-other.md"]);
++  assert.equal(gap.status, "missing");
++  assert.match(gap.remedy, /create-adr\.mjs --root <root> --slug storage --title "Storage"/u);
++  assert.match(gap.remedy, /create-adr\.mjs --root <root> --slug event-bus-choice --title "Event bus choice"/u);
++  assert.doesNotMatch(gap.remedy, /--slug other/u, "a slug that exists as an accepted record gets no command");
++  assert.match(gap.remedy, /architecture-decision/u, "the old remedy text stays");
++  // A promised path that has no <number>-<slug>.md shape still reads by exact path and gets no create-adr command.
++  const odd = adrPromise(["docs/adr/notes.md"], []);
++  assert.equal(odd.status, "missing");
++  assert.doesNotMatch(odd.remedy, /create-adr\.mjs/u);
++});
++
++test("AC-112 adr-decision: an injected adrDraftStates reader appends the draft states to the evidence and steers the remedy away from a second create-adr", () => {
++  const drafts = [{ slug: "storage", path: "docs/adr/draft-storage.md", state: "unbound", acceptedId: null }, { slug: "bus", path: "docs/adr/draft-bus.md", state: "bound", acceptedId: "0002-bus" }];
++  const gap = adrPromise(["docs/adr/0003-storage.md", "docs/adr/0004-cache.md"], [], { adrDraftStates: () => drafts });
++  assert.equal(gap.status, "missing");
++  assert.match(gap.evidence, /drafts: docs\/adr\/draft-storage\.md: unbound; docs\/adr\/draft-bus\.md: bound/u);
++  assert.doesNotMatch(gap.remedy, /--slug storage --title/u, "create-adr would refuse a slug that already has a draft");
++  assert.match(gap.remedy, /docs\/adr\/draft-storage\.md exists \(unbound\)/u);
++  assert.match(gap.remedy, /bind-adr-proposals\.mjs/u);
++  assert.match(gap.remedy, /create-adr\.mjs --root <root> --slug cache --title "Cache"/u);
++  // A materialized draft of the promised slug counts present even when the listing cannot show it.
++  assert.equal(adrPromise(["docs/adr/0003-storage.md"], [], { adrDraftStates: () => [{ slug: "storage", path: "docs/adr/draft-storage.md", state: "materialized", acceptedId: "0001-storage" }] }).status, "present");
++  // Without a reader, with a throwing one or with garbage the row is exactly the reader-less row (never a refusal, never a throw).
++  const bare = adrPromise(["docs/adr/0003-storage.md"], []);
++  for (const reader of [undefined, () => { throw new Error("x"); }, () => null, () => [], () => [{ nope: 1 }]]) {
++    const same = adrPromise(["docs/adr/0003-storage.md"], [], { adrDraftStates: reader });
++    assert.deepEqual(same, bare);
++  }
++  // The draft states also ride on the impact-derived rows; the row shape stays closed and a not-applicable row stays bare.
++  const decided = rows(full({ adrDraftStates: () => drafts }))["adr-decision"];
++  assert.equal(decided.status, "present");
++  assert.match(decided.evidence, /drafts: docs\/adr\/draft-storage\.md: unbound/u);
++  assert.deepEqual(Object.keys(decided).sort(), ["evidence", "id", "remedy", "status"]);
++  assert.equal(rows(full({ architectureImpact: () => "no-architecture-impact", adrDraftStates: () => drafts }))["adr-decision"].evidence, null);
++});
++
+ test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {
+   assert.equal(rows(full())["architecture-fitness"].status, "present");
+   const missing = rows(full({ rigorHistory: () => [{ body: { featureId: "other", fitnessProjection: {} } }] }))["architecture-fitness"];
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index f50a81bf2..e8452f9c1 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -48,6 +48,7 @@ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STE
+ import { attachRunbookLink } from "../lib/runbook-link.mjs";
+ import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
+ import { loadMapBundle } from "./module-inventory.mjs";
++import { inspectAdrDraftBindings } from "../lib/architecture-effective-decisions.mjs";
+ import { pushApprovalActive, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+ import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+ import { retireFinishedContinuityOwnerRouteDescriptors } from "../lib/onboarding-continuity.mjs";
+@@ -1315,9 +1316,15 @@ function readQualityRows(root, coordinator) {
+     return [...new Set(bundle.modules.flatMap((mod) => (Array.isArray(mod.adrReferences) ? mod.adrReferences : [])).filter((p) => typeof p === "string" && SAFE_RELATIVE.test(p)))].sort();
+   };
+   // G20-27: the journey row reads the Spec the plan was bound to (the same path the audit index records), else the conventional one.
+-  let specPath;
+-  try { const bound = stateSnapshot(root).state?.planSubmission?.specPath; if (typeof bound === "string" && SAFE_RELATIVE.test(bound)) specPath = bound; } catch { /* the conventional spec path applies */ }
+-  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, specPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
++  let specPath, planPath;
++  try {
++    const submission = stateSnapshot(root).state?.planSubmission;
++    if (typeof submission?.specPath === "string" && SAFE_RELATIVE.test(submission.specPath)) specPath = submission.specPath;
++    if (typeof submission?.planPath === "string" && SAFE_RELATIVE.test(submission.planPath)) planPath = submission.planPath;
++  } catch { /* the conventional spec path applies */ }
++  // AC-112 (candidate 31 L4 stage 1): what became of each ADR draft, read from the files alone (the same reader and feature folders submit-plan uses); report-only.
++  const adrDraftStates = () => inspectAdrDraftBindings({ rootDir: resolve(root), featureDirs: [...new Set([planPath, specPath].filter((value) => typeof value === "string").map((value) => dirname(value.replace(/\\/gu, "/"))))] });
++  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, specPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths, adrDraftStates } });
+ }
+ function auditPackageIndex(root, coordinator) {
+   const { readers } = qualityReaders(root);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 0b47896b7..c910097f7 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -1134,6 +1134,38 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+   assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
+ });
+ 
++// AC-112 (candidate 31 lane L4, stage 1): the close injects the draft-state reader, so the adr-decision row of a real drive shows the state of a draft
++// for a slug the design promised, matches an accepted record of the same slug by slug, and writes nothing.
++test("process: AC-112 the adr-decision row shows the draft state of a promised slug and matches an accepted record by slug, report-only", () => {
++  const seen = {};
++  const status = (root) => spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).stdout;
++  processFixture("adrdraft", {
++    afterPrepared({ root }) {
++      const run = () => invoke(["drive", "--dry-run", "--root", root, "--lifecycle", "close-adrdraft", "--actor", "PO"]).qualityReadback.find((r) => r.id === "adr-decision");
++      mkdirSync(join(root, "architecture", "map"), { recursive: true });
++      writeFileSync(join(root, "architecture", "map", "index.md"), "# Map\n");
++      writeFileSync(join(root, "architecture", "map", "storage.md"), ["---", "type: Governed Module", "id: storage", "responsibility: Keeps the data.", "nonResponsibilities: []", "ownedPaths:", "  - src/storage/**", "publicContracts:", "  - src/storage/index.mjs", "allowedDependencies: []", "authorityEffects: []", "verificationEntryPoints:", "  - tests/storage.test.mjs", "adrReferences:", "  - docs/adr/0003-storage.md", "---", "", "# Module: storage", ""].join("\n"));
++      seen.noDraft = run();
++      const created = spawnSync(process.execPath, [fileURLToPath(new URL("./create-adr.mjs", import.meta.url)), "--root", root, "--slug", "storage", "--title", "Storage"], { encoding: "utf8", env: childEnv() });
++      assert.equal(created.status, 0, created.stderr || created.stdout);
++      seen.beforeDraftStatus = status(root);
++      seen.draft = run();
++      seen.afterDraftStatus = status(root);
++      writeFileSync(join(root, "docs", "adr", "0001-storage.md"), "# Storage\n");
++      writeFileSync(join(root, "docs", "adr", "0001-storage.json"), `${JSON.stringify({ id: "0001-storage", status: "accepted" })}\n`);
++      seen.accepted = run();
++    },
++  });
++  assert.equal(seen.noDraft.status, "missing", JSON.stringify(seen.noDraft));
++  assert.match(seen.noDraft.remedy, /create-adr\.mjs --root <root> --slug storage --title "Storage"/u);
++  assert.equal(seen.draft.status, "missing");
++  assert.match(seen.draft.evidence, /drafts: docs\/adr\/draft-storage\.md: unbound/u);
++  assert.doesNotMatch(seen.draft.remedy, /--slug storage --title/u);
++  assert.equal(seen.afterDraftStatus, seen.beforeDraftStatus, "the readback writes no file");
++  assert.equal(seen.accepted.status, "present", JSON.stringify(seen.accepted));
++  assert.match(seen.accepted.evidence, /docs\/adr\/0003-storage\.md: exists as docs\/adr\/0001-storage\.md/u);
++});
++
+ test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
+   const fixture = processFixture("delivery");
+   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");
