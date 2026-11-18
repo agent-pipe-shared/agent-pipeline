@@ -25,7 +25,7 @@ import { GATE_STRENGTH_PATHS } from "../hooks/guard-gate-strength.mjs";
 import { MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND } from "./critical-action-approval-request.mjs";
 import { readPrivateApprovals } from "./critical-action-authorization.mjs";
 import { validateVerifySuiteReceipt } from "./verify-resume.mjs";
-import { resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
+import { CALIBRATION_PATHS, resolveAuthorityArtifactPath } from "./project-authority-read.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
 
 export { MAINTENANCE_RED_ACKNOWLEDGEMENT_KIND };
@@ -254,7 +254,7 @@ export function preApprovalRedReceipt({ commonDir, root, check, approvalCommit, 
 
 /** The committed verify command of the calibration at `commit` (project tier first), or null when none reads. */
 function calibratedVerifyAt(git, commit) {
-  for (const path of ["project/pipeline.json", ".claude/pipeline.json"]) {
+  for (const path of CALIBRATION_PATHS) {
     const shown = git(["show", `${commit}:${path}`]);
     if (!gitOk(shown)) continue;
     try { const value = JSON.parse(String(shown.stdout)); return typeof value?.verify === "string" ? value.verify : null; } catch { return null; }

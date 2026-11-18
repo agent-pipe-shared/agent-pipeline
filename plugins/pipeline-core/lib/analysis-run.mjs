@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync
 import { isAbsolute, join, resolve } from 'node:path';
 import { spawnSync as realSpawnSync } from 'node:child_process';
 import { classifyVerifyCommand } from '../scripts/pipeline-state.mjs';
+import { CALIBRATION_PATHS } from './project-authority-read.mjs';
 
 export const ANALYSIS_RESULT_SCHEMA = 'pipeline.analysis-run.v1';
 export const OUTPUT_LIMIT_BYTES = 65536;
@@ -25,7 +26,6 @@ export const KEEP_DAYS = 7;
 export const TREE_CHANGED_REPAIR = 'review and revert the change in the working tree';
 
 const RUN_ID = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-[0-9a-f]{8}$/u;
-const CALIBRATION_PATHS = ['project/pipeline.json', '.claude/pipeline.json'];
 
 const refuse = (code, detail) => ({ status: 'refused', code, ...(detail ? { detail } : {}) });
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');

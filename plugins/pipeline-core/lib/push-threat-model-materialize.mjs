@@ -17,13 +17,14 @@ import { join } from "node:path";
 
 import { readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { gateConfig, loadManifestSafe } from "./manifest.mjs";
+import { CALIBRATION_PATHS } from "./project-authority-read.mjs";
 
 export const PUSH_THREAT_MODEL_UNCHANGED_MARKER = "<!-- push-threat-model: project judgement pending; delete this whole line once the questions below are answered for this project -->";
 
 const lf = (text) => String(text).replace(/\r\n/gu, "\n");
 
 function readCalibration(root) {
-  for (const rel of ["project/pipeline.json", ".claude/pipeline.json"]) {
+  for (const rel of CALIBRATION_PATHS) {
     const path = join(root, rel);
     if (!existsSync(path)) continue;
     try { const parsed = JSON.parse(readFileSync(path, "utf8")); return parsed !== null && typeof parsed === "object" ? parsed : {}; } catch { return {}; }

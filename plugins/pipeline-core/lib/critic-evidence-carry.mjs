@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+import { CALIBRATION_PATHS } from "./project-authority-read.mjs";
 import { administrationDocumentationClassOf } from "./administration-documentation-paths.mjs";
 import { promoteRepositoryModeBytes } from "../scripts/repository-mode-promote.mjs";
 
@@ -51,7 +52,7 @@ function changedEntries(root, from, to) {
   return entries;
 }
 
-const CALIBRATION_TWINS = new Set(["project/pipeline.json", ".claude/pipeline.json"]);
+const CALIBRATION_TWINS = new Set(CALIBRATION_PATHS);
 const GIT_ENV = { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
   GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" };
 

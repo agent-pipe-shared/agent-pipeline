@@ -100,6 +100,17 @@ test("no module that used a private calibration path list names either calibrati
   assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import the constants of project-authority-read.mjs");
 });
 
+// C30J-J17: the four modules J9 could not reach take the same list.
+const CALIBRATION_LIST_MODULES_J17 = ["critic-evidence-carry.mjs", "analysis-run.mjs", "maintenance-delivery.mjs", "push-threat-model-materialize.mjs"];
+
+test("the four remaining calibration path lists use the shared one: no quoted calibration literal is left in their sources", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const literal = /["'`](?:project|\.claude)\/pipeline\.json(?::[^"'`]*)?["'`]/u;
+  const offenders = CALIBRATION_LIST_MODULES_J17.filter((name) => readFileSync(join(here, name), "utf8").split("\n")
+    .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/u.test(line)).some((line) => literal.test(line)));
+  assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import CALIBRATION_PATHS of project-authority-read.mjs");
+});
+
 test("the calibration read orders stay what each reader did: neutral first, and the file resolver is not the same rule", () => {
   const put = (base, rel, text) => { mkdirSync(dirname(join(base, rel)), { recursive: true }); writeFileSync(join(base, rel), text); };
   const fresh = () => { const dir = join(WORK, `order-${counter += 1}`); mkdirSync(dir, { recursive: true }); return dir; };
