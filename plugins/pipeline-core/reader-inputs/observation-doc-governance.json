@@ -306,6 +306,7 @@
           "docs/adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md",
           "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
           "docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md",
+          "docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md",
           "docs/adr/README.md"
         ]
       },
