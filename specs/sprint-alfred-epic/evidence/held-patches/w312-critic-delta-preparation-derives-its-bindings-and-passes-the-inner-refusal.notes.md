@@ -1,0 +1,43 @@
+# w312 — the Critic delta preparation derives its bindings and passes the inner refusal through (candidate 31, C31-M2, lanes L10a + L12)
+
+Chained patch: it is the delta `7a6b942165cfccdb70a5076aeab77da320406f49..HEAD` on the base clone of candidate 31, so it applies only AFTER the base clone patch of candidate 31 (`apply --check` on the integration clone: exit 0; against the real checkout alone it is expected to fail).
+Criterion binding: AC-112 is the closest existing accepted criterion (fresh bounded attempt under its unchanged Spec text). PRD and Spec are unchanged. The Critic is suspended by the PO for candidates of this repository and no Full Verify ran: this change is verified by tests only.
+
+## 0. Recon (first, as the briefing asks)
+
+Shape of a delta request. `register-feature-package.mjs --add-delta-request <input.json>` reads an input file and writes the immutable `critic-delta-request-<sha>.json` (descriptor `pipeline.critic-delta-request.v1`). Before this patch the input file had to carry four keys:
+
+| Field | Judgment or derivable | Consumer |
+|---|---|---|
+| `coordinatorImpactConfirmed` | judgment (must be `true`) | `admitReviewAttempt` (review-economy), binding check |
+| `impactAmbiguous` | judgment (`true` makes the next round a FULL round, needs `--confirm-full-round`) | `admitReviewAttempt`, the verb |
+| `pathInvariantMap` | derivable only where the course registered ids already; otherwise judgment (which invariant a path touches) | `admitReviewAttempt` (every changed path needs a key, `RE-DELTA-UNKNOWN-PATH`), the reader `requestRead` (`CCA-DELTA-MAP`: keys equal the range's changed paths exactly) |
+| `changedBehaviorClaims` | derivable: only SAFE_ID is checked, so it is the invariant ids of the map | `admitReviewAttempt` binding check; the lineage record keeps the key (`critic-review-lineage-core.mjs`); the Codex host (`economy.changed_behavior_claims`) and the generic batch correction declaration (`critic-generic-batch.mjs`, its own required field list) feed the same admission from their own inputs and are not touched; nothing in the Critic's own review scope reads it |
+
+Everything else of the descriptor (feature, course key, base, candidate, registration commit, changed paths, parent, evidence digests) was already derived by the verb. Invariant ids exist nowhere but in the maps of registered delta requests: round 1 is a full round with no map, so a first delta round has no registered ids to derive from.
+Where the inner refusal was cut: (a) the course admission projection (`deriveCriticCourseAdmissionV2`) forwards `reason` but not `binding`, and `admitReviewAttempt` gave no `reason`, so the preflight's refused result carried only the bare code; (b) `prepare-dispatch` cut the step reason to 1500 characters.
+`RDP-REQUIRED-PATH` is emitted by `codex-critic-selected-host.mjs` (not in the five files of the write list): not touched, see "Not changed".
+
+## 1. What it changes
+
+- Input file (`feature-package-registration.mjs`, `register-feature-package.mjs` help): the required keys are only the two confirmations. `changedBehaviorClaims` is optional and derived from the invariant ids of the map (sorted, unique); a supplied list still wins and keeps its validation. `pathInvariantMap` is optional: a path this course already registered an invariant for (any registered delta request of the manifest, a later one wins) is filled in, a supplied entry wins, an empty list means "take the registered ones". Nothing is invented. A changed path that stays without an id is refused `FPR-DELTA-INVARIANT-UNKNOWN` naming exactly those paths (also in `missingPaths`), the field `pathInvariantMap`, the expected form and the one command to rerun. A map key that is not a changed path is still `FPR-DELTA-MAP` (now also naming the key and the field). The path skeleton written for an absent input file carries the registered ids.
+- Compile order is unchanged: the budget, transport and missing-diagnostic refusals still come first (a path without an id is compiled with a stand-in that is never registered).
+- Help: the delta route documents the two required and the two optional fields and carries one complete copy-paste input example.
+- `review-economy.mjs`: every `RE-DELTA-BINDINGS-INVALID` and `RE-DELTA-UNKNOWN-PATH` refusal now carries a `reason` that names the field (the binding keeps its own `binding` key) and the expected form and the command that fixes it.
+- `critic-dispatch-preflight.mjs`: the refused course result carries the admission's own `reason` (it was dropped), and an `RE-DELTA-*` refusal without a table repair names the command that fixes the request.
+- `prepare-dispatch.mjs`: the preflight step's reason is passed through unshortened (code, reason and repair unchanged).
+
+## 2. Checks (tests only; Critic suspended, no Full Verify)
+
+Test-first: the five new readback cases were written first and run RED against the original code (`register-feature-package-readback.test.mjs`: 48 tests, 43 pass, 5 fail, exit 1); the review-economy and prepare-dispatch cases were written before the production edit but were not run RED separately.
+GREEN after the change: `register-feature-package-readback.test.mjs` 48 of 48, `prepare-dispatch.test.mjs` 38 of 38, `review-economy.test.mjs` 1 of 1 (its `ok()` cases run inside), `critic-dispatch-preflight.test.mjs` 125 of 125 (final clone commit 94faa65, which the saved patch is; the readback suite 48 of 48 was rerun at that state). The review-economy, prepare-dispatch and preflight-refusal-text cases were written before or after their production edit without a separate RED run; only the readback cases have the RED run above. C31-M2-2 was corrected after the production change to register its manual request without a claims list, so that manual and derived claims agree: the criterion, the derived map equals the manual map, is unchanged. New cases: claims derived (and a supplied list wins), derived map equals the manual map byte for byte (same request digest), an unknown path is refused naming the path, the field and the command (and a partial supplied map covers its own paths only), the help example is complete valid JSON, the real preflight prints the field and expected form for an invalid supplied claim, the passed-through refusal keeps its inner code and whole reason.
+
+## 3. Not changed / not proven
+
+- NOT DONE, needs a file outside the write list: pipeline evidence paths (lineage, verify result, dispatch addendum, export, registrations) still need a map key. The stored request must carry the exact changed paths as keys because `critic-course-admission.mjs` `requestRead` refuses unless `request.changedPaths` and the keys of `pathInvariantMap` equal `source.changedPaths` (about lines 1036 and 1037, `CCA-DELTA-BINDING` / `CCA-DELTA-MAP`), the descriptor is built from the raw range diff (about line 1152) and `review-economy.mjs` `RE-DELTA-UNKNOWN-PATH` wants every changed path keyed. Excluding the evidence classes (by the exported `classifyEvidenceOnlyCommit`/path classes) needs those three spots changed together in `critic-course-admission.mjs`; a stand-in invariant id was deliberately not used. As built, an evidence path is derived only when an earlier registered round named an id for it; otherwise it is named in `FPR-DELTA-INVARIANT-UNKNOWN` (one refusal naming every missing path, not six).
+- A first delta round (round 2) has no registered invariant ids anywhere: the ids of its non-derivable paths stay a Coordinator input (now one typed refusal with a copy-paste example, no claims list, no exact-key-set refusal).
+- `RDP-REQUIRED-PATH` (`codex-critic-selected-host.mjs`, outside the write list) is not changed. `CDP-ARGUMENT`: the patch names flag and form for the exact-registration-commit ambiguity, selectors mixed with the sweep, a selector without a feature Spec and the two criterion-locator refusals. Still naming no form: "Duplicate course selector.", "--task-id is not a safe task id.", "--task-id needs an exact base-to-candidate range".
+- Cross-round derivation is only proven within one course state: C31-M2-2 derives from the request it has just registered; a real round 3 reading a map registered in round 2 is the same code path (a registered request of the manifest) but has no separate test.
+- The generic batch correction declaration (`critic-generic-batch.mjs`) and the Codex host economy input keep their own required claims fields.
+- Stale text outside the write list: `critic-course-admission.mjs` about line 144 still tells the reader that the input lists four fields.
+- No stored status, no record shape, digest or key byte change; the registered request has the same shape (a derived map and claims produce the same bytes as a manual one).
