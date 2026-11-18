@@ -179,7 +179,9 @@ test("F7: every Dispatch trailer example in the agent obligations is admitted an
   const examples = [...text.matchAll(/`Dispatch:[ \t]+([^`\n]+)`/gu)]
     // Evidence-bound bindings (administrative, generated, signed integration) are admitted only with their own
     // independent evidence; they are not unconditional work-package examples and are pinned elsewhere.
-    .filter((match) => !/administrative \(elephant\)$|\(elephant-generated\)$|\(integration\)$/u.test(match[1].trim()))
+    // QG-04 restatement (C30K K18): the form list is now derived from the policy export and the exception form
+    // (elephant-exception) is one more evidence-bound binding with its own proof, so it is excluded the same way.
+    .filter((match) => !/administrative \(elephant\)$|\(elephant-generated\)$|\(integration\)$|\(elephant-exception\)$/u.test(match[1].trim()))
     .map((match) => match[1].trim().replace(/<[A-Za-z_]+>/gu, "ALF-C-P20-12E"));
   assert.ok(examples.length >= 3, `expected the documented Dispatch examples, found ${JSON.stringify(examples)}`);
   assert.ok(examples.includes("stage-0 (elephant)"));
