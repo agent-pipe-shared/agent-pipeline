@@ -271,6 +271,18 @@ export function computeManifest({
 }
 
 /**
+ * The vendored dispatch-template pairs (canonical -> vendored) exactly as this
+ * generator would write them: one per file in `templates/prompts`. The
+ * plugin's `check-vendored-template-sync.mjs` reads its pairs from here, so a
+ * template added to that directory is checked without a second list to edit.
+ */
+export function vendoredTemplatePairs(rootDir = REPO_ROOT) {
+  return computeManifest({ rootDir, directories: UNIVERSAL_DIRECTORIES.filter((d) => d.dir === "templates/prompts"), standaloneFiles: [], adrs: [] }).map(
+    (entry) => ({ name: entry.origin.split("/").pop(), canonical: entry.origin, vendored: entry.dest }),
+  );
+}
+
+/**
  * Compute the manifest and (by default) write every destination byte-for-byte
  * from its origin. `write: false` computes without touching disk (used by
  * `--check` and by the drift test, which asserts the computed content follows

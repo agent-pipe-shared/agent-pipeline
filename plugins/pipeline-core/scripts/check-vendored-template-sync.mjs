@@ -43,6 +43,13 @@ export const TEMPLATE_PAIRS = [
   },
 ];
 
+let deriveTemplatePairs = null;
+try {
+  ({ vendoredTemplatePairs: deriveTemplatePairs } = await import("../../../harness/scripts/generate-vendored-canon.mjs"));
+} catch {
+  deriveTemplatePairs = null;
+}
+
 /** Reads a file's raw bytes relative to `root`. Returns `{ ok, content, error }`; never throws. */
 function readRelative(root, relPath) {
   try {
@@ -56,7 +63,10 @@ function readRelative(root, relPath) {
  * Compares each configured canonical/vendored template pair byte-for-byte under `root`
  * (defaults to the repo root two levels above this script's `scripts/` directory).
  */
-export function checkVendoredTemplateSync({ root = REPO_ROOT, pairs = TEMPLATE_PAIRS } = {}) {
+export function checkVendoredTemplateSync({ root = REPO_ROOT, pairs } = {}) {
+  // Pairs come from the generator's own list when it is present (a source checkout); an installed
+  // plugin has no harness/ and keeps the static list above.
+  pairs ??= deriveTemplatePairs ? deriveTemplatePairs(root) : TEMPLATE_PAIRS;
   const results = pairs.map((pair) => {
     const canonical = readRelative(root, pair.canonical);
     const vendored = readRelative(root, pair.vendored);

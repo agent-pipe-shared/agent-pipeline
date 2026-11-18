@@ -81,6 +81,23 @@ test("reports allInSync=false with a reason when the vendored file is missing", 
   assert.match(missing.reason, /vendored file unreadable/);
 });
 
+test("a template present in the generator's list and absent from the check's static list is reported (AC-112)", () => {
+  writeFileSync(join(fixtureRoot, "templates/prompts/brand-new-template.md"), "new\n");
+  // vendored copy intentionally absent: the generator would write it, the check must notice.
+  const receipt = checkVendoredTemplateSync({ root: fixtureRoot });
+  const entry = receipt.results.find((r) => r.name === "brand-new-template.md");
+  assert.ok(entry, "the check must derive its pairs from the generator's template directory");
+  assert.equal(entry.inSync, false);
+  assert.equal(receipt.allInSync, false);
+});
+
+test("a derived pair that is byte-identical reports in sync", () => {
+  writeFileSync(join(fixtureRoot, "templates/prompts/brand-new-template.md"), "new\n");
+  writeFileSync(join(fixtureRoot, "plugins/pipeline-core/templates/prompts/brand-new-template.md"), "new\n");
+  const receipt = checkVendoredTemplateSync({ root: fixtureRoot });
+  assert.equal(receipt.results.find((r) => r.name === "brand-new-template.md").inSync, true);
+});
+
 test("real repo templates are byte-identical (guards against actual re-drift)", () => {
   const receipt = checkVendoredTemplateSync({});
   assert.equal(receipt.allInSync, true, JSON.stringify(receipt.results, null, 2));

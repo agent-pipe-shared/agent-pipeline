@@ -35,7 +35,18 @@ import {
   checkVendoredCanon,
   computeManifest,
   generateVendoredCanon,
+  vendoredTemplatePairs,
 } from "./generate-vendored-canon.mjs";
+
+test("vendoredTemplatePairs lists exactly the templates/prompts entries of the manifest", () => {
+  const pairs = vendoredTemplatePairs(REPO_ROOT);
+  const fromManifest = computeManifest({ rootDir: REPO_ROOT }).filter((e) => e.origin.startsWith("templates/prompts/"));
+  assert.deepEqual(
+    pairs.map((p) => [p.canonical, p.vendored]),
+    fromManifest.map((e) => [e.origin, e.dest]),
+  );
+  assert.ok(pairs.some((p) => p.name === "goldfish-task.md") && pairs.some((p) => p.name === "critic-review.md"));
+});
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
