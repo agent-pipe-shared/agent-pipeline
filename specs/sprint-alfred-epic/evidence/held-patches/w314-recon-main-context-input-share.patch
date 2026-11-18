@@ -1,0 +1,93 @@
+diff --git a/specs/sprint-alfred-epic/plans/recon-l18-main-context-input-share-2026-11-18.md b/specs/sprint-alfred-epic/plans/recon-l18-main-context-input-share-2026-11-18.md
+new file mode 100644
+index 000000000..68db475dd
+--- /dev/null
++++ b/specs/sprint-alfred-epic/plans/recon-l18-main-context-input-share-2026-11-18.md
+@@ -0,0 +1,87 @@
++# Recon L18: which pipeline outputs dominate the Elephant's context, and what can be compacted without losing a fact (candidate 31, 2026-11-18)
++
++Slice C31-R4, analysis only. Labels: PROVEN (read in code and/or run read-only here), INFERRED (follows from code, not run), NOT MEASURED (named gap). Source of the figures in the plan row (64.5 percent of new input, 228 turns, 97 refusals): the two consumer reports, whose transcripts are not in this repository; they are taken as given, not re-derived. Criterion binding AC-112 (closest accepted criterion); PRD and Spec unchanged. No Critic round (suspended by the PO) and no Full Verify ran; the only check is the plain file test of the held patch.
++
++## 1. Premise check (plan row 48)
++
++- PROVEN: the biggest single start output is already compact. `compactReadyEnvelope` (`scripts/pipeline-start-preflight.mjs`, candidate 28c) writes the full envelope to `scratch/<session>/preflight-full.json` and prints a line without the green parts; pinned by `lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs` and `lib/bootstrap-payload-budget.mjs` (45,000 byte limit, `printedPayload` measures the printed line). Its code comment gives ~11 KB before compaction. Run B ran on 30h, after 28c, so that line was already short there.
++- PROVEN: the grammar refusal text is NOT repeated whole in every refusal. `GRAMMAR_DENIAL_REMEDY_SHORT` (`lib/guard/grammar-denials.mjs`) replaces the 3.3 KB listing from the second refusal of the same code in one scope (`isFirstDenialThisScope`, `lib/guard/denial-telemetry.mjs`). Observed live in this dispatch: refusal 1 full, refusal 3 to 6 short.
++- INFERRED, and the likely real cause of the repetition in run B: the trim key is `session_id` or a resolved subagent id (`denialClassesScopeKey`, lines 82 to 88). The Antigravity adapter's payload (`antigravityGuardPayload`, `hooks/antigravity-pretool-guard.mjs` line 358) carries only `antigravity_conversation_id`, no `session_id`. Probe run here: `isFirstDenialThisScope` on such an input returned `true, true, true` for three calls (PROVEN at function level; the complete hook chain was not run). A fail-open key means the full listing on every grammar refusal in an Antigravity main conversation.
++- NOT MEASURED: the share of 64.5 percent per output. `usage-ledger.mjs --timeline` counts refusals by code but records no byte size per tool result, so no existing tool can attribute it. This is the measurement gap (section 6, M0).
++
++## 2. (a) Printed size of the outputs an Elephant meets (bytes of stdout, this repository, read-only runs)
++
++Method: one throw-away node script spawned each read-only command with the repository as cwd and recorded stdout bytes and the bytes of the same JSON printed compact. Nothing mutating was run.
++
++| Output | Printed | Same JSON compact | Label |
++|---|---|---|---|
++| `pipeline-state.mjs inspect` (state `implementing`) | 7,200 | 5,798 | PROVEN |
++| `pipeline-state.mjs feature-package-inspect` | 2,106 | 1,679 | PROVEN |
++| `project-onboarding-v3.mjs inspect --intent session` | 2,401 | 1,925 | PROVEN |
++| `project-onboarding-v3.mjs inspect --intent bootstrap` | 1,359 | 1,129 | PROVEN |
++| `prepare-dispatch.mjs --help` (also the `repair` text of 4 argument refusals) | 3,871 | not JSON | PROVEN |
++| `close-coordinator.mjs --help` | 1,572 | not JSON | PROVEN |
++| start preflight, ready line | not run (writes scratch, runs housekeeping) | | NOT MEASURED |
++| `finish-feature.mjs --one-shot`, `register-feature-package.mjs`, `prepare-dispatch.mjs critic`, `critic-dispatch-preflight.mjs`, `session-critic-finalizer.mjs`, `close-coordinator.mjs drive` | mutating or need a live feature | | NOT MEASURED |
++
++- PROVEN: pretty printing costs 17 to 21 percent of the bytes (inspect 19.5, feature-package-inspect 20.3, onboarding session 20.0, bootstrap 17.0). Scripts that print with `JSON.stringify(x, null, 2)`: `finish-feature.mjs` (lines 1012, 1020), `prepare-dispatch.mjs` (line 330), `dispatch-briefing.mjs` (line 1717), 26 sites in `pipeline-state.mjs` (inspect at 14637). Already single-line: `close-coordinator.mjs` (118), `session-critic-finalizer.mjs` (1163), `register-feature-package.mjs`, the preflight. Tokens are not bytes (runs of indentation tokenise cheaply); the token saving is smaller than the byte saving and was not measured.
++- INFERRED: `finish-feature --one-shot` is the largest multi-call output: each rerun prints `stages`, `commit.paths`, `commit.steps`, `next` again as pretty JSON (lines 886, 1012), and the same `commit.steps` and `next` a second time on stderr (line 1014; `declined` line 1015). A runner that merges stderr shows both.
++
++## 3. (b) Compact form already there, and fields repeated per call
++
++- Already has a file plus short line: the preflight (above); `prepare-dispatch.mjs critic` writes the briefing files and prints paths, placeholders and a pointer (briefing text itself is not printed; `critic-fill` prints a two-line pointer prompt); `dispatch-briefing.mjs build --out` prints no text.
++- Repeats a large unchanged field per call: `inspect` re-prints `activeFeature` (1,193 B here), `phoenixEpicHistory` (1,093), `continuityAuthorityDrift` (648) and `publicHandoverDuty` (481) on every call, about half of its compact size in this repository (a consumer's values are smaller: INFERRED). `prepare-dispatch.mjs critic` prints the static `briefingUse` sentence block on every call (two variants of roughly 1.0 to 1.3 KB, read off the source, not measured). The four `repair: PREPARE_DISPATCH_HELP` sites print the whole 3.9 KB help as the repair of every argument error.
++- Dedupes already: the runbook link (`attachRunbookLink`, once per session unless refused).
++
++## 4. (c) Refusal texts, bytes of the rendered refusal (the pure builders `blocked()` and `protectedAuthorityDocumentWriteOnly()` rendered with fixed arguments; stderr bytes without the optional override block)
++
++| Rank | Code | First | Repeat | Trimmed |
++|---|---|---|---|---|
++| 1 | `GUARD-READ-COMMAND-UNSUPPORTED` | 3,923 | 858 | yes, per code |
++| 2 | `GUARD-PARSE-UNSUPPORTED` | 3,580 | 515 | yes, per code |
++| 3 | `GUARD-OPERATOR-UNAPPROVED` and `GUARD-REDIRECT-UNAPPROVED` (same table) | 3,575 | about 515 | yes, per code |
++| 4 | `GUARD-LIFECYCLE-AUTHORITY-BOUND` | 2,223 | 2,223 | no |
++| 5 | `GUARD-READ-SCOPE-OUTSIDE-ROOT` | 1,156 | 1,156 | no, by design (its remedy is the repair) |
++
++- PROVEN: the listing (`GRAMMAR_DENIAL_REMEDY`) is 3,345 B of every first refusal; the trimmed form is 280 B. Static literals of other refusal sites (INFERRED, approximate): `guard-gate-strength` about 1.4 KB, GIT-03 commit message about 1.4 KB, `guard-testpath` about 0.9 KB, `guard-push` target about 0.9 KB.
++- PROVEN, live in this dispatch: the trim key is the code, not the listing. A `GUARD-PARSE-UNSUPPORTED` refusal printed the whole listing, and the next call, a `GUARD-READ-COMMAND-UNSUPPORTED` refusal, printed it again in full, although the same listing was already in context. With four listing-printing codes a context window pays up to four full listings (about 14.7 KB), three more than needed (about 9.2 KB).
++- Frequency: 97 refusals in run A is from the report, not re-countable here. Rank 4 and 5 are rare or by design; ranks 1 to 3 are the frequent ones.
++
++## 5. (d) Smallest builds, each failing-first, with the facts that must stay
++
++B1, refusal trim key (lib/guard/denial-telemetry.mjs, lib/guard/evaluate.mjs call sites, lib/guard/grammar-denials.mjs wording; clone-slice route, protected paths):
++- Change: `denialClassesScopeKey` falls back to `antigravity_conversation_id` when `session_id` and the subagent id are absent (same character check `^[A-Za-z0-9._-]{1,128}$` as `resetDenialClassesForSession`); the four listing-printing codes share one class key; the short text says "an earlier grammar refusal" instead of "of this kind".
++- Failing first (red today): in `denial-telemetry.test.mjs` an Antigravity-shaped input asked twice must give `true, false` (today `true, true`, probe above); code A then code B in one scope must render B short (today full).
++- Must stay: the first refusal in each scope is full (a fresh subagent has no earlier text); the `retryActions` JSON line, the `Rejected element` line and the request-bound `repeatOverrideGuidance` command stay in the short form; every failure of the store still fails open to the full text; no new file kind (the same `guard-denial-classes/<scope>.json` store holds one more key); `READ_SCOPE` and credential refusals unchanged.
++- Open: whether Antigravity has a post-compaction hook that must clear the conversation-keyed file like `resetDenialClassesForSession` does for Claude: NOT EXAMINED. Without it the short form could outlive a compaction on that runner.
++
++B2, single-line stdout for the four happy-path scripts (`pipeline-state.mjs inspect`, `finish-feature.mjs`, `prepare-dispatch.mjs`, `dispatch-briefing.mjs`): drop the indent argument at the five sites named in section 2 (17 to 21 percent of the bytes).
++- Failing first: a process test per script asserting that stdout is exactly one line and that `JSON.parse` gives the same value as today's output; red today (multi-line).
++- Must stay: every key and value, the exit codes, the stderr next-step lines. `lastJson()` in `prepare-dispatch.mjs` already parses a single line. Pins that match the multi-line text are restated (QG-04) and named.
++
++B3, `prepare-dispatch.mjs` argument refusals: `repair` names the usage line of the failed verb and `--help`, not the whole 3.9 KB help. Failing first: a refusal's `repair` must stay under 600 B and contain the verb's usage line. Must stay: a runnable command in `repair` (hard limit 4).
++
++B4, file plus short line for `inspect` and `finish-feature --one-shot`, in the shape of the preflight (full JSON beside the session scratch, printed line keeps `status`, `nextAction`, `next`, counts, and the path). NOT built here: the sizes of the second one are NOT MEASURED, so the gain is a guess until M0 ran on a transcript. Must stay (when built): `nextAction` and every `repair` verbatim in the printed line, and the file written only when the status is the success path, as `compactReadyEnvelope` does.
++
++M0, measurement: extend `usage-ledger.mjs --timeline` with the bytes of every tool result grouped by the script it ran (and by refusal code), derived from the transcript at read time, nothing stored. Failing first: a fixture transcript with two results of known size must list both under their script. This turns the 64.5 percent into a per-output table for all three runners and decides B4. It overlaps lane L17 (the same reader), so it should ride that slice.
++
++## 6. Ranked proposal
++
++1. B1: a proven defect on Antigravity (the trim never fires), about 3 KB saved per repeated grammar refusal, and about 9 KB per window on every runner from the shared key. Smallest, no new store, no gate.
++2. M0: the missing measurement, read-only, rides lane L17.
++3. B2: 17 to 21 percent of the bytes of the five largest happy-path outputs, mechanical.
++4. B3: small, removes the worst repeated static text of a script refusal.
++5. B4: only after M0 shows `inspect` or `finish-feature` carries a measurable share.
++Not proposed: a second shortened first print of the grammar listing (the first refusal must stay self-contained), trimming `GUARD-READ-SCOPE` (its text is the repair), any change to which refusal is raised.
++
++## 7. PO decisions, with defaults
++
++- D1: key the denial trim for Antigravity by the conversation id and share one key across the four listing codes (B1). Default: yes.
++- D2: also shorten the FIRST grammar refusal to a pointer to `templates/prompts/agent-obligations.md` section 1. Default: no (a consumer Elephant may not hold that file; the short form already points back to the first print).
++- D3: single-line JSON for the four happy-path scripts (B2). Default: yes; the 26 other `pipeline-state` sites stay.
++- D4: build M0 inside the L17 slice. Default: yes.
++- D5: B3 and B4. Default: B3 yes, B4 held until M0.
++
++## 8. Not examined
++
++The preflight's real printed bytes (it writes scratch and runs housekeeping), the byte sizes of the mutating and fixture-bound scripts in section 2, any token count (all figures are bytes), the Antigravity hook chain end to end, the post-compaction behaviour of the Antigravity runner, and the run transcripts behind the plan figures.
