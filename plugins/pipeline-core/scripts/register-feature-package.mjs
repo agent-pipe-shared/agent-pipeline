@@ -75,7 +75,12 @@ export function pushThreatModelReadback(root) {
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>] [--stage]",
+  "register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>] [--stage]",
+  "",
+  "Successor of a DISCARDED feature (the feature it replaces was discarded; its implementation stays in Git history): register it with `register-feature-package.mjs --root <root> --supersedes <predecessor feature id>`.",
+  "  The manifest then carries `supersedes: <id>` and the Critic course admission starts the first full review before the inherited implementation, with no --successor-of at review time. The State must record the predecessor",
+  "  as discarded (discard it first with the discard-feature route, or register without the flag when the feature is an ordinary one). The flag is given at the first registration only: an approved manifest is never edited,",
+  "  so a feature already registered without it names the predecessor at review time with --successor-of <feature id of the discarded predecessor>.",
   "",
   "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
   "  your commit stays one `git commit -F <message file>` of what is staged.",
@@ -169,8 +174,10 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   const addDelta = (argv.length === 4 || (argv.length === 5 && argv[4] === "--confirm-full-round")) && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
   // ADR-0095: `--add-spec-addendum <approval record>` registers a PO-approved Spec addendum and its approval record.
   const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>]" })}\n`);
+  // C30I-S3: `--root <root> --supersedes <predecessor feature id>` registers the successor of a DISCARDED feature with its predecessor written into the manifest.
+  const withSupersedes = argv.length === 4 && argv[2] === "--supersedes" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum && !withSupersedes) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--supersedes <predecessor feature id> | --add-review-unit |--add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> [--confirm-full-round] | --add-spec-addendum <approval record>]" })}\n`);
     return 2;
   }
   let root;
@@ -215,7 +222,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
     out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
-  const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract });
+  const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract, ...(withSupersedes ? { supersedes: argv[3] } : {}) });
   const printed = result.status === "registered" || result.status === "already-registered" ? { ...result, ...commitPlan(root, result) } : result;
   out(emit(printed));
   return result.status === "refused" ? 2 : 0;

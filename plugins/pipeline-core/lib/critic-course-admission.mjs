@@ -22,8 +22,9 @@ import { bytes as projectAuthorityBytes, resolveProjectAuthorityPaths } from "./
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MODES = new Set(["full", "delta"]);
-const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
-const SHA256 = /^[a-f0-9]{64}$/u;
+// Exported for the registration writer of `supersedes` (C30I-S3): one feature id grammar, never a second copy of it.
+export const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+const SHA256 =/^[a-f0-9]{64}$/u;
 const DELTA_KEYS = ["changedPaths", "changedBehaviorClaims", "priorReceipt", "pathInvariantMap", "pathInvariantMapSha256", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const exact = (value, keys) => object(value)
@@ -860,9 +861,12 @@ function discardedFeatureIds(root){
  try{
   const paths=resolveProjectAuthorityPaths({rootDir:root});if(paths.status!=='ready'||typeof paths.state!=='string')return [];
   const raw=projectAuthorityBytes(root,paths.state);if(raw===null)return [];
-  const state=JSON.parse(raw.toString('utf8'));
-  return Array.isArray(state?.discardedFeatures)?[...new Set(state.discardedFeatures.filter(e=>object(e)&&typeof e.id==='string'&&FEATURE_ID.test(e.id)&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0).map(e=>e.id))]:[];
+  return discardedFeatureIdsOfState(JSON.parse(raw.toString('utf8')));
  }catch{return [];}}
+// The notion of "recorded as discarded", read from an already parsed State: shared by the course admission above and the registration writer of `supersedes` (C30I-S3).
+export function discardedFeatureIdsOfState(state){
+ return Array.isArray(state?.discardedFeatures)?[...new Set(state.discardedFeatures.filter(e=>object(e)&&typeof e.id==='string'&&FEATURE_ID.test(e.id)&&typeof e.discardedBy==='string'&&e.discardedBy.length>0&&typeof e.reason==='string'&&e.reason.length>0).map(e=>e.id))]:[];
+}
 function recordedDiscarded(root,featureId){return discardedFeatureIds(root).includes(featureId);}
 /** True when the feature manifest at the commit declares a predecessor feature (read-only; only decides which repair sentence a CCA-MANIFEST-READ refusal prints). */
 export function criticCourseDeclaresPredecessor({repoRoot,featureId,commit}){

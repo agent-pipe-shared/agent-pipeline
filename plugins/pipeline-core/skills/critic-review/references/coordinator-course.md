@@ -132,6 +132,8 @@ declared-unobserved`: its model and effort are the briefing's declaration, never
 any host-observed predicate. Use the task id of
 that record for every round (next section).
 
+When the feature replaces a feature that was discarded, register it with `register-feature-package.mjs --root <root> --supersedes <predecessor feature id>` so the first full review starts before the inherited implementation without any review-time flag; a feature already registered without it still names the predecessor with `--successor-of <feature id of the discarded predecessor>` on the first round.
+
 ## Real commits after a consumed PASS (D199)
 
 A consumed PASS ends the course only for the same candidate. Real (non-evidence) commits after the passed

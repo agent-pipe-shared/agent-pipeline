@@ -41,7 +41,7 @@ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArt
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
-import { COURSE_EVIDENCE_GAP_CODES, courseEvidenceGapText, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+import { COURSE_EVIDENCE_GAP_CODES, FEATURE_ID, courseEvidenceGapText, discardedFeatureIdsOfState, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
 import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
 import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
 import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
@@ -185,10 +185,12 @@ function resolveRigor(state) {
 // supersede is refused -- an entry is never dropped silently.
 const SUPERSEDABLE_STATES = Object.freeze(["approved", "implementing"]);
 const REDERIVED_CLASSES = new Set(["prd", "spec", "acceptance", "result"]);
-function supersededRegistrations(bytes, featureId, envelopePath, root = null) {
+// C30I-S3: a manifest that declares a predecessor (`supersedes`) is rebuilt only when the caller names that very predecessor again (`supersedes` argument), so the
+// relation is carried over and never dropped or changed; without the argument the rebuild is refused exactly as before.
+function supersededRegistrations(bytes, featureId, envelopePath, root = null, supersedes = null) {
   let manifest;
   try { manifest = JSON.parse(bytes.toString("utf8")); } catch { return null; }
-  if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== null || !Array.isArray(manifest.artifacts)) return null;
+  if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== supersedes || !Array.isArray(manifest.artifacts)) return null;
   const unitPath = criticReviewUnitPath(featureId);
   const kept = manifest.artifacts.filter((entry) => !REDERIVED_CLASSES.has(entry?.class) && !(entry?.class === "design" && entry.path === unitPath));
   const evidence = kept.filter((entry) => entry?.class === "candidate-evidence");
@@ -213,14 +215,39 @@ function approvalBoundSources(envelope) {
   return bound;
 }
 
+/** C30I-S3: the `supersedes` an existing manifest of this feature declares (null or a feature id), or undefined when the bytes are no manifest of this feature. */
+function declaredRelation(bytes, featureId) {
+  try {
+    const manifest = JSON.parse(bytes.toString("utf8"));
+    return manifest?.schema === FEATURE_PACKAGE_SCHEMA && manifest.feature?.id === featureId ? (manifest.supersedes ?? null) : undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * C30I-S3: the refusal of an optional `--supersedes <predecessor feature id>` input, or null when it may be written. The id grammar is the course admission's
+ * (FEATURE_ID) narrowed by this module's own manifest id grammar (SAFE_ID, which the topology validator enforces on `supersedes`), and "discarded" is the
+ * course admission's own reading of the State (discardedFeatureIdsOfState). Every refusal names its repair.
+ */
+function supersedesRefusal(supersedes, featureId, state) {
+  if (typeof supersedes !== "string" || !FEATURE_ID.test(supersedes) || !SAFE_ID.test(supersedes)) {
+    return refused("FPR-SUPERSEDES-PATTERN", `--supersedes must name the predecessor feature by its id (lowercase letters, digits and single hyphens, for example feature-a), not ${JSON.stringify(supersedes)}. Register without --supersedes when this feature has no discarded predecessor`);
+  }
+  if (supersedes === featureId) return refused("FPR-SUPERSEDES-SELF", `--supersedes names the feature itself (${featureId}); name the discarded predecessor, or register without --supersedes`);
+  if (!discardedFeatureIdsOfState(state).includes(supersedes)) {
+    return refused("FPR-SUPERSEDES-NOT-DISCARDED", `the State does not record ${supersedes} as discarded. Discard it first with the discard-feature route (pipeline-state.mjs discard-feature), or register without --supersedes when this feature is an ordinary one`);
+  }
+  return null;
+}
+
 /**
  * @param {object} input
  * @param {string} input.root absolute repository root
  * @param {object} input.state the parsed project authority State (read by the caller through its own resolver)
  * @param {Function} input.readAcceptedDeliveryContract the existing envelope reader (`scripts/pipeline-state.mjs`)
+ * @param {string} [input.supersedes] C30I-S3: the discarded predecessor of a successor feature, written as the manifest's `supersedes` (absent or null: no relationship, as before)
  * @returns {object} `pipeline.feature-package-registration.v1`: status registered | already-registered | refused
  */
-export function registerFeaturePackage({ root: rootInput, state, readAcceptedDeliveryContract } = {}) {
+export function registerFeaturePackage({ root: rootInput, state, readAcceptedDeliveryContract, supersedes: supersedesInput } = {}) {
   if (typeof readAcceptedDeliveryContract !== "function" || !object(state)) return refused("FPR-ARGS", "root, state and the envelope reader are required");
   let root;
   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
@@ -238,6 +265,12 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
     return refused("FPR-NO-APPROVED-PLAN", "no current plan approval of the v9 accepted-contract shape exists for the active feature; run approve-plan first");
   }
   const manifestPath = `specs/${featureId}/lifecycle.json`;
+  // C30I-S3: the optional predecessor is validated before the State, the envelope or the tree is touched further.
+  const supersedes = supersedesInput === undefined || supersedesInput === null ? null : supersedesInput;
+  if (supersedes !== null) {
+    const rejected = supersedesRefusal(supersedes, featureId, state);
+    if (rejected !== null) return rejected;
+  }
 
   // 2. The envelope: the existing reader decides whether its bytes re-derive.
   const envelopeRead = repositoryRelative(envelopePath) ? inspect(root, envelopePath) : { kind: "other" };
@@ -260,12 +293,16 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   const existing = existingRead.kind === "file" ? existingRead.bytes : null;
   let superseded = null;
   if (existingRead.kind !== "absent") {
+    // C30I-S3: an approved manifest is never edited, so a flag that does not match the relation it already holds is refused with the supported route.
+    const held = supersedes !== null && existing ? declaredRelation(existing, featureId) : undefined;
+    if (held === null) return refused("FPR-SUPERSEDES-LATE", `${manifestPath} was registered without a predecessor (supersedes: null) and an approved manifest is never edited, so --supersedes cannot be added now. Name the discarded predecessor at review time instead: add --successor-of <feature id of the discarded predecessor> to the prepare-dispatch.mjs critic or critic-dispatch-preflight.mjs command of the first review round`, { manifestPath });
+    if (typeof held === "string" && held !== supersedes) return refused("FPR-SUPERSEDES-CONFLICT", `${manifestPath} already declares supersedes ${held} and an approved manifest is never edited: rerun with --supersedes ${held}, or without the flag`, { manifestPath });
     if (observed?.code && !READER_BEFORE_REGISTRATION.includes(observed.code) || observed?.ok === true) {
       return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, envelopePath, manifestSha256: digest(existing ?? Buffer.alloc(0)), readerCode: observed?.code ?? null };
     }
     // Antigravity greenfield 2026-11-08: after a reopen the old manifest blocked the new approval and the agent hand-edited it.
     // A manifest that lists only earlier approvals of this feature is superseded by the current one: rebuilt here, the earlier envelopes retained.
-    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath, root) : null;
+    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath, root, supersedes) : null;
     if (superseded === null) {
       const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
       return refused("FPR-MANIFEST-CONFLICT", checked.ok
@@ -351,7 +388,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
       : { class: entry.class, path: entry.path, sha256: entry.sha256, authority: entry.authority, mutability: entry.mutability, retention: entry.retention, ...(Object.hasOwn(entry, "amendment") ? { amendment: entry.amendment } : {}) });
   }
   artifacts.push({ class: "candidate-evidence", path: envelopePath, sha256: digest(envelopeBytes), authority: false, mutability: "immutable", retention: "retain" });
-  const manifest = { schema: FEATURE_PACKAGE_SCHEMA, feature: { id: featureId, rigor: rigor.rigor }, state: lifecycle.status, artifacts, candidate: null, supersedes: null };
+  const manifest = { schema: FEATURE_PACKAGE_SCHEMA, feature: { id: featureId, rigor: rigor.rigor }, state: lifecycle.status, artifacts, candidate: null, supersedes };
   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   // 6. Exclusive creates only (never overwrite): the generated documents first, the manifest last. Any later failure undoes exactly what was created here.
@@ -407,7 +444,9 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
       result: "absent -> generated status record (authority:false, immutable, active); present -> registered as found, never rewritten, append-only (authority:true only when the approval's companion binding names this path and digest)",
       envelope: "candidate-evidence, authority:false, immutable, retain (fixed by the topology)",
       candidate: "null (only verifying/completed require a candidate binding)",
-      supersedes: "null (no relationship; only superseded/retained require one)",
+      supersedes: supersedes === null
+        ? "null (no relationship; only superseded/retained require one). A successor of a DISCARDED feature registers with --supersedes <predecessor feature id> (the State must record the predecessor as discarded); an already registered successor names it at review time with --successor-of"
+        : `${supersedes} (the discarded predecessor named with --supersedes <predecessor feature id>; the State records it as discarded, and the Critic course admission reads it as the successor of a discarded feature)`,
     },
   };
 }

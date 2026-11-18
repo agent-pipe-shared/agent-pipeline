@@ -1777,4 +1777,65 @@ test("C30F-G4B (e) a later round WITHOUT the input recovers the predecessor from
   rmSync(join(fx.root, ".claude"), {recursive: true, force: true});
   assert.equal(later().code, "CCA-GENESIS-BINDING", "no State at all");
 });
+// C30I-S3 (queue C30-12; AC-108 is the closest accepted criterion): `register-feature-package.mjs --supersedes <id>` writes the relation at creation, so round 1 of the
+// successor of a DISCARDED feature needs no `--successor-of`. The successor is registered through the REAL registration function (a stub envelope reader with the real
+// reader's contract is the one named seam), committed, and admitted exactly as the hand-written manifest of C30F-G4. Neutral ids only.
+import {registerFeaturePackage as registerSuccessorPackage} from "./feature-package-registration.mjs";
+import {PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson} from "./plan-spec-state-v2.mjs";
+function registeredSuccessorFixture({supersedes = null} = {}) {
+  const root = mkdtempSync(join(tmpdir(), "critic-successor-reg-"));
+  const featureId = "feature-b", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, planPath = `${dir}/prd.md`, specPath = `${dir}/spec.md`;
+  git(root, ["init", "-q"]); git(root, ["config", "user.name", "Fixture"]); git(root, ["config", "user.email", "fixture@example.invalid"]);
+  const commit = (message) => { git(root, ["add", "."]); git(root, ["commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
+  mkdirSync(join(root, "src"), {recursive: true}); mkdirSync(join(root, dir), {recursive: true});
+  writeFileSync(join(root, "README.md"), "pre\n");
+  const pre = commit("pre-manifest");
+  writeFileSync(join(root, planPath), "# PRD\n"); writeFileSync(join(root, specPath), "# Spec\nAC-1 behavior\n");
+  const planSha256 = hash(readFileSync(join(root, planPath))), specSha256 = hash(readFileSync(join(root, specPath)));
+  const envelope = Buffer.from(`${JSON.stringify({featureId, manifestPath, request: {binding: {sources: {companions: []}}}})}\n`);
+  const envelopeSha256 = hash(envelope), envelopePath = `${dir}/evidence/accepted-delivery-contract-${envelopeSha256}.json`;
+  mkdirSync(join(root, `${dir}/evidence`), {recursive: true}); writeFileSync(join(root, envelopePath), envelope);
+  const planSubmission = {schema: PLAN_SUBMISSION_SCHEMA, featureId, planPath, planSha256, specPath, specSha256, profile: "mini", profileSha256: H("a"), submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z"};
+  const state = {schema: "pipeline.state.v0", activeFeature: {id: featureId, planPath, phase: "implementation"}, planSubmission, planApproved: true,
+    planApproval: {schema: RETAINED_APPROVAL_SCHEMA, approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z", submissionSha256: sha256CanonicalJson(planSubmission), profileSha256: H("a"),
+      poGateAuthority: {schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: H("b"), runtimeSha256: H("c"), receiptSha256: H("d"), repositoryFingerprint: H("e"), planPath, planSha256, specPath, specSha256},
+      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null, acceptedContract: {schema: "pipeline.accepted-delivery-contract-reference.v1", path: envelopePath, sha256: envelopeSha256}},
+    discardedFeatures: [{id: PREDECESSOR, planPath: `specs/${PREDECESSOR}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null}]};
+  // The envelope reader's contract: CAC-REGISTRATION-INVALID until the manifest exists (the writer re-reads it after writing), then ok.
+  const readAcceptedDeliveryContract = ({dir: at}) => (existsSync(join(at, manifestPath)) ? {ok: true, code: null} : {code: "CAC-REGISTRATION-INVALID"});
+  const registered = registerSuccessorPackage({root, state, readAcceptedDeliveryContract, ...(supersedes === null ? {} : {supersedes})});
+  assert.equal(registered.status, "registered", JSON.stringify(registered));
+  const base = commit("register the successor package");
+  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 1;\n"); const code = commit("delivered code");
+  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 2;\n"); const candidate = commit("candidate");
+  const fx = {root, featureId, manifestPath, pre, base, code, candidate, git: (...a) => git(root, a)};
+  recordDiscarded(fx);
+  return fx;
+}
+test("C30I-S3 (a) a successor registered with --supersedes is admitted in round 1 over the inherited range WITHOUT --successor-of, exactly as a hand-written supersedes of C30F-G4", () => {
+  const fx = registeredSuccessorFixture({supersedes: PREDECESSOR});
+  assert.equal(JSON.parse(git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])).supersedes, PREDECESSOR);
+  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
+  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+  const identity = successorIdentity(fx, fx.pre);
+  assert.equal(identity.ok, true, JSON.stringify(identity));
+  const course = identity.value.courseIdentity, introduced = hash(`${git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])}\n`);
+  assert.equal(course.genesisCandidate.base, fx.pre, "the inherited range review starts from the commit before the inherited implementation");
+  assert.equal(fx.git("rev-list", "--count", `${fx.pre}..${fx.candidate}`), "3", "the inherited range holds the registered package, the delivered code and the candidate");
+  assert.deepEqual(course.successor, {predecessorFeatureId: PREDECESSOR, introducingCommit: fx.base});
+  assert.equal(course.originalManifestSha256, introduced);
+  assert.deepEqual(identity.value.aliases, []);
+  assert.equal(successorIdentity(fx, fx.code).value.courseIdentity.successor, undefined, "a base that holds the manifest never takes the successor route");
+  // The explicit input of C30F-G4B stays valid beside the written relation and is still refused when it names another predecessor.
+  assert.equal(successorOfIdentity(fx, {successorOf: PREDECESSOR}).ok, true);
+  recordDiscarded(fx, [PREDECESSOR, "feature-c"]);
+  assert.equal(successorOfIdentity(fx, {successorOf: "feature-c"}).code, "CCA-SUCCESSOR-OF");
+});
+test("C30I-S3 (b) the control: the same successor registered WITHOUT the flag still needs --successor-of at review time (the trap the flag removes)", () => {
+  const fx = registeredSuccessorFixture();
+  assert.equal(JSON.parse(git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`])).supersedes, null);
+  assert.equal(readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre})).decision.code, "CCA-MANIFEST-READ");
+  assert.equal(successorIdentity(fx, fx.pre).code, "CCA-MANIFEST-READ");
+  assert.equal(successorOfIdentity(fx, {successorOf: PREDECESSOR}).ok, true, "the supported route for an already registered successor is unchanged");
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
