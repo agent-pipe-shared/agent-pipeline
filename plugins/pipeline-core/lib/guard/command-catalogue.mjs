@@ -241,7 +241,11 @@ function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
   // D41: a sole `--help` prints the evidence route; it takes no root and combines with nothing.
   if (allArgs.length === 1 && allArgs[0] === "--help") return true;
   // C28c: a trailing `--stage` (stage exactly the printed commitPaths, never commit) combines with every root form; the form before it is judged as before.
-  const args = allArgs.length > 2 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
+  const staged = allArgs.length > 2 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
+  // C30J-J14: the lineage and the delta request forms take ONE trailing `--feature <feature id>` (a lowercase id of the registrar's own shape, never a path), also before `--stage`; no other verb takes it.
+  const selected = staged.length >= 6 && staged.at(-2) === "--feature" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(staged.at(-1))
+    && ["--add-review-lineage", "--add-delta-request"].includes(staged[2]);
+  const args = selected ? staged.slice(0, -2) : staged;
   if (!exactRoot(args, root, 0)) return false;
   if (args.length === 2) return true;
   if (args.length === 3) return args[2] === "--add-review-unit";
