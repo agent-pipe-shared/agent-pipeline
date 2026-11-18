@@ -257,16 +257,20 @@ export const CEREMONY_CARD_KINDS = Object.freeze(Object.keys(CEREMONY_SPECS));
  * The card for a `sign-intent` ceremony, as lines ending in CARD_END_LINE; an unknown kind has no card (empty list). `facts` is what the request
  * holds for that kind (see CEREMONY_SPECS); the decline part covers both ways of saying no, since a passphrase-protected key has no typed token.
  */
-export function signingCeremonyCard({ kind, facts, language } = {}) {
+export function signingCeremonyCard({ kind, facts, language, requestFile = true } = {}) {
   const spec = Object.hasOwn(CEREMONY_SPECS, kind) ? CEREMONY_SPECS[kind] : null;
   if (spec === null) return [];
   const lang = Object.hasOwn(LABELS, language) ? language : "en";
   const de = lang === "de";
   const labels = LABELS[lang];
   const parts = spec(isObject(facts) ? facts : {}, de, lang);
+  // `requestFile` is false on the digest-only route (`sign-intent --intent-sha256`), where no request file exists; derived by the caller, never stored.
+  const left = requestFile !== false
+    ? (de ? "Die Anfrage bleibt ohne Signatur in scratch/ und gewährt nichts" : "The request file stays in scratch/ without a signature and grants nothing")
+    : (de ? "Auf diesem Weg gibt es keine Anfragedatei, und ohne Signatur wird nichts gewährt" : "No request file exists on this route; without a signature nothing is granted");
   const decline = de
-    ? `Nichts wird signiert und kein Nachweis geschrieben, solange Sie nicht bestätigen (bei einem passphrasengeschützten Schlüssel: solange Sie die Passphrase nicht eingeben). Die Anfrage bleibt ohne Signatur in scratch/ und gewährt nichts; ${parts.closed}.`
-    : `Nothing is signed and no proof is written unless you confirm (with a passphrase-protected key: unless you enter the passphrase). The request file stays in scratch/ without a signature and grants nothing; ${parts.closed}.`;
+    ? `Nichts wird signiert und kein Nachweis geschrieben, solange Sie nicht bestätigen (bei einem passphrasengeschützten Schlüssel: solange Sie die Passphrase nicht eingeben). ${left}; ${parts.closed}.`
+    : `Nothing is signed and no proof is written unless you confirm (with a passphrase-protected key: unless you enter the passphrase). ${left}; ${parts.closed}.`;
   return [
     `${labels[0]} ${parts.what}`,
     `${labels[1]} ${parts.why}`,

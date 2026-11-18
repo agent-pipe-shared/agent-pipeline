@@ -244,10 +244,13 @@ test("C30J-J28: the digest-only guard-override route builds the same card from t
   const description = (cardFacts) => ({ resolved: true, lines: ["recorded request: x (tool Write, class in-root-write)", "window expires at (signed, absolute): " + EXPIRES], ...(cardFacts === undefined ? {} : { cardFacts }) });
   const bare = (record, language = "en") => signingConfirmationCard({ requestSchema: undefined, request: null, record, language });
   const lines = bare(description(OVERRIDE_FACTS));
-  assert.deepEqual(lines, ceremony("guard-override", OVERRIDE_FACTS), "the same card the signature request route builds from the same four facts");
+  // QG-04 (C30K-K21): the same card apart from the decline sentence, which no longer names a request file on this route.
+  const notDecline = (card) => card.filter((entry) => !entry.startsWith("IF YOU DECLINE:"));
+  assert.deepEqual(notDecline(lines), notDecline(ceremony("guard-override", OVERRIDE_FACTS)), "the same card the signature request route builds from the same four facts");
   assert.equal(lines.at(-1), CARD_END_LINE);
   for (const fact of ['"Write"', '"in-root-write"', EXPIRES, "2 "]) assert.ok(lines.join("\n").includes(fact), fact);
-  assert.deepEqual(bare(description(OVERRIDE_FACTS), "de"), ceremony("guard-override", OVERRIDE_FACTS, "de"), "the configured language applies");
+  const notDeDecline = (card) => card.filter((entry) => !entry.startsWith("WENN SIE ABLEHNEN:"));
+  assert.deepEqual(notDeDecline(bare(description(OVERRIDE_FACTS), "de")), notDeDecline(ceremony("guard-override", OVERRIDE_FACTS, "de")), "the configured language applies");
   // The facts, not the display lines, are the source: lines that say something else change nothing.
   assert.deepEqual(bare({ ...description(OVERRIDE_FACTS), lines: ["window expires at (signed, absolute): 1999-01-01T00:00:00.000Z"] }), lines);
   // Absent or malformed facts leave out that part of the card, never a guess.
@@ -258,6 +261,25 @@ test("C30J-J28: the digest-only guard-override route builds the same card from t
   for (const record of [description(), description(null), description("Write"), description([OVERRIDE_FACTS]), { resolved: false, lines: [], cardFacts: OVERRIDE_FACTS }, { resolved: true, lines: ["x"] }]) assert.deepEqual(bare(record), []);
   // A request that names another schema never takes the digest-only facts.
   assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.signed-quality-package.v1", request: {}, record: description(OVERRIDE_FACTS), language: "en" }), []);
+});
+
+// C30K-K21 (QG-04: the J28 case above pinned the request-file decline sentence for the digest-only route; it now compares the card apart from that one line).
+test("C30K-K21: the digest-only route's decline sentence says no request file exists; the request-file route's text is unchanged", () => {
+  const declineOf = (lines, language) => lines.find((entry) => entry.startsWith(language === "en" ? "IF YOU DECLINE:" : "WENN SIE ABLEHNEN:"));
+  const bare = (language) => signingConfirmationCard({ requestSchema: undefined, request: null, record: { resolved: true, lines: ["x"], cardFacts: OVERRIDE_FACTS }, language });
+  for (const language of ["en", "de"]) {
+    const digestOnly = declineOf(bare(language), language);
+    const withFile = declineOf(ceremony("guard-override", OVERRIDE_FACTS, language), language);
+    assert.doesNotMatch(digestOnly, /stays in scratch|bleibt ohne Signatur in scratch/u, language);
+    assert.match(digestOnly, language === "en" ? /no request file exists on this route/iu : /keine Anfragedatei/u, language);
+    assert.match(digestOnly, language === "en" ? /Nothing is signed and no proof is written/u : /Nichts wird signiert und kein Nachweis geschrieben/u);
+    assert.match(withFile, language === "en" ? /The request file stays in scratch\/ without a signature and grants nothing/u : /Die Anfrage bleibt ohne Signatur in scratch\/ und gewährt nichts/u, "request-file route text unchanged");
+    // Only the decline line differs between the two routes.
+    assert.deepEqual(bare(language).filter((entry) => entry !== digestOnly), ceremony("guard-override", OVERRIDE_FACTS, language).filter((entry) => entry !== withFile));
+  }
+  // The signature-request route keeps the request-file wording.
+  const viaRequest = signingConfirmationCard({ requestSchema: "pipeline.human-guard-override-signature-digest.v1", request: {}, record: { resolved: true, lines: [], fullReviewMaterial: { toolName: "Write", commandClass: "in-root-write", expiresAt: EXPIRES, eligiblePaths: ["a"] } }, language: "en" });
+  assert.match(declineOf(viaRequest, "en"), /The request file stays in scratch\//u);
 });
 
 test("C30J-J12: signingConfirmationCard builds the design-approval card from the validated request binding, in the configured language", () => {

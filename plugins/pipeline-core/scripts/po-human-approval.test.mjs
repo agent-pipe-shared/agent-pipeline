@@ -3672,6 +3672,29 @@ test("C30J-J28: sign-intent --intent-sha256 on a guard-override digest prints th
   }
 });
 
+test("C30K-K21: on the digest-only route the confirmation prompt's decline sentence says no request file exists", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = hgoFixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const armed = armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo digest-only decline\n" });
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const prompts = [];
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", armed.intent.sha256],
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
+    );
+    assert.equal(result.ok, true);
+    const decline = prompts[0].split("\n").map((entry) => entry.trim()).find((entry) => entry.startsWith("IF YOU DECLINE:"));
+    assert.ok(decline !== undefined, "the card has its decline part");
+    assert.match(decline, /Nothing is signed and no proof is written/u);
+    assert.match(decline, /no request file exists on this route/iu);
+    assert.doesNotMatch(decline, /stays in scratch/u);
+    assert.equal(JSON.parse(readFileSync(result.paths.proof, "utf8")).intentSha256, armed.intent.sha256, "the proof still covers the digest only");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("C30J-J28: the digest-only route prints no guard-override card for an unresolved digest or a maintenance-window digest", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = hgoFixtureDirs();
   try {

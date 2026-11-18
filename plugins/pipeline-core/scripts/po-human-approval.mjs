@@ -561,7 +561,7 @@ export function signingConfirmationCard({ requestSchema, request, record, langua
   // malformed one is left out by the card itself.
   if (requestSchema === undefined && record?.resolved === true && record.cardFacts !== null && typeof record.cardFacts === "object" && !Array.isArray(record.cardFacts)) {
     const { toolName, commandClass, expiresAt, pathCount } = record.cardFacts;
-    return signingCeremonyCard({ kind: "guard-override", language, facts: { toolName, commandClass, expiresAt, pathCount } });
+    return signingCeremonyCard({ kind: "guard-override", language, facts: { toolName, commandClass, expiresAt, pathCount }, requestFile: false });
   }
   return [];
 }
