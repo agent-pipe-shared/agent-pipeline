@@ -37,6 +37,7 @@ import { projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language
 import { readMachinePlane } from "../lib/machine-plane.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { applyProjectOnboardingLifecycleV4, planProjectOnboardingLifecycleV4 } from "../lib/project-onboarding-v3.mjs";
+import * as onboardingLib from "../lib/project-onboarding-v3.mjs";
 import { runHumanApproval } from "./po-human-approval.mjs";
 import "./bootstrap-trust-recovery.test.mjs";
 
@@ -2551,6 +2552,81 @@ test("C28-ONBOARDING-QUESTIONS: a v1 record, an older v2 record without the Advi
       assert.equal(ask.reviewedDefaults.advisorExportConsent.value, "declined", name);
     } finally { dispose(root); }
   }
+});
+
+// C30J-J23 (AC-112 closest criterion; PO tile 2026-11-18): the ONE existing first onboarding round also asks its own question "is a remote push planned
+// later?" and tells the agent what to do with the answer. The answer is NOT stored: no argv flag, no input or field, no receipt field, no digest changes.
+const REMOTE_PUSH_QUESTION = "Is a push to a remote planned later? (yes / no / not sure)";
+const countOf = (text, needle) => text.split(needle).length - 1;
+const ASK_FLAGS_BEFORE_J23 = ["--root", "--runner", "--git-author-name", "--git-author-email", "--pipeline-actor", "--human-approval", "--advisor-export-consent", "--language"];
+
+test("C30J-J23: the first round asks 'is a remote push planned later?' once, with a recommendation, a reason and what the agent does with each answer", () => {
+  const home = freshHome();
+  const root = freshRoot();
+  try {
+    const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude", env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home } }));
+    assert.ok(ask, "the first-answer round is published");
+    assert.equal(countOf(ask.guidance, REMOTE_PUSH_QUESTION), 1, "the question appears exactly once per ask");
+    assert.match(ask.guidance, /Recommended:/u, "one-line recommendation");
+    assert.match(ask.guidance, /reason:/u, "one-line reason");
+    assert.match(ask.guidance, /yes and a remote already exists -> run node <plugin-root>\/scripts\/repository-mode-promote\.mjs --root <project-root> --to remote-tracked before the first feature/u);
+    assert.match(ask.guidance, /yes and no remote yet -> run that same command once the PO has added the remote/u);
+    assert.match(ask.guidance, /no or not sure -> do nothing now/u);
+    assert.match(ask.guidance, /not recorded anywhere/u, "the ask says the answer has no stored home");
+  } finally { dispose(root); dispose(home); }
+});
+
+test("C30J-J23: the ask's argv, inputs and fields stay exactly what they were; the new question adds no flag, input, placeholder or field", () => {
+  const home = freshHome();
+  try {
+    for (const runner of ["claude", "codex"]) {
+      const root = freshRoot();
+      try {
+        const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner, env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home } }));
+        assert.deepEqual(ask.applyAction.argv.filter((part) => part.startsWith("--")), ASK_FLAGS_BEFORE_J23, `${runner}: the argv flags are unchanged`);
+        assert.deepEqual(ask.fieldsAtOnce.map((field) => field.name), ask.inputs.map((input) => input.name), `${runner}: fields mirror inputs`);
+        assert.equal(ask.inputs.some((input) => /remote|push.?planned/iu.test(input.name)), false, `${runner}: no input for the question`);
+        assert.equal(ask.fieldsAtOnce.some((field) => /remote|push.?planned/iu.test(field.name)), false, `${runner}: no field for the question`);
+        assert.equal(ask.applyAction.argv.some((part) => /^<.*(remote|push).*>$/iu.test(part)), false, `${runner}: no placeholder for the question`);
+        assert.equal(ask.applyAction.argv.some((part) => /remote/iu.test(part) && part.startsWith("--")), false, `${runner}: no remote flag`);
+      } finally { dispose(root); }
+    }
+  } finally { dispose(home); }
+});
+
+test("C30J-J23: a rerun (reload in the middle) renders the same ask byte for byte, still with one question", () => {
+  const home = freshHome();
+  const root = freshRoot();
+  try {
+    const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+    const first = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude", env }));
+    const second = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude", env }));
+    assert.equal(countOf(second.guidance, REMOTE_PUSH_QUESTION), 1);
+    assert.equal(JSON.stringify(second), JSON.stringify(first), "the re-entry publishes the identical ask");
+  } finally { dispose(root); dispose(home); }
+});
+
+test("C30J-J23: the wording is defined once and both rendering sites use that one constant (library ask and driver rewrite)", () => {
+  assert.equal(typeof onboardingLib.REMOTE_PUSH_PLANNED_QUESTION, "string", "the library exports the one question constant");
+  assert.equal(onboardingLib.REMOTE_PUSH_PLANNED_QUESTION, REMOTE_PUSH_QUESTION);
+  assert.equal(typeof onboardingLib.REMOTE_PUSH_PLANNED_GUIDANCE, "string");
+  assert.equal(countOf(onboardingLib.REMOTE_PUSH_PLANNED_GUIDANCE, REMOTE_PUSH_QUESTION), 1);
+  const librarySource = readFileSync(new URL("../lib/project-onboarding-v3.mjs", import.meta.url), "utf8");
+  const driverSource = readFileSync(new URL("./onboarding-init.mjs", import.meta.url), "utf8");
+  assert.equal(countOf(librarySource, "planned later?") + countOf(driverSource, "planned later?"), 1, "the question wording exists in one place in the two sources");
+  assert.equal(countOf(librarySource, "${REMOTE_PUSH_PLANNED_GUIDANCE}"), 1, "the library ask renders the constant once");
+  assert.equal(countOf(driverSource, "${REMOTE_PUSH_PLANNED_GUIDANCE}"), 1, "the driver rewrite renders the constant once");
+  // The driver rewrite of a library-shaped trust-anchor ask carries exactly the constant, once.
+  const root = freshRoot();
+  try {
+    const action = { kind: "collect-input", inputs: [{ name: "gitAuthorName" }, { name: "humanApprovalMode" }, { name: "language" }, { name: "trustAnchorMode" }],
+      reviewedDefaults: { language: { value: "en" }, humanApproval: { value: "signature" } },
+      applyAction: { argv: ["onboarding-init.mjs", "--human-approval", "<signature|chat>", "--trust-anchor-mode", "<m>"] } };
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude", run: () => respond({ schema: "pipeline.project-onboarding.v4", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: false, pendingAsks: [action] } }) });
+    const guidance = result.pendingAsks[0].guidance;
+    assert.equal(countOf(guidance, REMOTE_PUSH_QUESTION), 1);
+    assert.equal(countOf(guidance, onboardingLib.REMOTE_PUSH_PLANNED_GUIDANCE), 1, "identical text to the library site");
+  } finally { dispose(root); }
 });
 
 test("DEFAULT_STEP_CAP is a small, positive constant", () => {
