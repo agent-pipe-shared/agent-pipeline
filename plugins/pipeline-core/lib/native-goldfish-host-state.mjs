@@ -3,7 +3,8 @@ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativ
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
 import { setAdmissionDeadline, clearAdmissionDeadline } from './admission-deadline.mjs';
 import { admissionProgress } from './admission-progress.mjs';
-import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord, inspectSessionAuthorityLock } from './session-authority-registry.mjs';
+import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord, inspectSessionAuthorityLock, healSessionAuthorityDrift } from './session-authority-registry.mjs';
+import { planSettledPending } from './routine-repair.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
 /** Private runner-hook correlation state for native Goldfish host commits. */
@@ -587,6 +588,10 @@ function nativeAuthorityOwner(repository) {
   owner.repository=repo;
   return owner;
 }
+/** The registry binding digest of one pending state: the retained owner record's, else derived from the pending state. One home, shared by the scan and the repair inspection (C30J-J4). */
+export function nativePendingBindingSha256({repository,state,retainedOwner=null}){
+  return retainedOwner?.bindingSha256??nativeManagedDigest({repository:{primaryRoot:repository.primaryRoot,commonDir:repository.commonDir},runner:state.runner,sessionId:state.sessionId,correlation:state.toolUseId,dispatchId:state.binding.dispatchId,candidate:state.binding.candidateCommit});
+}
 function nativeAuthorityScan(owner) {
   const [read] = readNativeManagedInventory(owner.repository,'native-goldfish');
   const byName = new Map(read.entries.map(entry=>[entry.relativePath,entry]));
@@ -608,7 +613,7 @@ function nativeAuthorityScan(owner) {
     if (!operation) {
       const handle=Object.freeze({});
       operation={handle,name:entry.relativePath,association:retainedOwner?nativeManagedAssociation(retainedOwner.value.association):{state:'unbound',target:null},
-        bindingSha256:retainedOwner?.value.bindingSha256??nativeManagedDigest({repository:{primaryRoot:owner.repository.primaryRoot,commonDir:owner.repository.commonDir},runner:state.runner,sessionId:state.sessionId,correlation:state.toolUseId,dispatchId:state.binding.dispatchId,candidate:state.binding.candidateCommit}),
+        bindingSha256:nativePendingBindingSha256({repository:owner.repository,state,retainedOwner:retainedOwner?.value}),
         phase:'armed',pendingSha256:entry.sourceFact.sha256};
       nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(entry.relativePath,operation);
     }
@@ -688,7 +693,12 @@ function nativeAuthorityScan(owner) {
     owner.operations.get(association.pendingFile).sourceFacts.push(entry.sourceFact);
     if(owner.operations.get(association.pendingFile).phase!=='terminal-observed')owner.operations.get(association.pendingFile).phase='running';
   }
-  for(const operation of owner.operations.values())if(operation.pendingSha256&&!byName.has(operation.name))throw nativeManagedFault('native-authority-missing-pending');
+  // C30J-J4: an operation this process (or a sibling stop of it) scanned before the integration step retired its pending state is dropped only when the
+  // retained aside proves that step retired it, read from the retained files; every other missing pending state keeps the fault.
+  for(const operation of [...owner.operations.values()])if(operation.pendingSha256&&!byName.has(operation.name)){
+    if(retainedIntegratedAside({repository:owner.repository,pendingSha256:operation.pendingSha256})!==null){owner.operations.delete(operation.name);continue;}
+    throw nativeManagedFault('native-authority-missing-pending');
+  }
   const pendingHashes=new Set(pending.map(entry=>entry.sourceFact.sha256));
   for(const entry of read.entries.filter(e=>e.relativePath.startsWith('authority-')))if(!pendingHashes.has(entry.value.pendingSha256))throw nativeManagedFault('native-authority-orphan-prefix');
   return read;
@@ -2138,6 +2148,80 @@ export function integrateNativeGoldfishItemDelivery(args={},{once=integrateNativ
     pause(wait);
   }
 }
+// C30J-J4 (SM-9, AC-112): the step that writes the integration record also retires the pending state it settles. Only `integrated` has such a step;
+// `integrated-by-commit` and `cancelled` stay derived on read and retired by heal. The retirement is derived, never stored: it runs only while every
+// fact it needs is read from the files in this boundary, and any doubt leaves the pending state where it is (heal retires it later, as before).
+const INTEGRATED_ASIDE_SUFFIX='-integrated-pending';
+const integratedAsideDirectory=repository=>join(repository.commonDir,'agent-pipeline/session-authority-abandoned');
+/** The retained aside of a pending state this step retired, found from the retained files themselves (never from a stored status): the answer of a replay. */
+function retainedIntegratedAside({repository,pendingSha256}){
+  const base=integratedAsideDirectory(repository);
+  let names;try{names=readdirSync(base);}catch{return null;}
+  for(const name of names.filter(row=>row.endsWith(`-${pendingSha256.slice(0,12)}${INTEGRATED_ASIDE_SUFFIX}`))){
+    try{
+      const files=readdirSync(join(base,name));
+      if(files.includes(`authority-integration-${pendingSha256}.json`)&&files.some(file=>file.startsWith('pending-')&&digest(readFileSync(join(base,name,file)))===pendingSha256))return name;
+    }catch{/* an unreadable aside proves nothing */}
+  }
+  return null;
+}
+/** The integration records (with their pending state and latest scope amendment) of every retained aside this step wrote; an unreadable aside yields nothing. */
+function readRetainedIntegratedRows(repository){
+  const base=integratedAsideDirectory(repository),rows=[];
+  let names;try{names=readdirSync(base);}catch{return rows;}
+  for(const name of names.filter(row=>row.endsWith(INTEGRATED_ASIDE_SUFFIX)).sort()){
+    try{
+      const dir=join(base,name),files=readdirSync(dir),json=file=>JSON.parse(readFileSync(join(dir,file),'utf8'));
+      const pendingFile=files.find(file=>file.startsWith('pending-')),integrationFile=files.find(file=>/^authority-integration-[a-f0-9]{64}\.json$/u.test(file));
+      if(!pendingFile||!integrationFile)continue;
+      const sha=integrationFile.slice('authority-integration-'.length,-'.json'.length);
+      if(digest(readFileSync(join(dir,pendingFile)))!==sha)continue;
+      const value=json(integrationFile),pending=json(pendingFile);
+      if(value?.schema!=='pipeline.native-goldfish-item-integration.v1'||value.pendingSha256!==sha)continue;
+      const scopes=files.filter(file=>file.startsWith(`authority-scope-${sha}-`)).map(json).sort((a,b)=>a.revision-b.revision);
+      rows.push({value,pending,writeScope:scopes.at(-1)?.writeScope??pending.delivery?.writeScope});
+    }catch{/* an unreadable aside proves nothing: it releases nothing */}
+  }
+  return rows;
+}
+/** Retires the integrated pending state with its authority records and agent association (moved aside and retained, never deleted) and moves the
+ * registry baseline in the same boundary. Kept, with the reason and the repair, whenever a sibling could still need the files or a reader would lose a fact. */
+function retireIntegratedNativePending({repository,owner,boundary,operation,pendingSha256}){
+  const repair=`node ${fileURLToPath(new URL('../scripts/routine-repair.mjs',import.meta.url))} run settled-pending-aside --root ${repository.primaryRoot} --reason "<why>"`;
+  const kept=reason=>({status:'kept',reason,repair});
+  const dir=join(repository.commonDir,'agent-pipeline/run/native-goldfish-host-commit');
+  const moved=[];let aside=null;
+  const putBack=()=>{for(const file of moved.splice(0).reverse()){try{renameSync(join(aside,file),join(dir,file));}catch{/* the retained copy is intact; heal names the rest */}}};
+  try{
+    const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256===pendingSha256);
+    if(!entry)return kept('the pending state is not on disk');
+    const terminalOf=row=>read.entries.find(other=>other.relativePath===`authority-terminal-${row.sourceFact.sha256}.json`);
+    const others=read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row!==entry);
+    // A dispatch that is not terminal is in flight, and a sibling's lineage proof (terminal record, receipt, public terminal files) may name this one.
+    const open=others.filter(row=>!terminalOf(row));
+    if(open.length)return kept(`${open.length} other dispatch(es) are still in flight (a pending state without a terminal record), so this pending state is kept for their lineage and their registry baseline`);
+    // Only a receipt that a sibling still on disk names as its terminal observation counts (the receipt of a retired sibling stays behind and proves nothing).
+    if(others.some(row=>{const receipt=read.entries.find(other=>other.sourceFact.sha256===terminalOf(row).value.observationSha256);return Array.isArray(receipt?.value?.foreignCommits)&&receipt.value.foreignCommits.some(proof=>proof?.pendingSha256===pendingSha256);}))return kept('a sibling receipt names this pending state as its lineage proof');
+    // The integration record is read by dependency admission; it leaves only when commit evidence derives the same fact (Dispatch: <slice> (goldfish)).
+    const governed=resolveGovernedItemQueue({root:repository.primaryRoot}),sliceId=entry.value.delivery?.sliceId;
+    if(governed.status!=='required'||!readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}).includes(sliceId))return kept('commit evidence (a commit with the trailer Dispatch: <slice> (goldfish)) does not prove the slice integrated, so the integration record stays the only record of it');
+    const plan=planSettledPending({pendingDir:dir,reservations:[{pending:entry.relativePath,status:'ok',settled:'integrated',dispatchId:entry.value.binding?.dispatchId??null,sliceId,commit:null}]});
+    if(plan.kept.length||plan.retire.length!==1)return kept(plan.kept[0]?.reason??'the pending state could not be planned for retirement');
+    const files=[plan.retire[0].name,...plan.retire[0].siblings,...read.entries.filter(row=>row.relativePath.startsWith('agent-')&&row.value?.pendingFile===entry.relativePath).map(row=>row.relativePath)];
+    const name=`${new Date().toISOString().replace(/[^0-9]/gu,'')}-${pendingSha256.slice(0,12)}${INTEGRATED_ASIDE_SUFFIX}`;
+    aside=join(integratedAsideDirectory(repository),name);
+    mkdirSync(aside,{recursive:true,mode:0o700});
+    for(const file of files){renameSync(join(dir,file),join(aside,file));moved.push(file);}
+    // The registry baseline moves in this same boundary: nothing of this producer is in flight (checked above), so the heal re-anchors exactly this retirement.
+    // The scan inside it drops the operation of the retired pending state, because the retained aside proves the retirement.
+    const healed=healSessionAuthorityDrift({boundary});
+    if(healed.status!=='readable'){putBack();return kept(`the registry baseline could not be moved with the retirement (${healed.code??healed.status}); the files were put back`);}
+    return {status:'retired',aside:name,files:files.length};
+  }catch(error){
+    putBack();
+    return kept(`the retirement was not completed (${String(error?.reason??error?.message??error).slice(0,160)}); files moved so far were put back`);
+  }
+}
 /** Elephant integration acknowledgement only after Source-bound targeted
  * delivery and Main ancestry/content readback. It never executes ordinary tests. */
 function integrateNativeGoldfishItemDeliveryOnce({root,pendingSha256}={}) {
@@ -2146,6 +2230,7 @@ function integrateNativeGoldfishItemDeliveryOnce({root,pendingSha256}={}) {
     const repository=inspectSignedDescriptorCustodyRepository(root),owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
     return withSessionAuthorityBoundary({repository},boundary=>{
       const read=nativeAuthorityScan(owner),entry=read.entries.find(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256===pendingSha256);
+      if(!entry){const retained=retainedIntegratedAside({repository,pendingSha256});if(retained!==null)return {status:'integrated',code:'NGHS-ITEM-INTEGRATED',replayed:true,retirement:{status:'retired',aside:retained}};}
       const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256);
       if(!entry?.value.delivery||!entry.value.binding.itemDelivery||!operation||operation.phase!=='terminal-observed')throw nativeManagedFault('native-item-not-delivered');
       const current=nativeManagedCurrentOwner(repository);
@@ -2166,7 +2251,7 @@ function integrateNativeGoldfishItemDeliveryOnce({root,pendingSha256}={}) {
       const prior=read.entries.find(row=>row.relativePath===`authority-integration-${pendingSha256}.json`);
       if(members[0].record.phase==='released'){
         if(!prior)throw nativeManagedFault('native-item-release-without-integration');
-        return {status:'integrated',code:'NGHS-ITEM-INTEGRATED',memberRef:members[0].memberRef,replayed:true};
+        return {status:'integrated',code:'NGHS-ITEM-INTEGRATED',memberRef:members[0].memberRef,replayed:true,retirement:retireIntegratedNativePending({repository,owner,boundary,operation,pendingSha256})};
       }
       recoverNativeAuthorityOperation({repository,owner,operation,port,boundary});
       const value={schema:'pipeline.native-goldfish-item-integration.v1',pendingSha256,bindingSha256:operation.bindingSha256,kind:'integrated',
@@ -2177,7 +2262,7 @@ function integrateNativeGoldfishItemDeliveryOnce({root,pendingSha256}={}) {
       const refreshed=refreshSourceOwnedDispatchAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=refreshed.memberRef;
       const terminalHandle=Object.freeze({});nativeItemTerminals.set(terminalHandle,{owner,pendingSha256,integrationSha256:stored.sha256});
       const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle});
-      return {status:'integrated',code:'NGHS-ITEM-INTEGRATED',releaseRef:released.releaseRef,memberRef:released.memberRef};
+      return {status:'integrated',code:'NGHS-ITEM-INTEGRATED',releaseRef:released.releaseRef,memberRef:released.memberRef,retirement:retireIntegratedNativePending({repository,owner,boundary,operation,pendingSha256})};
     });
   }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-INTEGRATION-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
@@ -2330,19 +2415,25 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
       const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port}),read=readNativeManagedInventory(repository,'native-goldfish')[0];
       const members=inspectNativeMemberRecords({boundary,port,producer});
       const integrated=[],{releasedPendingHashes}=readNativeReleasedItemReservations({repository,boundary});
-      for(const row of read.entries.filter(entry=>entry.relativePath.startsWith('authority-integration-'))) {
+      // C30J-J4: the integration records of retired pending states are read from their retained asides, so the checker-snapshot gate below (a weakened
+      // checker must not release a dependent, NGHS12) is the same whether the record is still in the namespace or was retired by its own integration step.
+      const liveRows=read.entries.filter(entry=>entry.relativePath.startsWith('authority-integration-')).map(row=>{
+        const found=read.entries.find(entry=>entry.relativePath.startsWith('pending-')&&entry.sourceFact.sha256===row.value.pendingSha256);
+        return {value:row.value,pending:found?.value,writeScope:()=>effectiveNativePendingState(read,found).delivery.writeScope,live:true};
+      });
+      for(const row of [...liveRows,...readRetainedIntegratedRows(repository).map(retained=>({value:retained.value,pending:retained.pending,writeScope:()=>retained.writeScope,live:false}))]) {
         if(!members.some(member=>member.record.phase==='released'&&member.record.bindingSha256===row.value.bindingSha256))continue;
-        releasedPendingHashes.push(row.value.pendingSha256);
+        if(row.live)releasedPendingHashes.push(row.value.pendingSha256);
         // D177: the per-row proof (a git read per row) runs only for rows the caller can still use. A settled-set caller
         // unions the cancelled slices anyway, and a dependency caller needs only its own dependsOn ids; releasedPendingHashes
         // above stays complete in every shape.
         if(only&&!only.has(row.value.sliceId))continue;
         if(cancelled.has(row.value.sliceId))continue;
-        const pending=read.entries.find(entry=>entry.relativePath.startsWith('pending-')&&entry.sourceFact.sha256===row.value.pendingSha256);
+        const pending={value:row.pending};
         const item=governed.normalized.slices.find(item=>item.id===row.value.sliceId&&item.delivery.itemId===row.value.itemId);
-        if(!pending?.value.binding.itemDelivery||!item)continue;
+        if(!pending.value?.binding?.itemDelivery||!item)continue;
         const briefing=pending.value.binding.itemDelivery;
-        if(item.delivery.baseCommit!==pending.value.binding.candidateCommit||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effectiveNativePendingState(read,pending).delivery.writeScope)
+        if(item.delivery.baseCommit!==pending.value.binding.candidateCommit||nativeManagedDigest(item.writeScope)!==nativeManagedDigest(row.writeScope())
           ||nativeManagedDigest(deliveryBinding(item.delivery))!==nativeManagedDigest(deliveryBinding(briefing))||nativeManagedDigest(item.delivery.checks)!==nativeManagedDigest(briefing.checks))continue;
         // C29 K-37 (Glossover): integration is a fact about commits. The working-tree snapshot threw item-check-source-not-candidate whenever an
         // in-flight dispatch had edited an earlier item's check file in its own scope, and that aborted the whole stop of the dispatch before its

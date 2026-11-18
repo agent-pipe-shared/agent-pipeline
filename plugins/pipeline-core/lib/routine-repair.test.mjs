@@ -456,6 +456,65 @@ test("C19K-W248-2: without --no-goldfish-running heal still defers and moves not
   assert.ok(existsSync(join(commitDir(ap), settled.name)));
 }));
 
+// C30J-J4 (SM-9, PO tile E1-5, AC-112): heal derives "nothing is in flight" from what inspect reports: every in-flight member is a native-goldfish
+// member that maps (by its binding digest) to one reservation whose dispatch record is judged `gone` (its owner process is dead), and no record is
+// judged `alive`. The hand-given --no-goldfish-running stays the fallback for every case without that proof. Written before the production edit.
+const BINDING = "b".repeat(64);
+const memberOf = (producerId = "native-goldfish", extra = {}) => ({ ...armedProducer, producerId, inFlightMembers: [{ memberId: "member-1", phase: "armed", bindingSha256: BINDING }], ...extra });
+const judged = (settled, state, records, producer = memberOf()) => ({ ...withProducer(producer, { ...rowOf(settled, state), bindingSha256: BINDING }), liveness: { records } });
+const healDeferred = (result) => assert.match(result.settledPending.deferred.reason, /run this, an agent step needing no human: node .*routine-repair\.mjs run heal --no-goldfish-running/u);
+
+test("C30J-J4: a member left armed whose dispatch record is judged gone is proven not in flight: heal moves the stale registry aside and retires, without the flag", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-DEAD", { terminal: true });
+  const armed = stub(judged(settled, "integrated-by-commit", [{ taskId: "D-DEAD", verdict: "gone" }]));
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: armed.spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  assert.deepEqual(armed.calls.map((call) => call.args[0]), ["inspect", "move-aside", "inspect", "heal", "inspect"]);
+  assert.equal(result.settledPending.deferred, undefined);
+  assert.equal(result.settledPending.staleMemberMoveAside.code, "moved-aside");
+  assert.deepEqual(result.settledPending.staleMemberMoveAside.proof, [{ memberId: "member-1", dispatchId: "D-DEAD", verdict: "gone" }]);
+  assert.deepEqual(result.settledPending.retiredPending.map((row) => row.name), [settled.name]);
+}));
+
+test("C30J-J4 KEEP: a record judged alive beats any reservation (a Goldfish that committed by itself may still run), so heal defers and moves nothing aside", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-LIVE2", { terminal: true });
+  for (const state of ["integrated-by-commit", "integrated", "cancelled", null]) {
+    const armed = stub(judged(settled, state, [{ taskId: "D-LIVE2", verdict: "alive" }]));
+    const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: armed.spawn, ...SETTLED_DEPS });
+    assert.equal(exit, 0, JSON.stringify(result));
+    assert.ok(!armed.calls.some((call) => call.args[0] === "move-aside"), `${state}: never proven not in flight`);
+    healDeferred(result); assert.match(result.settledPending.deferred.reason, /Not proven that nothing is in flight \(the dispatch record of D-LIVE2 is judged alive, not gone\)/u);
+    assert.ok(existsSync(join(commitDir(ap), settled.name)));
+  }
+}));
+
+test("C30J-J4 KEEP: unjudgeable, an absent record, another alive record, a member of another producer or an unlisted member never prove; the flag stays the fallback", () => withRepo((root, ap) => {
+  const settled = writeNamedPending(ap, "D-OPEN", { terminal: true });
+  const gone = [{ taskId: "D-OPEN", verdict: "gone" }];
+  const cases = [
+    ["unjudgeable", judged(settled, "integrated-by-commit", [{ taskId: "D-OPEN", verdict: "unjudgeable" }])],
+    ["no open record", judged(settled, "integrated-by-commit", [])],
+    ["no liveness reported", { ...judged(settled, "integrated-by-commit", gone), liveness: undefined }],
+    ["another record alive", judged(settled, "integrated-by-commit", [...gone, { taskId: "D-OTHER", verdict: "alive" }])],
+    ["another record unjudgeable (A7-1: it counts as running)", judged(settled, "integrated-by-commit", [...gone, { taskId: "D-OTHER", verdict: "unjudgeable" }])],
+    ["an unsettled reservation with no listed member", { ...judged(settled, "integrated-by-commit", gone), reservations: [{ ...rowOf(settled, "integrated-by-commit"), bindingSha256: BINDING }, { pending: "pending-claude-x.json", sliceId: "S-X", dispatchId: "D-X", settled: null, bindingSha256: "d".repeat(64) }] }],
+    ["an unreadable reservation", { ...judged(settled, "integrated-by-commit", gone), reservations: [{ ...rowOf(settled, "integrated-by-commit"), bindingSha256: BINDING }, { pending: "pending-claude-y.json", status: "unreadable", reason: "x" }] }],
+    ["member of another producer", judged(settled, "integrated-by-commit", gone, memberOf("onboarding-continuity"))],
+    ["member not listed", judged(settled, "integrated-by-commit", gone, memberOf("native-goldfish", { inFlight: 2 }))],
+    ["member maps to no reservation", { ...judged(settled, "integrated-by-commit", gone), reservations: [{ ...rowOf(settled, null), bindingSha256: "c".repeat(64) }] }],
+  ];
+  for (const [label, inspect] of cases) {
+    const armed = stub(inspect);
+    const { result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: armed.spawn, ...SETTLED_DEPS });
+    assert.ok(!armed.calls.some((call) => call.args[0] === "move-aside"), label);
+    healDeferred(result);
+    assert.ok(existsSync(join(commitDir(ap), settled.name)), label);
+  }
+  const asserted = stub(judged(settled, "integrated-by-commit", [{ taskId: "D-OPEN", verdict: "alive" }]));
+  const forced = runRoutineRepair({ kind: "heal", root, reason: "r", noGoldfishRunning: true }, { spawn: asserted.spawn, ...SETTLED_DEPS });
+  assert.equal(forced.result.settledPending.staleMemberMoveAside.code, "moved-aside", "the hand-given assertion still works as before");
+}));
+
 test("C19K-W248-3: move-aside is not refused for an open item reservation, and a member left armed with nothing else wrong is moved aside", () => withRepo((root) => {
   const open = { pending: "pending-claude-x.json", sliceId: "S-OPEN", queueState: "ready", settled: null, commit: null };
   const armed = stub(withProducer(armedProducer, open));

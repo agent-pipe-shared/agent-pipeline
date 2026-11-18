@@ -383,15 +383,57 @@ function retireSettledPending(ctx, inspect) {
 /** C19: the in-flight predicate is inspect's own (producer.inFlight counts bound members that are armed or running); it is consumed, not re-defined. */
 const anyMemberInFlight = (inspect) => (inspect?.registry?.producers ?? []).some((row) => Number(row?.inFlight) > 0);
 
+/**
+ * C30J-J4 (SM-9, PO tile E1-5): "nothing is in flight" derived from what inspect reports, never assumed from age and never stored. Proven only when no
+ * open dispatch record is judged `alive` and every bound member armed or running is a native-goldfish member that maps, by its binding digest, to exactly
+ * one pending reservation whose dispatch record is judged `gone` (its owner process is dead). A record judged `alive` beats any reservation (a Goldfish that
+ * committed by itself may still run); `unjudgeable`, an absent record, a cancelled reservation, a member of another producer and a producer that lists
+ * fewer members than it counts leave the proof open: heal keeps its deferral and the hand-given --no-goldfish-running remains the fallback.
+ */
+export function proveNothingInFlight(inspect) {
+  const open = (reason) => ({ proven: false, reason });
+  const records = inspect?.liveness?.records;
+  if (!Array.isArray(records)) return open("the dispatch-record liveness was not reported");
+  // Any open record not judged `gone` leaves the proof open: `alive` runs, and an `unjudgeable` one counts as running too (finding A7-1).
+  const notGone = records.filter((row) => row?.verdict !== "gone");
+  if (notGone.length) return open(`the dispatch record of ${notGone.map((row) => String(row?.taskId)).join(", ")} is judged ${[...new Set(notGone.map((row) => String(row?.verdict)))].join("/")}, not gone`);
+  const reservations = Array.isArray(inspect?.reservations) ? inspect.reservations : [];
+  const members = [];
+  for (const row of Array.isArray(inspect?.registry?.producers) ? inspect.registry.producers : []) {
+    const count = Number(row?.inFlight) || 0;
+    if (count === 0) continue;
+    const listed = Array.isArray(row?.inFlightMembers) ? row.inFlightMembers : [];
+    if (row.producerId !== "native-goldfish" || listed.length !== count) return open(`producer ${row.producerId} holds ${count} member(s) in flight that no dispatch record can judge`);
+    members.push(...listed);
+  }
+  const proof = [];
+  for (const member of members) {
+    const rows = reservations.filter((row) => typeof row?.bindingSha256 === "string" && row.bindingSha256 === member?.bindingSha256);
+    const dispatchId = rows.length === 1 ? rows[0].dispatchId : null;
+    if (typeof dispatchId !== "string") return open(`member ${member?.memberId} (${member?.phase}) maps to no single pending reservation`);
+    const record = records.filter((row) => row?.taskId === dispatchId);
+    if (record.length !== 1 || record[0].verdict !== "gone") return open(`the dispatch record of ${dispatchId} is ${record.length === 1 ? `judged ${record[0].verdict}` : "not an open record"}, so its owner process is not proven dead`);
+    proof.push({ memberId: member.memberId, dispatchId, verdict: "gone" });
+  }
+  // Every reservation must be accounted for: settled by a native integration (its member is released) or tied to a member proven dead above.
+  // An unsettled, unreadable, cancelled or integrated-by-commit reservation with no listed member proves nothing (a cancelled or self-committing Goldfish may still run).
+  const proven = new Set(proof.map((row) => row.dispatchId));
+  for (const row of reservations) {
+    if (row?.settled === "integrated" && row.status !== "unreadable") continue;
+    if (row?.status === "unreadable" || typeof row?.dispatchId !== "string" || !proven.has(row.dispatchId)) return open(`reservation ${row?.sliceId ?? row?.pending} is not settled by a native integration and is not tied to a member whose dispatch is judged gone`);
+  }
+  return { proven: true, proof };
+}
+
 /** C19: nothing moves; reports how many settled pending states, orphaned authority records and stop-failure records a heal with nothing armed would retire. */
-function deferredSettledPending(commonDir, inspect) {
+function deferredSettledPending(commonDir, inspect, notProven = null) {
   const pendingDir = pendingDirOf(commonDir);
   const preview = previewSettledPending(commonDir, inspect);
   const count = preview.settledCount + planOrphanAuthority({ pendingDir }).retire.length + preview.leavingDispatchIds.length;
   // A member whose dispatch ended without releasing it (the hook that admitted it was ended by the host, or the child never reported) stays
   // armed for ever, and heal never un-arms a member: "run heal again when nothing is armed" would then never come true. The text therefore
   // also names the one way out for the case that no Goldfish runs, so a refusal always carries a repair that can really be run.
-  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed. If no Goldfish runs (a dispatch that was cut off or ended without a report leaves its member armed for ever, and heal never un-arms it), run this, an agent step needing no human: " + healNoGoldfishNext(), next: healNoGoldfishNext() } };
+  return { deferred: { count, reason: "a producer reports a bound member armed or running (a Goldfish dispatch is in flight), so the settled pending states and stop-failure records of other dispatches are not retired now (retiring them drifted the registry namespace under it); run heal again when nothing is armed. Not proven that nothing is in flight" + (notProven === null ? "" : ` (${notProven})`) + ". If no Goldfish runs (a dispatch that was cut off or ended without a report leaves its member armed for ever, and heal never un-arms it), run this, an agent step needing no human: " + healNoGoldfishNext(), next: healNoGoldfishNext() } };
 }
 
 /** D231 (E): the owner-route orphan release, delegated to the closed script (the same release `continuity-owner-route.mjs release-orphan` runs). */
@@ -419,15 +461,19 @@ function execute(plan, ctx) {
       const inspect = run.status === 0 ? parseJson(run.stdout) : null;
       // C19 (AC-127): while any producer reports a bound member armed or running, the retirement is deferred (it drifted the registry
       // namespace under a sibling dispatch on 2026-11-02); a later heal with nothing armed retires the same states.
+      // C30J-J4: without the hand-given assertion, heal proceeds only on a derived proof that nothing is in flight (a dead owner process per member).
+      const proof = inspect !== null && anyMemberInFlight(inspect) && plan.noGoldfishRunning !== true ? proveNothingInFlight(inspect) : null;
       if (inspect === null) settledPending = { skipped: "session-authority-repair inspect did not report, so no pending state was classified" };
-      else if (anyMemberInFlight(inspect) && plan.noGoldfishRunning !== true) settledPending = deferredSettledPending(commonDir, inspect);
+      else if (proof !== null && !proof.proven) settledPending = deferredSettledPending(commonDir, inspect, proof.reason);
       else if (anyMemberInFlight(inspect)) {
         // PO 2026-11-06: the caller asserts that no Goldfish runs, so an armed member is one a cut-off dispatch left behind. The registry
         // (with that member) is moved aside first, retained, then the settled pending states are retired on the fresh namespace.
-        const moved = delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", `heal --no-goldfish-running: a member left armed deferred the retirement; ${plan.reason}`.slice(0, 500)], root), ctx);
+        // C30J-J4: the same branch when the proof above found every armed member's dispatch dead; it is recorded with the result.
+        const why = proof === null ? "heal --no-goldfish-running" : "heal (nothing in flight is proven: every armed member's dispatch record is judged gone)";
+        const moved = delegated("session-authority-repair move-aside", spawn(SAR, ["move-aside", "--root", root, "--no-goldfish-running", "--reason", `${why}: a member left armed deferred the retirement; ${plan.reason}`.slice(0, 500)], root), ctx);
         if (!moved.ok) return { ...moved, ownerRoute, staleMemberMoveAside: { attempted: true, code: moved.code } };
         const fresh = parseJson(spawn(SAR, ["inspect", "--root", root], root).stdout);
-        settledPending = fresh === null ? { skipped: "session-authority-repair inspect did not report after the move-aside" } : { ...retireSettledPending(ctx, fresh), staleMemberMoveAside: { attempted: true, code: "moved-aside" } };
+        settledPending = fresh === null ? { skipped: "session-authority-repair inspect did not report after the move-aside" } : { ...retireSettledPending(ctx, fresh), staleMemberMoveAside: { attempted: true, code: "moved-aside", ...(proof === null ? {} : { proof: proof.proof }) } };
       }
       else settledPending = retireSettledPending(ctx, inspect);
     } catch (error) { settledPending = { skipped: short(error) }; }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { sliceQueueLocation, readSliceQueueSource, writeWorkingQueue, takeHandoverQueue } from "./slice-queue-location.mjs";
 import { createHash } from "node:crypto";
 import { canonical } from "./po-approval-proof.mjs";
@@ -659,6 +659,9 @@ const cases = [
     const stillHeld=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.deepEqual(stillHeld.integrated,[]);
     assert.equal(readyAndLive({queue,records:[],live:[],integrationReadiness:stillHeld.handle}).ready.includes('DEPENDENT'),false,'terminal completed cannot release the dependent');
     const integrated=runtime.run(()=>qualifyNativeGoldfishHookDelivery({root,result:finalized})).integration;assert.equal(integrated.status,'integrated',JSON.stringify(integrated));
+    // C30J-J4 KEEP (commit evidence): the dispatch id DELIVER-AC-1 is not the slice id ITEM-AC-1, so no commit carries `Dispatch: ITEM-AC-1 (goldfish)` and the
+    // integration record stays the only record of the integration: the pending state is kept, nothing moves, and this case's later reads are unchanged.
+    assert.equal(integrated.retirement?.status,'kept',JSON.stringify(integrated));assert.match(integrated.retirement.reason,/commit evidence/u);assert.match(integrated.retirement.repair,/settled-pending-aside/u);
     const observed=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.equal(observed.status,'observed',JSON.stringify(observed));assert.deepEqual(observed.integrated,['ITEM-AC-1']);assert.equal(readyAndLive({queue,records:[],live:[],integrationReadiness:observed.handle}).ready.includes('DEPENDENT'),true,'genuine integrated Source evidence releases the dependent');
     const replayed=runtime.run(()=>integrateNativeGoldfishItemDelivery({root,pendingSha256:prepared.sha256}));assert.equal(replayed.status,'integrated',JSON.stringify(replayed));assert.equal(replayed.replayed,true);
     writeFileSync(join(root,'src/change.test.mjs'),"import test from 'node:test';test('weakened checker',()=>{});\n");
@@ -2115,6 +2118,74 @@ const cases = [
     assert.equal(nativeHookIntegrationDeadlineMs({ event: "SubagentStop", startedMs: 1_000 }), 1_000 + 300_000 - NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS);
     assert.equal(nativeHookIntegrationDeadlineMs({ event: "PreToolUse", startedMs: 0 }), 120_000 - NATIVE_HOOK_AFTER_INTEGRATION_RESERVE_MS);
   } },
+
+  { id: "NGHS75", name: "C30J-J4 (SM-8/SM-9, AC-112): a pending state does not survive its own integration; the integration step retires it with its authority records aside, in the registry boundary, and readiness, replay and the next dispatch are unchanged", run: () => fixture(({ root }) => {
+    // Written from the criterion before the production edit: after the integration step the host-commit directory holds no pending file of the
+    // integrated dispatch and no authority record naming it (they are retained under session-authority-abandoned, never deleted), the registry
+    // still reads strictly (no namespace drift), and what a reader derives from the integration is still derived (commit evidence).
+    const { original, repository, runtime } = d177Setup(root, false);
+    const left = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator); assert.equal(left.prepared.ok, true, JSON.stringify(left.prepared));
+    const pendingDir = join(root, ".git/agent-pipeline/run/native-goldfish-host-commit"), abandoned = join(root, ".git/agent-pipeline/session-authority-abandoned");
+    const pendingNames = () => readdirSync(pendingDir).filter((name) => name.startsWith("pending-") && createHash("sha256").update(readFileSync(join(pendingDir, name))).digest("hex") === left.prepared.sha256);
+    const naming = () => readdirSync(pendingDir).filter((name) => name.includes(left.prepared.sha256));
+    assert.equal(pendingNames().length, 1, "control: the pending state of LEFT is on disk before the stop");
+    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // J4 LEFT\n");
+    const returned = { ...left.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: left.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: "LEFT", candidateCommit: left.binding.candidateCommit, outcome: "succeeded", report: "J4 fixture return.", changedPaths: ["src/change.mjs"] }) }] } };
+    assert.equal(runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned })).status, "authored-commit-recorded");
+    assert.ok(naming().some((name) => name.startsWith("authority-terminal-")), "control: the terminal record of LEFT is on disk before the integration");
+    const integrated = runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: left.prepared.sha256 }));
+    assert.equal(integrated.status, "integrated", JSON.stringify(integrated));
+    assert.deepEqual(pendingNames(), [], "the pending state does not survive its own integration");
+    assert.deepEqual(naming(), [], "no authority record names the retired pending state (they travel with it)");
+    assert.equal(integrated.retirement?.status, "retired", JSON.stringify(integrated));
+    const asides = readdirSync(abandoned).filter((name) => name.endsWith(`-${left.prepared.sha256.slice(0, 12)}-integrated-pending`));
+    assert.equal(asides.length, 1, "one retained aside names the integrated pending state");
+    const retained = readdirSync(join(abandoned, asides[0]));
+    assert.ok(retained.some((name) => name.startsWith("pending-")) && retained.includes(`authority-integration-${left.prepared.sha256}.json`) && retained.includes(`authority-terminal-${left.prepared.sha256}.json`), `retained, not deleted: ${retained.join(",")}`);
+    assert.equal(inspectSessionAuthorityRegistryRead({ repository: inspectSignedDescriptorCustodyRepository(root) }).status, "readable", "the registry baseline moved in the same step: no namespace drift is left for a later heal");
+    assert.deepEqual(runtime.run(() => observeGovernedItemIntegrationReadiness({ root })).integrated, ["LEFT"], "readiness still derives LEFT as integrated (commit evidence)");
+    // The gate a retired record carried is derived from the retained aside: a weakened checker must still not release a dependent (the NGHS12 assertion, after retirement).
+    const checkerPath = join(root, "src/change.test.mjs"), checker = readFileSync(checkerPath, "utf8");
+    writeFileSync(checkerPath, "import test from 'node:test';test('weakened checker',()=>{});\n");
+    const weakened = runtime.run(() => observeGovernedItemIntegrationReadiness({ root }));
+    writeFileSync(checkerPath, checker);
+    assert.equal(weakened.status, "refused", "a retired integration record still refuses readiness while the checker is weakened: " + JSON.stringify(weakened));
+    assert.deepEqual(runtime.run(() => observeGovernedItemIntegrationReadiness({ root })).integrated, ["LEFT"], "restored checker: integrated again");
+    const replayed = runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: left.prepared.sha256 }));
+    assert.equal(replayed.status, "integrated", JSON.stringify(replayed)); assert.equal(replayed.replayed, true, "a second integration of the same selector is still a replay, answered from the retained aside");
+    assert.equal(runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: "f".repeat(64) })).status, "refused", "a selector no retained aside names is still refused");
+    const right = d177Item(runtime, root, original, "RIGHT", "second", original.criterionLocators["AC-2"]); assert.equal(right.prepared.ok, true, "the next dispatch is admitted on the retired namespace: " + JSON.stringify(right.prepared));
+    void repository;
+  }) },
+
+  { id: "NGHS76", name: "C30J-J4 KEEP: a sibling dispatch still in flight keeps the integrated pending state where it is (a running dispatch is never proven not in flight; heal retires it later); nothing is moved and the registry reads strictly", run: () => fixture(({ root }) => {
+    const { runtime, items } = d177Setup(root);
+    const pendingDir = join(root, ".git/agent-pipeline/run/native-goldfish-host-commit");
+    const item = items.LEFT;
+    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // J4 keep LEFT\n");
+    const returned = { ...item.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: item.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: "LEFT", candidateCommit: item.binding.candidateCommit, outcome: "succeeded", report: "J4 keep fixture return.", changedPaths: ["src/change.mjs"] }) }] } };
+    assert.equal(runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned })).status, "authored-commit-recorded");
+    const before = readdirSync(pendingDir).sort();
+    const integrated = runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: item.prepared.sha256 }));
+    assert.equal(integrated.status, "integrated", JSON.stringify(integrated));
+    assert.equal(integrated.retirement?.status, "kept", "RIGHT is prepared and has no terminal record: a running dispatch is never proven not in flight");
+    assert.match(integrated.retirement.reason, /in flight/u);
+    assert.deepEqual(readdirSync(pendingDir).filter((name) => !before.includes(name)), [`authority-integration-${item.prepared.sha256}.json`], "only the integration record was added; the pending state and its records stay");
+    assert.ok(before.every((name) => readdirSync(pendingDir).includes(name)), "nothing was moved");
+    assert.equal(inspectSessionAuthorityRegistryRead({ repository: inspectSignedDescriptorCustodyRepository(root) }).status, "readable");
+    const replayed = runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: item.prepared.sha256 }));
+    assert.equal(replayed.replayed, true); assert.equal(replayed.retirement?.status, "kept", "a replay asks the same question again and gets the same answer while RIGHT runs");
+  }) },
+
+  { id: "NGHS77", name: "C30J-J4 KEEP: a pending state that vanished without a retained aside still faults native-authority-missing-pending (only the aside of the integration step excuses a missing pending state)", run: () => fixture(({ root }) => {
+    const { original, runtime } = d177Setup(root, false);
+    const left = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator); assert.equal(left.prepared.ok, true, JSON.stringify(left.prepared));
+    const pendingDir = join(root, ".git/agent-pipeline/run/native-goldfish-host-commit");
+    const name = readdirSync(pendingDir).find((file) => file.startsWith("pending-"));
+    renameSync(join(pendingDir, name), join(root, ".git", "moved-by-hand.json"));
+    const baseline = () => createNativeGoldfishAuthorityProducerPort({ repository: inspectSignedDescriptorCustodyRepository(root) }).readBaseline();
+    assert.throws(() => runtime.run(baseline), (error) => /native-authority-missing-pending/u.test(`${error.code} ${error.reason} ${error.message}`), "no retained aside names it, so the fault stays");
+  }) },
 
 ];
 

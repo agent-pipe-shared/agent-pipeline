@@ -158,6 +158,18 @@ const cases = [
     const next = dispatch("ITEM-AC-2", "DELIVER-AC-2", "native-tool-two");
     assert.equal(next.ok, true, JSON.stringify(next));
   }) },
+  { id: "SAR04b", name: "C30J-J4: inspect names each in-flight member with the binding digest of its reservation and derives 'nothing in flight' fail closed (no open dispatch record: not proven)", run: () => fixture(({ root }) => {
+    const { dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const found = repair("inspect", "--root", root).result;
+    const native = found.registry.producers.find((row) => row.producerId === "native-goldfish");
+    assert.equal(native.inFlight, 1); assert.equal(native.inFlightMembers.length, 1, JSON.stringify(native));
+    const row = found.reservations.find((entry) => entry.sliceId === "ITEM-AC-1");
+    assert.match(row.bindingSha256, /^[a-f0-9]{64}$/u); assert.equal(native.inFlightMembers[0].bindingSha256, row.bindingSha256, "the member maps to its reservation");
+    assert.deepEqual(found.liveness.records, [], "no dispatch record is open in the fixture");
+    assert.equal(found.nothingInFlight.proven, false, "a member whose dispatch has no open record is never proven not in flight");
+    assert.match(found.nothingInFlight.reason, /not an open record/u);
+  }) },
   { id: "SAR05", name: "a running session binds late from its own session id, to the same descriptor its hooks use; a shell without one stays unbound (D52 (1))", run: () => fixture(({ root }) => {
     const { original, repository, runtime } = course(root);
     const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-0", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };

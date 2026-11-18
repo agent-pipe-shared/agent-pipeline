@@ -44,12 +44,13 @@ import { createHash, randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { moveStopFailuresAside } from "../lib/routine-repair.mjs";
+import { moveStopFailuresAside, proveNothingInFlight } from "../lib/routine-repair.mjs";
+import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
 import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { retireAbandonedChatGateCeremonies } from "../lib/chat-gate-ceremony.mjs";
 import { healSessionAuthorityDrift, initializeSessionAuthorityRegistry, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
-import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedCommits, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+import { cancelUnstartedGovernedItemSlice, nativePendingBindingSha256, readOrchestratorCommitIntegratedCommits, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
 
@@ -133,14 +134,17 @@ function producerReport(repository) {
       members = record.members.map((entry) => readRef(entry.memberRef));
       releases = members.filter((member) => member.releaseRef).map((member) => readRef(member.releaseRef));
     } catch (error) { producers.push({ producerId, status: "unreadable", reason: short(error) }); continue; }
-    const inFlight = members.filter((member) => member.association?.state === "bound" && IN_FLIGHT.has(member.phase)).length;
+    const inFlightMembers = members.filter((member) => member.association?.state === "bound" && IN_FLIGHT.has(member.phase));
+    const inFlight = inFlightMembers.length;
+    // C30J-J4: the in-flight members are named (id, phase, binding digest) so heal can derive "nothing in flight" per member; nothing is stored.
+    const inFlightList = inFlightMembers.map((member) => ({ memberId: member.memberId, phase: member.phase, bindingSha256: member.bindingSha256 }));
     let live;
     try { live = port.reconcile({ producerRecord: Object.freeze(record), memberRecords: Object.freeze(members), releaseRecords: Object.freeze(releases) }); }
-    catch (error) { producers.push({ producerId, status: "reconcile-refused", code: error?.code ?? null, reason: short(error), inFlight }); continue; }
+    catch (error) { producers.push({ producerId, status: "reconcile-refused", code: error?.code ?? null, reason: short(error), inFlight, inFlightMembers: inFlightList }); continue; }
     const byId = (rows) => new Map((rows ?? []).map((row) => [row.namespaceId, row]));
     const stored = byId(record.baseline), current = byId(live);
     const drifted = [...new Set([...stored.keys(), ...current.keys()])].filter((id) => !same(stored.get(id), current.get(id))).sort();
-    producers.push({ producerId, status: drifted.length ? "drifted" : "ok", drifted, inFlight });
+    producers.push({ producerId, status: drifted.length ? "drifted" : "ok", drifted, inFlight, inFlightMembers: inFlightList });
   }
   return { status: "present", producers };
 }
@@ -162,7 +166,13 @@ function reservationReport(repository, root) {
     const queueState = slices.find((row) => row.id === sliceId)?.state ?? null;
     const nativeIntegrated = names.includes(`authority-integration-${sha}.json`);
     const byCommit = sliceId !== null && integrated.has(sliceId);
-    rows.push({ pending: name, sliceId, itemId: state?.delivery?.itemId ?? null, dispatchId: state?.binding?.dispatchId ?? null, sessionId: typeof state?.sessionId === "string" ? state.sessionId : null, queueState,
+    // C30J-J4: the registry binding digest of this pending state, so a member left armed maps to its reservation (derived on read, never stored).
+    let bindingSha256 = null;
+    try {
+      const retained = names.includes(`authority-owner-${sha}.json`) ? JSON.parse(readFileSync(join(dir, `authority-owner-${sha}.json`), "utf8")) : null;
+      bindingSha256 = nativePendingBindingSha256({ repository, state, retainedOwner: retained });
+    } catch { bindingSha256 = null; }
+    rows.push({ pending: name, bindingSha256, sliceId, itemId: state?.delivery?.itemId ?? null, dispatchId: state?.binding?.dispatchId ?? null, sessionId: typeof state?.sessionId === "string" ? state.sessionId : null, queueState,
       settled: nativeIntegrated ? "integrated" : byCommit ? "integrated-by-commit" : queueState === "cancelled" ? "cancelled" : null,
       commit: !nativeIntegrated && byCommit ? commits.get(sliceId) ?? null : null });
   }
@@ -322,6 +332,14 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   // A read refused only because the lock is held is explained by the lock step, not by move-aside.
   const unexplained = registry.read.status === "refused" && !healable(registry.read.reason) && !(held && registry.read.code === "SDC-LOCK-HELD");
   if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
+  // C30J-J4: only while a bound member is armed or running, the open dispatch records are judged (read-only) and the derived proof "nothing is in flight"
+  // is printed next to them; heal consumes the same pure function. Nothing is stored; an unreadable judgement proves nothing.
+  if (registry.producers.some((row) => Number(row.inFlight) > 0)) {
+    let liveness;
+    try { liveness = { records: readDispatchRecordLiveness(root).records.map((row) => ({ taskId: row.taskId, verdict: row.verdict, reason: row.reason })) }; }
+    catch (error) { liveness = { status: "unavailable", reason: short(error) }; }
+    return { lock, cleanupLocks, registry, reservations, scratchBinding, next, liveness, nothingInFlight: proveNothingInFlight({ registry, reservations, liveness }) };
+  }
   return { lock, cleanupLocks, registry, reservations, scratchBinding, next };
 }
 
