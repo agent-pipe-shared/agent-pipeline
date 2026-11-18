@@ -5,8 +5,23 @@
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
 carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
 or `refresh-mandatory-hooks.mjs --root <root>`. Elephant executes that exact
-action once, then reruns the identical preflight and continues only on `ready`;
-a missing or failed action stops bootstrap. Goldfish and Critic never execute it.
+action once, then reruns the identical preflight and continues only on `ready`
+(or, for the one soft case below, under that soft status); a missing or failed
+action stops bootstrap. Goldfish and Critic never execute it.
+
+One further case carries the same refresh: a soft `plugin-refresh-required`
+whose ONLY cause is the loaded/installed version mismatch (no failed attestation,
+no ambiguous registry) and whose mandatory hooks are stale. Its `nextAction` is
+then the same `refresh-mandatory-hooks.mjs --root <root>` command (expected
+readback `pipeline.mandatory-hook-refresh.v1` `ready`) instead of the advisory.
+Elephant executes it once, reruns the identical preflight and continues under the
+soft status, which no longer lists stale hooks; the status never becomes `ready`
+by this step and the soft advisory stays noted in the confirmation line. The
+refresh binds the hooks to the LOADED plugin's own library, the tree the
+staleness was measured against, never to the registry's installed copy. Under a
+failed attestation or an ambiguous registry the soft status offers no action and
+the guard's `HOOK-SNAPSHOT-STALE` refusal names the command. Goldfish and Critic
+never receive or execute it.
 
 Status `plugin-attestation-required` is a closed hard recovery, never the
 soft `plugin-refresh-required` advisory. For Codex, accept it only with
@@ -94,7 +109,8 @@ prior turn, even for an identical earlier restart action: re-read it.
 
 Preflight status `plugin-refresh-required` is advisory-only: no recovery
 action is required. `nextAction` is `{kind: "advisory", ...}` (nothing to
-execute); bootstrap continues normally through Step 0-4, and the advisory
+execute), except the one version-mismatch-only case with stale hooks above,
+where it is the one typed hook refresh; bootstrap continues normally through Step 0-4, and the advisory
 (a pending plugin refresh) is noted in the printed confirmation line rather
 than withholding it. This covers both the pre-existing loaded/installed
 version-mismatch case and the origin/content self-application attestation

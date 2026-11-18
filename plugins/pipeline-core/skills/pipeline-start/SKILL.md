@@ -46,6 +46,9 @@ author question and the rule before consent exists (no deliverable file) are in
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
 carries a mutating `nextAction`: execute it once as
 `references/onboarding-recovery.md` states; Goldfish and Critic never execute it.
+A soft `plugin-refresh-required` caused only by the version mismatch with stale
+hooks carries the same one refresh action: execute it once, rerun the preflight,
+then continue under the soft status (it stays soft; the reference states the case).
 
 Status `windows-authority-unavailable` stops bootstrap. Present its closed
 causes using `references/onboarding-recovery.md`; never execute an ACL repair.

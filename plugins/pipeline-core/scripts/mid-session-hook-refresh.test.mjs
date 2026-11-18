@@ -139,5 +139,33 @@ test('tampered hook and untrusted source refuse refresh while preserving origina
   for (const [index, hook] of hooks.entries()) assert.deepEqual(readFileSync(paths(f, hook).hook), before[index]);
 }));
 
-if (cases.length !== 2) throw new Error('mid-session hook refresh case count drift');
+// C30J-J24 (the open "Not measured" of the J8 notes): which tree the refresh rebinds the hooks to. The typed action is the
+// LOADED plugin's own script (`<pluginRoot>/scripts/refresh-mandatory-hooks.mjs`), and a refresh without an injected library
+// binds to the library next to that script -- the tree the staleness was measured against -- never to a registry copy. This holds
+// the same way under the soft version-mismatch status (installed copy differs from the loaded one), because neither the plan nor
+// the apply reads the registry. Measured with the real, un-injected installers.
+test('refresh without an injected library plans and applies against the loaded plugin tree next to the script', () => fixture(f => {
+  const loadedLib = resolve(import.meta.dirname, '..', 'lib');
+  const registryCopyLib = source(f.root, 'registry-installed-copy');
+  install(f, registryCopyLib);
+  const before = hooks.map(hook => JSON.parse(readFileSync(paths(f, hook).marker, 'utf8')).pluginLibDir);
+  for (const hook of hooks) {
+    const plan = hook.module.planInstall({ rootDir: f.project });
+    assert.equal(plan.status, 'ready-to-upgrade', hook.name);
+    assert.equal(plan.updateRequired, true, `${hook.name}: hooks bound to another tree read stale against the loaded one`);
+    assert.equal(plan.pluginLibDir, loadedLib, `${hook.name}: the plan targets the loaded plugin tree`);
+  }
+  const refreshed = refreshMandatoryHooks(f.project);
+  assert.equal(refreshed.status, 'ready');
+  assert.deepEqual(refreshed.results.map(row => row.status), hooks.map(() => 'refreshed'));
+  for (const [index, hook] of hooks.entries()) {
+    const marker = JSON.parse(readFileSync(paths(f, hook).marker, 'utf8'));
+    assert.notEqual(marker.pluginLibDir, before[index], `${hook.name}: rebound away from the registry-copy snapshot`);
+    assert.ok(inside(f.project, marker.pluginLibDir) && marker.pluginLibDir.includes('/runtime-'), `${hook.name}: a private runtime snapshot of the loaded tree`);
+    assert.equal(hook.module.planInstall({ rootDir: f.project }).updateRequired, false, `${hook.name}: current against the loaded tree`);
+  }
+  assert.deepEqual(refreshMandatoryHooks(f.project).results.map(row => row.status), hooks.map(() => 'current'), 'the second run changes nothing');
+}));
+
+if (cases.length !== 3) throw new Error('mid-session hook refresh case count drift');
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });

@@ -115,15 +115,18 @@ const provisioning = ({ preCommit: pc = "current", commitMsg: cm = "current", pr
 const modelReady = { ok: true, code: "MODEL-ROLE-BOOTSTRAP-READY", status: "ready" };
 const modelUnavailable = { ok: false, code: "MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE", status: "unavailable" };
 
-async function runWith(observe, { role, hooks, modelRole = modelReady, provisioningFn, installedVersion } = {}) {
+const rejectedObservation = { schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-SOURCE-DIRTY"] };
+async function runWith(observe, { role, hooks, modelRole = modelReady, provisioningFn, installedVersion, registryText, observation } = {}) {
   const calls = [];
   const result = await observe({
     // Cases that name `installedVersion` hand the registry as the thunk the preflight actually calls, so its identity is read.
-    env: {}, pluginList: installedVersion === undefined ? pluginList() : () => pluginList(installedVersion), read: () => manifest, cwd: work,
+    // `registryText` hands a whole registry payload; `observation` replaces the origin/content attestation observation.
+    env: {}, pluginList: registryText !== undefined ? () => registryText : installedVersion === undefined ? pluginList() : () => pluginList(installedVersion), read: () => manifest, cwd: work,
     checkCloneProvisioningFn: provisioningFn ?? (() => provisioning(hooks)),
     observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "active", root: rootDir, scopeKey: "a".repeat(64), repositoryKind: "git", provenance: { kind: "isolated-unit-capability", refs: [] }, diagnostics: [], requiresEnforcement: true, hintAllowed: false }),
     observeAntigravityLoadedTopologyFn: ({ loadedPluginRoot }) => ({ schema: "pipeline.antigravity-loaded-topology.v1", status: "current", loadedKind: "direct", loadedPluginRoot, executingGuardAssurance: "not-established-by-topology" }),
     observe: () => ({ schema: "pipeline.public-core-observation.v1", status: "ready", candidate: { repository: "https://github.com/agent-pipe-shared/agent-pipeline.git", branch: "main", commit: "a".repeat(40), tree: "b".repeat(40) }, plugin: { name: "pipeline-core", version: "0.4.5+test", manifestSha256: "c".repeat(64), contentSha256: "d".repeat(64) } }),
+    ...(observation === undefined ? {} : { observe: () => observation }),
     inspectEffectiveArchitectureDecisionsFn: () => ({ schema: "pipeline.architecture-effective-decisions.v1", area: "project", status: "advisory", code: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING", projectionSha256: "a".repeat(64), decisions: [], activeExceptions: [], findings: [] }),
     requireProjectOnboardingReadyFn: () => {},
     runModelRoleBootstrapFn: async (args) => { calls.push(args); if (modelRole instanceof Error) throw modelRole; return modelRole; },
@@ -334,7 +337,7 @@ test("RED P1/P2: advice-only preflight (stale hooks no longer escalate) is caugh
 
 test("RED P1/P2: a refresh that leaks to Goldfish would be caught by the control", async () => {
   const mutant = await loadMutant("pipeline-start-preflight.mjs", (s) => s.replace(
-    'if (role === "goldfish" || role === "critic" || baseStatus !== "ready") return unchanged;', 'if (baseStatus !== "ready") return unchanged;'));
+    'if (role === "goldfish" || role === "critic" || (baseStatus !== "ready" && !softOffer)) return unchanged;', 'if ((baseStatus !== "ready" && !softOffer)) return unchanged;'));
   const { result } = await runWith(mutant.observePipelineStartPreflight, { role: "goldfish", hooks: { preCommit: "refresh" } });
   assert.notEqual(result.status, "ready", "mutant gates the Goldfish");
 });
@@ -373,14 +376,12 @@ test("RED P3: a refresh that also installs over a foreign hook is caught", async
   assert.deepEqual(applyCalls, [], "production never applies over a foreign hook");
 });
 
-// ===== P7 : C30J-J8 (AC-112) -- the bootstrap's one refresh is offered exactly when the loaded plugin is the attested,
-// installed one; a plugin that is not (soft refresh advisory) gets detection only, never a hook rebind ===================
-// Recon result of C30J-J8: after a reload the agent-runnable refresh already runs at the bootstrap when the readback is
-// `ready` (P1/P2), and the first refused commit already names the one command and "then repeat the refused command"
-// (git-hook-runtime-snapshots pin, AC-179). What is pinned here is the CURRENT behaviour at the edge: under a soft status
-// (the installed plugin differs from the loaded one) the bootstrap reports the staleness and offers no action. Whether a
-// version-mismatch-only soft status should get the refresh is an open decision this pin does not make; changing it means
-// restating these two cases, not weakening them.
+// ===== P7 : C30J-J24 (AC-112; restates the C30J-J8 pin P7, QG-04) -- under a SOFT `plugin-refresh-required` whose ONLY cause
+// is the version mismatch (installed plugin differs from the loaded one; no failed self-application attestation, no
+// ambiguous registry identity) an Elephant bootstrap carries the same ONE typed hook-refresh action as a `ready` readback.
+// The status stays the soft one (exit 0, carried forward); nothing automatic runs; every other soft cause, a hard status and
+// the Goldfish/Critic roles keep detection only. The J8 text of this pin ("no action under a soft status") was recorded as
+// "not a PO-mandated boundary"; the PO tile of 2026-11-18 decided the open question, so the pin is restated, not weakened. =====
 function assertSoftAdvisoryWithDetectionOnly(result) {
   assert.equal(result.status, "plugin-refresh-required", "the soft status is carried forward, not replaced by a hook gate");
   assert.equal(pipelineStartPreflightExitCode(result), 0);
@@ -388,35 +389,112 @@ function assertSoftAdvisoryWithDetectionOnly(result) {
   assert.equal(result.nextAction.mutation, false);
   assert.equal(result.nextAction.executable, null);
   assert.deepEqual(result.nextAction.argv, []);
-  assert.equal(result.nextAction.refreshes, undefined, "no hook refresh is attached to a soft status");
+  assert.equal(result.nextAction.refreshes, undefined, "no hook refresh is attached");
   assert.deepEqual(result.staleHookSnapshots.map((entry) => entry.id).sort(), [COMMIT_MSG, PRE_COMMIT],
     "the staleness is still detected and typed, so the refusal's own command stays the way forward");
 }
+function assertSoftWithRefreshAction(result, expectedCovered) {
+  assert.equal(result.status, "plugin-refresh-required", "the status itself stays the soft one");
+  assert.equal(pipelineStartPreflightExitCode(result), 0, "soft: exit 0, the session proceeds");
+  const a = result.nextAction;
+  assert.equal(a?.kind, "command");
+  assert.equal(a.mutation, true);
+  assert.equal(basename(a.argv[0]), "refresh-mandatory-hooks.mjs");
+  assert.deepEqual(a.argv.slice(1, 2), ["--root"]);
+  assert.deepEqual(a.expected, { schema: "pipeline.mandatory-hook-refresh.v1", status: "ready" });
+  assert.deepEqual([...a.refreshes].sort(), expectedCovered);
+  assert.deepEqual(result.staleHookSnapshots.map((entry) => entry.id).sort(), [COMMIT_MSG, PRE_COMMIT], "the typed staleness stays visible");
+}
+const STALE_TWO = { preCommit: "refresh", commitMsg: "refresh" };
 
-test("P7: a soft refresh advisory (installed plugin differs from the loaded one) with stale hooks gets no hook refresh action", async () => {
+test("P7: a version-mismatch-only soft refresh advisory with stale hooks offers the ONE typed hook refresh to the Elephant", async () => {
   for (const role of ["elephant", undefined]) {
-    const { result } = await run({ role, hooks: { preCommit: "refresh", commitMsg: "refresh" }, installedVersion: "0.4.4+test" });
+    const { result } = await run({ role, hooks: STALE_TWO, installedVersion: "0.4.4+test" });
+    assertSoftWithRefreshAction(result, [COMMIT_MSG, PRE_COMMIT]);
+  }
+});
+
+test("P7 keep: Goldfish and Critic never receive or execute the refresh under the soft status", async () => {
+  for (const role of ["goldfish", "critic"]) {
+    const { result } = await run({ role, hooks: STALE_TWO, installedVersion: "0.4.4+test" });
+    assert.equal(result.status, "plugin-refresh-required");
+    assert.equal(result.nextAction?.kind, "advisory", `${role}: nothing executable`);
+    assert.equal(result.nextAction.executable, null);
+    assert.deepEqual(result.nextAction.argv, []);
+    assert.equal(result.nextAction.refreshes, undefined);
+    assert.equal(JSON.stringify(result).includes("refresh-mandatory-hooks.mjs"), false, `${role}: the refresh script is not named anywhere in the envelope`);
+  }
+});
+
+test("P7 keep: a soft status caused by a FAILED self-application attestation never gets the refresh (with or without a version mismatch)", async () => {
+  for (const installedVersion of ["0.4.4+test", "0.4.5+test"]) {
+    for (const role of ["elephant", undefined]) {
+      const { result } = await run({ role, hooks: STALE_TWO, installedVersion, observation: rejectedObservation });
+      assertSoftAdvisoryWithDetectionOnly(result);
+    }
+  }
+});
+
+test("P7 keep: a soft status caused by an AMBIGUOUS registry identity never gets the refresh", async () => {
+  const twin = JSON.parse(pluginList("0.4.4+test")).installed[0];
+  const registryText = JSON.stringify({ installed: [twin, { ...twin, version: "0.4.3+test" }], available: [] });
+  for (const role of ["elephant", undefined]) {
+    const { result } = await run({ role, hooks: STALE_TWO, registryText });
     assertSoftAdvisoryWithDetectionOnly(result);
   }
 });
 
-test("P7 journey: soft advisory with stale hooks, then the matching plugin loads -> one refresh action -> ready", async () => {
-  const stale = { preCommit: "refresh", commitMsg: "refresh" };
-  assertSoftAdvisoryWithDetectionOnly((await run({ role: "elephant", hooks: stale, installedVersion: "0.4.4+test" })).result);
-  const matching = (await run({ role: "elephant", hooks: stale, installedVersion: "0.4.5+test" })).result;
+test("P7 keep: soft version mismatch with a MISSING hook beside the stale one offers no refresh before the readback is ready", async () => {
+  const { result } = await run({ role: "elephant", hooks: { preCommit: "refresh", commitMsg: "install" }, installedVersion: "0.4.4+test" });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.nextAction?.kind, "advisory");
+  assert.equal(result.nextAction.executable, null);
+});
+
+test("P7 journey: soft version mismatch with stale hooks -> one refresh action -> the rerun is the soft status without a stale report -> the matching plugin loads -> ready", async () => {
+  const first = (await run({ role: "elephant", hooks: STALE_TWO, installedVersion: "0.4.4+test" })).result;
+  assertSoftWithRefreshAction(first, [COMMIT_MSG, PRE_COMMIT]);
+  // the typed action is executed once (P3 and MSH003 measure the real apply); the rerun reads the hooks current
+  const rerun = (await run({ role: "elephant", hooks: {}, installedVersion: "0.4.4+test" })).result;
+  assert.equal(rerun.status, "plugin-refresh-required", "the soft status is carried forward after the refresh");
+  assert.equal(pipelineStartPreflightExitCode(rerun), 0);
+  assert.equal(rerun.staleHookSnapshots, undefined, "no stale report after the refresh");
+  assert.equal(rerun.nextAction?.kind, "advisory");
+  assert.equal(rerun.nextAction.executable, null, "no second refresh is offered");
+  const matching = (await run({ role: "elephant", hooks: STALE_TWO, installedVersion: "0.4.5+test" })).result;
   assertStaleHookEnforced(matching, [COMMIT_MSG, PRE_COMMIT]);
   const afterRefresh = (await run({ role: "elephant", hooks: {}, installedVersion: "0.4.5+test" })).result;
   assert.equal(afterRefresh.status, "ready");
-  assert.equal(afterRefresh.staleHookSnapshots, undefined, "nothing stale is reported once the refresh read back current");
+  assert.equal(afterRefresh.staleHookSnapshots, undefined);
   assert.equal(pipelineStartPreflightExitCode(afterRefresh), 0);
 });
 
 test("RED P7: a bootstrap that offers the hook refresh whatever the base status was is caught by the soft-advisory boundary", async () => {
   const mutant = await loadMutant("pipeline-start-preflight.mjs", (s) => s.replace(
-    'if (role === "goldfish" || role === "critic" || baseStatus !== "ready") return unchanged;', 'if (role === "goldfish" || role === "critic") return unchanged;'));
-  const { result } = await runWith(mutant.observePipelineStartPreflight, { role: "elephant", hooks: { preCommit: "refresh", commitMsg: "refresh" }, installedVersion: "0.4.4+test" });
-  assert.equal(result.status, "hook-refresh-required", "mutant offers the refresh although the readback is not ready");
+    'if (role === "goldfish" || role === "critic" || (baseStatus !== "ready" && !softOffer)) return unchanged;', 'if (role === "goldfish" || role === "critic") return unchanged;'));
+  const { result } = await runWith(mutant.observePipelineStartPreflight, { role: "elephant", hooks: { preCommit: "refresh", commitMsg: "refresh" }, installedVersion: "0.4.5+test", observation: rejectedObservation });
+  assert.equal(result.status, "hook-refresh-required", "mutant offers the refresh although the soft cause is the failed attestation");
   assert.throws(() => assertSoftAdvisoryWithDetectionOnly(result), assert.AssertionError);
+});
+
+test("RED P7 keep: a soft refresh that reaches a Goldfish is caught by the role keep case", async () => {
+  const mutant = await loadMutant("pipeline-start-preflight.mjs", (s) => s.replace(
+    'if (role === "goldfish" || role === "critic" || (baseStatus !== "ready" && !softOffer)) return unchanged;', 'if ((baseStatus !== "ready" && !softOffer)) return unchanged;'));
+  const { result } = await runWith(mutant.observePipelineStartPreflight, { role: "goldfish", hooks: STALE_TWO, installedVersion: "0.4.4+test" });
+  assert.notEqual(result.nextAction?.kind, "advisory", "the mutant changes what the Goldfish is given under the soft status");
+});
+
+test("RED P7 keep: offering the refresh for every soft cause is caught (failed attestation, ambiguous registry)", async () => {
+  const mutant = await loadMutant("pipeline-start-preflight.mjs", (s) => s.replace(
+    "softVersionMismatchOnly: installedIdentity?.ambiguous !== true && !attestationFailed && installedVersion !== null && installedVersion !== version,", "softVersionMismatchOnly: true,"));
+  const failed = (await runWith(mutant.observePipelineStartPreflight, { role: "elephant", hooks: STALE_TWO, installedVersion: "0.4.4+test", observation: rejectedObservation })).result;
+  assert.equal(failed.nextAction?.kind, "command", "mutant offers the action under a failed attestation");
+  assert.throws(() => assertSoftAdvisoryWithDetectionOnly(failed), assert.AssertionError);
+  const twin = JSON.parse(pluginList("0.4.4+test")).installed[0];
+  const registryText = JSON.stringify({ installed: [twin, { ...twin, version: "0.4.3+test" }], available: [] });
+  const ambiguous = (await runWith(mutant.observePipelineStartPreflight, { role: "elephant", hooks: STALE_TWO, registryText })).result;
+  assert.equal(ambiguous.nextAction?.kind, "command", "mutant offers the action under an ambiguous registry identity");
+  assert.throws(() => assertSoftAdvisoryWithDetectionOnly(ambiguous), assert.AssertionError);
 });
 
 // ===== P6 : the start skill states the confirmation-withheld and readback-consumed rules (ALF-C-P19-03B) =========

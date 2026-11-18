@@ -1858,6 +1858,40 @@ test("C30J-J8: stale mandatory hooks beside plugin-attestation-required keep nex
   }
 });
 
+// C30J-J24 (AC-112): under a soft `plugin-refresh-required` whose ONLY cause is the version mismatch, stale mandatory hooks carry the
+// one typed refresh action for the Elephant; the status stays soft. Every other soft cause, the Goldfish/Critic roles and a hard
+// status keep the old shape (advisory or null action, staleness typed). The pin file (P7) carries the journey and the RED mutants.
+test("C30J-J24: a version-mismatch-only soft refresh with stale hooks carries the one typed refresh action, and nothing else changes", () => {
+  const stale = () => ({ schema: "pipeline.clone-provisioning-report.v1", status: "ready", checks: [
+    { id: "pre-commit-hook", status: "refresh" }, { id: "commit-msg-hook", status: "refresh" }, { id: "pre-push-hook", status: "current" },
+  ] });
+  for (const role of [undefined, "elephant"]) {
+    const result = preflight({ env: {}, pluginList: pluginList("0.4.4+test"), read: () => manifest, checkCloneProvisioningFn: stale, ...(role === undefined ? {} : { role }) });
+    assert.equal(result.status, "plugin-refresh-required", `${role}: the status stays soft`);
+    assert.equal(pipelineStartPreflightExitCode(result), 0);
+    assert.equal(result.nextAction.kind, "command");
+    assert.equal(result.nextAction.mutation, true);
+    assert.equal(result.nextAction.argv[0], resolve(result.pluginRoot, "scripts", "refresh-mandatory-hooks.mjs"), "the LOADED plugin's own script");
+    assert.deepEqual(result.nextAction.argv.slice(1), ["--root", resolve(process.cwd())]);
+    assert.deepEqual(result.nextAction.expected, { schema: "pipeline.mandatory-hook-refresh.v1", status: "ready" });
+    assert.deepEqual(result.nextAction.refreshes, ["commit-msg-hook", "pre-commit-hook"]);
+  }
+  for (const role of ["goldfish", "critic"]) {
+    const result = preflight({ env: {}, pluginList: pluginList("0.4.4+test"), read: () => manifest, checkCloneProvisioningFn: stale, role });
+    assert.equal(result.status, "plugin-refresh-required");
+    assertRefreshAdvisory(result);
+  }
+  // a current readback beside the same soft cause is still exactly the advisory
+  const current = preflight({ env: {}, pluginList: pluginList("0.4.4+test"), read: () => manifest });
+  assert.equal(current.status, "plugin-refresh-required");
+  assertRefreshAdvisory(current);
+  // a failed attestation beside the same stale hooks: no action
+  const failedAttestation = preflight({ env: {}, pluginList: pluginList("0.4.4+test"), read: () => manifest, checkCloneProvisioningFn: stale,
+    observe: () => ({ schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-SOURCE-DIRTY"] }) });
+  assert.equal(failedAttestation.status, "plugin-refresh-required");
+  assertRefreshAdvisory(failedAttestation);
+});
+
 test("C30G-D3: the registry-binding repair text prints 'none' when the snapshot lists no pipeline-core entry, and survives an unreadable snapshot", () => {
   const describe = preflightModule.describeClaudeRegistryBindingRepair;
   assert.equal(typeof describe, "function");

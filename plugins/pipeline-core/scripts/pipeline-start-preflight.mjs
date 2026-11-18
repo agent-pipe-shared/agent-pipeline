@@ -1791,6 +1791,8 @@ export function observePipelineStartPreflight({
   const hookRefresh = planMandatoryHookRefresh({
     role,
     baseStatus: status,
+    // The soft status is caused ONLY by the version mismatch: no failed attestation, no ambiguous registry identity.
+    softVersionMismatchOnly: installedIdentity?.ambiguous !== true && !attestationFailed && installedVersion !== null && installedVersion !== version,
     gatedStatus: applyMandatoryHookGate(status, mandatoryHookReadiness),
     cloneProvisioning,
     mandatoryHookReadiness,
@@ -1866,7 +1868,7 @@ export function observePipelineStartPreflight({
           executionBoundary,
           expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
         }
-      : resultStatus === "hook-refresh-required"
+      : resultStatus === "hook-refresh-required" || resultStatus === "plugin-refresh-required" && refreshAction !== null
       ? refreshAction
       // A blocked mandatory-hook state (foreign owner, decline, unsupported) carries no action. A stale hook
       // next to a missing one is no longer blocked (Ruling 84 F1): it is provisioning-required first, then refresh.
@@ -1994,16 +1996,22 @@ function staleMandatoryHookSnapshots(cloneProvisioning) {
 /**
  * HOOKREFRESH (Rulings 67 and 70): turn a stale mandatory hook into an enforced, typed refresh. It applies
  * only to an Elephant session (every role except "goldfish" and "critic") whose base status is already
- * `ready` -- the same precondition as `applyMandatoryHookGate`. Exactly one shape qualifies: a ready mandatory-hook
+ * `ready` -- the same precondition as `applyMandatoryHookGate` -- or (C30J-J24) the soft `plugin-refresh-required`
+ * caused only by the version mismatch (`softVersionMismatchOnly`), where the same action is offered and the status stays soft.
+ * Exactly one readback shape qualifies: a ready mandatory-hook
  * report with stale hooks (status becomes `hook-refresh-required`, which the exit-code allowlist does not
  * list, so it exits non-zero). A stale hook next to a missing one is NOT a second shape (Ruling 84 F1): that mix
  * is `provisioning-required` first (the coordinator installs the missing hook), and only the ready state it
  * leaves behind is refreshed. The advisory pre-push hook never changes the status; it is only listed in
  * `refreshes` when it is stale beside a mandatory one. Anything else is returned unchanged.
  */
-function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisioning, mandatoryHookReadiness, pluginRoot, cwd, executionBoundary }) {
+function planMandatoryHookRefresh({ role, baseStatus, softVersionMismatchOnly = false, gatedStatus, cloneProvisioning, mandatoryHookReadiness, pluginRoot, cwd, executionBoundary }) {
   const unchanged = { status: gatedStatus, action: null };
-  if (role === "goldfish" || role === "critic" || baseStatus !== "ready") return unchanged;
+  // C30J-J24: the soft `plugin-refresh-required` whose ONLY cause is the version mismatch gets the same one typed action
+  // (derived from the same inputs as `status`, nothing stored); its status stays soft. Any other soft cause, any other base
+  // status and the Goldfish/Critic roles return unchanged.
+  const softOffer = baseStatus === "plugin-refresh-required" && softVersionMismatchOnly === true;
+  if (role === "goldfish" || role === "critic" || (baseStatus !== "ready" && !softOffer)) return unchanged;
   const staleReady = mandatoryHookReadiness?.status === "ready"
     && Array.isArray(mandatoryHookReadiness.refreshAvailable)
     && mandatoryHookReadiness.refreshAvailable.length > 0;
@@ -2013,7 +2021,7 @@ function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisio
     .map((entry) => entry.id)
     .sort();
   return {
-    status: "hook-refresh-required",
+    status: softOffer ? gatedStatus : "hook-refresh-required",
     action: {
       kind: "command",
       executable: process.execPath,
