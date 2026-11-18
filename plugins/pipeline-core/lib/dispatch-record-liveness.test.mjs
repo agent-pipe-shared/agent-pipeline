@@ -18,7 +18,7 @@ import test from "node:test";
 
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { discoverRepository, startSessionDescriptor } from "./worktree-lifecycle.mjs";
-import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness } from "./dispatch-record-liveness.mjs";
+import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness, readRunningDispatches, settledIntegratedDispatchIds } from "./dispatch-record-liveness.mjs";
 import { DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
 import * as dispatchRecordLane from "./guard/dispatch-record-lane.mjs";
 import { realpathSync, symlinkSync } from "node:fs";
@@ -325,4 +325,31 @@ test("D169-DRO-4: syncCreationDirectory skips the directory open and fsync on wi
   assert.doesNotThrow(() => dispatchRecordLane.syncCreationDirectory(blind.dir, "win32"));
   assert.throws(() => dispatchRecordLane.syncCreationDirectory(blind.dir, "linux"), (error) => error.code === "EACCES");
   chmodSync(blind.dir, 0o700);
+});
+
+// C30J-J2 (analysis C1, finding I5): a settled dispatch is not a running dispatch.
+const rec = (taskId, verdict) => ({ taskId, verdict, record: `dispatch-record-${taskId}.json` });
+const runningIds = (records, settled) => readRunningDispatches("/nonexistent-root", { readFn: () => ({ records }), settledIdsFn: () => settled }).map((entry) => entry.dispatchId);
+
+test("C30J-J2-1 an unjudgeable record whose dispatch has a settled integrated reservation is not listed as running", () => {
+  assert.deepEqual(runningIds([rec("A", "unjudgeable"), rec("B", "unjudgeable")], new Set(["A"])), ["B"]);
+});
+
+test("C30J-J2-2 an alive record always counts as running, whatever its reservation says", () => {
+  assert.deepEqual(runningIds([rec("A", "alive")], new Set(["A"])), ["A"]);
+});
+
+test("C30J-J2-3 an unjudgeable record with no settled reservation (or an unreadable settled readback) is still listed, never a silent pass", () => {
+  assert.deepEqual(runningIds([rec("A", "unjudgeable")], new Set()), ["A"]);
+  const throwing = readRunningDispatches("/nonexistent-root", { readFn: () => ({ records: [rec("A", "unjudgeable")] }), settledIdsFn: () => { throw new Error("no inspect"); } });
+  assert.deepEqual(throwing.map((entry) => entry.dispatchId), ["A"]);
+});
+
+test("C30J-J2-4 a cancelled or unsettled reservation is not proof; only integrated and integrated-by-commit settle, and one open row of the same dispatch vetoes", () => {
+  const rows = [
+    { dispatchId: "A", settled: "integrated" }, { dispatchId: "B", settled: "integrated-by-commit" }, { dispatchId: "C", settled: "cancelled" },
+    { dispatchId: "D", settled: null }, { dispatchId: "E", settled: "integrated" }, { dispatchId: "E", settled: null }, { pending: "x", status: "unreadable" },
+  ];
+  assert.deepEqual([...settledIntegratedDispatchIds(rows)].sort(), ["A", "B"]);
+  assert.deepEqual([...settledIntegratedDispatchIds(null)], []);
 });

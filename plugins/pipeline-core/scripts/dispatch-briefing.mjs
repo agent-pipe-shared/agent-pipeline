@@ -148,7 +148,7 @@ const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue, stale
 const { observeCurrentPlanApprovalForCalibration } = cliHelp ? {} : await import("./pipeline-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
 const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
-const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+const { readRunningDispatches, settledIntegratedDispatchIds } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
 const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
 const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
 const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
@@ -370,7 +370,14 @@ function defaultQueueRow(root, sliceId) {
   } catch { return null; }
 }
 
-const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
+// C30J-J2: the reservation rows `session-authority-repair inspect` already derives (read-only, nothing stored). Any failure throws and
+// the reader then drops nothing, so an unjudgeable record is still announced.
+function defaultSettledDispatchIds(root) {
+  const out = execFileSync(process.execPath, [fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url)), "inspect", "--root", root], { encoding: "utf8", timeout: 30000, stdio: ["ignore", "pipe", "ignore"] });
+  return settledIntegratedDispatchIds(JSON.parse(out.trim().split("\n").filter(Boolean).pop()).reservations);
+}
+
+const defaultRunningDispatches = (root, deps = {}) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing, settledIdsFn: deps.settledDispatchIds ?? defaultSettledDispatchIds });
 
 const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
 // D180b: the diagnostic lives outside the inventoried native Goldfish namespace; the legacy directory is still read.
@@ -1054,7 +1061,7 @@ export function generateDispatchBinding(options, deps = {}) {
 
   // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
   // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
-  const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
+  const others = (deps.runningDispatches ?? ((dir) => defaultRunningDispatches(dir, deps)))(root).filter((entry) => entry.dispatchId !== dispatchId);
   const unreadable = others.filter((entry) => !Array.isArray(entry.writeScope) || entry.writeScope.length === 0);
   for (const entry of others) {
     if (unreadable.includes(entry)) continue;

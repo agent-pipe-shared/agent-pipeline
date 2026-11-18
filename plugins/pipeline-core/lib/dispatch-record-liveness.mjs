@@ -188,6 +188,20 @@ function briefedWriteScopes(root, parseBriefing) {
 }
 
 /**
+ * C30J-J2: the dispatch ids that the reservation rows (`reservations` of session-authority-repair inspect) show as settled integrated
+ * (`integrated` or `integrated-by-commit`). `cancelled` is no proof (a cancelled Goldfish may still write), and one unsettled or
+ * cancelled row of the same dispatch vetoes the id. Pure; derives from the rows, stores nothing.
+ */
+export function settledIntegratedDispatchIds(rows) {
+  const proven = new Set(), vetoed = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (typeof row?.dispatchId !== "string") continue;
+    if (row.settled === "integrated" || row.settled === "integrated-by-commit") proven.add(row.dispatchId); else vetoed.add(row.dispatchId);
+  }
+  return new Set([...proven].filter((id) => !vetoed.has(id)));
+}
+
+/**
  * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read. A dispatch
  * is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably gone (alive, or
  * unjudgeable, which is the usual Claude case). Its scope is the governed queue row's write scope, else the allowed paths of
@@ -196,9 +210,16 @@ function briefedWriteScopes(root, parseBriefing) {
  * `queueRowFn(root, id)` (the governed queue row of an id, or null) is injected by the caller: this module must not import the
  * governed-queue module (an import cycle through guard-dispatch would initialise modules in a different order).
  */
-export function readRunningDispatches(root, { readFn = readDispatchRecordLiveness, queueRowFn = () => null, parseBriefing = () => null } = {}) {
+export function readRunningDispatches(root, { readFn = readDispatchRecordLiveness, queueRowFn = () => null, parseBriefing = () => null, settledIdsFn = () => new Set() } = {}) {
   let records;
   try { records = readFn(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
+  // C30J-J2 (finding I5): an unjudgeable record whose dispatch has a reservation settled as integrated is finished, not running. An
+  // alive record always counts; an unreadable settled readback drops nothing (an unjudgeable record is still announced).
+  if (records.some((entry) => entry.verdict === "unjudgeable")) {
+    let settled;
+    try { settled = settledIdsFn(root); } catch { settled = null; }
+    if (settled instanceof Set && settled.size > 0) records = records.filter((entry) => entry.verdict !== "unjudgeable" || !settled.has(entry.taskId));
+  }
   if (records.length === 0) return [];
   const briefed = briefedWriteScopes(root, parseBriefing);
   return records.map((entry) => {

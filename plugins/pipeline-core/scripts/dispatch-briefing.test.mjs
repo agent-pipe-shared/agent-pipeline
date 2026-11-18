@@ -1067,6 +1067,24 @@ test("D76 the default reader finds a running dispatch from its open record and i
   assert.equal(runDispatchBriefing(argvOf(fx), deps).ok, true, "a terminal record is not a running dispatch");
 });
 
+test("C30J-J2 the default reader does not list an unjudgeable open record whose reservation is settled integrated, and still lists it otherwise", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+  assert.equal(spawnSync("git", ["-C", fx.root, "init", "-q"], { encoding: "utf8", env }).status, 0);
+  const other = runDispatchBriefing(argvOf(fx, { "--dispatch-id": "ALF-RUN", "--check": "plugins/x/other.test.mjs", "--path": PATH_A }), depsOf(fx));
+  mkdirSync(join(fx.root, "scratch"), { recursive: true });
+  mkdirSync(join(fx.root, "evidence"), { recursive: true });
+  writeFileSync(join(fx.root, "scratch", "briefing-ALF-RUN.md"), other.skeleton);
+  writeFileSync(join(fx.root, "evidence", "dispatch-record-ALF-RUN.json"), JSON.stringify({ taskId: "ALF-RUN", outcome: "in-progress" }));
+  const deps = depsOf(fx);
+  delete deps.queueRow;
+  assert.equal(runDispatchBriefing(argvOf(fx), { ...deps, settledDispatchIds: () => new Set() }).code, "DBG-SCOPE-OVERLAP", "no settled reservation: still announced");
+  const settled = runDispatchBriefing(argvOf(fx), { ...deps, settledDispatchIds: () => new Set(["ALF-RUN"]) });
+  assert.equal(settled.ok, true, JSON.stringify(settled).slice(0, 300));
+  assert.equal(settled.warnings.some((entry) => entry.code === "DBG-RUNNING-SCOPE-UNKNOWN"), false);
+});
+
 // --- D75 (A): a re-dispatch after a wrong-premise stop needs a recon reference ---
 
 const SLICE_ITEM = "pipeline.sample-slug";
