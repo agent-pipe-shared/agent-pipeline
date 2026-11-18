@@ -1,0 +1,188 @@
+# Audit-bundle completeness: what a bundle holds per gate and approval, what is missing, how a reader proves completeness (2026-11-18)
+
+Lane C30K-K7 of candidate 30k (see the [30k plan](candidate-30k-plan-2026-11-18.md), lane K3 topic). Status: **analysis only, no test run**. This document was produced by reading code, tests, ADRs and plans of the integrated 30j tree. Nothing was executed, no code, test or registry was changed, and nothing here is built until the PO releases it.
+
+Conventions. `PC/` means `plugins/pipeline-core/`. A reference is `file:line` (lines of the integrated 30j tree). **PROVEN** = read at that line in code, a test or a document. **INFERRED** = reasoned from what was read, not read itself. **NOT MEASURED** = could not be answered by reading. A first attempt of this topic returned findings as text; its load-bearing claims were re-read here, and the places where it did not hold are listed in section 7.
+
+Criterion binding. The slice package names AC-112 as the closest accepted criterion. The Spec row of AC-112 (`specs/sprint-alfred-epic/spec.md:3035`) is about an unrelated item (managed refresh of an agent host). That is a briefing defect, reported to the Coordinator; PRD and Spec stay unchanged by this document.
+
+## 1. Where a bundle is built, versioned and checked (PROVEN)
+
+| Step | Where | What it does |
+|---|---|---|
+| Request | `PC/scripts/finish-feature.mjs:779` | The one-shot close writes `audit-request.json` whose `evidence` names exactly four things: `criticReports`, an optional `dispatchProjectionPath`, `sbomRecordPath`, an optional `gateChangesRecordPath`. |
+| Plan | `PC/lib/feature-close-audit-preflight.mjs:67-99` | Needs one passing candidate-bound Verify file among the package artifacts (`FCA-QUALIFICATION`, :67-72), generates the evidence index from the candidate's Git tree (:75), compares an existing output byte-for-byte (`FCA-OUTPUT-COLLISION`, :83-94) and summarizes typed gaps (:99). |
+| Plan content | `PC/lib/audit-bundle.mjs:357-370` | Copies EVERY artifact of the feature package manifest (:364: PRD, Spec, acceptance, Result, candidate evidence as registered), then the evidence items of `collectEvidence` (:256-350). |
+| Build | `PC/lib/audit-bundle.mjs:373-384` | Create-only; `manifest.json` and `README.md` are never rewritten later (:172-175). |
+| Later additions | `PC/lib/audit-proof-collection.mjs:80-164` | `writeAuditProofFollowUp` adds new files under `proofs/` plus one list per approved commit; callers are the push follow-up (`PC/scripts/audit-proof-followup.mjs:42`) and the release preflight (`PC/scripts/release-preflight-cli.mjs:723`). |
+| Verify | `PC/lib/audit-bundle.mjs:386-398` | Checks manifest shape, artifact digests, README digest, the items the manifest names (:402-435), proofs (:394), the evidence index SHAPE (:395) and follow-up lists (:396). |
+| Reader text | `PC/lib/audit-bundle.mjs:48-79` | The README states that `verified` means "internally consistent" (:72) and "is not a claim that ... a review or PO approval occurred" (:76). |
+| Location and versioning | `PC/lib/feature-close-audit-preflight.mjs:78`; `PC/scripts/finish-feature.mjs:246,839` | Default output `audit-bundles/<feature>/<candidate commit>`; the close treats that directory as its own output when it checks the working tree (:839), and a rerun replays the prepared phase without rebuilding the bundle (:246 comment). The bundle format is versioned by the schema ids `pipeline.audit-bundle-manifest.v1`, `pipeline.audit-bundle-evidence.v1` and `pipeline.audit-bundle-followup.v1`. How the close commit carries it, the close journal and the package record: NOT MEASURED (section 6). |
+
+Five different things are called an index or "complete" (PROVEN, see section 5): the manifest evidence items and evidence index, `scripts/audit-index.mjs`, `lib/durable-evidence.mjs` (a tracked `audit/` mirror with its own `check`, section 4), `lib/close-quality-readback.mjs`, `scripts/audit-pack.mjs` (the last one was not re-read here).
+
+## 2. Table (a): every gate and approval, where its evidence is written, whether it enters a bundle, who checks it
+
+"Enters" is about a bundle built by the one-shot close plus its later follow-ups. "Checks" names what reads the entry back.
+
+| Gate or approval | Evidence written at | Enters a bundle? | Who checks it |
+|---|---|---|---|
+| Plan gate / design approval, signature mode | State `planApproval.designApproval` (`PC/lib/human-approval-trace.mjs:162-173`) | Yes, as a public proof under `proofs/`, only when `design.mode === "signature"` (`PC/lib/audit-proof-collection.mjs:39-40`; carried at `PC/scripts/close-coordinator.mjs:790-791`). PRD and Spec text enter as package artifacts (`audit-bundle.mjs:364`). | Verifier re-checks digest, intent digest and the Ed25519 signature (`audit-bundle.mjs:160-171`). It does NOT check what the intent says: the trace itself names the intent as not reconstructible (`human-approval-trace.mjs:170-173`). The close checks that the package binds the approved PRD and Spec digests (`close-coordinator.mjs:795-800`). |
+| Plan approval, chat mode | Same State record (`design.mode === "chat"`) | **No.** The collector has no branch for it (`audit-proof-collection.mjs:40`); the follow-up carries attributions only for push and release (:155-162). | Nothing. The trace labels it `attribution-only` (`human-approval-trace.mjs:174`) but the trace is not in the bundle (see G1). |
+| PRD release (seal at approval) | The sealed PRD and Spec digests in the package manifest (`PC/lib/authority-seal-reader.mjs:30` names the scope) | Yes, as the `prd` and `spec` package artifacts (`audit-bundle.mjs:364`). A distinct "release" record was not located (INFERRED: the seal is the manifest binding). | `close-coordinator.mjs:795-800` (close, not the bundle verifier); `scripts/audit-index.mjs:181-185` as private gate entries `plan-approval:plan` and `plan-approval:spec`. |
+| Verify, candidate | Package artifact class `candidate-evidence` | Yes, as a package artifact (`audit-bundle.mjs:364`). | The plan refuses without one passing candidate-boundary file (`feature-close-audit-preflight.mjs:67-72`). The bundle verifier only re-hashes the file. |
+| Verify and Security, final (green) | Private `final-verification.json` plus byte copies under the git common directory (`PC/scripts/finish-feature.mjs:902-913`) | **Only** through the post-push or post-release follow-up (`audit-proof-collection.mjs:111-125`, closed kinds at `PC/lib/critical-action-authorization.mjs:625-628`). A close with no later push or release approval never carries them (the two callers are the only entry, INFERRED to be exhaustive from the two callers found). A red result stops the one-shot before the record exists (`finish-feature.mjs:898,901`). | `authorizeAuditProofFollowUp` admits only the two recorded digests (`docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md:18`); the verifier re-hashes listed files (`audit-bundle.mjs:198-201`). |
+| Critic result | Per round `evidence/critic/<packet>/report.md`, exported from the private journal at close (`finish-feature.mjs:740-752`) | Yes: one `critic-report:<packet>` item per round, carried or a typed gap (`audit-bundle.mjs:311-317`); the close's own packet is always listed (`finish-feature.mjs:745`). Whether the independence `receipt.json` is copied beside it: NOT MEASURED (the README points to it, `audit-bundle.mjs:78`). | The close refuses a missing qualification at rigor 1 and above (`close-coordinator.mjs:772-774`), a caller-authored Critic without acknowledgement (:333-360) and open earlier findings (:767). The bundle verifier has NO branch for critic items (`audit-bundle.mjs:402-435` handles projection, sbom, sbom documents and trace only): the item is a statement, not a check. |
+| Acceptance (human answer at close) | `acceptance.md` attribution record, or `evidence/human-acceptance.md` when a registered acceptance is bound and must not be edited (`PC/lib/close-acceptance-record.mjs:6-7,23`; `finish-feature.mjs:601`) | A registered `acceptance.md` enters as a package artifact (INFERRED from the manifest-wide copy at `audit-bundle.mjs:364`); the fallback file enters at most by path and blob in the evidence index (INFERRED: it depends on being tracked before the candidate). | Nothing reads the answer back. A decline is a separate branch (`finish-feature.mjs:625`, not followed further here). |
+| Push approval | Private approval store, kind `push` (`audit-proof-collection.mjs:25`) | Yes, but only later: public proof, or for a chat approval an attribution record `{kind, mode, approvedAt}` (`audit-proof-collection.mjs:155-160`). `no-bundle` is a typed notice, never an error (:152-154). | `followUpFindings` (`audit-bundle.mjs:186-204`): digests and signatures. An absent list is skipped (`audit-bundle.mjs:189`). |
+| Release approval | Release preflight record and approval | Later, same follow-up, kind `release-preflight` (`audit-proof-collection.mjs:161-162`; caller `release-preflight-cli.mjs:723`). | Same as push. The trace lists `release-preflight` as NOT enumerated (`human-approval-trace.mjs:31`). |
+| Human-guard override | Capability files under the git common directory (`human-approval-trace.mjs:179-188`) | **No** as an approval. The trace names a chat capability `attribution-only` and a signed one `PROOF-NOT-RETAINED-IN-CAPABILITY` (:186-187). The collector's header promises "a typed gap" (`audit-proof-collection.mjs:11`), but no code produces one: its only gap is `PROOF-NOT-CARRIABLE` (:35). A gate-DEFINITION change is different and does enter, as the `gate-changes` item with the proof that admitted it (`finish-feature.mjs:767-777`). | The close refuses an unproven or unreadable gate-change range (`close-coordinator.mjs:763-766`); the verifier checks only the item's shape and digest. |
+| Model exception | Append-only private store under the git common directory (`PC/lib/dispatch-model-exception.mjs:10`) | **No** record. The generated briefing states the exception in its dispatch metadata (`PC/scripts/dispatch-briefing.mjs:1336`), but a current close writes the briefing as `digest-only` (`audit-bundle.mjs:220`), so the sentence does not travel. Whether the dispatch record carries it: INFERRED no, because an uncapped search of `finish-feature.mjs`, `close-coordinator.mjs`, `durable-evidence.mjs`, `audit-bundle.mjs` and `PC/lib/dispatch-record.mjs` for "model exception" finds nothing (the field could be named otherwise). | The dispatch guard consumes it at admission (`dispatch-briefing.mjs:1145-1146`); no bundle check. |
+| Consent record (onboarding) | `.agent-pipeline/onboarding-consent.json` and an audit journal (`PC/lib/onboarding-consent-marker.mjs:16,37`) | **No.** An uncapped search of `finish-feature.mjs`, `close-coordinator.mjs`, `audit-bundle.mjs`, `durable-evidence.mjs` and `human-approval-trace.mjs` for "consent" finds nothing, so neither the bundle nor the mirror nor the trace carries it. Whether the marker is tracked in a consumer project: NOT MEASURED. | Nothing in the close path. |
+
+Other items a close names (not gates, listed because they decide "complete by construction"): the SBOM record is always named (`finish-feature.mjs:766`); the dispatch projection is named only when the feature has dispatches or typed gaps (:758-763), so a close with none carries no item at all; the evidence index is the Git tree listing of `specs/<feature>` at the candidate (`feature-close-audit-preflight.mjs:75`).
+
+## 3. Gaps (b)
+
+### G1. The approval block of the evidence input never runs in a close-built bundle (PROVEN)
+
+`collectEvidence` runs its approval block (`approval-trace`, `approval-proofs:*`, `verify-record`, `security-scan`) only when one of four keys is named, or when no evidence key at all is named (`audit-bundle.mjs:263,274`). The close names none of the four (`finish-feature.mjs:779`). A search of `PC/`, `harness/`, `scripts/` and `docs/` for `traceReportPath`, `verifyRecordPath`, `securityScanPath` finds only `audit-bundle.mjs`, its test and `docs/audit-bundles-technical.md`. So the README section "Human approval evidence" (`audit-bundle.mjs:32`) and the `approval-trace` verifier branch (:429-432) are reachable only from tests and hand-built requests. The one read-only table that already lists every approval with a verdict (`human-approval-trace.mjs`, the nearest thing to the table of section 2) never enters a close-built bundle. It is instead the input of a second, separate derivation: `durable-evidence sync` mirrors its rows into a tracked `audit/` directory (`PC/lib/durable-evidence.mjs:225-231`), which no bundle indexes (the evidence index lists `specs/<feature>` only, `feature-close-audit-preflight.mjs:75`) and which the close never calls (G6).
+
+### G2. Evidence the collector computes and the close drops (PROVEN)
+
+`collectAuditProofs` returns `{proofs, gaps}`; both callers read only `.proofs` (`close-coordinator.mjs:790-791,805-807`). The gap kinds it can produce are one (`PROOF-NOT-CARRIABLE`, `audit-proof-collection.mjs:35`). The promised gap for an override capability (:11) and any gap for a chat plan approval do not exist in code.
+
+### G3. Evidence that exists but never enters a bundle (PROVEN unless marked)
+
+- Chat-mode plan approval (no branch, `audit-proof-collection.mjs:40`).
+- Human-guard override capabilities (section 2).
+- Model exception store (section 2; dispatch record content NOT MEASURED).
+- Onboarding consent (section 2).
+- Final Verify and Security of a close that is never followed by a push or release follow-up (section 2). Whether a chat-mode push also triggers the follow-up call (`audit-proof-followup.mjs:42`) was not read (INFERRED yes, because `prepareAuditProofFollowUp` has an attribution branch for it, `audit-proof-collection.mjs:157-160`).
+- Release approval is in the follow-up only; a release without an existing bundle gets the typed notice `no-bundle` and nothing else (`audit-proof-collection.mjs:152-154`).
+
+### G4. Bundle entries that nothing reads (PROVEN)
+
+- The evidence index: the verifier checks its shape only (`audit-bundle.mjs:395`); it is a listing for a human.
+- `critic-report` items (no verifier branch, :402-435), `verify-record` and `security-scan` items except by shape and digest.
+- `exportMetadata`: shape only (`audit-bundle.mjs:91`); no producer was found in the close path (INFERRED from the close request, `finish-feature.mjs:779`).
+- The private audit index (`scripts/audit-index.mjs`) is "evidence only ... can never refuse, delay or change the close" (`close-coordinator.mjs:1167-1169`); its `complete` flag is printed in the close result (`:1258`, `audit-index.mjs:275-281`) and read by no gate. It lives in the private publication-close directory, so a reader of the repository does not see it (INFERRED from `closeAuditIndex`, `close-coordinator.mjs:1171-1185`, which writes under the common-directory close path).
+- Typed gap summary of the plan: `feature-close-audit-preflight.mjs:99` is computed for the plan output; a gate on it was not found (NOT MEASURED beyond the callers read).
+
+### G5. A bundle can be complete by construction while a gate was skipped (PROVEN mechanisms, INFERRED consequences)
+
+- The verifier checks only what the manifest names. A manifest without an `evidence` key verifies (`audit-bundle.mjs:393` runs the check only when the key exists); an item whose status is `gap` verifies; an item without `bundlePath` is skipped (:405).
+- What the bundle must contain is not stored anywhere: no expected item set exists in the manifest, so "absent" and "not applicable" are indistinguishable for any item the close did not name (dispatch projection, trace, approvals).
+- Both the expected list and the carried list come from one producer (`finish-feature.mjs:740-779`), so a producer that does not name an item cannot be caught by its own bundle.
+- A bundle is only planned when the close is at rigor 1 or above or an audit request is given (`close-coordinator.mjs:772-775`); the case "rigor 0, no request" leaves no bundle and nothing in the repository says so (INFERRED).
+- What protects completeness today is the CLOSE, not the bundle: `CLOSE-QUALIFICATION-REQUIRED` (`close-coordinator.mjs:772-774`), `FCA-QUALIFICATION` (`feature-close-audit-preflight.mjs:67-72`), `CLOSE-GATE-CHANGE-UNPROVEN` (`close-coordinator.mjs:765`), `CLOSE-CRITIC-EARLIER-FINDINGS-OPEN` (:767), the final Verify and Security red stops (`finish-feature.mjs:898,901`). A gate the close does not refuse on can be skipped and still leave a verifying bundle: acceptance, the chat plan approval, push and release approval, override, model exception, consent.
+- A signature that verifies is not proof the key is the project's or that the intent says what the plan says (`human-approval-trace.mjs:170-173`; `audit-bundle.mjs:76` says so in the README for the whole bundle).
+
+### G6. Duplicated notions (PROVEN)
+
+- `pipeline.audit-index.v1` is declared twice with different shapes: `PC/scripts/audit-index.mjs:28` and `PC/lib/durable-evidence.mjs:31`. A third id, `pipeline.close-audit-package-index.v1`, is in `PC/lib/close-quality-readback.mjs:28`.
+- `buildAuditIndex` is exported by two modules (`scripts/audit-index.mjs:86`, `lib/close-quality-readback.mjs:172`); `close-coordinator.mjs` imports one from each (:25, :49).
+- `docs/audit-bundles-technical.md:72-78` still describes the four approval evidence keys as the plan's evidence input, although no production close names them (G1).
+
+## 4. How a reader proves completeness from the repository alone (c)
+
+What a reader can do today, without any new code:
+
+1. Run the offline verify command printed in the README (`audit-bundle.mjs:70`): internal consistency only (README :72).
+2. Read `evidence.items` in `manifest.json` and the README sections: each named item is `carried` or a typed `gap` with a code (`audit-bundle.mjs:266,283-347`).
+3. Run the read-only approval trace for the candidate, `node PC/scripts/human-approval-trace.mjs --repo <root> [--commit <oid>]` (usage line `PC/scripts/human-approval-trace.mjs:6`): one row per approval record found in the private store and the State, with a typed verdict and an explicit `notEnumerated` list (`human-approval-trace.mjs:31,194`). It needs the private store of the machine that did the work, so it is not a repository-only check.
+4. Compare the Critic items with the lineage files and the dispatch projection with the delivery course (INFERRED as possible; the projection verifier at `audit-bundle.mjs:222-231` checks the file's own shape, not the course).
+
+Does a derived completeness check already exist? Partly. `scripts/audit-index.mjs` already derives, from existing records and without storing a new status, an expected step list and a verdict: sources (PRD, Spec, Result), the plan approval digests, every non-cancelled dispatch record of the delivery course, the Critic receipt each record binds, and the passing candidate Verify evidence, with `missingSteps` and `complete` (`audit-index.mjs:86-116,157-236`). Limits, all PROVEN: it covers only the ACTIVE feature (`reason: "not-active"`, :162-165), writes to the private close directory (:270-282), is report-only (`close-coordinator.mjs:1167-1169`), and does not mention acceptance, push, release, override, model exception, consent, the final Verify and Security, or the SBOM and gate-change items.
+
+A second existing check works from the repository alone: `node PC/scripts/durable-evidence.mjs check --root <root>` (`PC/scripts/durable-evidence.mjs:7,30`; `checkDurableEvidence`, `PC/lib/durable-evidence.mjs:292-348`; pinned for a fresh clone by `PC/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs`). It needs the tracked `audit/index.json` and then verifies each index row by digest, that every entry is tracked (`git ls-files`), that mirrored approval proofs hold their Ed25519 signature, and that no private key or host path is in the mirror (:298-339). The mirror covers dispatch records, the work-verify result and approval references of kinds push, feature-package-reconcile, deploy and plan-approval (:32-36,:42); it does not cover human-guard override, consent, model exception, acceptance or the Critic result. Its completeness test is weak by design: `AUDIT-UNSYNCED` fires only for a dispatch or Verify result whose PRIVATE source exists on the machine that runs the check (:340-346), so on a fresh clone it proves consistency of what was mirrored, not that nothing was left out. It is a repository-wide check, not a per-bundle one, `sync` is never called by the close (the only callers are the script and the guard's admission of the command, `PC/lib/guard/command-catalogue.mjs:815`), and no skill, document or template names the command (searched `skills/`, `docs/`, `plugins/pipeline-core/docs/` and `templates/`; only a Verify pin mentions it). Whether the `audit/` directory exists in this repository or in any consumer project: NOT MEASURED.
+
+What a reader cannot do from the repository alone: tell whether an approval that is absent from the bundle never happened, happened and was left out, or was out of scope. That needs an expected set. The existing derived expected sets are the private audit index (active feature, partial), the trace (private store, partial) and the mirror (consistency only, as above); none of them is tied to a bundle.
+
+Making any of these a BLOCKING check (a close or a verify that fails on a missing item, or a verifier that fails on a manifest without a required item) would be a new gate. That is a PO decision (D1); this document recommends against it.
+
+## 5. What "nothing reads" and "five notions" mean for the next step
+
+Of the five index/complete notions, only two are bound to a bundle (the manifest items and the follow-up list). The other three are operator or close-result tools: the private audit index (written at `feature-close-prepared`, `close-coordinator.mjs:1256-1259`), the durable-evidence mirror (its `projectCloseDispatches` and input reader ARE used by the close, `finish-feature.mjs:27,757`, and feed the bundle's dispatch projection; its `sync` and `check` commands are reached by no lifecycle step, `PC/scripts/durable-evidence.mjs:5-7`, section 4), and the audit pack (no lifecycle caller found: only the guard's admission of the command, `PC/lib/guard/command-catalogue.mjs:43` and `PC/lib/guard-maintenance-window.mjs:542-544`, and `PC/docs/audit-packs.md`; the module was not re-read). The approval rows of the trace are therefore derived three times from the same sources: into bundle proofs (collector), into follow-up proofs, and into mirror entries. That is the duplicated-state finding of this topic; Stage 1 below adds no fourth derivation. Removing any of them is not proposed here (D2).
+
+## 6. Not measured
+
+No close, build, verify or trace was run. Not measured: the ordering of audit-index write and bundle build inside one close; whether `.agent-pipeline/` and the State file are tracked in a consumer project (decides whether consent and plan approval are in the evidence index); the exact moment the acceptance record is written relative to the candidate; whether the Critic `receipt.json` is copied next to each exported report; whether the dispatch record carries the model exception; the reader inputs and the documentation inventory (`docs/audit-and-evidence.md`, `docs/audit-bundles.md` were searched for completeness claims only: the user guide says the bundle "does not claim that the bundle is self-contained", lines 47-51); Verify registration of the suites named below; the audit-pack module; how the close commit carries the bundle, the close journal and the package record beyond the lines cited in section 1; whether `audit/` exists here or in a consumer project; whether the mirror's approval entry carries a chat attribution.
+
+## 7. Where the first attempt's findings did not hold (corrections)
+
+- It listed "README says verified means consistent, not complete" as a Stage 2 text change. The README already says so (`audit-bundle.mjs:72,76`). What it lacks is a statement of which gates it did not enumerate (derivable from `EVIDENCE_ITEMS`, `audit-bundle.mjs:206`, and `TRACE_NOT_ENUMERATED`, `human-approval-trace.mjs:31`).
+- It said acceptance "is not a manifest class". Every artifact of the package manifest is copied (`audit-bundle.mjs:364`), and a comment in the topology code treats `acceptance.md` as a registered artifact (`PC/lib/feature-package-topology.mjs:76-79`); so a registered acceptance very likely enters (INFERRED, as in the table), while the human-acceptance fallback file is outside the manifest.
+- It called the durable-evidence mirror a tool "nothing reads" and an "operator tool" on the strength of file names. Read now: it is a complete, fresh-clone-capable consistency check of dispatch, Verify and approval references (section 4), reached by no lifecycle step.
+- It said the model exception reaches no bundle. Confirmed for the store; but the briefing states the exception (`dispatch-briefing.mjs:1336`), so the open question is the dispatch record, not the briefing (a current close carries briefings digest-only, `audit-bundle.mjs:220`).
+- New finding it missed: the close names none of the four approval keys, so the approval block of the evidence input is dead in production (G1).
+- New finding: carrying the trace as is would label every signed plan approval `untraceable` with the break `DESIGN-INTENT-NOT-RECONSTRUCTIBLE` (`human-approval-trace.mjs:173`), which makes the trace verdict in a README misleading until that row is reworked.
+
+## Recommendation
+
+1. **Do not add a gate and do not store a status.** The biggest gap is not a missing check but a missing statement: a reader cannot tell "absent" from "out of scope". Close it by DERIVING, from records that already exist, and by printing, not by refusing.
+2. **Smallest stage (Stage 1):** let the close carry what it already computes. Pass the gaps of `collectAuditProofs` into the evidence input as typed gap items under names the manifest already admits (`approval-proofs:<kind>`, pattern at `audit-bundle.mjs:237`), and add the two gaps the collector's own header promises but never produces: a chat-mode plan approval (code `CHAT-ATTRIBUTION-ONLY`, kind `plan-approval`) and a human-guard override capability that retains no proof (`PROOF-NOT-RETAINED-IN-CAPABILITY`, as the trace names it). No new item name, no new stored state, no change to an existing key or digest byte; only bundles built after the change differ. Cost to state: a close that built its bundle before the change and re-plans after it is refused `FCA-OUTPUT-COLLISION` (`feature-close-audit-preflight.mjs:94`, INFERRED consequence) and needs the existing "choose another explicit output" route.
+3. **Stage 2 is text only:** the README gets one derived paragraph that lists which gates this bundle type does not enumerate (from `EVIDENCE_ITEMS` and `TRACE_NOT_ENUMERATED`) and says that the follow-up lists, not the manifest, carry push, release and the final Verify and Security; `docs/audit-bundles-technical.md` stops describing the dead evidence input.
+4. **A read-only derived completeness line** (an expected-versus-carried comparison printed by the existing verify command) is a decision for the PO (D1, D3), not part of the recommended build.
+5. Carry the trace itself only after its plan-approval row is reworked (D4).
+
+## What stays unchanged (DO-NOT-DO)
+
+Binding list from `state-machine-simplification-analysis-2026-11-17.md` section "DO-NOT-DO", applied here:
+
+1. The bundle stays create-only: no rewrite of `manifest.json` or `README.md` of a built bundle (`audit-bundle.mjs:172-175`); no automatic re-bind of an immutable or append-only artifact.
+2. No Verify result is made to stand for a commit it did not run on (ADR 0104 Option A is a separate lane).
+3. No change to the bytes of an existing key or digest: manifest digests, the follow-up list format, the close effect chain, the Critic lineage records. New bundles may add typed items; old bundles must keep verifying.
+4. No item name leaves `EVIDENCE_ITEMS` (`audit-bundle.mjs:206`); no value is removed from a state or phase list.
+5. No time-based expiry of any record; "absent" is never inferred from age.
+6. Nothing is deleted by a repair; the private audit index, the durable-evidence mirror and the audit pack stay as they are.
+7. No automatic step for anything that needs a signature, and no private key, host path or private-store content in a bundle: only the NAME of an absence is carried, never the content of the store.
+8. No new stored status and no new gate; a refusing completeness check is a PO decision (D1).
+9. The close keeps its own blockers (`close-coordinator.mjs:765,767,772-774`); the bundle does not duplicate them.
+10. No freehand edit of the State file.
+
+## Staged plan
+
+Each stage is at most one Goldfish dispatch, test first, rollback by revert (no stage migrates or rewrites a stored record).
+
+### Stage 0: characterization tests only (safe to start, no decision)
+
+- Failing-first proof: a case that builds the evidence input exactly as the close does (the four keys of `finish-feature.mjs:779`) and asserts which items exist. It is written to fail against the claim "the manifest names every approval it could carry": it shows no `approval-*` item for a chat-mode plan approval and none for an override. A second case asserts that a gap returned by `collectAuditProofs` reaches no manifest item. These cases pin G1 and G2 as measured facts and turn every INFERRED row of section 2 that a fixture can settle into PROVEN or struck.
+- Neighbour suites (existing, run serially): `PC/lib/audit-bundle.test.mjs`, `PC/scripts/audit-bundle.test.mjs`, `PC/lib/feature-close-audit-preflight.test.mjs`, `PC/lib/human-approval-trace.test.mjs`, `PC/scripts/close-coordinator.test.mjs`, `PC/scripts/finish-feature.test.mjs`, `PC/scripts/close-path-e2e.test.mjs`. A dedicated test file for `audit-proof-collection.mjs` was not found by name (NOT MEASURED whether another file covers it); a new file would need registration in the Verify suite list.
+- Unchanged: all production code.
+
+### Stage 1: carry the computed and the promised gaps (needs D1 default "typed gaps only")
+
+- Files: `PC/lib/audit-proof-collection.mjs` (the two promised gaps), `PC/scripts/close-coordinator.mjs` (hand `.gaps` on), `PC/lib/audit-bundle.mjs` (one new input key and its shape, items under the admitted names).
+- Failing-first proof: a close fixture whose plan approval is chat-mode produces a manifest with the item `approval-proofs:plan-approval` as a typed gap with its code, and the README lists it; before the change the manifest has no such item. A second case: a bundle with such an item verifies (verifier unchanged) and a bundle built before the change still verifies.
+- Neighbour suites: those of Stage 0 plus `PC/lib/feature-close-audit-executor.test.mjs` and `PC/lib/feature-close-audit-receipt.test.mjs`.
+- Unchanged: item names, existing key and digest bytes, the follow-up format, every close blocker.
+- Shape facts that make "verifier unchanged" hold (PROVEN, `audit-bundle.mjs:234-239`): an item is `{item, status, code, bundlePath}`; `status` is the closed set `carried` or `gap`; a gap needs a non-null `code` matching `^[A-Z0-9-]{3,48}$` and a null `bundlePath`; the item name is `[a-z-]+(:[a-z0-9-]{1,40})?` with its prefix in `EVIDENCE_ITEMS`; at most 64 items. The codes `CHAT-ATTRIBUTION-ONLY` and `PROOF-NOT-RETAINED-IN-CAPABILITY` (32 characters) and the names `approval-proofs:plan-approval` and `approval-proofs:human-guard-override` fit. The build stays create-only (`AB-OUTPUT-EXISTS`, `audit-bundle.mjs:375`; `wx` writes, :379-382).
+- Risk to name in the dispatch: `FCA-OUTPUT-COLLISION` for a close resumed across the upgrade (INFERRED).
+- Overlap to name: the mirror (`durable-evidence`) and the follow-up already derive approval rows from the same trace; Stage 1 reads the collector's existing output and adds no new reader.
+
+### Stage 2: text (no behaviour)
+
+- Files: the README generator text (`audit-bundle.mjs:48-79`, affects new bundles only; the README digest is recorded per bundle) and `docs/audit-bundles-technical.md` (replace the dead input description and the line-number citations by function names).
+- Failing-first proof: a case that asserts the README of a new bundle names the not-enumerated gates and the follow-up route; a case that the technical document no longer names the four approval keys as the close's input.
+- Neighbour suites: Stage 0 list; the documentation inventory check if one registers the touched document (NOT MEASURED which).
+
+### Stage 3: only after the PO decides D1 or D3
+
+- A read-only expected-versus-carried line in the existing verify output, derived from the package manifest, the Critic lineage files and the delivery course; informational unless D1 says otherwise.
+- Failing-first proof: a bundle fixture whose manifest lists a Critic round that the lineage files name but the manifest omits must print a "not carried" line while the exit code stays 0 (before: nothing is printed); a second case: a complete fixture prints none.
+- Neighbour suites: `PC/lib/audit-bundle.test.mjs`, `PC/scripts/audit-bundle.test.mjs`, `PC/lib/feature-close-audit-preflight.test.mjs`, `PC/scripts/close-path-e2e.test.mjs`.
+- Unchanged: the exit code and every finding code of verify; the README bytes of built bundles.
+
+## Open decisions for the PO
+
+| # | Decision | Default |
+|---|---|---|
+| D1 | Should a missing approval or gate EVER refuse a close or a verify (a new gate), or stay a typed gap and a printed line? | Typed gaps only; no new gate. Cost of a refusing gate: a close or verify that fails on a missing item blocks closes whose approval is legitimately out of scope (rigor 0, chat mode), needs an "out of scope" marker (a new stored status) and changes the meaning of `verified` for every built bundle. |
+| D2 | Wire into the lifecycle, keep as is, or retire the tools that duplicate the approval derivation: `durable-evidence sync/check` (a lifecycle `sync` would write tracked `audit/` files into the close commit and re-open the leak-scan risk of C28e, `PC/lib/durable-evidence.mjs:165-167`), `audit-pack`, the private audit index summary? | Keep all unwired; retire nothing in this wave. Cost: the triple derivation of approval rows stays until a later decision. |
+| D3 | Print an expected-versus-carried comparison from the existing verify command (read-only, derived, not stored)? | Not now; decide after Stage 1 shows the real gap list. Cost of doing it now: a new output contract of the verify command that scripts may start to parse. |
+| D4 | Carry the approval trace in the bundle? It needs its plan-approval row reworked first (`untraceable` for every signed plan, `human-approval-trace.mjs:173`) and a change of the `collectEvidence` entry condition (`audit-bundle.mjs:274`) so a trace-only request does not add false `verify-record` and `security-scan` gaps. | No; carry typed gaps (Stage 1) instead. Cost of carrying it: every signed plan reads `untraceable` in the README until the row is reworked, and the trace needs the private store of the building machine. |
+| D5 | A public redacted reference for override, model exception and consent (name only, never the store content)? | No; Stage 1 names the absence, nothing else. Cost of a reference: a new public record type with its own privacy screen and its own digest rules. |
+| D6 | Rename or describe the colliding schema id `pipeline.audit-index.v1` (two shapes)? | Describe both in the docs; no rename (a rename changes digest-bound bytes). |
+| D7 | A close without a later push or release never carries the final Verify and Security: accept and say so in the README? | Accept and say so (Stage 2). |
+| D8 | The slice package binds AC-112, whose Spec row names an unrelated item. Re-bind this and the sibling analysis lanes to a fitting criterion, or add one? | Coordinator checks the criterion field of the 30k packages; no Spec change here. |

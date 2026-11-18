@@ -1,0 +1,164 @@
+# Analysis: how a risk accepted in a PRD is traced to a test, a gate or a stated residual, and where that trace is lost (candidate 30k, lane K8)
+
+Status: analysis only, no test run. Nothing was executed; every statement comes from reading files of the integrated 30j tree. No code, test, registry, PRD or Spec was changed. Lane K4 of the plan (`candidate-30k-plan-2026-11-18.md`) delivered its findings only as text (its file write was refused); this document is the redo under lane K8 and re-checks the load-bearing claims of that first attempt itself.
+
+Criterion binding: AC-112 (`specs/sprint-alfred-epic/spec.md:3035`) is the closest existing accepted criterion. Its text names another item (a managed-refresh item); this analysis is a fresh bounded attempt under that unchanged Spec text. The PRD and the Spec are unchanged.
+
+Labels. PROVEN: read in code, a test or a document, with a file:line. INFERRED: reasoned, not read. An absence claim is PROVEN only for the files and patterns named next to it, never for the whole repository.
+
+Paths below are repository-relative.
+
+## 0. Answer in short
+
+1. A risk accepted in a PRD is prose. No code reads it, no identifier names it, and nothing fails when it materialises. Between the PRD and a failing test the chain is convention at every link (section 2).
+2. Two mechanisms the earlier attempt missed already carry criterion identifiers from a Spec to evidence: the opt-in `<spec>.requirements.json` map and the `traceability.md` companion, reconciled at design approval. Neither carries a risk, neither can say "residual", and the epic's own package declares no map (section 2, links L6 and L7; section 3, E1).
+3. This repository's own epic shows the trace missing for three of five PRD assumptions, closed for one, and kept as a one-line bullet for one (section 3).
+4. A read-time derivation closes the visibility gap, not the truth gap. It can list each accepted risk with the covering test path or residual statement it names, and report the ones that name nothing. It cannot prove that the named test fails when the risk materialises (section 4).
+5. Recommended smallest stage: a pure reader over a closed Spec table plus one report-only close readback row. No stored status, no new gate, no refusal (sections 5 to 8).
+
+## 1. Where the four statements are recorded today
+
+| Statement | Where it is written | Shape | Read by code |
+|---|---|---|---|
+| Risk (with mitigation) | PRD section "Risks & mitigation": "the 2-4 most important risks, each with a countermeasure" (`templates/prd.md:67-68`); the PRD is produced for rigor >= 1 or risk class high (`roles/elephant.md:163`) | free prose, no id | PROVEN none in the files searched below (section 2, L1) |
+| Accepted residual | no PRD or Spec template slot. Five unrelated carriers exist, none fed from a PRD (section 2, L9) | five different shapes | each by its own checker |
+| Out-of-scope | PRD section "Non-goals" (`templates/prd.md:64-65`); epic PRD section 6 (`specs/sprint-alfred-epic/prd_sprint-alfred-epic.md:506-530`); Spec part B "REMOVED Requirements" is a delta list, not a non-goal list (`templates/spec.md:256`) | free prose | PROVEN none (same search) |
+| Stated assumption | no PRD template slot. The epic PRD holds "Assumptions and risks" with ids A-1 to A-5 (`prd_sprint-alfred-epic.md:623-655`); the Spec template names "a wrong assumption" only inside the slice-order advice (`templates/spec.md:88`) | free prose, ad hoc ids | PROVEN none |
+
+PROVEN: the Spec template has no risk, assumption or non-goal section. Its headings are 1 Problem, 2 Technical Plan, 2a stateful-control checklist, 3 Alternatives, 4 Detailed Implementation, 5 Acceptance Criteria, 6 Definition of Done, then part B (`templates/spec.md:72-272`, heading list). Its "Risk class" is a triage field for the review matrix, not a risk register (`templates/spec.md:62`). Section 3 "Alternatives" records rejected options with a reason (`templates/spec.md:113-121`); that is the nearest slot for a rejected mitigation and is not a risk list.
+
+PROVEN: the plan hand-off asks for the opposite direction only. It scans the whole Spec text for test paths and command ids (`plugins/pipeline-core/lib/plan-handoff-readiness.mjs:177`, `:195`) and requires acceptance rows and journeys (`:161-174`); it never asks which risk a test covers.
+
+## 2. The chain today, link by link
+
+The wanted chain: risk accepted in the PRD -> Spec criterion or statement -> test or gate -> something fails when the risk materialises.
+
+| Link | What exists | Owner (file:line) | Strength |
+|---|---|---|---|
+| L1 PRD risk to anything | PRD prose block. The PRD to Spec binding is one digest marker (`technical-spec-sha256`, checked by `DCC-PRD-MARKER-*`, `plugins/pipeline-core/lib/design-consistency-check.mjs:535-544`); it binds the bytes of the Spec, not a risk. The PRD says "NOT acceptance criteria" and leaves them to the Spec (`roles/elephant.md:163`) | `templates/prd.md:67`, `roles/elephant.md:163` | convention |
+| L2 Readiness review | The reviewer's checks are the architecture-scope coverage question, decomposition, first path, journeys (`PLR-HANDOFF-NO-JOURNEY`) and decisions to record (`plugins/pipeline-core/agents/readiness-reviewer.md:75-124`). A "coverage or decomposition question" is by definition a question and never blocks (`:52-59`). No check names a PRD risk, an assumption or a non-goal | `readiness-reviewer.md:44-59`, `:75-124` | convention (a reviewer may ask; nothing requires it) |
+| L3 Spec criterion registry | Criterion rows are `AC-n` EARS lines; user-facing rows must name `Journeys:` and `Asserts:` (`templates/spec.md:134-174`). The registry parses rows and statuses (`critic-accepted-contract.mjs`, imported at `plan-handoff-readiness.mjs:32`; that module was not opened, so "knows no risk id" is INFERRED from its use at `:158-172`) | `plan-handoff-readiness.mjs:158-174` | code, but only for criteria |
+| L4 Hand-off test paths | Every `*.test.(mjs|cjs|js)` token anywhere in the Spec is checked for shape, git-ignore and file kind; an absent file is admitted as state `absent` (`plan-handoff-readiness.mjs:49`, `:177-194`, `checkState` returns `absent` at `:86`). `command:<id>` tokens must be registered in the calibration (`:195-205`). So a test named in a risk row would be shape-checked, but nothing ties it to a risk and a not-yet-written test passes | `plan-handoff-readiness.mjs:177-205` | code, but only shape and trackability |
+| L5 Verify registries | `harness/verify-suites.json` registers suites by name and file (example: `close-quality-readback-tests` at `harness/verify-suites.json:4597-4598`); the case-completion registry rows are `name`, `path`, `disposition` and, for `legacy-process-only`, a `reason` that must be an existing `backlog/items/*.md` (`harness/scripts/check-verify-case-completion.mjs:20-21`, `:522-529`). Neither carries an AC id or a risk id | `check-verify-case-completion.mjs:15-21`, `:515-534` | code, but about suites |
+| L6 Opt-in requirement map | A Spec may carry `<spec-basename>.requirements.json` (`templates/spec.md:176-199`): closed schema, 1-64 criteria with ids of the pattern `^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$`, predicates `path-exists`, `file-contains-literal`, `behavioral-output`, and a `specSha256` that must equal the exact Spec bytes or the map is refused (`plugins/pipeline-core/lib/requirement-traceability.mjs:9-18`, `:75-96`, `:140-142`). A missing target makes the Critic dispatch refuse `CDP-REQUIREMENT-ABSENT` (`plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs:402-407`). An undeclared map is a visible skip: mode `undeclared` (`requirement-traceability.mjs:131-133`) | `requirement-traceability.mjs`, `critic-dispatch-preflight.mjs:388-409` | code, opt-in, presence only ("literal presence does not prove correctness", `templates/spec.md:178-179`) |
+| L7 `traceability.md` reconciliation | At design approval, when a map is declared, the first-cell ids of the unfenced table rows of the feature's `traceability.md` are compared with the map ids: duplicates `DCC-ID-DUPLICATE`, missing or unregistered `DCC-COUNT-MISMATCH` (`plugins/pipeline-core/lib/design-consistency-check.mjs:446-466`, `:551-569`; wired at `plugins/pipeline-core/scripts/pipeline-state.mjs:10688-10697`). Undeclared map: no comparison | `design-consistency-check.mjs:553-569` | code, opt-in |
+| L8 Close readback | Six report-only rows: security-scan, adr-decision, architecture-fitness, critic-report-file, handover-freshness, journey-coverage; "It is NOT a gate" (`plugins/pipeline-core/lib/close-quality-readback.mjs:2-3`, `:26`). None is about risk or residual | `close-quality-readback.mjs:26` | report-only, no risk row |
+| L9 Residual carriers | Five vocabularies, each closed in its own domain and none fed from a PRD risk: (a) control placement `residualGaps`, where a `prose`-enforced row must carry a `compensating-detection:` entry (`plugins/pipeline-core/scripts/control-placement.mjs:115-118`); (b) the open-minors block in the handover (`plugins/pipeline-core/lib/open-minors.mjs:2-16`); (c) PO residual acceptance of an unresolved Critic major (`plugins/pipeline-core/lib/critic-lapsed-findings.mjs:11-19`); (d) dated debt: the accepted-debt baseline of evidence paths with a due date (`harness/scripts/check-required-evidence-not-ignored.mjs:16-20`), the scanner-exception file with reason and expiry (`plugins/pipeline-core/lib/security-close-status.mjs:90-96`), the deploy-deviation record with `owner`, `expires`, `approved-by` (`templates/risks.md:35-42`); (e) `legacy-process-only` with a backlog reason (L5) | the cited files | code, each in its own domain |
+| L10 Backlog falsifier | An item may declare `done_when` with four closed forms (`path-exists`, `contains`, `script-exit-zero`, `manual`); `check-backlog-done-predicate.mjs` reports `STALE-OPEN`, `REGRESSION`, `MALFORMED`; an open item with no `done_when` is `UNDECLARED`, reported and not fatal (`backlog/README.md:36-42`) | `backlog/README.md:36-42` | code, report/refusal per class |
+| L11 Test fails when the risk materialises | Only for a risk someone turned into a criterion and a behavioral test. No link above checks that this happened or that the test would fail | none | convention |
+
+Verdict. PROVEN for the files cited: no file in the table reads a PRD "Risks" or "Assumptions" section. PRD risk to Spec criterion is convention (L1 to L3). The criterion-to-test and criterion-to-evidence links exist for criteria (L3 to L8) and are partly opt-in (L6, L7). The residual side has five closed carriers that cannot be reached from a risk (L9).
+
+INFERRED: a risk reaches a test today only when an author, a reader of the PRD, and the readiness reviewer each choose to carry it. The review of the Spec journeys (`PLR-HANDOFF-NO-JOURNEY`) is the one place the pipeline already converted a "this must be examined" duty into a typed, checkable clause; the same pattern is the model for a risk row.
+
+## 3. Examples from this repository (cited, not invented)
+
+The epic PRD section 8 lists assumptions A-1 to A-5 (`prd_sprint-alfred-epic.md:623-655`). The searches below used the pattern `\bA-[1-5]\b` over `spec.md`, `acceptance.md`, `traceability.md` and `design.md` of `specs/sprint-alfred-epic/`, and the phrases "evidence debt" and "OKF" over `spec.md`, `acceptance.md`, `traceability.md`.
+
+| # | Case | State | Evidence | Label |
+|---|---|---|---|---|
+| E1 | The epic package declares no requirement map and its `traceability.md` has no risk entry | register is `undeclared`, so no reconciliation runs | no `*.requirements.json` in the epic directory (directory listing, depth 1); case-insensitive "risk" has no hit in `specs/sprint-alfred-epic/traceability.md`; its tables map sources and findings, not risks | PROVEN (scope: that directory and that file) |
+| E2 | A-4: calibration evidence may be insufficient; then D2/B1 stay report-only "with explicit evidence debt, never a calibrated PASS" (`prd_sprint-alfred-epic.md:642-646`) | trace missing | no hit for "evidence debt" in `spec.md`, `acceptance.md`, `traceability.md`; no `A-4` token in the four files | PROVEN (scope: those files and patterns); whether a test elsewhere pins "never a calibrated PASS" was not searched, INFERRED unpinned |
+| E3 | A-1: the preceding sprint's work lands on `main` in a rebaseable shape; mitigation "wave 0 re-verifies A1/A5 after the rebase" (`prd_sprint-alfred-epic.md:625-631`) | stated once, no criterion | one bullet `spec.md:862`; no `A-1` in `acceptance.md`, `traceability.md`, `design.md` | PROVEN (scope as above); that a later rebase happened and was re-verified is not measured |
+| E4 | A-3: the navigation representation stays available and pinnable; fallback "pluggable by construction" (`prd_sprint-alfred-epic.md:639-641`) | reaches the Spec as a design property, no criterion | `spec.md:555` ("pluggable contract"), `spec.md:816` (profile schema "+ pin fields") | PROVEN for the two lines; INFERRED that they are the only carriers |
+| E5 | A-5: epic scale, droppable tail (`prd_sprint-alfred-epic.md:647-655`) | no hit | no `A-5` token in the four files | PROVEN (scope as above) |
+| E6 | A-2: the subagent-hook gap is runner behaviour; until measured the role is `unavailable` and presentation and close are refused (`prd_sprint-alfred-epic.md:632-638`) | the closed case | Spec cites it (`spec.md:1624`); acceptance row AC-35 ends "unmeasured means `unavailable`" (`specs/sprint-alfred-epic/acceptance.md:65`) | PROVEN for the rows; the code that enforces `unavailable` was not read, INFERRED enforced |
+| E7 | PO-accepted residual `git push --no-verify` | stated three times, one typed row | `spec.md:111-114` and `:843`; typed `residualGaps` entry on the push control (`policies/control-placement.v1.json:15`); the residual test pins four other controls' codes only (`plugins/pipeline-core/scripts/control-placement.test.mjs:84-101`) | PROVEN for those lines; a pin elsewhere was not searched |
+| E8 | The 14 unresolved originals: owner "the Coordinator of this epic", due "no later than 2026-10-19", "never accepted on the existence of its cited file" (`spec.md:3013-3020`) | dated residual in Spec prose | the due date has passed on 2026-11-18; I searched for no reader of this paragraph and did not measure whether the 14 were resolved | PROVEN for the text; INFERRED that no code reads the date |
+| E9 | Open items kept as queue prose: suites "not run by the lanes", old wording left in two test files "a follow-up", the J28 decline sentence "imprecise, follow-up" (`specs/sprint-alfred-epic/plans/candidate-30-queue-2026-11-15.md:561`, `:569`, `:573`) | residual stated in a plan, no backlog item | no item in `backlog/items` matches "request file stays in", `READ_TARGET_CODE` or "decline sentence" (three patterns, clone tree) | PROVEN as document statements and for those three patterns; not that no other tracking exists |
+| E10 | The closed shape: J25 keeps a private path list inside the generated hook, "pinned equal to the shared list by two test cases" (`candidate-30-queue-2026-11-15.md:573`) | residual + covering test, stated together | the queue statement | PROVEN as a statement of the queue; the test cases were not opened here |
+| E11 | The closed shapes inside the code: a `prose`-enforced control must carry `compensating-detection:` (`control-placement.mjs:116-117`); a `legacy-process-only` suite must name an existing backlog item (`check-verify-case-completion.mjs:527-529`) | residual forced to be stated | the two lines | PROVEN |
+
+Reading of the table: where the repository made "an accepted gap" a typed row, the statement and its cover travel together and a checker fails on a missing half (E11). Where the gap lives in a PRD assumption (E2, E3, E5) or a plan paragraph (E8, E9), no reader exists and the dated promise (E8) outlived its date unobserved. The one assumption with a cover (E6) got it because someone wrote a criterion row, which is the manual step the chain relies on.
+
+## 4. Would a read-time derivation close the gap?
+
+Question (c). Yes for visibility, no for truth, and only if the key is a closed marker in the Spec, never PRD prose.
+
+### 4.1 The key
+
+A PRD risk cannot be the key: it has no id and free text (L1), and a parser over prose would be a heuristic gate (DO-NOT-DO 12 of `state-machine-simplification-analysis-2026-11-17.md:290-303` allows a derived read, never a new status). The Spec is the approved, digest-bound document and the criteria already live there. So the key is one closed table in the Spec, written once when the Spec is written, with one row per accepted risk or assumption:
+
+`| id | source | statement | trace |` where `trace` is exactly one of: a test path or `command:<id>` (covered), `residual: <backlog item path>` (a stated residual), `not-applicable: <reason>`.
+
+The derivation, evaluated on read, yields per row: covered (the test path or command id resolves with the hand-off's own rules, `plan-handoff-readiness.mjs:177-205`), residual-stated (the backlog item exists), untraced (the cell is empty or names nothing), stale (a named path no longer exists), malformed (the cell fits no form). Nothing is stored; the Spec bytes are the only state, the same shape as the journey reader (`inspectSpecJourneys`, `lib/spec-journey-coverage.mjs:60`, consumed at `close-quality-readback.mjs:143` and `plan-handoff-readiness.mjs:165`).
+
+### 4.2 Reuse of the existing register versus a separate reader
+
+Two designs are possible and they differ in whether they widen an existing refusal.
+
+| | A. separate reader over a Spec table | B. risk ids inside the existing `requirements.json` and `traceability.md` |
+|---|---|---|
+| New state | none (the table is Spec text) | none, but ids of two kinds share one map |
+| Can express "residual" | yes (`residual: backlog/items/x.md`) | only by pointing `path-exists` at the backlog item, indistinguishable from a covering test in the result |
+| Missing cover | reported | refuses `CDP-REQUIREMENT-ABSENT` before a Critic dispatch (`critic-dispatch-preflight.mjs:402-407`): a widened gate |
+| Stale cost | none | the map's `specSha256` must be regenerated on every Spec edit, or the map is refused (`requirement-traceability.mjs:140-142`) |
+| Opt-in | no new opt-in; absent table reads `not-applicable` | inherits opt-in; the epic's register is undeclared (E1), so a risk added there would still run no check |
+| Duplicate states | one more id list, but the cover is read from the table itself | no extra list, but `DCC-COUNT-MISMATCH` then also counts risk ids against `traceability.md` |
+
+Judgement (INFERRED, not tested): A adds no refusal and keeps "report" and "refuse" apart; B has the attraction of one id registry, but turning a risk cover into a pre-dispatch refusal is a new gate on a Critic dispatch, which the PO goal rules out unless decided. B is flagged as a PO decision (D2) with that cost. Whatever is chosen, the table must not duplicate the criterion rows: a risk that becomes an acceptance criterion points to its `AC-n` in the `trace` cell instead of restating the criterion.
+
+### 4.3 What it would refuse and what it would only report
+
+- Refuse: nothing new. The existing refusals stay as they are: malformed map, stale map digest, absent named requirement in the Critic preflight, `PLR-HANDOFF-*` codes. A malformed risk table is reported `malformed`, not refused, in stage 1 (section 7).
+- Report: untraced, stale, malformed and residual-stated rows, in one close readback row and one readiness reviewer question. The readiness reviewer already separates a blocking finding from a question (`readiness-reviewer.md:40-59`); an untraced accepted risk fits the question class ("a coverage question") without becoming a block.
+- Not closable by a derivation (INFERRED): that the named test fails when the risk materialises (L11); completeness against free PRD prose (a risk nobody wrote into the table is invisible); whether a residual reason is still true; Specs approved before the table existed (they read `not-applicable`, never "missing", or old packages would flip).
+
+## 5. What could not be measured
+
+- No test or producer was run; this is a reading analysis.
+- Whether the 14 originals of `spec.md:3013-3020` were resolved; whether any code reads that date.
+- Whether any test elsewhere pins E2 ("never a calibrated PASS") or E7 (the `--no-verify` wording).
+- The code that enforces the `unavailable` role state (E6).
+- The J25 pin cases (E10).
+- How many open backlog items declare `done_when` (L10): the checker's counts were not run.
+- Test file names for the plan hand-off and the readback's journey row beyond those cited: the journey reader is pinned by `plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs` (found by searching for the typed code); a dedicated `plan-handoff-readiness` test file was not found at the expected name (not searched under other names).
+- PRD parsers keyed on patterns other than the ones named were not tried.
+
+## Recommendation
+
+1. Do not parse the PRD. Make the Spec carry one closed table of accepted risks, assumptions and stated residuals (`id`, `source`, `statement`, `trace`), where `source` names the PRD section and `trace` is a test path or command id, a residual with an existing backlog item, or `not-applicable: <reason>`.
+2. Derive the status on read with a pure reader modelled on `inspectSpecJourneys`: covered, residual-stated, untraced, stale, malformed, not-applicable. Store nothing.
+3. Surface it in two places that already report and never refuse: one new row in the close quality readback (`close-quality-readback.mjs:26`) and one question in the readiness reviewer (`readiness-reviewer.md`, "Decisions to record" neighbourhood).
+4. Keep the existing residual carriers (L9) exactly as they are; the table points at a backlog item for a residual instead of inventing a sixth vocabulary.
+5. Backfill the epic's A-1 to A-5 by a registered Spec addendum only if the PO asks (D4); never by editing approved bytes.
+6. File the example gaps E2, E8 and E9 as backlog items (each with a `done_when`), and build nothing else.
+
+## What stays unchanged (DO-NOT-DO)
+
+Binding list: `specs/sprint-alfred-epic/plans/state-machine-simplification-analysis-2026-11-17.md:290-303`. Applied here:
+
+1. No new stored status and no stored coverage record (DO-NOT-DO 12): the status is derived on every read.
+2. No new gate and no new refusal: an untraced risk is reported, never refused. The existing refusals (`CDP-REQUIREMENT-ABSENT`, `DCC-COUNT-MISMATCH`, `PLR-HANDOFF-*`) keep their meaning and are not extended to risk rows without a PO decision (D2).
+3. No parse of PRD prose and no automatic extraction of risks from a PRD.
+4. No change to approved bytes of a Spec or PRD (DO-NOT-DO 1, 3): a backfill is a registered addendum or nothing.
+5. No time-based expiry of a residual, an owner or a due date as a new rule (DO-NOT-DO 5). The repository already has dated carriers (L9 d); this analysis neither extends nor removes them. An owner and due date on a residual is a PO decision (D3).
+6. No automatic signature step and no automatic re-bind of an `immutable` or `append-only` artifact (DO-NOT-DO 1, 8).
+7. No change to the existing residual carriers: `residualGaps`, the open-minors block, the PO residual acceptance, the dated debt lists, `legacy-process-only`.
+8. No removal or weakening of any existing check or case; the new reader gets its own cases.
+9. No claim of enforcement: the document never says a named test "protects" a risk, only that it is named and exists.
+
+## Staged plan (smallest first)
+
+Every stage is one Goldfish dispatch, test first, and reverts by reverting its commits. No stage migrates or rewrites a stored record.
+
+| Stage | Content | Failing-first proof | Neighbour suites | Unchanged |
+|---|---|---|---|---|
+| S1 | Pure reader `inspectSpecRiskTrace(specText, deps)` in a new file `plugins/pipeline-core/lib/spec-risk-trace.mjs`, returning per row covered / residual-stated / untraced / stale / malformed and an overall not-applicable when the table is absent | Cases written first against a module that does not exist (red: import fails): a covered row (test path resolves), a residual row (backlog item exists), an untraced row (empty cell), a stale row (path gone), a malformed row (fits no form), no table at all (not-applicable, never missing), a Spec with the table inside a fenced block (ignored) | the new suite, `plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs` (same Spec text parsed), `plugins/pipeline-core/lib/requirement-traceability.test.mjs` | every existing reader; the hand-off |
+| S2 | One report-only row `risk-trace` in the close quality readback, using the S1 reader; `unknown` when the Spec cannot be read, `not-applicable` when there is no table | Extend `plugins/pipeline-core/lib/close-quality-readback.test.mjs` first (red: `QUALITY_ROW_IDS` has no such id, `close-quality-readback.mjs:26`): untraced rows make the row `missing` with the ids listed, a fully traced table makes it `present`; the readback exit status is unchanged | `lib/close-quality-readback.test.mjs`, the close coordinator suite that pins the audit index output (`harness/verify-suites.json:4597-4600`, its `nonOverlapNote`) | the six existing rows and their order; no gate |
+| S3 | Texts: the Spec template gets the table skeleton, the PRD template gets an "Assumptions" line (the epic PRD already has one, the template has none), the readiness reviewer gets one question about untraced accepted risks | Pin test written first (red: the strings are absent), tying the template and reviewer wording to the S1 constants so a text and the reader cannot drift | the documentation contract check and the agent-obligations generator pins named by the queue | PRD release flow; no mandatory slot |
+| S4 | Optional backfill of the epic's A-1 to A-5 as a registered Spec addendum | the S1 reader run over the epic Spec reports five rows instead of not-applicable | ADR-0095 addendum checks | approved Spec bytes |
+
+S1 has no dependency and no PO decision. S2 needs S1. S3 needs S1 and should follow S2 so the template names a row that exists. S4 is a PO decision (D4).
+
+## Open decisions for the PO
+
+| # | Decision | Default | Cost of the other choice |
+|---|---|---|---|
+| D1 | Where the table lives | the Spec only, one closed table | the PRD would need an id scheme and a parser (heuristic on prose), which the analysis rejects |
+| D2 | Reuse `requirements.json` and `traceability.md` for risk ids (design B) instead of a separate reader | no: separate reader, report only | one registry, but an absent cover then refuses a Critic dispatch (`CDP-REQUIREMENT-ABSENT`) and the map digest must be regenerated on every Spec edit: a widened gate |
+| D3 | Owner and due date on an accepted residual | no | a dated promise needs a reader or it repeats E8; a reader that acts on the date is a time-based expiry (DO-NOT-DO 5) |
+| D4 | Backfill the epic's A-1 to A-5 by a registered Spec addendum | no | five rows of addendum text and one approval; leaves E2 to E5 visible as untraced until done |
+| D5 | Add an "Assumptions" line to the PRD template | yes (text only, no check) | assumptions stay an ad hoc section as in the epic |
+| D6 | File E2, E8 and E9 as backlog items and build nothing else | yes | the dated promise of E8 stays an unobserved sentence |
+| D7 | When an untraced row exists at close, only the readback row reports it | yes (report only) | making it a close stop is a new gate and is not proposed |

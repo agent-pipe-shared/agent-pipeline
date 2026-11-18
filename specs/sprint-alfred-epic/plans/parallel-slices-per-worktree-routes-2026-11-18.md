@@ -1,0 +1,183 @@
+# Parallel Goldfish slices per git worktree: what a safe fan-out needs, and where the clone-slice route is a workaround (2026-11-18)
+
+Candidate 30k, lane C30K-K6. Analysis only, no test run: nothing was executed, no code, test, registry or state was changed. Every statement about code or a document carries a file and line reference and one label: **PROVEN** (read in code, a test or a document) or **INFERRED** (reasoned from what was read, not read itself). Line numbers refer to the integrated 30j tree (the clone), not to the applied checkout. Criterion binding: AC-112 is the closest existing accepted criterion (fresh bounded attempt); the PRD and the Spec are unchanged.
+
+Sources: `docs/operating-tools.md` (Clone-slice route, lines 93-126); `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`; `.../antigravity-native-dispatch.md`; `plugins/pipeline-core/lib/native-goldfish-host-state.mjs`, `agy-host-commit-admission.mjs`, `worktree-lifecycle.mjs`, `worktree-count-check.mjs`, `session-authority-registry.mjs`; `plugins/pipeline-core/hooks/guard-dispatch.mjs`, `guard-worktree-isolation.mjs`, `antigravity-pretool-guard.mjs`; `plugins/pipeline-core/scripts/agy-native-integrate.mjs`, `goldfish-host-commit-recover.mjs`; the C30 queue (C30-23, the C30J status) and the 30k plan; the DO-NOT-DO list of `state-machine-simplification-analysis-2026-11-17.md` (lines 290-303), which binds every recommendation below.
+
+## 1. Summary
+
+1. The briefing's premise, that the host commit, admission, baseline-dirty refusal, the sibling-commit exception and the admission budget are steps of the clone-slice route that exist only because a worktree could not be used, **does not hold**. They belong to the shared-tree host-commit route; a clone-slice lane's three deliverables land in the real tree through that same route (PROVEN, this dispatch's own briefing: write scope in the real tree, "host commits"). A worktree would not remove them; it would replace them by a different integration step (section 3).
+2. What the clone-slice route really works around: (a) plugin source that is protected in the real checkout (coordinator-stated in the briefing, not verified here; `plugins/pipeline-core/scripts/dispatch-briefing.mjs:1277-1284` only warns, the enforcing rule was not read); (b) a base that is an unapplied chain of held patches and therefore no commit of the real repository (INFERRED, see 3.2); (c) the PO applying protected changes. Neither (a) nor (b) is solved by a worktree.
+3. One real blocking is visible in the 30j wave: four host commits failed with `native-concurrent-unowned-head` because the Coordinator's own recovery commits moved HEAD while a sibling ran (PROVEN as text: `candidate-30-queue-2026-11-15.md:569`, read in the real checkout). The code path that can produce it is readable (4.1); which raise site fired in those four cases cannot be read from the repository.
+4. The smallest first stage is a text rule that the 30k plan already schedules, plus a test-only reproduction; any code change waits for that reproduction and a PO decision (section 9).
+
+## 2. What the route does today, step by step
+
+The route has three layers. They must not be confused, because only the first is "the clone-slice route" proper.
+
+| # | Layer | Step | Source | Exists because a worktree could not be used? |
+|---|---|---|---|---|
+| 1 | clone | A shared clone of the repository (`mkclone.mjs`, `git clone --shared`), or of another clone (`clone-of.mjs`), at a base commit; for a chained slice the base is the integrated 30j tree (coordinator-stated) | `docs/operating-tools.md:95-99` PROVEN | Partly. A worktree could also give a private tree. It cannot give a base that is not a commit of the real repository (3.2). |
+| 2 | clone | Edit and test only inside the clone with a private TMPDIR, one suite at a time (`test-in.mjs`) | `docs/operating-tools.md:108` PROVEN | No. The private tmp and one-suite rule come from the registry/tmp collision, not from the tree kind (PROVEN: operating-tools :122 records a clone under `/tmp` giving 73 red steps; INFERRED that a worktree has the same tmp question). |
+| 3 | clone | Commit inside the clone with a throwaway identity (`commit-in.mjs`, `commit-file.mjs`) | `docs/operating-tools.md:101-102` PROVEN | Yes, in the sense that a clone commit never touches the real index or HEAD. A worktree commit would not either (INFERRED: a linked worktree has its own index and HEAD, standard git behaviour, not read here). |
+| 4 | clone | Export the net change as a held patch and prove `git apply --check` on the repository or on a chain clone (`save-patch.mjs`) | `docs/operating-tools.md:111` PROVEN | Yes for the export itself: it replaces the commit/branch that a worktree route would integrate (agy: `agy-native-integrate.mjs`, section 3). |
+| 5 | clone | Export a chain of commits as numbered patches plus one PO apply script, rehearse it in a fresh clone, rebuild the chain when main moved (`export-held-chain.mjs`, `rehearse.mjs`, `rebase-chain.mjs`) | `docs/operating-tools.md:105,115-116` PROVEN | Yes for the protected part: the PO applies and commits protected source (coordinator-stated). |
+| 6 | host commit | The dispatch's own deliverables (the patch, the notes, the check) are written in the real tree, and the host observes and commits them | this dispatch's briefing; `workflow-dispatch.md:141-150` PROVEN | **No.** This is the shared-tree host-commit route (decision D76), independent of any clone. |
+| 7 | host commit | Admission before the dispatch: governed item queue, reservation, write-scope overlap, route binding | `guard-dispatch.mjs:999-1009`, `workflow-dispatch.md:141-150` PROVEN | **No.** |
+| 8 | host commit | Admission budget: `ADMISSION_BUDGET_MS = 300000`, deadline margin `5000` ms | `guard-dispatch.mjs:95`; `admission-deadline.mjs:21` PROVEN | **No.** The "250 s" of the briefing is an observation (`candidate-30-queue-2026-11-15.md:551`: more than 250 s, 888 and 900 checks), not the configured budget. |
+| 9 | host commit | Baseline capture and the baseline-dirty refusal `AGY-HOST-BASELINE-DIRTY`, which names up to 20 dirty paths that are not foreign paths | `agy-host-commit-admission.mjs:88-92` PROVEN | **No.** |
+| 10 | host commit | Sibling-commit exception: a moved HEAD is admitted only when it is a disjoint advance; otherwise `native-concurrent-unowned-head` | `native-goldfish-host-state.mjs:865-897`; `agy-host-commit-admission.mjs:147-151` PROVEN | **No.** |
+| 11 | recovery | A checkpointed or stopped lane is landed by `goldfish-host-commit-recover.mjs plan\|apply`; its reservation is released with `slice-queue cancel --started --class ...` | `goldfish-host-commit-recover.mjs:4,300`; `native-goldfish-host-state.mjs:78` PROVEN | **No.** |
+
+Reading: of eleven steps, steps 4 and 5 and part of 1 are the workaround; steps 2 and 3 are only partly tied to the tree kind (step 3 is "yes" for the real index, but a worktree has its own, INFERRED). Steps 6 to 11 are the cost of the shared-tree host commit and are paid whether the lane edits a clone or the real tree. The clone-slice route avoids the shared index only for the work done inside the clone (PROVEN for the rule: `workflow-dispatch.md:36-38` "Shared worktrees must never have concurrent committers through the same Git index"; INFERRED for the effect on the clone lanes).
+
+## 3. What a worktree route needs from the host
+
+Three worktree shapes exist or are conceivable: the Claude `isolation: "worktree"` call (prose plus advisory hooks), the Antigravity `Workspace: "branch"` route (built), and a Codex route (no evidence read).
+
+### 3.1 Requirement by requirement
+
+| Need | What exists today | Source | Label |
+|---|---|---|---|
+| Isolation granted or refused | Claude: a count of `git worktree list` before and after, a warning on a mismatch, never a block (exit 1 = allow plus stderr). Antigravity: every value other than `Workspace: "branch"` is refused (`AGY-NATIVE-WORKSPACE-NOT-ISOLATED`) | `guard-worktree-isolation.mjs:3-9`; `worktree-count-check.mjs:4-15,530-548`; `antigravity-native-dispatch.md:52-58` | PROVEN |
+| Expected path and SHA | Every Claude briefing must carry both and open with a containment check; the worktree is cut from the local `refs/remotes/origin/HEAD` target, not from the current branch, so the base can be stale and is repaired by `git checkout --detach <sha>` | `workflow-dispatch.md:62-95`; `CLAUDE.md` Environment note | PROVEN |
+| Base is a commit that exists in the real repository | A worktree is created from a commit of the real object database. A chain tip made in a `--shared` clone exists only in that clone's own object store | `docs/operating-tools.md:95` (shared clone); no read of an alternates file | INFERRED |
+| Commit surface: who commits, with which trailers | Claude shared-tree route: the host commits, the agent never does; trailers `AI-Assisted: true` plus one `Dispatch:` line (`templates/prompts/agent-obligations.md` section 6). Antigravity: the child commits on its own branch; the Elephant lands it with `agy-native-integrate.mjs plan` then `apply`; a fast-forward needs every commit to carry `Dispatch: <id> (goldfish)` (ADR 0099); a branch that cannot fast-forward takes the one-call `--commit-dispatch-id` route | `antigravity-native-dispatch.md:69-83`; `agy-native-integrate.mjs:5-22` | PROVEN |
+| Host commit observes the worktree | The baseline capture runs git at the root it is handed (`physical`, lines 80-87) and the final assessment at `baseline.root` (140-145); `discoverRepository` returns `primaryRoot = dirname(<git common dir>)` for any start path, also inside a linked worktree. That the handed root is the primary checkout was not read | `agy-host-commit-admission.mjs:80-87,140-145`; `worktree-lifecycle.mjs:260-265` | PROVEN for the two reads; that a Claude worktree dispatch's edits are invisible to the host commit is INFERRED |
+| Registry and reservation namespace per worktree | One namespace per repository: private files resolve under the git common directory, and so does the worktree-count store. No per-worktree namespace exists | `session-authority-registry.mjs:109-111,162`; `worktree-count-check.mjs:219`; `worktree-lifecycle.mjs:262-265` | PROVEN |
+| The guard's view of a path outside the main tree | Antigravity: a registered worktree is governed as its parent repository with every worktree path mapped to the same relative path, so a protected file stays protected; an unregistered worktree-shaped directory is refused. Claude: not read; the hook wrapper resolves the common dir from the process working directory | `antigravity-native-dispatch.md:63-68`; `antigravity-pretool-guard.mjs:633-643`; `guard-worktree-isolation.mjs:32-39` | PROVEN (Antigravity); the Claude guard view is NOT MEASURED |
+| Write-scope overlap check | For a call declared `isolation: "worktree"` the second-writer check and the scope-overlap check are skipped; the text rule says overlap waits even with separate worktrees | `guard-dispatch.mjs:1000-1008`; `workflow-dispatch.md:33-35` | PROVEN (both texts disagree); whether the queue reservation covers the gap for governed items is INFERRED from `guard-dispatch.mjs:999,1009` |
+| Cleanup | Claude: the dispatch's worktree is discarded and the Elephant checks the main tree. Antigravity: the host owns worktree and branch, "do not remove them". The lifecycle library has session-cleanup records and `worktree remove` | `workflow-dispatch.md:233-234`; `antigravity-native-dispatch.md:81-82`; `worktree-lifecycle.mjs:1265-1289,1853` | PROVEN |
+| Compile or type gate inside a worktree | The agent definition warns that a project's compile gate can be fail-open inside a worktree | `plugins/pipeline-core/agents/goldfish-deep.md:12-14` | PROVEN (the warning); effect NOT MEASURED |
+
+### 3.2 What this means
+
+- A worktree is cut from a commit. The clone-slice chain slices build on an unapplied chain (coordinator-stated), so a worktree of the real repository has no commit to start from unless the chain objects are first fetched into the real repository. That is a write toward the real object store and a new step (INFERRED).
+- A worktree inside the governed repository keeps protected plugin source protected (PROVEN for Antigravity, 3.1). The clone is useful for protected-source slices exactly because it is outside governance (coordinator-stated). So a worktree is no replacement for that reason (INFERRED for Claude, PROVEN for Antigravity).
+- The registry is one per repository whatever the tree. The admission cost and the retained-state cost (4.2) are therefore not removed by a worktree (INFERRED from the PROVEN common-directory binding).
+- The one shape that already removes the host-commit steps is the Antigravity one: the child commits itself and the Elephant integrates by `agy-native-integrate.mjs`. It trades them for a plan/apply integration, an uncommitted-parent refusal and the "second parallel slice cannot fast-forward" case (`antigravity-native-dispatch.md:55-56,77-78`).
+
+## 4. Failure modes of the routes
+
+### 4.1 Shared-tree host commit (R1): the recovery commit against a running sibling
+
+The code, in `nativeConcurrentPlan` of `native-goldfish-host-state.mjs` (PROVEN, read):
+
+- Every other pending sibling whose member is not `released` adds its allowed paths to the foreign set and to `siblingScopes`, and its dispatch id to `inFlightSiblings` (line 848). Only paths that this slice shares with a settled sibling are skipped (845-848).
+- HEAD must descend from the briefing's base (865-866). Each commit on the first-parent range is checked: a commit with no sibling proof (an ordinary commit of the orchestrator) is accepted only when it touches none of this slice's scope, check or dependency paths **and none of `siblingScopes`**; otherwise it is refused as `native-concurrent-unowned-head` (878-885). The comment names the intent: such a commit may be a sibling's host commit whose proof is not written yet.
+- The refusal is retried, not final: while some pending sibling has no `authority-terminal` record, the settle loop waits with a doubling delay up to a budget (955-980; `siblingInFlight` is computed at 963-964, the retry condition at 976-977).
+
+Reading of the mechanism (INFERRED, composed from the lines above): when the Coordinator lands the recovery commit of a finished lane X while lane Y still runs, the commit touches X's paths. If X's member is not yet `released` and X has no `authority-terminal` (a recovered lane has none, INFERRED: `goldfish-host-commit-recover.mjs` shows no terminal write in the lines read), then from Y's view X is a sibling in flight, the commit is "ordinary and on a sibling path", and Y is refused at line 885 until its settle budget ends. This matches the four incidents; it was not reproduced.
+
+Which of the four raise sites (lines 866, 873, 885, 897) fired in J8, J9, J16 and J20 cannot be read from the repository: the stop diagnostics of those runs are not committed (NOT MEASURED).
+
+History of the rule (PROVEN as text, `specs/sprint-alfred-epic/evidence/held-patches/w246-a-stop-lands-its-host-commit-after-any-disjoint-advance-of-head-including-during-its-terminal-prepare.notes.md:10-25`): an ordinary commit on a disjoint path was first accepted by w246 and "an unproven commit is accepted only when it also touches no path of a sibling still in flight (`siblingScopes`)" so that the settle loop waits for a proof not written yet. The refusal at line 885 is therefore deliberate, not an accident. The older notes (`w90`, `w242`) cover the moved-head tolerance and the simultaneous pair. No Coordinator note beyond the queue lines below was found for the 30h to 30j waves; a search of the held-patch notes for `unowned-head|recovery commit` found only the w76, w90, w170, w238, w242, w246 and w258 notes, none about the 30j incidents.
+
+Incidents (PROVEN as text, `candidate-30-queue-2026-11-15.md:569`, read in the real checkout): "four host commits failed with `NGHF-COMMIT-EXCEPTION native-concurrent-unowned-head` because the Coordinator's own recovery commits moved HEAD while a sibling ran (J8, J9, J16, J20; deliverables intact, recovered with the recovery route)"; the same status says J25 "stopped at a budget checkpoint with the deliverables complete and was landed by the recovery route after the sibling lanes ended" (`:573`); and the open item "Coordinator rule for 30k: land recovery commits only while no sibling runs" (`:571`). The 30k plan carries that rule as a build lane (`candidate-30k-plan-2026-11-18.md:30`, real checkout).
+
+Existing neighbours: the mixed-lineage case (an ordinary commit plus a proven sibling commit) is pinned in `lib/native-goldfish-host-stop-pair.test.mjs` (around line 392); the stop-failure detail `native-concurrent-unowned-head` is read by `scripts/goldfish-host-commit-recover.test.mjs` (around lines 156-159). Neither reproduces "ordinary commit on a path of a lane that is finished but not released" (PROVEN by the search for the code: one hit in each file, both about other cases).
+
+### 4.2 Shared-tree host commit (R1): admission cost, baseline, shared index
+
+- Admission slowness: three starts in one message, the first admitted, two refused `GUARD-DISPATCH-SLOW` after more than 250 s and 888 / 900 checks; cause class "a settled dispatch is not a running dispatch"; eighteen retained pending states and ten stop diagnostics were read by every admission; after the PO released closing them (cancel `--started`, fourteen `integrated-elsewhere`) the heal retired them (`candidate-30-queue-2026-11-15.md:551,553`, PROVEN as text). Whether the cost returns after a new run of retained states is NOT MEASURED.
+- Baseline-dirty: any tracked or staged change that is not a foreign path refuses the host commit with the dirty paths named (`agy-host-commit-admission.mjs:88-92`, PROVEN). A moved HEAD is tolerated only on the non-concurrent path and only for a disjoint advance (147-151).
+- Shared index: concurrent self-committing dispatches in one tree lost one agent's uncommitted edits and orphaned four commits on 2026-08-18 (`workflow-dispatch.md:97-139`, PROVEN as text); host-commit dispatches with disjoint scopes may run in parallel (`:141-150`).
+
+### 4.3 Clone-slice (R2)
+
+- The patch is a delta on an unapplied chain and does not apply to the real checkout until the chain is applied first (coordinator-stated; consistent with `w30k03-analysis-audit-bundle-completeness.check.test.mjs:2-4`, PROVEN); the check files therefore never run `git apply` against the repository root (same check file, lines 3-4).
+- The chain breaks when main moves: `rebase-chain.mjs` exists because a patch failed its context at the rehearsal after `docs/state.md` was condensed (`docs/operating-tools.md:105`, PROVEN).
+- A clone changes test results by location: a Full Verify clone under `/tmp` ended with 73 red steps of 1152 and passed in a clone below the home directory (`docs/operating-tools.md:122`, PROVEN as text).
+- The helper tools run from `scratch/agent-out/`, which is untracked; on a fresh machine they must be copied there first (`docs/operating-tools.md:95`; `CLAUDE.md` "Reusable scripts never stay in `scratch/`", PROVEN).
+- A scratch tree must hold real copies or a shared clone, never links, because suites write through a link into tracked state (`docs/operating-tools.md:124-126`, PROVEN).
+- The clone is outside governance, so the guards that would judge the same edits in the real tree do not run until the PO applies the chain (INFERRED from the coordinator-stated fact that plugin files are ordinary files inside the clone).
+- Integration is serial by construction: the Coordinator commits the three deliverables, the PO applies the chain, the stamp follows (`candidate-30-queue-2026-11-15.md:573`, `docs/operating-tools.md:115-116`).
+
+### 4.4 Worktree route (R3)
+
+- Claude: a requested isolation can silently not be granted; on 2026-08-25 three dispatches never received a worktree and a retry's self-heal detached the Elephant's own HEAD (`workflow-dispatch.md:83-86`, PROVEN as text). The count check is advisory by design (`guard-worktree-isolation.mjs:3-9`). The worktree starts from the last pushed state, not from the current branch (`CLAUDE.md`, PROVEN), so every briefing needs the path, the SHA and a self-heal step (`workflow-dispatch.md:62-95`).
+- Claude: isolated worktree dispatches were live-tested in 2026-08: 9 of 9 parallel worktree dispatches landed on the correct HEAD with the SHA self-check and 0 of 9 without it (`workflow-dispatch.md:80-82`), and a 2-agent round returned empty results over complete diffs (`:314-320`) (PROVEN as text). What has no record in the files read is a Claude Goldfish that wrote in a worktree under the current host-commit form, and the Claude guard view of a worktree path (NOT MEASURED).
+- Antigravity: parent with uncommitted tracked changes is refused (`AGY-NATIVE-WORKTREE-UNCOMMITTED`); a folder that became a repository after the session started needs a restart; the second parallel slice cannot fast-forward (`antigravity-native-dispatch.md:55-56,59-62,77-78`, PROVEN). The Antigravity route has measured notes (M4b), but none about a protected-source slice.
+- Codex: no worktree route was found in the files read (NOT MEASURED).
+
+## 5. Comparison
+
+R1 = shared tree with host commit, R2 = scratch clone plus held patch, R3 = worktree per slice (Antigravity built; Claude and Codex not).
+
+| Row | R1 shared tree + host commit | R2 clone + held patch | R3 worktree | Verdict |
+|---|---|---|---|---|
+| Working-state isolation | none beyond disjoint scopes; shared index rule applies (PROVEN) | full (PROVEN: separate directory) | full (INFERRED for git; PROVEN for Antigravity) | R2 and R3 better |
+| Base freshness | the current checkout | any commit, incl. an unapplied chain (briefing fact) | Claude: last pushed state unless self-healed (PROVEN); Antigravity: the parent's committed HEAD (PROVEN) | R2 best for chains; R3 worse for Claude |
+| Protected plugin source | refused in the real tree (briefing fact) | editable, outside governance | stays protected (PROVEN Antigravity; Claude NOT MEASURED) | R2 only |
+| Commit surface | host commits by the briefed paths (PROVEN) | Coordinator commits deliverables, PO applies chain | agent commits on its branch, Elephant integrates (Antigravity, PROVEN); Claude unmeasured | R1 simplest; R3 Claude unknown |
+| Admission and its cost | full cost, one registry (PROVEN) | same cost for the deliverable commit (PROVEN, section 2) | same registry (PROVEN) | no row difference; none removes it |
+| Sibling-commit exception | present (PROVEN) | present for the three deliverables (PROVEN) | replaced by "branch cannot fast-forward" (PROVEN Antigravity) | R3 differs, not clearly better |
+| Registry / reservation namespace | one per repository (PROVEN) | the real one for deliverables; the clone has its own (INFERRED) | one per repository (PROVEN) | R1 and R3 identical; no per-worktree namespace needed |
+| Guard view | the real governance | none inside the clone (INFERRED) | Antigravity: parent's (PROVEN); Claude NOT MEASURED | R3 Claude unknown |
+| Overlap rule | enforced (`guard-dispatch.mjs:1004`) | enforced for the deliverables | skipped for an isolated call (PROVEN), text says it waits | rule and code disagree for R3 |
+| Integration | in place, no step | held patch, chain apply, PO | `agy-native-integrate.mjs` plan/apply (PROVEN) | R1 cheapest |
+| Cleanup | none | delete the clone | Claude discard; Antigravity host-owned (PROVEN) | R1 cheapest |
+| Portability across runners | one briefing form for Claude, Codex and Antigravity, but an Antigravity code-writing child is refused without `Workspace: "branch"` (`antigravity-native-dispatch.md:52-53`), and per-runner qualification is stated as pending (`workflow-dispatch.md:50-53`) | Claude (this lane); others NOT MEASURED | Antigravity built; Claude prose plus 2026-08 live tests; Codex none | R1 widest, none fully qualified |
+| Measured evidence | 30j wave: four exceptions, admission slowness fixed by retiring states | 30h to 30k waves: works, serial integration | Antigravity M4b; Claude 2026-08 isolation tests (`workflow-dispatch.md:80-82`), none under the host-commit form | R3 Claude: partial |
+
+Count: R3 is better than R1 on the working-state isolation row and, for Antigravity only, on keeping protected source protected; the registry, admission and sibling-exception rows give no advantage; the remaining rows are worse or unmeasured for R3. R2 is the only route for protected source and for a base that is an unapplied chain.
+
+## 6. Smallest first stage
+
+The smallest stage that removes one real blocking without a new gate has two parts, both free of runtime change:
+
+1. Write the Coordinator rule where the dispatch route is documented (`workflow-dispatch.md`, one paragraph near the parallel host-commit paragraph at 141-150): land a recovery commit only when no sibling is in flight, otherwise wait or land it after the sibling ends. `session-authority-repair.mjs inspect` is read-only and reports, per native item reservation, its slice, queue state and whether it still blocks, and the bound members in flight (`plugins/pipeline-core/scripts/session-authority-repair.mjs:9-12`, PROVEN); that it answers exactly "no sibling pending without a terminal record" is INFERRED (section 7). This is the 30k plan's own lane (`candidate-30k-plan-2026-11-18.md:30`); no second text rule is proposed.
+2. A test-only reproduction of 4.1 in the existing stop-pair or fan-out suite: it decides, before any code change, whether lines 848 and 878-885 are the cause.
+
+## 7. What could not be measured
+
+- No test, probe or dispatch ran (analysis only, no test run).
+- Which raise site produced the four `native-concurrent-unowned-head` failures; the stop diagnostics are not in the repository.
+- Whether a recovery commit writes an `authority-terminal` or releases the member of the recovered lane; the recover script was searched, not read in full.
+- The order of `slice-queue cancel --started` and the recovery commit in the Coordinator's practice.
+- The Claude guard's view of a worktree path, the Claude host commit under a worktree, the `hooks.json` timeout for admission, Windows worktrees, any Codex worktree route.
+- Whether `session-authority-repair.mjs inspect` answers "no sibling is in flight" in the form the rule needs (only its header lines 9-17 were read).
+- Whether chain objects can be reached from a worktree of the real repository without a fetch.
+
+## 8. Recommendation
+
+1. Keep the clone-slice route for protected-source slices and for slices whose base is an unapplied chain. A worktree route does not replace it (3.2).
+2. Keep the shared-tree host commit with disjoint scopes for ordinary slices; it is the widest route across runners, although none is fully qualified (section 5).
+3. Do not build a general worktree replacement now. The Antigravity shape exists and stays as built. A Claude worktree route needs a measurement first (stage 3).
+4. Correct the premise in the dispatch documents: say that admission, baseline-dirty, the sibling exception and the admission budget belong to the host commit and that the clone-slice route adds only the patch export and chain steps (stage 0).
+5. Fix the one visible blocking at its cause: the recovery commit against a running sibling, first by the rule, then by a reproduction, and only then, by decision, by deriving "settled" once where the sibling scopes are collected (stage 2).
+6. Fix the text/code disagreement for an isolated call (`workflow-dispatch.md:33-35` against `guard-dispatch.mjs:1004`) by text, not by code (open decision D3).
+
+## 9. What stays unchanged (DO-NOT-DO)
+
+The twelve items of `state-machine-simplification-analysis-2026-11-17.md` lines 290-303 apply unchanged. Specifically for this topic:
+
+1. No new stored status, no stored "isolation granted" flag and no per-worktree registry namespace: the namespace is the repository's (3.1) and the isolation is derivable from `git worktree list`.
+2. No new gate on recovery commits and no new gate before a worktree dispatch.
+3. No time-based expiry or age-based retirement of a reservation, a member or a retained pending state; "not in flight" is proven from an integrated or cancelled queue row or a dead owner (DO-NOT-DO 5).
+4. A sibling judged alive is never dropped from the running set (DO-NOT-DO 6).
+5. No automatic step that needs a signature; the PO still applies protected source (DO-NOT-DO 8).
+6. No automatic re-bind of an immutable artifact and no change to the bytes of an existing key or digest (DO-NOT-DO 1, 3).
+7. Nothing is deleted by a repair; no worktree or branch the host owns is removed by an agent (DO-NOT-DO 7; `antigravity-native-dispatch.md:81-82`).
+8. The skip of the overlap check for an isolated call is not widened; the queue reservation remains the cover for governed items.
+9. The clone-slice tools are not rewritten; the shared-tree rule "no concurrent committers through one index" stays.
+
+## 10. Staged plan (smallest first)
+
+| Stage | Content | Failing-first proof | Neighbour suites (one at a time) |
+|---|---|---|---|
+| 0 | One paragraph in `workflow-dispatch.md` (Coordinator rule, premise correction, overlap-rule note); the same wording in the other copy of that reference if one exists | A documentation-contract case asserting the paragraph names the rule and the inspection command; RED before the paragraph exists | `doc-contracts` and `doc-contracts-test` (`docs/operating-tools.md:87`); the vendored-copy sync check if a copy exists |
+| 1 | Test-only reproduction: two pending siblings; the first is finished, its queue row is integrated or cancelled (settled, so it is not alive, DO-NOT-DO 6) and an ordinary commit on its paths is on HEAD; the second then commits; assert that it is admitted. A fixture whose first sibling is still unsettled must keep refusing (lines 874-877) | The case is written first from the wanted behaviour. RED means the mechanism of 4.1 is confirmed at the named line; GREEN means it is not the cause and stage 2 is dropped | `native-goldfish-host-stop-pair`, `native-goldfish-host-state-fanout`, `native-goldfish-host-parallel-admission`, `native-goldfish-host-state`, `native-goldfish-host-finalizer-regression`, `goldfish-host-commit-recover` |
+| 2 (PO decision D1) | Only if stage 1 is RED: at `native-goldfish-host-state.mjs:848`, leave a sibling that `readSettledItemSliceIds` already reports as settled (integrated or cancelled; the derived read held at lines 820 and 837) out of `siblingScopes` and `inFlightSiblings` only. Its paths stay in `foreignPaths` on purpose (comment 841-842; `foreignPaths` feeds the dirty check at `agy-host-commit-admission.mjs:89-91`). No new status, no new gate, no expiry | The stage 1 case turns GREEN; a second case keeps a still-running sibling's scope refused (DO-NOT-DO 6) | the same six suites plus `guard-dispatch` scope-overlap cases |
+| 3 (PO decision D2) | One attended probe of a Claude Goldfish with `isolation: "worktree"`: measure the guard view, the host commit observation, the provisioning base and the cleanup | The probe is the measurement; nothing is built from it before the PO reads it | `worktree-count-check` (`lib/worktree-count-check.test.mjs` exists) |
+| 4 | Only after stage 3: copy the Antigravity shape (child commits, Elephant integrates) for Claude, if the probe shows the guard keeps protected files protected | per-stage, set after stage 3 | the Antigravity pretool-guard and `agy-native-integrate` suites (file names not checked) |
+
+## 11. Open decisions for the PO
+
+| # | Decision | Cost | Default |
+|---|---|---|---|
+| D1 | Stage 2: change the sibling-scope collection so a settled sibling no longer blocks an ordinary commit on its paths | A change in the host-commit safety check (a trust boundary); needs stage 1 RED first, and the order of the queue cancel and the recovery commit must be known | Not now; decide after stage 1 |
+| D2 | Stage 3: allow one attended Claude worktree probe | PO attention and one dispatch; no repository change | Not now |
+| D3 | Align `workflow-dispatch.md:33-35` with `guard-dispatch.mjs:1004` by text (state that the guard skips the overlap check for an isolated call and the queue reservation covers governed items) rather than by code | One paragraph | Yes, by text, within stage 0 |
+| D4 | Keep the clone-slice route as the route for protected-source and chain slices | None | Yes |
+| D5 | Whether the premise correction (section 1, point 1) also goes into `docs/operating-tools.md` | One sentence in the Clone-slice route section | Yes, with stage 0 |
