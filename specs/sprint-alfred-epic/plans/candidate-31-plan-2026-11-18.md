@@ -54,11 +54,13 @@ Not built, with reason: OS isolation of the Critic and a real read sandbox (both
 
 The closed bundle stays byte-identical. A follow-up addendum is appended next to it, binds the first bundle by its manifest digest and carries what only exists after the close: the security verdict (produced at close, so it goes in at close, never only at a push), the push signature and the final verify when a push happens, and the dispatch records of results the orchestrator landed. It is typed (`addendum`), verified together with the bundle and never blocks. Run B shows why push cannot be the only trigger: a local-only close never reaches it.
 
-## Open PO tiles for 31
+## Tiles answered later the same day (PO took the recommended option each time)
 
-1. Baseline boundary policy (L11): write at `materialize-architecture`, or default non-module path classes, or only report.
-2. Delta bindings (L12): auto-derive from the diff (removes judgment fields) or keep the manual file with a documented schema and passed-through refusals only.
-3. Digest mismatch on Antigravity (L13): repair message with the first differing line, or leave the reference text.
+1. L11: `materialize-architecture` writes the baseline policy with the non-module classes (docs, public, manifests) before any Critic round, so the tree never changes shortly before the close.
+2. L12: follow-up rounds derive path map and behaviour claims from `git diff <previous candidate>..HEAD` and the existing invariants (like `--auto-addenda`); the behaviour-claims judgment field goes away; the bindings file stays as an optional override.
+3. L13: on a digest mismatch the guard names the first differing line and column and orders that exact line to be copied from the file; no pointer route, no loosening.
+
+L11 to L13 move into wave 1 once their recon is written (they touch guard, hook and state sources: clone-slice route).
 
 ## Persisted rules
 
