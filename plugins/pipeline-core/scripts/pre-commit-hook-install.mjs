@@ -493,6 +493,8 @@ function isTrustAnchorBootstrapUpgrade(projectRoot, relPath) {
 // twin, a changed unrelated key, a pre-existing configured command, or any
 // extra protected-path rewrite all fail closed and remain subject to the normal
 // capability check.
+// Kept equal to CALIBRATION_PATHS of lib/project-authority-read.mjs (same values, same order) by a pin in
+// pre-commit-hook-install.test.mjs; this synchronous hook code does not import the shared list at hook time.
 const VERIFY_CALIBRATION_PATHS = Object.freeze([
   "project/pipeline.json",
   ".claude/pipeline.json",

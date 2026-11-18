@@ -31,6 +31,7 @@ import {
   applyDecline,
   DECLINE_MARKER_SCHEMA,
 } from "./pre-commit-hook-install.mjs";
+import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
@@ -1063,6 +1064,29 @@ test("renderImpl: the agent-facing refusal marks any override as human-operator-
   assert.doesNotMatch(printedRefusal, /--no-verify/, "the printed refusal must never teach the exact bypass flag");
   assert.match(printedRefusal, /HUMAN OPERATOR ONLY/);
   assert.match(printedRefusal, /agent MUST NOT/);
+});
+
+// The generated hook keeps its own calibration-twin list (it resolves synchronously and cannot import the shared one at
+// hook time); this pin keeps it equal to the shared frozen list, value for value and in order.
+function hookCalibrationPaths(impl) {
+  const match = /const VERIFY_CALIBRATION_PATHS = Object\.freeze\(\[([^\]]*)\]\);/.exec(impl);
+  assert.ok(match, "the generated hook must declare a frozen VERIFY_CALIBRATION_PATHS list");
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+}
+
+test("renderImpl: the hook's calibration twin list equals the shared CALIBRATION_PATHS element by element and in order", () => {
+  const impl = renderImpl(PLUGIN_DIRS);
+  assert.deepEqual(hookCalibrationPaths(impl), [...CALIBRATION_PATHS]);
+});
+
+test("renderImpl: a mutated hook calibration list (reordered or changed) no longer equals the shared list", () => {
+  const impl = renderImpl(PLUGIN_DIRS);
+  const [first, second] = CALIBRATION_PATHS;
+  const reordered = impl.replace(`"${first}",\n  "${second}",`, `"${second}",\n  "${first}",`);
+  assert.notEqual(reordered, impl, "the mutation must change the generated text");
+  assert.notDeepEqual(hookCalibrationPaths(reordered), [...CALIBRATION_PATHS]);
+  const changed = impl.replace(`"${second}",`, `"${second}.bak",`);
+  assert.notDeepEqual(hookCalibrationPaths(changed), [...CALIBRATION_PATHS]);
 });
 
 // ---- decline recording --------------------------------------------------------------------
