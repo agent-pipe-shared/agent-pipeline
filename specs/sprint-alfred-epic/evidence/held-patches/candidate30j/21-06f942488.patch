@@ -1,0 +1,142 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index b09f42476c4bce9d67bac67efb0d8fc1398dd938..dda2a986b5a50832a83bfb2c48f65e4ba45613e7 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -6234,7 +6234,11 @@ const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
+ const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
+ const INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER = "<approved|declined>";
+ // C28-ONBOARDING-QUESTIONS: said once where the Advisor question is no longer asked (shared with the driver's rewrite of this guidance).
+-export const ADVISOR_EXPORT_FOLDED_GUIDANCE = "The Advisor export consent was already given with the first Pipeline consent question and is recorded with it, so do not ask it again: the returned argv carries approved.";
++// C30J-J23 (AC-112 closest criterion): the ONE wording of the remote-push question of the first onboarding round, rendered by the library ask and by the
++// driver's rewrite of it. The answer has no field, no argv flag and no record: the ask tells the agent what to run with it (repository-mode-promote.mjs).
++export const REMOTE_PUSH_PLANNED_QUESTION = "Is a push to a remote planned later? (yes / no / not sure)";
++export const REMOTE_PUSH_PLANNED_GUIDANCE = `Also ask, in this same question and as its own plain-language question that has no field and no placeholder: "${REMOTE_PUSH_PLANNED_QUESTION}" Recommended: yes only when a remote is already known, otherwise not sure; reason: promoting the project to remote-tracked is one small commit now, but a gate-definition change when it is first done inside a running close. The answer is not recorded anywhere and is never added to applyAction.argv; act on it yourself once this round is applied: yes and a remote already exists -> run node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked before the first feature and commit the paths it prints as their own commit; yes and no remote yet -> run that same command once the PO has added the remote (it refuses with RMP-NO-REMOTE until one exists); no or not sure -> do nothing now, and run the same command later as its own commit before the next feature if a remote is added. A host-managed project needs none of this. `;
++export const ADVISOR_EXPORT_FOLDED_GUIDANCE ="The Advisor export consent was already given with the first Pipeline consent question and is recorded with it, so do not ask it again: the returned argv carries approved.";
+ const FIELDS_AT_ONCE_MARK = "Ask for every field in fieldsAtOnce";
+ const FIELDS_AT_ONCE_DEFAULT_INPUTS = Object.freeze({ language: "language", humanApprovalMode: "humanApproval", advisorExportConsent: "advisorExportConsent" });
+ 
+@@ -7451,7 +7455,7 @@ function collectInitialAnswersAction(observed, fs) {
+         ? { value: "approved", source: "onboarding-consent-record", requiresConfirmation: false }
+         : { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
+     },
+-    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} ${advisorFolded ? ADVISOR_EXPORT_FOLDED_GUIDANCE : "Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation."} Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
++    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} ${advisorFolded ? ADVISOR_EXPORT_FOLDED_GUIDANCE : "Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation."} Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}${REMOTE_PUSH_PLANNED_GUIDANCE}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+     applyAction: commandAction(
+       argv,
+       true,
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 828dcd90e27b4668e0cedaa8e8b3299434744db0..22a7dfef5c21d07fb0682209a599e2f20ba63eb7 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -130,7 +130,7 @@ import {
+   INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE,
+   INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE,
+   INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE,
+-  ADVISOR_EXPORT_FOLDED_GUIDANCE, withFieldsAtOnce,
++  ADVISOR_EXPORT_FOLDED_GUIDANCE, REMOTE_PUSH_PLANNED_GUIDANCE, withFieldsAtOnce,
+   shellWord, intakeGitAuthor,
+ } from "../lib/project-onboarding-v3.mjs";
+ import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+@@ -1389,7 +1389,7 @@ function initialAnswersActionWithoutTrustAnchor(action) {
+     ...action,
+     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
+     ...(trustFollowUp.length === 0 ? {} : { followUpIfSignature: trustFollowUp }),
+-    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy${asksAdvisor ? ", and explicit approved|declined repository-data export consent for the same-runner Advisor" : ""}${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. ${asksAdvisor ? "Declined keeps the Advisor disabled; never infer approval from using the Pipeline." : ADVISOR_EXPORT_FOLDED_GUIDANCE} The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
++    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy${asksAdvisor ? ", and explicit approved|declined repository-data export consent for the same-runner Advisor" : ""}${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. ${asksAdvisor ? "Declined keeps the Advisor disabled; never infer approval from using the Pipeline." : ADVISOR_EXPORT_FOLDED_GUIDANCE} The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}${REMOTE_PUSH_PLANNED_GUIDANCE}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+     applyAction: { ...action.applyAction, argv },
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index 3bdc2e3bf509460998d77f2dc7075cd62b6c756c..af32ecb82e65619d2ee689d277529581bfb7e496 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -37,6 +37,7 @@ import { projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language
+ import { readMachinePlane } from "../lib/machine-plane.mjs";
+ import { parseYaml } from "../lib/yaml-lite.mjs";
+ import { applyProjectOnboardingLifecycleV4, planProjectOnboardingLifecycleV4 } from "../lib/project-onboarding-v3.mjs";
++import * as onboardingLib from "../lib/project-onboarding-v3.mjs";
+ import { runHumanApproval } from "./po-human-approval.mjs";
+ import "./bootstrap-trust-recovery.test.mjs";
+ 
+@@ -2553,6 +2554,81 @@ test("C28-ONBOARDING-QUESTIONS: a v1 record, an older v2 record without the Advi
+   }
+ });
+ 
++// C30J-J23 (AC-112 closest criterion; PO tile 2026-11-18): the ONE existing first onboarding round also asks its own question "is a remote push planned
++// later?" and tells the agent what to do with the answer. The answer is NOT stored: no argv flag, no input or field, no receipt field, no digest changes.
++const REMOTE_PUSH_QUESTION = "Is a push to a remote planned later? (yes / no / not sure)";
++const countOf = (text, needle) => text.split(needle).length - 1;
++const ASK_FLAGS_BEFORE_J23 = ["--root", "--runner", "--git-author-name", "--git-author-email", "--pipeline-actor", "--human-approval", "--advisor-export-consent", "--language"];
++
++test("C30J-J23: the first round asks 'is a remote push planned later?' once, with a recommendation, a reason and what the agent does with each answer", () => {
++  const home = freshHome();
++  const root = freshRoot();
++  try {
++    const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude", env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home } }));
++    assert.ok(ask, "the first-answer round is published");
++    assert.equal(countOf(ask.guidance, REMOTE_PUSH_QUESTION), 1, "the question appears exactly once per ask");
++    assert.match(ask.guidance, /Recommended:/u, "one-line recommendation");
++    assert.match(ask.guidance, /reason:/u, "one-line reason");
++    assert.match(ask.guidance, /yes and a remote already exists -> run node <plugin-root>\/scripts\/repository-mode-promote\.mjs --root <project-root> --to remote-tracked before the first feature/u);
++    assert.match(ask.guidance, /yes and no remote yet -> run that same command once the PO has added the remote/u);
++    assert.match(ask.guidance, /no or not sure -> do nothing now/u);
++    assert.match(ask.guidance, /not recorded anywhere/u, "the ask says the answer has no stored home");
++  } finally { dispose(root); dispose(home); }
++});
++
++test("C30J-J23: the ask's argv, inputs and fields stay exactly what they were; the new question adds no flag, input, placeholder or field", () => {
++  const home = freshHome();
++  try {
++    for (const runner of ["claude", "codex"]) {
++      const root = freshRoot();
++      try {
++        const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner, env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home } }));
++        assert.deepEqual(ask.applyAction.argv.filter((part) => part.startsWith("--")), ASK_FLAGS_BEFORE_J23, `${runner}: the argv flags are unchanged`);
++        assert.deepEqual(ask.fieldsAtOnce.map((field) => field.name), ask.inputs.map((input) => input.name), `${runner}: fields mirror inputs`);
++        assert.equal(ask.inputs.some((input) => /remote|push.?planned/iu.test(input.name)), false, `${runner}: no input for the question`);
++        assert.equal(ask.fieldsAtOnce.some((field) => /remote|push.?planned/iu.test(field.name)), false, `${runner}: no field for the question`);
++        assert.equal(ask.applyAction.argv.some((part) => /^<.*(remote|push).*>$/iu.test(part)), false, `${runner}: no placeholder for the question`);
++        assert.equal(ask.applyAction.argv.some((part) => /remote/iu.test(part) && part.startsWith("--")), false, `${runner}: no remote flag`);
++      } finally { dispose(root); }
++    }
++  } finally { dispose(home); }
++});
++
++test("C30J-J23: a rerun (reload in the middle) renders the same ask byte for byte, still with one question", () => {
++  const home = freshHome();
++  const root = freshRoot();
++  try {
++    const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
++    const first = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude", env }));
++    const second = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude", env }));
++    assert.equal(countOf(second.guidance, REMOTE_PUSH_QUESTION), 1);
++    assert.equal(JSON.stringify(second), JSON.stringify(first), "the re-entry publishes the identical ask");
++  } finally { dispose(root); dispose(home); }
++});
++
++test("C30J-J23: the wording is defined once and both rendering sites use that one constant (library ask and driver rewrite)", () => {
++  assert.equal(typeof onboardingLib.REMOTE_PUSH_PLANNED_QUESTION, "string", "the library exports the one question constant");
++  assert.equal(onboardingLib.REMOTE_PUSH_PLANNED_QUESTION, REMOTE_PUSH_QUESTION);
++  assert.equal(typeof onboardingLib.REMOTE_PUSH_PLANNED_GUIDANCE, "string");
++  assert.equal(countOf(onboardingLib.REMOTE_PUSH_PLANNED_GUIDANCE, REMOTE_PUSH_QUESTION), 1);
++  const librarySource = readFileSync(new URL("../lib/project-onboarding-v3.mjs", import.meta.url), "utf8");
++  const driverSource = readFileSync(new URL("./onboarding-init.mjs", import.meta.url), "utf8");
++  assert.equal(countOf(librarySource, "planned later?") + countOf(driverSource, "planned later?"), 1, "the question wording exists in one place in the two sources");
++  assert.equal(countOf(librarySource, "${REMOTE_PUSH_PLANNED_GUIDANCE}"), 1, "the library ask renders the constant once");
++  assert.equal(countOf(driverSource, "${REMOTE_PUSH_PLANNED_GUIDANCE}"), 1, "the driver rewrite renders the constant once");
++  // The driver rewrite of a library-shaped trust-anchor ask carries exactly the constant, once.
++  const root = freshRoot();
++  try {
++    const action = { kind: "collect-input", inputs: [{ name: "gitAuthorName" }, { name: "humanApprovalMode" }, { name: "language" }, { name: "trustAnchorMode" }],
++      reviewedDefaults: { language: { value: "en" }, humanApproval: { value: "signature" } },
++      applyAction: { argv: ["onboarding-init.mjs", "--human-approval", "<signature|chat>", "--trust-anchor-mode", "<m>"] } };
++    const result = driveOnboardingInit({ rootDir: root, runner: "claude", run: () => respond({ schema: "pipeline.project-onboarding.v4", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: false, pendingAsks: [action] } }) });
++    const guidance = result.pendingAsks[0].guidance;
++    assert.equal(countOf(guidance, REMOTE_PUSH_QUESTION), 1);
++    assert.equal(countOf(guidance, onboardingLib.REMOTE_PUSH_PLANNED_GUIDANCE), 1, "identical text to the library site");
++  } finally { dispose(root); }
++});
++
+ test("DEFAULT_STEP_CAP is a small, positive constant", () => {
+   assert.ok(Number.isInteger(DEFAULT_STEP_CAP));
+   assert.ok(DEFAULT_STEP_CAP > 0);

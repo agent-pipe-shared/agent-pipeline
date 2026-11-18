@@ -1,0 +1,12 @@
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index b6219337f8ed1254991e5675f300b97c26e0f17b..909e86444708d5399970a057689f31265acae904 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -305,6 +305,7 @@
+           "docs/adr/0101-the-stage-0-fast-path-admits-small-changes-with-tests-at-any-rigor.md",
+           "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
+           "docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md",
++          "docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md",
+           "docs/adr/README.md"
+         ]
+       },

@@ -1,0 +1,176 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index a2405f8bf23a8eca003a6bb98e260841a20f110b..c327fc080f8b5c2ca3b011ca23b586e82ce7a041 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -2817,8 +2817,9 @@ test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and stat
+     // the same paths in each. AC-197 group G (QG-04 justification, bounded to the last two
+     // assertions of this block): PO decision D24 (po-decisions-2026-10-18) made the generator
+     // recommend a message file, git commit -F <msgfile> -- <paths>, for a parenthesised Dispatch
+-    // role, because guard-push refuses the parenthesised --trailer spelling the old assertion
+-    // required. The file-free form keeps the AI-Assisted trailer; the refused spelling must not return.
++    // role, because the dispatched route stays the message file (guard-dispatch-budget's closing-act
++    // check rejects parentheses; guard-push itself admits a quoted parenthesised trailer on one plain
++    // printable-ASCII line, PGC-T82b). The file-free form keeps the AI-Assisted trailer; the old spelling must not return.
+     assert.match(result.stderr, /git add -- <paths>/u);
+     assert.match(result.stderr, /git commit -m /u);
+     assert.match(result.stderr, /--trailer 'AI-Assisted: true'/u);
+diff --git a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+index cb5cb16271e1b822ef3933c26406007ba0a9c86c..b22ee2fb84b972ce5fe4b4422140087e68c92868 100644
+--- a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+@@ -288,8 +288,9 @@ for (const { id, title, input: scenario } of COMMITFLOW_SCENARIOS) {
+ 
+ // PRODUCER-T -- Ruling 150 (specs/sprint-alfred-epic/plans/0.7-execution-order.md): the producer emits the
+ // message-file route. Today its commit step is `git commit -m <subject> -m <body>... --trailer "Dispatch: <ID> (goldfish)"
+-// --trailer "AI-Assisted: true" -- <paths>`, which guard-push refuses (the parenthesised trailer value), so the route
+-// the template mandates has never been executable. Every case below is RED BY DESIGN until PRODUCER-F
++// --trailer "AI-Assisted: true" -- <paths>`. guard-push admits one plain printable-ASCII commit on one line, no backslash,
++// no global option, with a QUOTED parenthesised trailer (PGC-T82b); the dispatched route still stays the message file,
++// because guard-dispatch-budget's closing-act check rejects parentheses. Every case below is RED BY DESIGN until PRODUCER-F
+ // (lib/goldfish-commit-command-flow.mjs) changes the route. Do not weaken or skip them to make the suite green.
+ //
+ // Assumptions, named so the fix may revisit a FIELD NAME but not the route:
+@@ -317,7 +318,7 @@ const PRODUCER_T_CLI_ARGS = ["--task-id", input.taskId, "--type", input.type, "-
+   "--summary", input.summary, ...input.bodyParagraphs.flatMap((body) => ["--body", body]),
+   ...input.paths.flatMap((path) => ["--path", path])];
+ const PRODUCER_T_REASON = "Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` "
+-  + "(guard-push refuses -m with a parenthesised --trailer)";
++  + "(a dispatched closing act stays the message file: guard-dispatch-budget's closing-act check rejects parentheses)";
+ 
+ function assertMessageFileRoute(result) {
+   assert.equal(result.ok, true);
+diff --git a/plugins/pipeline-core/scripts/publication-close-journal.mjs b/plugins/pipeline-core/scripts/publication-close-journal.mjs
+index 3c2601a6959933e60d7887f963c902eaa2b1aa5b..6a899ea80310e5e27df4545818c7b78bbe3831a5 100644
+--- a/plugins/pipeline-core/scripts/publication-close-journal.mjs
++++ b/plugins/pipeline-core/scripts/publication-close-journal.mjs
+@@ -365,31 +365,6 @@ export function advanceCloseCoordinator(state, args) {
+   validateCloseCoordinator(post); return post;
+ }
+ 
+-export function createCloseJournal(input) {
+-  assertKeys(input, ["lifecycleId", "candidateOid", "candidateTree", "authority", "afkComplete", "recoveryPending"], "create journal");
+-  if (input.afkComplete !== true || input.recoveryPending !== false) throw new Error("close blockers active");
+-  const journal = { schema: JOURNAL_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "pending", candidateOid: input.candidateOid, candidateTree: input.candidateTree, authority: structuredClone(input.authority), effects: [] };
+-  validateCloseJournal(journal);
+-  return journal;
+-}
+-
+-export function advanceCloseJournal(journal, args) {
+-  validateCloseJournal(journal);
+-  assertKeys(args, ["expectedRevision", "expectedStateSha256", "phase", "inputDigest", "observedDigest"], "advance arguments");
+-  assertCas(journal, args.expectedRevision, args.expectedStateSha256, "close-journal");
+-  assertHex(args.inputDigest, "inputDigest", true); assertHex(args.observedDigest, "observedDigest", true);
+-  if (args.phase === journal.phase && journal.phase !== "pending") {
+-    const prior = journal.effects.at(-1);
+-    if (prior.inputDigest === args.inputDigest && prior.observedDigest === args.observedDigest) return journal;
+-    throw new Error("conflicting close phase replay");
+-  }
+-  const nextPhase = JOURNAL_PHASES[JOURNAL_PHASES.indexOf(journal.phase) + 1];
+-  if (args.phase !== nextPhase) throw new Error("close phase invalid");
+-  const post = { ...journal, revision: journal.revision + 1, priorStateSha256: args.expectedStateSha256, phase: args.phase, effects: [...journal.effects, { phase: args.phase, inputDigest: args.inputDigest, observedDigest: args.observedDigest }] };
+-  validateCloseJournal(post);
+-  return post;
+-}
+-
+ function validatePrerequisites(value) {
+   assertKeys(value, ["d2", "closePostimageDigest", "afk", "recoveryPending"], "publication prerequisites");
+   assertKeys(value.d2, ["phase", "receiptDigest", "closePostimageDigest"], "D2 prerequisite");
+@@ -585,25 +560,7 @@ function durableReplace(path, value) {
+   }
+ }
+ 
+-export function storeCloseJournal({ gitCommonDir, journal, expectedRawSha256 }) {
+-  validateCloseJournal(journal);
+-  const paths = publicationClosePaths(gitCommonDir, journal.lifecycleId);
+-  return withLock(paths, () => {
+-    const exists = existsSync(paths.journal);
+-    if (!exists && expectedRawSha256 !== null) throw new Error("close journal missing for CAS");
+-    if (exists) {
+-      const current = readMode0600(paths.journal, validateCloseJournal);
+-      if (current.rawDigest !== expectedRawSha256) throw new Error("stale close journal raw CAS");
+-      const wanted = jsonBytes(journal);
+-      if (current.raw.equals(Buffer.from(wanted))) return { path: paths.journal, rawDigest: current.rawDigest, written: false };
+-      if (journal.revision !== current.value.revision + 1 || journal.priorStateSha256 !== hash(current.value) || journal.lifecycleId !== current.value.lifecycleId || journal.candidateOid !== current.value.candidateOid || journal.candidateTree !== current.value.candidateTree || canonical(journal.authority) !== canonical(current.value.authority)) throw new Error("close journal transition invalid");
+-    } else if (expectedRawSha256 !== null) throw new Error("stale close journal raw CAS");
+-    else if (journal.revision !== 0) throw new Error("initial close journal revision invalid");
+-    const stored = durableReplace(paths.journal, journal);
+-    return { path: paths.journal, rawDigest: stored.rawDigest, written: true };
+-  });
+-}
+-
++// Read side only: the legacy journal has no writer any more, an old journal file stays readable.
+ export function readCloseJournal(gitCommonDir, lifecycleId) {
+   const paths = publicationClosePaths(gitCommonDir, lifecycleId);
+   const stored = readMode0600(paths.journal, validateCloseJournal);
+diff --git a/plugins/pipeline-core/scripts/publication-close-journal.test.mjs b/plugins/pipeline-core/scripts/publication-close-journal.test.mjs
+index 768d67fda8ab7b2c8a5ad8c16b6004654959ea7d..ee1495f0bb758d36092e5aa4dcf73125e37d5eb4 100644
+--- a/plugins/pipeline-core/scripts/publication-close-journal.test.mjs
++++ b/plugins/pipeline-core/scripts/publication-close-journal.test.mjs
+@@ -1,12 +1,13 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import { existsSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { createHash } from "node:crypto";
+ import { approvePublication, authorizePublication, closePublication, observePublication, preparePublication, publicationDigest, startReadback } from "../lib/publication-bundle.mjs";
+-import { advanceCloseJournal, createCloseJournal, createPublicationLifecycle, importPublicationChannel, lifecycleDigest, publicationClosePaths, readCloseJournal, readPublicationLifecycle, recordCleanup, storeCloseJournal, storePublicationLifecycle } from "./publication-close-journal.mjs";
++import * as journalModule from "./publication-close-journal.mjs";
++import { JOURNAL_SCHEMA, createPublicationLifecycle, importPublicationChannel, lifecycleDigest, publicationClosePaths, readCloseJournal, readPublicationLifecycle, recordCleanup, storePublicationLifecycle, validateCloseJournal } from "./publication-close-journal.mjs";
+ const h = (char, length = 64) => char.repeat(length);
+ const rawDigest = (value) => createHash("sha256").update(`${JSON.stringify(value, null, 2)}\n`).digest("hex");
+ const authority = { implementationResultDigest: h("1"), prdDigest: h("2"), specDigests: [h("3"), h("4"), h("5"), h("6"), h("7"), h("8")], verifyDigest: h("9"), criticDigest: h("a"), d2ReceiptDigest: h("b"), privateIntentDigest: h("c"), publicIntentDigest: h("d") };
+@@ -22,25 +23,18 @@ function receipt(channel, char) {
+   return closePublication(state, { expectedRevision: 4, expectedStateSha256: publicationDigest(state), fetchedRef: "refs/heads/main", fetchedOid: oid, fetchedTree: tree, completedAt: 4 });
+ }
+ let tests = 0; const check = (name, fn) => { fn(); tests++; };
+-let journal = createCloseJournal({ lifecycleId: "batman", candidateOid: h("a", 40), candidateTree: h("b", 40), authority, afkComplete: true, recoveryPending: false });
++// The write side of the legacy close journal is removed; only the readers stay, so an old journal file (AC-047-27 compatibility) remains readable.
++check("the legacy close-journal write side is gone", () => { for (const name of ["createCloseJournal", "advanceCloseJournal", "storeCloseJournal"]) assert.equal(name in journalModule, false, name); });
++check("the legacy close-journal readers stay exported", () => { assert.equal(typeof journalModule.validateCloseJournal, "function"); assert.equal(typeof journalModule.readCloseJournal, "function"); });
++const pendingJournal = { schema: JOURNAL_SCHEMA, lifecycleId: "batman", revision: 0, priorStateSha256: null, phase: "pending", candidateOid: h("a", 40), candidateTree: h("b", 40), authority, effects: [] };
++const legacyJournal = { ...pendingJournal, revision: 1, priorStateSha256: lifecycleDigest(pendingJournal), phase: "implementation-result-bound", effects: [{ phase: "implementation-result-bound", inputDigest: h("c"), observedDigest: h("d") }] };
+ const common = mkdtempSync(join(tmpdir(), "publication-close-"));
+-const initial = storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: null });
+-journal = advanceCloseJournal(journal, { expectedRevision: 0, expectedStateSha256: lifecycleDigest(journal), phase: "implementation-result-bound", inputDigest: h("c"), observedDigest: h("d") });
+-check("ordered close phase", () => assert.equal(journal.phase, "implementation-result-bound"));
+-check("identical phase replay is zero-state-change", () => assert.equal(advanceCloseJournal(journal, { expectedRevision: 1, expectedStateSha256: lifecycleDigest(journal), phase: "implementation-result-bound", inputDigest: h("c"), observedDigest: h("d") }), journal));
+-check("conflicting replay blocks", () => assert.throws(() => advanceCloseJournal(journal, { expectedRevision: 1, expectedStateSha256: lifecycleDigest(journal), phase: "implementation-result-bound", inputDigest: h("e"), observedDigest: h("d") }), /conflicting/));
+-const first = storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: initial.rawDigest });
+-check("durable journal is mode 0600", () => assert.equal(statSync(first.path).mode & 0o777, 0o600));
+-const before = statSync(first.path).mtimeMs;
+-const replayStore = storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: first.rawDigest });
+-check("identical durable replay does not replace journal", () => { assert.equal(replayStore.written, false); assert.equal(statSync(first.path).mtimeMs, before); });
+-check("stale raw CAS blocks", () => assert.throws(() => storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: h("0") }), /stale/));
+-check("recovery names only next phase", () => assert.equal(readCloseJournal(common, "batman").nextPhase, "feature-closed"));
+-const lockPath = publicationClosePaths(common, "batman").lock;
+-writeFileSync(lockPath, "foreign-lock\n", { mode: 0o600 });
+-check("foreign writer lock is never removed", () => { assert.throws(() => storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: first.rawDigest }), /EEXIST/); assert.equal(existsSync(lockPath), true); });
+-unlinkSync(lockPath);
+-writeFileSync(first.path, "torn\n", { mode: 0o600 });
++const legacyPaths = publicationClosePaths(common, "batman");
++mkdirSync(legacyPaths.directory, { recursive: true, mode: 0o700 });
++writeFileSync(legacyPaths.journal, `${JSON.stringify(legacyJournal, null, 2)}\n`, { mode: 0o600 });
++check("an old journal file stays valid", () => assert.equal(validateCloseJournal(legacyJournal), true));
++check("recovery of an old journal names only the next phase", () => { const read = readCloseJournal(common, "batman"); assert.equal(read.nextPhase, "feature-closed"); assert.equal(read.journal.phase, "implementation-result-bound"); });
++writeFileSync(legacyPaths.journal, "torn\n", { mode: 0o600 });
+ check("torn state blocks recovery", () => assert.throws(() => readCloseJournal(common, "batman"), /torn/));
+ rmSync(common, { recursive: true, force: true });
+ let lifecycle = createPublicationLifecycle({ lifecycleId: "batman", epicId: "epic", featureId: "feature", prerequisites: prerequisite });
+@@ -65,5 +59,14 @@ check("receipt raw digest is recomputed", () => assert.throws(() => importPublic
+ lifecycle = recordCleanup(lifecycle, { expectedRevision: 2, expectedStateSha256: lifecycleDigest(lifecycle), status: "uncertain", evidenceDigest: h("f") });
+ storedLifecycle = storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: storedLifecycle.rawDigest });
+ check("cleanup uncertainty blocks without erasing receipts", () => { assert.equal(lifecycle.status, "blocked"); assert.notEqual(lifecycle.channels.private, null); });
++// Restated (QG-04) from the removed journal writer cases: the shared lock/CAS/replay paths, now through the lifecycle writer.
++const lifecycleMtime = statSync(storedLifecycle.path).mtimeMs;
++const lifecycleReplay = storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: storedLifecycle.rawDigest });
++check("identical durable replay does not replace the lifecycle", () => { assert.equal(lifecycleReplay.written, false); assert.equal(statSync(storedLifecycle.path).mtimeMs, lifecycleMtime); });
++check("stale raw CAS blocks", () => assert.throws(() => storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: h("0") }), /stale/));
++const lifecycleLock = publicationClosePaths(lifecycleCommon, "batman").lock;
++writeFileSync(lifecycleLock, "foreign-lock\n", { mode: 0o600 });
++check("foreign writer lock is never removed", () => { assert.throws(() => storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: storedLifecycle.rawDigest }), /EEXIST/); assert.equal(existsSync(lifecycleLock), true); });
++unlinkSync(lifecycleLock);
+ rmSync(lifecycleCommon, { recursive: true, force: true });
+ console.log(`publication-close-journal: ${tests} tests passed`);

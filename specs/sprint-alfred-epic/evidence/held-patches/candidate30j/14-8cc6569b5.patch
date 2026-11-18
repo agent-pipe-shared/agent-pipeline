@@ -1,0 +1,62 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 8bbb22f612e7b2a56f42bf4c64ed101ed17240cf..1d5949e5fb99b6b4ccdb478ef7eff06e7c08c2f6 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -241,7 +241,11 @@ function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
+   // D41: a sole `--help` prints the evidence route; it takes no root and combines with nothing.
+   if (allArgs.length === 1 && allArgs[0] === "--help") return true;
+   // C28c: a trailing `--stage` (stage exactly the printed commitPaths, never commit) combines with every root form; the form before it is judged as before.
+-  const args = allArgs.length > 2 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
++  const staged = allArgs.length > 2 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
++  // C30J-J14: the lineage and the delta request forms take ONE trailing `--feature <feature id>` (a lowercase id of the registrar's own shape, never a path), also before `--stage`; no other verb takes it.
++  const selected = staged.length >= 6 && staged.at(-2) === "--feature" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(staged.at(-1))
++    && ["--add-review-lineage", "--add-delta-request"].includes(staged[2]);
++  const args = selected ? staged.slice(0, -2) : staged;
+   if (!exactRoot(args, root, 0)) return false;
+   if (args.length === 2) return true;
+   if (args.length === 3) return args[2] === "--add-review-unit";
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 244025b9388f8789f1933db6fc9e99f0727bff36..df73af844971743bd0bd583b653d591c55328159 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -533,6 +533,20 @@ test("PF-94 feature-package registration: --add-review-lineage --packet <32 lowe
+   withFixture("feature", f => {
+     const hex = "0123456789abcdef0123456789abcdef";
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-lineage", "--packet", hex), f, "add review lineage");
++    // C30J-J14: one trailing `--feature <feature id>` (the selector the registrar's refusals name) is admitted, also with `--stage`.
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "feature-a"), f, "lineage with the feature selector");
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "feature-a", "--stage"), f, "lineage with the feature selector, staged");
++    for (const [label, argv] of [["lineage selector uppercase id", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "Feature-A"]],
++      ["lineage selector path-like id", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "specs/feature-a"]],
++      ["lineage selector parent id", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", ".."]],
++      ["lineage selector dash id", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "--force"]],
++      ["lineage selector without id", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature"]],
++      ["lineage repeated selector", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "a", "--feature", "b"]],
++      ["lineage selector before the packet", ["--root", f.root, "--add-review-lineage", "--feature", "feature-a", "--packet", hex]],
++      ["lineage selector then unknown flag", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--feature", "feature-a", "--force"]],
++      ["selector on the review unit verb", ["--root", f.root, "--add-review-unit", "--feature", "feature-a"]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
+     for (const [label, argv] of [["lineage without packet flag", ["--root", f.root, "--add-review-lineage"]],
+       ["lineage packet without id", ["--root", f.root, "--add-review-lineage", "--packet"]],
+       ["lineage dash id", ["--root", f.root, "--add-review-lineage", "--packet", "--force"]],
+@@ -552,6 +566,19 @@ test("PF-94 feature-package registration: --add-delta-request <repository-relati
+     // C30d: the Coordinator's explicit yes to a full next round is the one trailing option this verb takes, and no other verb takes it.
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--confirm-full-round"), f, "add delta request, full round confirmed");
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--confirm-full-round", "--stage"), f, "add delta request, full round confirmed, staged");
++    // C30J-J14: one trailing `--feature <feature id>` after the existing forms.
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--feature", "feature-a"), f, "delta with the feature selector");
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--confirm-full-round", "--feature", "feature-a"), f, "delta, full round, feature selector");
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json", "--confirm-full-round", "--feature", "feature-a", "--stage"), f, "delta, full round, feature selector, staged");
++    for (const [label, argv] of [["delta selector uppercase id", ["--root", f.root, "--add-delta-request", "d.json", "--feature", "Feature-A"]],
++      ["delta selector path-like id", ["--root", f.root, "--add-delta-request", "d.json", "--feature", "a/b"]],
++      ["delta repeated selector", ["--root", f.root, "--add-delta-request", "d.json", "--feature", "a", "--feature", "b"]],
++      ["delta selector before the path", ["--root", f.root, "--add-delta-request", "--feature", "a", "d.json"]],
++      ["delta selector before the confirm", ["--root", f.root, "--add-delta-request", "d.json", "--feature", "a", "--confirm-full-round"]],
++      ["delta selector then unknown flag", ["--root", f.root, "--add-delta-request", "d.json", "--feature", "a", "--force"]],
++      ["selector on the diagnostic verb", ["--root", f.root, "--add-diagnostic-evidence", "d.json", "--feature", "a"]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
+     for (const [label, argv] of [["confirm on the diagnostic verb", ["--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--confirm-full-round"]],
+       ["confirm without the delta verb", ["--root", f.root, "--add-review-unit", "--confirm-full-round"]],
+       ["confirm with a dash path", ["--root", f.root, "--add-delta-request", "--force", "--confirm-full-round"]],

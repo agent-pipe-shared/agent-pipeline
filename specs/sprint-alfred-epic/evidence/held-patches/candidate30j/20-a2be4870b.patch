@@ -1,0 +1,225 @@
+diff --git a/plugins/pipeline-core/lib/human-command-render.mjs b/plugins/pipeline-core/lib/human-command-render.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..d2d0d1f0701035ea0c13610d6473f2bbb00e92e4
+--- /dev/null
++++ b/plugins/pipeline-core/lib/human-command-render.mjs
+@@ -0,0 +1,71 @@
++// SPDX-License-Identifier: SUL-1.0
++
++/**
++ * C30J-J22 (AC-112): one small renderer that shapes a command for the shell the human (or the agent's terminal) actually runs it in.
++ *
++ * Why: on a Windows host every path the Pipeline builds (`fileURLToPath`, `path.join`) carries backslashes, and the POSIX block of
++ * the shared copy-safe rendering printed them as they came. A bash block with `C:\Users\...` is valid only through its quoting; a
++ * chat, markdown or "!"-prefix layer that drops or re-wraps a backslash (a fragment ends in `\'`) tears the path apart. The forward
++ * form `C:/Users/...` is valid in bash, PowerShell and node alike, so a bash block shows paths in that form.
++ *
++ * Only the DISPLAYED string changes. The argv a caller holds, `command`, every digest, subject and signature preimage stay exactly
++ * as built; this module never hashes, signs or stores anything. Use it ONLY for a command whose path flags the receiving command resolves
++ * (`--repo-root`, `--directory`): a command that compares a path flag byte-for-byte against the path it printed (`approve-push --proof-request`,
++ * pipeline-state.mjs localMirrorScratchArtifacts) must keep the path exactly as built. Quoting and bounding stay the one definition in copy-safe-command.mjs.
++ */
++import { boundedCopySafeCommand, renderHumanCopySafeCommand } from "./copy-safe-command.mjs";
++
++const DRIVE_PATH = /^[A-Za-z]:\\/u;
++const UNC_PATH = /^\\\\[^\\/]/u;
++const FLAG_WITH_VALUE = /^(--?[\w-]+=)(.+)$/su;
++
++// Absolute paths only: a relative value (a stored path, a DOMAIN\user name) is never guessed to be a path.
++function isWindowsPath(value) {
++  return DRIVE_PATH.test(value) || UNC_PATH.test(value);
++}
++
++function toForwardSlashes(value) {
++  if (typeof value !== "string") return value;
++  if (isWindowsPath(value)) return value.replaceAll("\\", "/");
++  const flag = FLAG_WITH_VALUE.exec(value);
++  return flag !== null && isWindowsPath(flag[2]) ? `${flag[1]}${flag[2].replaceAll("\\", "/")}` : value;
++}
++
++/** The argv with every Windows-style path in forward-slash form; the SAME array when there is nothing to reshape. */
++export function posixPathArgv(argv) {
++  const shaped = argv.map(toForwardSlashes);
++  return shaped.every((value, index) => value === argv[index]) ? argv : shaped;
++}
++
++/**
++ * The line-break-safe string for ONE shell: the bounded bash (`CMD=` fragments, `eval "$CMD"`) or PowerShell block.
++ * `pathStyle` "posix" shows Windows-style paths with forward slashes, "native" leaves them as built; the default is "posix" for bash
++ * and "native" for PowerShell.
++ */
++export function renderHumanCommand({ executable, argv, shell, pathStyle } = {}) {
++  if (shell !== "bash" && shell !== "powershell") throw new TypeError('renderHumanCommand shell must be "bash" or "powershell"');
++  const style = pathStyle ?? (shell === "bash" ? "posix" : "native");
++  if (style !== "posix" && style !== "native") throw new TypeError('renderHumanCommand pathStyle must be "posix" or "native"');
++  const shaped = style === "posix" ? { executable: toForwardSlashes(executable), argv: posixPathArgv(argv) } : { executable, argv };
++  const { copyCommand } = boundedCopySafeCommand({ ...shaped, forceCopyCommand: true });
++  return shell === "bash" ? copyCommand.posix : copyCommand.powershell;
++}
++
++/**
++ * The shared `renderHumanCopySafeCommand` result for a step whose reader's shell is unknown (both blocks are printed), with its POSIX
++ * block shown in posix path style. Byte-identical to the shared rendering when no path needs reshaping.
++ */
++export function renderHumanStep({ label, executable, argv } = {}) {
++  const original = renderHumanCopySafeCommand({ label, executable, argv });
++  if (posixPathArgv(argv) === argv && toForwardSlashes(executable) === executable) return original;
++  const posix = renderHumanCopySafeCommand({ label, executable: toForwardSlashes(executable), argv: posixPathArgv(argv), platform: "posix" });
++  const copyCommand = { ...original.copyCommand, posix: renderHumanCommand({ executable, argv, shell: "bash" }) };
++  return { ...original, copyCommand, text: `${posix.text}${original.text.slice(original.text.indexOf("\nPowerShell:\n"))}` };
++}
++
++/** The shared `boundedCopySafeCommand` result with only `copyCommand.posix` shown in posix path style (still null where the shared result has none); argv, command and the other blocks are untouched. */
++export function boundedCopySafeCommandForBash({ executable, argv } = {}) {
++  const original = boundedCopySafeCommand({ executable, argv });
++  if (original.copyCommand.posix === null || (posixPathArgv(argv) === argv && toForwardSlashes(executable) === executable)) return original;
++  return { ...original, copyCommand: { ...original.copyCommand, posix: renderHumanCommand({ executable, argv, shell: "bash" }) } };
++}
+diff --git a/plugins/pipeline-core/lib/human-command-render.test.mjs b/plugins/pipeline-core/lib/human-command-render.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9a4a277243036116213664dde2ee9e7ffe54ae9a
+--- /dev/null
++++ b/plugins/pipeline-core/lib/human-command-render.test.mjs
+@@ -0,0 +1,92 @@
++// SPDX-License-Identifier: SUL-1.0
++// C30J-J22 (AC-112, closest accepted criterion): every command printed for the human is shaped for its target shell by ONE renderer.
++// The argv, the digests and the signing subject are never touched: only the displayed string changes.
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { readFileSync } from "node:fs";
++import { boundedCopySafeCommand, renderHumanCopySafeCommand } from "./copy-safe-command.mjs";
++import { authorizeCriticalPushCommand, poHumanApprovalSetupCommand } from "../scripts/po-human-approval.mjs";
++import { boundedCopySafeCommandForBash, posixPathArgv, renderHumanCommand, renderHumanStep } from "./human-command-render.mjs";
++
++const WIN_SCRIPT = "C:\\Users\\someone\\.claude\\plugins\\pipeline-core\\scripts\\pipeline-state.mjs";
++const WIN_PROOF = "C:\\work\\proj\\scratch\\critical-push-request-abcdef123456.json";
++const SHA = "a".repeat(64);
++
++test("a bash block for Windows-style paths carries forward-slash paths and no backslash", () => {
++  const block = renderHumanCommand({ executable: "node", argv: [WIN_SCRIPT, "approve-push", "--proof-request", WIN_PROOF], shell: "bash" });
++  assert.doesNotMatch(block, /\\/u);
++  assert.match(block, /C:\/Users\/someone\/\.claude/u);
++  assert.match(block, /eval "\$CMD"/u);
++});
++
++test("the bash block runs in a real bash and hands each path through as one exact word", { skip: process.platform === "win32" }, () => {
++  const block = renderHumanCommand({ executable: "printf", argv: ["%s\\n", WIN_SCRIPT, WIN_PROOF], shell: "bash" });
++  const run = spawnSync("bash", ["-c", block], { encoding: "utf8", shell: false, timeout: 10000 });
++  assert.equal(run.status, 0, run.stderr);
++  assert.deepEqual(run.stdout.split("\n").slice(0, 2), ["C:/Users/someone/.claude/plugins/pipeline-core/scripts/pipeline-state.mjs", "C:/work/proj/scratch/critical-push-request-abcdef123456.json"]);
++});
++
++test("a PowerShell block keeps the native backslash form unless the caller asks for the posix style", () => {
++  const argv = [WIN_SCRIPT, "--proof-request", WIN_PROOF];
++  assert.match(renderHumanCommand({ executable: "node", argv, shell: "powershell" }), /C:\\Users\\someone/u);
++  assert.doesNotMatch(renderHumanCommand({ executable: "node", argv, shell: "powershell", pathStyle: "posix" }), /\\/u);
++  assert.match(renderHumanCommand({ executable: "node", argv, shell: "bash", pathStyle: "native" }), /C:\\Users\\someone/u);
++});
++
++test("only absolute Windows paths are reshaped: hashes, flags, relative paths and any other backslash value stay as given", () => {
++  const argv = ["--by", "po", "--subject-sha256", SHA, "scratch/a.json", "--note=keep\\this", "two words\\here", "--repo-root=C:\\work\\proj", "scratch\\b.json", "\\\\host\\share\\x.json", "DOMAIN\\user"];
++  assert.deepEqual(posixPathArgv(argv), ["--by", "po", "--subject-sha256", SHA, "scratch/a.json", "--note=keep\\this", "two words\\here", "--repo-root=C:/work/proj", "scratch\\b.json", "//host/share/x.json", "DOMAIN\\user"]);
++  const plain = ["--by", "po", "scratch/a.json"];
++  assert.equal(posixPathArgv(plain), plain, "nothing to reshape returns the same array");
++});
++
++test("the renderer refuses an unknown shell or path style by name", () => {
++  assert.throws(() => renderHumanCommand({ executable: "node", argv: ["x"], shell: "zsh" }), /shell must be "bash" or "powershell"/u);
++  assert.throws(() => renderHumanCommand({ executable: "node", argv: ["x"], shell: "bash", pathStyle: "dos" }), /pathStyle must be "posix" or "native"/u);
++});
++
++test("a step without a Windows path is byte-identical to the shared copy-safe rendering", () => {
++  const input = { label: "agent push", executable: "git", argv: ["push", "origin", "HEAD:refs/heads/feat/x"] };
++  assert.deepEqual(renderHumanStep(input), renderHumanCopySafeCommand(input));
++});
++
++test("a step with Windows paths keeps its heading, PowerShell and cmd blocks and fixes only the POSIX block", () => {
++  const input = { label: "agent approve-push", executable: "node", argv: [WIN_SCRIPT, "approve-push", "--proof-request", WIN_PROOF] };
++  const original = renderHumanCopySafeCommand(input);
++  const step = renderHumanStep(input);
++  const [posixPart, rest] = step.text.split("\nPowerShell:\n");
++  assert.match(posixPart, /^Step: agent approve-push\nPOSIX:\n/u);
++  assert.doesNotMatch(posixPart, /\\/u);
++  assert.equal(rest, original.text.split("\nPowerShell:\n")[1], "PowerShell and cmd.exe blocks are byte-identical to the shared rendering");
++  assert.deepEqual({ ...step, text: null, copyCommand: { ...step.copyCommand, posix: null } }, { ...original, text: null, copyCommand: { ...original.copyCommand, posix: null } },
++    "executable, argv, command and the PowerShell and cmd copy blocks are untouched");
++  assert.doesNotMatch(step.copyCommand.posix, /\\/u);
++});
++
++test("po-human-approval prints the authorize-critical command with a posix block free of backslashes, argv and command untouched", () => {
++  const input = { repoRoot: "C:\\work\\proj", featureId: "feat-1", plan: "specs/plan.md", spec: "specs/spec.md",
++    subjectSha256: SHA, expiresAt: "2030-01-01T00:00:00.000Z", launcher: "C:\\Users\\someone\\plugin\\scripts\\po-human-approval.mjs" };
++  const built = authorizeCriticalPushCommand(input);
++  assert.doesNotMatch(built.copyCommand.posix, /\\/u);
++  assert.match(built.copyCommand.powershell, /C:\\Users\\someone/u);
++  assert.ok(built.argv.includes(input.plan) && built.command.includes("C:\\work\\proj"), "machine fields keep the exact values");
++  assert.ok(built.copyCommand.posix.replaceAll("'\nCMD=${CMD}'", "").includes(SHA), "the subject digest is relayed exactly");
++});
++
++test("the first-machine setup command is not reshaped (a third builder, outside the two adopted sites)", () => {
++  const input = { repoRoot: "C:\\work\\proj", directory: "C:\\Users\\someone\\keys", launcher: "C:\\Users\\someone\\plugin\\scripts\\po-human-approval.mjs" };
++  assert.deepEqual(poHumanApprovalSetupCommand(input), boundedCopySafeCommand({ executable: "node", argv: [input.launcher, "setup", "--repo-root", input.repoRoot, "--directory", input.directory] }));
++});
++
++test("push-prepare reshapes only the human signing step: approve-push and push are printed exactly as built", () => {
++  const source = readFileSync(new URL("../scripts/push-prepare.mjs", import.meta.url), "utf8");
++  assert.equal([...source.matchAll(/= renderHumanStep\(\{\s*label: "([^"]+)"/gu)].map((m) => m[1]).join(","), "human authorize-critical");
++  assert.equal([...source.matchAll(/= renderHumanCopySafeCommand\(\{\s*label: "agent approve-push"/gu)].length, 2);
++});
++
++test("the bounded helper hands back the input unchanged when no path needs reshaping", () => {
++  const built = boundedCopySafeCommandForBash({ executable: "node", argv: ["/opt/plugin/scripts/x.mjs", "--by", "po"] });
++  assert.equal(built.argv.length, 3);
++  assert.equal(built.command, "node /opt/plugin/scripts/x.mjs --by po");
++});
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 47a9cb6c2a24406636e56b4b3f1737551b70ab9a..e3d2f514b7d861cef7cdce32af0b9c1c9e6c375a 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -53,6 +53,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { MACHINE_PLANE_SCHEMA, readMachinePlane, validOperatorLabel, writeMachinePlane } from "../lib/machine-plane.mjs";
+ import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
++import { boundedCopySafeCommandForBash } from "../lib/human-command-render.mjs";
+ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA, validateDesignWorkflowPackageApprovalRequest } from "../lib/design-workflow-approval.mjs";
+@@ -2334,7 +2335,7 @@ function renderAuthorizeCriticalCommand(name, {
+     "--subject-sha256", subjectSha256,
+     "--expires-at", expiresAt,
+   );
+-  return boundedCopySafeCommand({ executable: "node", argv });
++  return boundedCopySafeCommandForBash({ executable: "node", argv });
+ }
+ 
+ export const PO_HUMAN_APPROVAL_SETUP_BOUNDARY = Object.freeze({
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 57c76011c7ff82e06029cd29211be955dde95acb..4575bfe0cd1277eb0496fcc86d0e65dfb52b8587 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -46,6 +46,7 @@ import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
+ import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
++import { renderHumanStep } from "../lib/human-command-render.mjs";
+ import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
+ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+@@ -1036,7 +1037,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+     repoRoot: dir, directory: null, featureId: feature.featureId, plan: feature.planPath, spec: feature.specPath,
+     subjectSha256, expiresAt,
+   });
+-  const authorizeCommand = renderHumanCopySafeCommand({
++  const authorizeCommand = renderHumanStep({
+     label: "human authorize-critical",
+     executable: authorize.executable,
+     argv: authorize.argv,
+@@ -1048,6 +1049,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+     "--by", by, "--remote", remote, "--destination", destination,
+     "--proof-request", artifacts.request, "--proof-authority", artifacts.authority, "--proof", artifacts.proof,
+   ];
++  // approve-push compares the three proof paths byte-for-byte with the mirror paths (pipeline-state.mjs localMirrorScratchArtifacts): printed exactly as built, never reshaped.
+   const approveCommand = renderHumanCopySafeCommand({
+     label: "agent approve-push",
+     executable: "node",

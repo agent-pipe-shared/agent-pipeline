@@ -1,0 +1,14 @@
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+index 85d61fde1ba750e3717eeb2a89e1f67ecbefde4c..3d01040152f519ebdb9f5e0663a991eaa51f1a66 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+@@ -697,6 +697,9 @@ const writeModeTwins = (dir, content, paths = MODE_TWIN_PATHS) => {
+ /** A repository whose two twins are committed with `headContent`, a hook installed, and (optionally) a remote configured. */
+ function seedModeRepo(prefix, { headContent = modeTwin(), remote = true } = {}) {
+   const { dir, git } = freshRepo(prefix);
++  // Hermetic line endings: the CRLF twin fixtures must reach the index byte-for-byte. A user-level core.autocrlf=input would otherwise normalise them to LF at `git add` and make the byte comparison depend on the machine.
++  assert.equal(git("config", "core.autocrlf", "false").status, 0);
++  assert.equal(git("config", "core.safecrlf", "false").status, 0);
+   writeModeTwins(dir, headContent);
+   assert.equal(git("add", ...MODE_TWIN_PATHS).status, 0);
+   assert.equal(git("commit", "-q", "-m", "seed calibration twins").status, 0);

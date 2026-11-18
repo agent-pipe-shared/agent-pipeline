@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index 1ee0f6f405269584cf2628514119c3b67036da32..fc1de512da47192a8525ea561fdb4512f29139c8 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -493,6 +493,8 @@ function isTrustAnchorBootstrapUpgrade(projectRoot, relPath) {
+ // twin, a changed unrelated key, a pre-existing configured command, or any
+ // extra protected-path rewrite all fail closed and remain subject to the normal
+ // capability check.
++// Kept equal to CALIBRATION_PATHS of lib/project-authority-read.mjs (same values, same order) by a pin in
++// pre-commit-hook-install.test.mjs; this synchronous hook code does not import the shared list at hook time.
+ const VERIFY_CALIBRATION_PATHS = Object.freeze([
+   "project/pipeline.json",
+   ".claude/pipeline.json",
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+index 87247b9653e0745dd0ab3b19e6a79700feeebc9a..85d61fde1ba750e3717eeb2a89e1f67ecbefde4c 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+@@ -31,6 +31,7 @@ import {
+   applyDecline,
+   DECLINE_MARKER_SCHEMA,
+ } from "./pre-commit-hook-install.mjs";
++import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+ import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+@@ -1065,6 +1066,29 @@ test("renderImpl: the agent-facing refusal marks any override as human-operator-
+   assert.match(printedRefusal, /agent MUST NOT/);
+ });
+ 
++// The generated hook keeps its own calibration-twin list (it resolves synchronously and cannot import the shared one at
++// hook time); this pin keeps it equal to the shared frozen list, value for value and in order.
++function hookCalibrationPaths(impl) {
++  const match = /const VERIFY_CALIBRATION_PATHS = Object\.freeze\(\[([^\]]*)\]\);/.exec(impl);
++  assert.ok(match, "the generated hook must declare a frozen VERIFY_CALIBRATION_PATHS list");
++  return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
++}
++
++test("renderImpl: the hook's calibration twin list equals the shared CALIBRATION_PATHS element by element and in order", () => {
++  const impl = renderImpl(PLUGIN_DIRS);
++  assert.deepEqual(hookCalibrationPaths(impl), [...CALIBRATION_PATHS]);
++});
++
++test("renderImpl: a mutated hook calibration list (reordered or changed) no longer equals the shared list", () => {
++  const impl = renderImpl(PLUGIN_DIRS);
++  const [first, second] = CALIBRATION_PATHS;
++  const reordered = impl.replace(`"${first}",\n  "${second}",`, `"${second}",\n  "${first}",`);
++  assert.notEqual(reordered, impl, "the mutation must change the generated text");
++  assert.notDeepEqual(hookCalibrationPaths(reordered), [...CALIBRATION_PATHS]);
++  const changed = impl.replace(`"${second}",`, `"${second}.bak",`);
++  assert.notDeepEqual(hookCalibrationPaths(changed), [...CALIBRATION_PATHS]);
++});
++
+ // ---- decline recording --------------------------------------------------------------------
+ 
+ test("applyDecline: records a decline marker with a timestamp, no name/credential", () => {

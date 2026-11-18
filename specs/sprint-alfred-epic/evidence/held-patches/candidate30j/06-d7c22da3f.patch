@@ -1,0 +1,277 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs b/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs
+index 1df0f151e1dfeaea272a44ee4f708b978909a503..11753bb64942661a940654a415f765fcc749b2cc 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs
+@@ -9,6 +9,7 @@ import {
+   CLEANUP_RECOVERY_DEFERRED_MESSAGE,
+   expectedPipelineScriptsRunnerAllowlistEntries,
+   inspectProjectOnboardingV3,
++  PROJECT_ONBOARDING_LIFECYCLE_STATUSES,
+   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
+   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
+   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+@@ -22,64 +23,14 @@ import {
+ } from "./session-cleanup-recovery.mjs";
+ 
+ export const PROJECT_ONBOARDING_READY_GATE_SCHEMA = "pipeline.project-onboarding-ready-gate.v1";
+-// This list stays hand-maintained -- unlike BASE_RESULT_KEYS/READY_ONLY_RESULT_KEYS above,
+-// deriving it structurally from project-onboarding-v3.mjs (Direction option 1,
+-// backlog/items/2026-08-28-the-ready-gate-hand-maintains-a-mirror-of-a-shape-it-does-not-own.md)
+-// was tried and is genuinely blocked: the ~40 status literals that reach v4Inspection's
+-// shared `lifecycleResult()` builder are not all passed as string literals at the call site.
+-// At least one (the app-server-* trio, project-onboarding-v3.mjs's `readyLifecycleResult`,
+-// around the `status` shorthand bound from a local ternary rather than written inline) is
+-// computed a few lines above its `lifecycleResult({ status, ... })` call, so no reliable
+-// static or call-site-local extraction of "every status the producer can return" exists
+-// without either an AST-level constant-folding pass or a structural rewrite of ~40
+-// independent branches spanning ~2500 lines -- out of proportion for this task and outside
+-// its own prohibition on changing the producer's actual output shape. Falls back to Direction
+-// option 2 instead: project-onboarding-ready-gate.test.mjs's derived-enumeration test drives
+-// this exact list against real gate behaviour and fails if a status here goes stale, so
+-// drift is still caught mechanically -- just at test time, not import time.
+-export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
+-  "portable-seed-required",
+-  "runtime-initialization-required",
+-  "runtime-attestation-required",
+-  "restart-required",
+-  "kickoff-required",
+-  "host-repository-init-required",
+-  "enrollment-retirement-required",
+-  "enrollment-history-recovery-required",
+-  "enrollment-activation-required",
+-  "partial",
+-  "invalid",
+-  "unsafe",
+-  "migration-required",
+-  "adoption-required",
+-  "repository-mount-read-only",
+-  "repository-control-path-invalid",
+-  "git-capability-unavailable",
+-  "project-root-read-only",
+-  "repository-mode-unsupported",
+-  "session-capability-unavailable",
+-  "worktree-capability-unavailable",
+-  "runtime-target-read-only",
+-  "runtime-readback-unavailable",
+-  "projection-drift",
+-  "continuity-damaged",
+-  "repository-observation-unavailable",
+-  "continuity-observation-unavailable",
+-  "app-server-execution-denied",
+-  "app-server-not-running",
+-  "app-server-unavailable",
+-  // Wave 4 onboarding coordinator, step 6 (NVA-BL-INTAKEBIND-1, design.md
+-  // SSa.4): this allowlist was never updated when step 6 added these three
+-  // new v4Inspection statuses, so a repo genuinely sitting at one of them
+-  // failed closed with the wrong typed error (PORG-INVALID-OBSERVATION
+-  // instead of PORG-NOT-READY) below at line 152's NON_READY_STATUSES.has()
+-  // check -- blocking any narrow admission keyed off error.lifecycleStatus
+-  // for this window (see guard-lifecycle-ready.mjs's bootstrap-binding-
+-  // required staging-authoring admission).
+-  "intake-required",
+-  "intake-design-questions-required",
+-  "bootstrap-binding-required",
+-]);
++// The list is the PRODUCER's (project-onboarding-v3.mjs, PROJECT_ONBOARDING_LIFECYCLE_STATUSES; analysis C7 / SM-5): its shared
++// result builder refuses a status outside that closed list, and this gate derives its controlling non-ready statuses from it -- every
++// status but `ready` blocks. It used to be a hand-maintained mirror (a static extraction of the producer's literals was tried and fails,
++// because a status is computed at some call sites); a status the mirror lacked reached the gate as PORG-INVALID-OBSERVATION instead of
++// PORG-NOT-READY (three statuses of the wave 4 onboarding coordinator, NVA-BL-INTAKEBIND-1). Same 33 statuses, same order.
++export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze(
++  PROJECT_ONBOARDING_LIFECYCLE_STATUSES.filter((status) => status !== "ready"),
++);
+ 
+ const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
+ const RUNNERS = new Set(["claude", "codex", "antigravity"]);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+index 064f0c552efb77e51d46531b9110ba2823fe811f..ba46a202e09d337902ec1c0732537b680ea828ae 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+@@ -24,8 +24,11 @@ import {
+   expectedPipelineScriptsRunnerAllowlistEntries,
+   inspectProjectOnboardingV3,
+   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
++  PROJECT_ONBOARDING_LIFECYCLE_STATUSES,
+   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
+   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
++  buildProjectOnboardingLifecycleResult,
++  requireProjectOnboardingLifecycleStatus,
+ } from "./project-onboarding-v3.mjs";
+ 
+ function root() { return mkdtempSync(join(tmpdir(), "project-ready-gate-")); }
+@@ -953,11 +956,10 @@ test("unsupported or missing intents are rejected before inspection", () => {
+   }
+ });
+ 
+-// pipeline.ready-gate-keys-derived-from-producer, Direction option 2 fallback (backlog:
+-// pipeline.ready-gate-hand-maintained-shape-mirror): the accepted STATUS enumeration cannot
+-// be derived structurally the way the two key lists above now are (see the comment above
+-// PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES in project-onboarding-ready-gate.mjs for
+-// the concrete obstacle). This test drives the gate against a REAL, non-stubbed
++// pipeline.ready-gate-keys-derived-from-producer (backlog:
++// pipeline.ready-gate-hand-maintained-shape-mirror): the accepted STATUS enumeration is now the
++// producer's own closed list (PROJECT_ONBOARDING_LIFECYCLE_STATUSES, C30J-J6), checked at the
++// producer's result builder; a static extraction was tried and fails. This test still drives the gate against a REAL, non-stubbed
+ // inspectProjectOnboardingV3() result instead -- a genuinely fresh, empty temp root, with no
+ // `inspect` override -- so at least one status is proven end to end against actual producer
+ // output, not an internally-consistent fixture that only agrees with itself.
+@@ -996,6 +998,48 @@ test("a real, non-stubbed inspectProjectOnboardingV3() result is driven straight
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+ 
++// C30J-J6 (analysis C7 / SM-5, AC-112): the producer OWNS the closed status list and its shared result builder refuses a status
++// outside it; the gate IMPORTS the list instead of mirroring it. Checking at the builder (not by static extraction, which was tried
++// and failed) means a status the producer starts returning without listing it fails where it is built, with the repair named.
++test("the producer owns the closed lifecycle status list: the gate's controlling list is derived from it, the same 33 in the same order", () => {
++  assert(Array.isArray(PROJECT_ONBOARDING_LIFECYCLE_STATUSES), "the producer must export its closed status list");
++  assert(Object.isFrozen(PROJECT_ONBOARDING_LIFECYCLE_STATUSES));
++  assert.equal(new Set(PROJECT_ONBOARDING_LIFECYCLE_STATUSES).size, PROJECT_ONBOARDING_LIFECYCLE_STATUSES.length, "no duplicate status");
++  assert.equal(PROJECT_ONBOARDING_LIFECYCLE_STATUSES.includes("ready"), true);
++  // Derived, never retyped: the gate's list is exactly the producer's list without the one status that does not control.
++  assert.deepEqual([...PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES], PROJECT_ONBOARDING_LIFECYCLE_STATUSES.filter((status) => status !== "ready"));
++  assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 33);
++});
++
++test("the producer's shared result builder refuses a status outside its closed list and names the repair; every listed status is built unchanged", () => {
++  const input = (status) => ({ status, root: null, runner: null, intent: "onboarding", repository: {}, runtime: {} });
++  assert.throws(() => buildProjectOnboardingLifecycleResult(input("a-status-this-producer-never-listed")), (error) => {
++    assert(error instanceof Error);
++    assert.match(error.message, /a-status-this-producer-never-listed/u);
++    // Hard limit 4 of the candidate: a refusal names a runnable command or a named human step.
++    assert.match(error.message, /PROJECT_ONBOARDING_LIFECYCLE_STATUSES/u);
++    assert.match(error.message, /node --test plugins\/pipeline-core\/lib\/project-onboarding-ready-gate\.test\.mjs/u);
++    return true;
++  });
++  for (const bad of [undefined, null, "", "READY", " ready", 7]) {
++    assert.throws(() => buildProjectOnboardingLifecycleResult(input(bad)), /closed lifecycle status list/u, String(bad));
++  }
++  for (const status of PROJECT_ONBOARDING_LIFECYCLE_STATUSES) {
++    const built = buildProjectOnboardingLifecycleResult(input(status));
++    assert.equal(built.status, status);
++    // The envelope is unchanged by the check: same keys in the same order as the exported base key list.
++    assert.deepEqual(Object.keys(built), [...PROJECT_ONBOARDING_BASE_RESULT_KEYS]);
++  }
++});
++
++test("the status check the builder and the enrollment returns share returns a listed status unchanged and refuses any other", () => {
++  for (const status of PROJECT_ONBOARDING_LIFECYCLE_STATUSES) assert.equal(requireProjectOnboardingLifecycleStatus(status), status);
++  for (const status of ["enrollment-retirement-required", "enrollment-history-recovery-required", "enrollment-activation-required"]) {
++    assert.equal(PROJECT_ONBOARDING_LIFECYCLE_STATUSES.includes(status), true, `${status} is returned by spread, outside the builder`);
++  }
++  assert.throws(() => requireProjectOnboardingLifecycleStatus("enrollment-unlisted-required"), /PROJECT_ONBOARDING_LIFECYCLE_STATUSES/u);
++});
++
+ // RF2B (ALFRED-RF2B2-20261004): the one diagnostic a ready observation may carry --
+ // the typed `cleanup_residue_foreign` warning. The two archive actions inside it are
+ // the producer's OWN, built here by the real planner over stubbed observation seams, so
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 05fb2c19f2877e549f6782a966654ee190f8fcbc..b09f42476c4bce9d67bac67efb0d8fc1398dd938 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3482,6 +3482,59 @@ function externalOperatorRestartAction(runner) {
+   };
+ }
+ 
++/**
++ * The CLOSED set of statuses a V4 lifecycle observation may carry: `ready` plus every status that blocks (the controlling non-ready ones).
++ * The producer owns it (analysis C7 / SM-5): the shared result builder below refuses any other status, and the ready gate imports the
++ * non-ready part instead of mirroring it by hand. A static extraction of the literals was tried and fails (a status is computed at some
++ * call sites), so the check sits at the one place every status passes through. Adding a status here is the whole change: the gate
++ * derives its blocking list from it, so a new status can no longer reach the gate as an "invalid observation" by omission.
++ */
++export const PROJECT_ONBOARDING_LIFECYCLE_STATUSES = Object.freeze([
++  "ready",
++  "portable-seed-required",
++  "runtime-initialization-required",
++  "runtime-attestation-required",
++  "restart-required",
++  "kickoff-required",
++  "host-repository-init-required",
++  "enrollment-retirement-required",
++  "enrollment-history-recovery-required",
++  "enrollment-activation-required",
++  "partial",
++  "invalid",
++  "unsafe",
++  "migration-required",
++  "adoption-required",
++  "repository-mount-read-only",
++  "repository-control-path-invalid",
++  "git-capability-unavailable",
++  "project-root-read-only",
++  "repository-mode-unsupported",
++  "session-capability-unavailable",
++  "worktree-capability-unavailable",
++  "runtime-target-read-only",
++  "runtime-readback-unavailable",
++  "projection-drift",
++  "continuity-damaged",
++  "repository-observation-unavailable",
++  "continuity-observation-unavailable",
++  "app-server-execution-denied",
++  "app-server-not-running",
++  "app-server-unavailable",
++  "intake-required",
++  "intake-design-questions-required",
++  "bootstrap-binding-required",
++]);
++const LIFECYCLE_STATUS_SET = new Set(PROJECT_ONBOARDING_LIFECYCLE_STATUSES);
++
++/** Returns `status` unchanged when it is in the closed list; throws otherwise, naming the repair. */
++export function requireProjectOnboardingLifecycleStatus(status) {
++  if (typeof status !== "string" || !LIFECYCLE_STATUS_SET.has(status)) {
++    throw new Error(`project onboarding refused a status outside its closed lifecycle status list (${typeof status === "string" ? JSON.stringify(status) : typeof status}); add it to PROJECT_ONBOARDING_LIFECYCLE_STATUSES in plugins/pipeline-core/lib/project-onboarding-v3.mjs (the ready gate then blocks on it without any other change) and run node --test plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs`);
++  }
++  return status;
++}
++
+ function lifecycleResult({
+   status,
+   root,
+@@ -3509,7 +3562,7 @@ function lifecycleResult({
+   // is already either a validated identity or a deliberate `null`.
+   return {
+     schema: SCHEMA,
+-    status,
++    status: requireProjectOnboardingLifecycleStatus(status),
+     root: root ?? null,
+     runner,
+     intent,
+@@ -3533,8 +3586,9 @@ function lifecycleResult({
+ // set back is derivation, not restatement: any key added to or removed from
+ // `lifecycleResult`'s object literal above changes this automatically, with
+ // no second list to keep in sync.
++export { lifecycleResult as buildProjectOnboardingLifecycleResult };
+ export const PROJECT_ONBOARDING_BASE_RESULT_KEYS = Object.freeze(Object.keys(lifecycleResult({
+-  status: "shape-probe",
++  status: "ready",
+   root: null,
+   runner: null,
+   intent: "onboarding",
+@@ -6084,7 +6138,7 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
+   let retired;try{retired = readGovernanceEnrollmentRetirement({rootDir: result.root ?? rootDir});}catch(error){
+     if(error.code==="GS-RETIREMENT-READBACK-EMPTY"){
+       const root=result.root??rootDir;
+-      return {...enrollmentResult,status:"enrollment-history-recovery-required",
++      return {...enrollmentResult,status:requireProjectOnboardingLifecycleStatus("enrollment-history-recovery-required"),
+         diagnostics:[...result.diagnostics,diagnostic("$.enrollmentRetirement",error.code,"the read-only retirement writer returned no host readback","repeat the exact inspection at the host boundary; do not assume enrollment history is absent")],
+         nextAction:{kind:"external-operator",executable:process.execPath,
+           argv:[fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs",import.meta.url)),"inspect","--root",root,"--intent",intent,"--runner",runner],
+@@ -6093,13 +6147,13 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
+           guidance:"Run this exact read-only inspection at the host boundary. A blank nested-process readback cannot prove that enrollment history is absent; do not approve, activate, or skip a gate from this result."}};
+     }
+     if(!["GS-NONGIT-RETAINED-HISTORY","GS-HOST-MANAGED-RETAINED-HISTORY"].includes(error.code))throw error;
+-    return {...enrollmentResult,status:"enrollment-history-recovery-required",nextAction:governanceEnrollmentRecoveryAction({rootDir:result.root??rootDir,runner})};
++    return {...enrollmentResult,status:requireProjectOnboardingLifecycleStatus("enrollment-history-recovery-required"),nextAction:governanceEnrollmentRecoveryAction({rootDir:result.root??rootDir,runner})};
+   }
+   if (retired !== null && retired.phase !== "active") {
+     const checkpoint = readOnboardingIntakeCheckpoint({rootDir: result.root ?? rootDir});
+-    if (retired.phase !== "pending") return {...enrollmentResult, status: "enrollment-retirement-required", nextAction: {kind: "command", executable: process.execPath, argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "retire-enrollment", "--root", retired.root, "--scope-key", retired.scopeKey, "--barrier-sha256", retired.barrierSha256, "--by", retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["retired"]}}};
+-    if (checkpoint.value?.retiredEnrollmentGenerationSha256 !== retired.generationSha256 || checkpoint.value.consent === null) return {...enrollmentResult, status: "intake-required", nextAction: intakeConsentAction(result.root ?? rootDir, runner, checkpoint, [], null)};
+-    if (result.status === "ready") return {...enrollmentResult,status:"enrollment-activation-required",nextAction:{kind:"command",executable:process.execPath,argv:[fileURLToPath(new URL("../scripts/pipeline-state.mjs",import.meta.url)),"activate-enrollment","--root",retired.root,"--scope-key",retired.scopeKey,"--barrier-sha256",retired.barrierSha256,"--by",retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["active"]}}};
++    if (retired.phase !== "pending") return {...enrollmentResult, status: requireProjectOnboardingLifecycleStatus("enrollment-retirement-required"), nextAction: {kind: "command", executable: process.execPath, argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "retire-enrollment", "--root", retired.root, "--scope-key", retired.scopeKey, "--barrier-sha256", retired.barrierSha256, "--by", retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["retired"]}}};
++    if (checkpoint.value?.retiredEnrollmentGenerationSha256 !== retired.generationSha256 || checkpoint.value.consent === null) return {...enrollmentResult, status: requireProjectOnboardingLifecycleStatus("intake-required"), nextAction: intakeConsentAction(result.root ?? rootDir, runner, checkpoint, [], null)};
++    if (result.status === "ready") return {...enrollmentResult,status:requireProjectOnboardingLifecycleStatus("enrollment-activation-required"),nextAction:{kind:"command",executable:process.execPath,argv:[fileURLToPath(new URL("../scripts/pipeline-state.mjs",import.meta.url)),"activate-enrollment","--root",retired.root,"--scope-key",retired.scopeKey,"--barrier-sha256",retired.barrierSha256,"--by",retired.by],mutation:true,requiresConfirmation:true,expected:{schema:"pipeline.enrollment-retirement-result.v1",statuses:["active"]}}};
+   }
+   if (intent === "session" && result?.status === "ready") {
+     try {

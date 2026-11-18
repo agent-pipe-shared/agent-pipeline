@@ -1,0 +1,225 @@
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs b/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs
+index a4d149424df030e5ca371b178ed73f075ab2c8d7..f0bcb1f271b83b924371cc8c6fb7fc1440bf77bb 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs
+@@ -238,6 +238,28 @@ test("C30J-J12: signingConfirmationCard builds the guard-override card from the
+   assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.signed-quality-package.v1", request: {}, record, language: "en" }), [], "another request schema gets no ceremony card");
+ });
+ 
++// C30J-J28: the digest-only route (`sign-intent --intent-sha256`, no request file) resolves a description whose STRUCTURED `cardFacts` come from the
++// indexed plan; the card is built from those facts and never from the display lines.
++test("C30J-J28: the digest-only guard-override route builds the same card from the structured cardFacts of the resolved description", () => {
++  const description = (cardFacts) => ({ resolved: true, lines: ["recorded request: x (tool Write, class in-root-write)", "window expires at (signed, absolute): " + EXPIRES], ...(cardFacts === undefined ? {} : { cardFacts }) });
++  const bare = (record, language = "en") => signingConfirmationCard({ requestSchema: undefined, request: null, record, language });
++  const lines = bare(description(OVERRIDE_FACTS));
++  assert.deepEqual(lines, ceremony("guard-override", OVERRIDE_FACTS), "the same card the signature request route builds from the same four facts");
++  assert.equal(lines.at(-1), CARD_END_LINE);
++  for (const fact of ['"Write"', '"in-root-write"', EXPIRES, "2 "]) assert.ok(lines.join("\n").includes(fact), fact);
++  assert.deepEqual(bare(description(OVERRIDE_FACTS), "de"), ceremony("guard-override", OVERRIDE_FACTS, "de"), "the configured language applies");
++  // The facts, not the display lines, are the source: lines that say something else change nothing.
++  assert.deepEqual(bare({ ...description(OVERRIDE_FACTS), lines: ["window expires at (signed, absolute): 1999-01-01T00:00:00.000Z"] }), lines);
++  // Absent or malformed facts leave out that part of the card, never a guess.
++  const partial = bare(description({ toolName: "Write", commandClass: 5, expiresAt: "multi\nline", pathCount: -1 })).join("\n");
++  assert.ok(partial.includes('"Write"') && !/in-root-write|\b5\b|multi|-1/u.test(partial), partial);
++  assert.match(partial, /does not show the expiry/u);
++  // No facts or not a plain object: no card at all (a maintenance-window record has none), and an unresolved record gets none either.
++  for (const record of [description(), description(null), description("Write"), description([OVERRIDE_FACTS]), { resolved: false, lines: [], cardFacts: OVERRIDE_FACTS }, { resolved: true, lines: ["x"] }]) assert.deepEqual(bare(record), []);
++  // A request that names another schema never takes the digest-only facts.
++  assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.signed-quality-package.v1", request: {}, record: description(OVERRIDE_FACTS), language: "en" }), []);
++});
++
+ test("C30J-J12: signingConfirmationCard builds the design-approval card from the validated request binding, in the configured language", () => {
+   const request = { schema: "pipeline.design-approval-request.v1", binding: { featureId: FEATURE, sources: { prd: { path: "specs/feature-a/prd.md", sha256: SHA("1") }, spec: { path: "specs/feature-a/spec.md", sha256: SHA("2") }, companions: [{ path: "specs/feature-a/c1.md", sha256: SHA("3") }] }, reviewReceipts: [{ round: 1 }], verdict: "open-findings", openFindingIds: ["DCC-1", "DCC-2"] }, approvalIntent: { value: { candidate: CANDIDATE }, sha256: SHA("4") } };
+   const en = signingConfirmationCard({ requestSchema: request.schema, request, record: { resolved: true, lines: [] }, language: "en" }).join("\n");
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 3a2f28b803e7a7460f9acc196e31491978357b28..1c994ae0eb4923bc7d9d0d3ba57e9c3e90f5d31c 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -5714,7 +5714,15 @@ function describeHumanGuardOverrideSelectionCore({ rootDir, pluginRoot, intentSh
+       const rendered=hgoDisplayText(text,HGO_SUMMARY_MAX_RATIONALE_CHARS);
+       return hgoDisplayText(guard,64).text+": \""+rendered.text+"\""+(rendered.truncated?" [truncated]":"");
+     }).join("; ");
+-    return {resolved:true,code:"HGO-RECORD-RESOLVED",materialArtifact,requestBinding,
++    // C30J-J28: the structured facts the indexed plan already holds, for the plain-language card; never parsed from the display lines.
++    // A value that is not the expected type is left out, so a consumer states only what is there.
++    const cardFacts = {
++      ...(typeof planned.toolName === "string" ? {toolName: planned.toolName} : {}),
++      ...(typeof planned.commandClass === "string" ? {commandClass: planned.commandClass} : {}),
++      ...(typeof planned.expiresAt === "string" ? {expiresAt: planned.expiresAt} : {}),
++      ...(Array.isArray(planned.eligiblePaths) ? {pathCount: planned.eligiblePaths.length} : {}),
++    };
++    return {resolved:true,code:"HGO-RECORD-RESOLVED",materialArtifact,requestBinding,cardFacts,
+       ...(includeFullMaterial ? {fullReviewMaterial: planned} : {}),lines:hgoClipLines([
+       "recorded request: "+(planned.schema===NATIVE_PLAN_SCHEMA?NATIVE_REQUEST_SCHEMA:REQUEST_SCHEMA)+" (tool "+hgoDisplayText(planned.toolName,32).text+", class "+hgoDisplayText(planned.commandClass,64).text+")",
+       "eligible paths this override would admit: "+eligiblePaths.join(", ")+pathsNote,
+diff --git a/plugins/pipeline-core/lib/human-guard-override.test.mjs b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+index 9ac3c98270bf9b0b1c32f8435ef7b4630abe7b4e..321f940277646914c1623655ae7c963beb0549e7 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+@@ -41,6 +41,7 @@ import {
+   concurrentWorktreeAdvisory,
+   consumeHumanGuardOverride,
+   describeHumanGuardOverrideSelection,
++  describeHumanGuardOverrideSignatureRequest,
+   HGO_SIGNATURE_REASON,
+   HumanGuardOverrideError,
+   humanGuardOverrideInternals,
+@@ -942,6 +943,43 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
+   }
+ });
+ 
++// C30J-J28 (AC-112 closest accepted criterion, queue C30-20 gap): the describer hands back the STRUCTURED facts the indexed plan already holds
++// next to its display lines, so the digest-only sign-intent route can build the plain-language card without parsing display text.
++test("C30J-J28: describeHumanGuardOverrideSelection() returns the four structured card facts from the indexed plan, the display lines and the index format unchanged", () => {
++  const root = fixtureSignature();
++  try {
++    const armed = prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "card-facts.md", content: "facts\n" }, denials: denial, nowMs: Date.now() });
++    const signing = prepareHumanGuardOverrideForSignature({
++      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: armed.recorded.requestSha256, scriptPath: armed.scriptPath,
++      humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
++    });
++    const resolved = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: signing.intentSha256, scriptPath: armed.scriptPath });
++    assert.equal(resolved.resolved, true);
++    // The facts are exactly the plan's own values: compare with the physical plan the resolver bound, read independently here.
++    const plan = JSON.parse(readFileSync(resolved.materialArtifact.path, "utf8"));
++    assert.deepEqual(resolved.cardFacts, { toolName: plan.toolName, commandClass: plan.commandClass, expiresAt: plan.expiresAt, pathCount: plan.eligiblePaths.length });
++    assert.equal(resolved.cardFacts.toolName, "Write");
++    assert.equal(typeof resolved.cardFacts.commandClass, "string");
++    assert.ok(resolved.cardFacts.pathCount >= 1);
++    // The display lines are the ones that were already there, and the facts are NOT derived from them (no parsing of display text).
++    assert.equal(resolved.lines.length, 4);
++    assert.ok(resolved.lines[0].startsWith("recorded request: "));
++    assert.ok(resolved.lines[3].startsWith("window expires at (signed, absolute): "));
++    // The disclosure index keeps its closed key list: the facts come from the indexed plan, not from a new index key.
++    const index = JSON.parse(readFileSync(join(dirname(resolved.materialArtifact.path), `${signing.intentSha256}.disclosure.json`), "utf8"));
++    assert.deepEqual(Object.keys(index).sort(), ["authorSourceRoot", "expiresAt", "intentSha256", "planSha256", "reasonSha256", "requestSha256", "root", "schema", "selectionSha256"]);
++    // An unresolved digest carries no facts at all.
++    const unresolved = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: createHash("sha256").update("no such intent").digest("hex"), scriptPath: armed.scriptPath });
++    assert.equal(unresolved.resolved, false);
++    assert.equal(Object.hasOwn(unresolved, "cardFacts"), false);
++    // The signature-request describer holds the same facts next to its full material.
++    const viaRequest = describeHumanGuardOverrideSignatureRequest({ schema: "pipeline.human-guard-override-signature-digest.v1", requestSha256: armed.recorded.requestSha256, planSha256: armed.plan.planSha256, selectionSha256: resolved.requestBinding.selectionSha256, intentSha256: signing.intentSha256 }, { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: armed.scriptPath });
++    assert.deepEqual(viaRequest.cardFacts, resolved.cardFacts);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ // NVA-SIGENTRY-1 DoD check 4: a digest resolving to no stored request at all -- neither
+ // GMW nor HGO -- must fall through unresolved, unchanged; this proves the new resolver
+ // is additive rather than a wider "always resolves something" behaviour.
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index e3d2f514b7d861cef7cdce32af0b9c1c9e6c375a..c8c5d4bee8025258c2557a672cd1c11eecd1bbd7 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -536,8 +536,9 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
+  * C30J-J12 (queue C30-20 gap): the plain-language card that opens the `sign-intent` confirmation for the two ceremonies that are not
+  * `authorize-critical`: the guard-override signature digest and the design approval. Pure and read-only: the facts come ONLY from values
+  * the ceremony already holds (the structured plan the signature request resolved to, or the validated request binding); it reads nothing,
+- * changes no request, digest or proof, and the evidence lines printed after the card are not its business. Any other request (the bare
+- * `--intent-sha256` route included, which resolves display lines only) gets no card rather than facts parsed out of display text.
++ * changes no request, digest or proof, and the evidence lines printed after the card are not its business. Any other request gets no card
++ * rather than facts parsed out of display text. The bare `--intent-sha256` route gets the guard-override card only from the structured
++ * `cardFacts` of the resolved description (C30J-J28).
+  */
+ export function signingConfirmationCard({ requestSchema, request, record, language } = {}) {
+   if (requestSchema === "pipeline.human-guard-override-signature-digest.v1") {
+@@ -555,6 +556,13 @@ export function signingConfirmationCard({ requestSchema, request, record, langua
+         verdict: binding?.verdict, openFindingCount: Array.isArray(binding?.openFindingIds) ? binding.openFindingIds.length : undefined,
+         candidateCommit: request?.approvalIntent?.value?.candidate?.commit } });
+   }
++  // C30J-J28: the digest-only route (no request file). Only a description that carries the guard-override describer's own structured `cardFacts` gets a
++  // card (a maintenance-window description or an unresolved digest has none); the facts are read key by key, never parsed from the display lines, and a
++  // malformed one is left out by the card itself.
++  if (requestSchema === undefined && record?.resolved === true && record.cardFacts !== null && typeof record.cardFacts === "object" && !Array.isArray(record.cardFacts)) {
++    const { toolName, commandClass, expiresAt, pathCount } = record.cardFacts;
++    return signingCeremonyCard({ kind: "guard-override", language, facts: { toolName, commandClass, expiresAt, pathCount } });
++  }
+   return [];
+ }
+ function nonPushCriticalHandoff(result) {
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 32647e038bdb840fdc0711598f67f16fc36db22f..990976fcc4e3669458d3adc0ae8d272980a57212 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -3632,6 +3632,80 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
+   }
+ });
+ 
++// C30J-J28 (AC-112 closest accepted criterion): the digest-only route (no request file) runs to its confirmation prompt on a fixture plan and
++// prints the plain-language card from the structured facts of the indexed plan, above the unchanged evidence lines.
++const J28_EN_LABELS = ["WHAT YOU ARE SIGNING:", "WHY YOU ARE ASKED NOW:", "WHAT THIS ALLOWS, AND UNTIL WHEN:", "WHAT THIS DOES NOT ALLOW:", "IF YOU DECLINE:", "HOW TO READ THE LINES BELOW:"];
++test("C30J-J28: sign-intent --intent-sha256 on a guard-override digest prints the card from the indexed plan's facts above the unchanged evidence lines", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = hgoFixtureDirs();
++  try {
++    keyFixture(dirs.directory);
++    const armed = armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo digest-only card\n" });
++    anchorFixtureKey(dirs.repoRoot, dirs.directory);
++    const prompts = [];
++    const result = runHumanApproval(
++      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", armed.intent.sha256],
++      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
++    );
++    assert.equal(result.ok, true);
++    assert.equal(prompts.length, 1, "still exactly one human confirmation");
++    const [prompt] = prompts;
++    let at = -1;
++    for (const label of J28_EN_LABELS) { const found = prompt.indexOf(label); assert.ok(found > at, `card label ${label} missing or out of order`); at = found; }
++    assert.ok(prompt.includes('tool "Write"'), "the tool name comes from the indexed plan");
++    assert.match(prompt, /command class "[^"\n]+"/u);
++    assert.match(prompt, /\b1 eligible path is listed below/u, "the eligible-path count comes from the indexed plan");
++    assert.match(prompt, /\(stored as \d{4}-\d{2}-\d{2}T[\d:.]+Z\)/u, "the signed expiry is stated");
++    assert.ok(prompt.includes("authorize-by-signature"));
++    // The evidence lines follow the end line exactly as before: digest first, then the display lines of the describer.
++    const promptLines = prompt.split("\n");
++    const endAt = promptLines.findIndex((entry) => entry.trim() === "-----");
++    assert.ok(endAt > 0, "the card ends with its end line");
++    const evidenceLines = promptLines.slice(endAt + 1).map((entry) => entry.trim()).filter((entry) => entry !== "");
++    assert.equal(evidenceLines[0], `intent sha256: ${armed.intent.sha256}`, "the digest is the first evidence line, exactly as without the card");
++    assert.ok(evidenceLines.some((entry) => entry.startsWith("eligible paths this override would admit: notes.md")));
++    assert.ok(evidenceLines.some((entry) => entry.includes("GUARD-DEVPLAN-NOT-READY")));    // The card carries no raw path and no rationale: those stay in the evidence lines only.
++    assert.equal(prompt.slice(0, prompt.indexOf(`intent sha256: ${armed.intent.sha256}`)).includes("notes.md"), false);
++    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
++    assert.equal(proof.intentSha256, armed.intent.sha256, "the signature still covers the digest only");
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("C30J-J28: the digest-only route prints no guard-override card for an unresolved digest or a maintenance-window digest", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = hgoFixtureDirs();
++  try {
++    keyFixture(dirs.directory);
++    armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo present but unrelated\n" });
++    const unrelated = createHash("sha256").update("neither gmw nor hgo resolves this either").digest("hex");
++    anchorFixtureKey(dirs.repoRoot, dirs.directory);
++    const prompts = [];
++    runHumanApproval(
++      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
++      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
++    );
++    for (const label of J28_EN_LABELS) assert.equal(prompts[0].includes(label), false, `no card for an unresolved digest: ${label}`);
++    assert.match(prompts[0], /no recorded request/iu);
++  } finally {
++    cleanup(dirs);
++  }
++  const windowDirs = windowFixture();
++  try {
++    keyFixture(windowDirs.directory);
++    const prepared = prepareWindow(windowDirs);
++    anchorFixtureKey(windowDirs.repoRoot, windowDirs.directory);
++    const prompts = [];
++    runHumanApproval(
++      ["sign-intent", "--repo-root", windowDirs.repoRoot, "--directory", windowDirs.directory, "--intent-sha256", prepared.intent.sha256],
++      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
++    );
++    for (const label of J28_EN_LABELS) assert.equal(prompts[0].includes(label), false, `a maintenance-window digest is not a guard override: ${label}`);
++    assert.ok(prompts[0].includes(WINDOW_REASON), "its own evidence lines are unchanged");
++  } finally {
++    cleanupWindow(windowDirs);
++  }
++});
++
+ test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged", { skip: REQUIRES_OPENSSL }, () => {
+   const dirs = hgoFixtureDirs();
+   try {

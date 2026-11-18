@@ -1,0 +1,252 @@
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index a68d6926cffb7a318d6ad5876ab770da32c7de09..30ff49e053646221b4fb9102237c4cd463aa2ca7 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -129,8 +129,9 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put();
+   put("<!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's");
+   put("     exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/");
+-  put("     grammar-denials.mjs); the rest of this rule is stated, because no component");
+-  put("     exports the whole grammar as data. Source of truth:");
++  put("     grammar-denials.mjs); the prose of this rule is stated here. The same module exports the");
++  put("     admitted shell shapes as data (ADMITTED_GRAMMAR_SHAPES, GRAMMAR_DENIAL_REMEDY) and the");
++  put("     generated briefing carries them. Source of truth:");
+   put("     plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables");
+   put("     below ARE measured. -->");
+   put();
+diff --git a/harness/scripts/generate-agent-obligations.test.mjs b/harness/scripts/generate-agent-obligations.test.mjs
+index a66e17ca96364b9664f7dfe2d4036334cc4f7961..c9afc8824a8a72a16138f4557280ec9b3da6f334 100644
+--- a/harness/scripts/generate-agent-obligations.test.mjs
++++ b/harness/scripts/generate-agent-obligations.test.mjs
+@@ -263,14 +263,28 @@ test("AC-7: the document carries no absolute or machine-specific path", () => {
+ 
+ test("AC-1: a hand-maintained line is marked as such, so the boundary is visible", () => {
+   const document = readFileSync(OBLIGATIONS_PATH, "utf8");
+-  // The grammar rule and the commit discipline are stated rather than derived --
+-  // no component exports either as data. That is acceptable; being silent about
++  // The grammar prose and the commit discipline are stated rather than derived --
++  // no component exports the commit rules as data. That is acceptable; being silent about
+   // it is not, because a reader cannot otherwise tell which lines a source
+   // change would update.
+   const marks = document.match(/hand-maintained/gu) ?? [];
+   assert.ok(marks.length >= 2, `expected every hand-maintained section to say so; found ${marks.length}`);
+ });
+ 
++// C30J-J26 (AC-112): since C30J-J18 the guard module exports the admitted shell shapes as data, so the section-1 comment must not say no
++// component exports the grammar; it names what is exported instead. The "hand-maintained" mark above stays (the prose is still stated).
++test("C30J-J26: section 1 does not claim that no component exports the grammar, and names the exported shape table", async () => {
++  for (const rel of ["templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md"]) {
++    const text = readFileSync(join(REPO_ROOT, rel), "utf8");
++    assert.doesNotMatch(text, /no component\s+exports the whole grammar/u, rel);
++    assert.match(text, /ADMITTED_GRAMMAR_SHAPES/u, rel);
++    assert.match(text, /GRAMMAR_DENIAL_REMEDY/u, rel);
++  }
++  const grammar = await import("../../plugins/pipeline-core/lib/guard/grammar-denials.mjs");
++  assert.ok(Array.isArray(grammar.ADMITTED_GRAMMAR_SHAPES) && grammar.ADMITTED_GRAMMAR_SHAPES.length > 0, "the shape table is exported");
++  assert.ok(Array.isArray(grammar.GRAMMAR_DENIAL_REMEDY), "the refusal lines are exported");
++});
++
+ // C30-19 / AC-111 (slice C30I-S4B): the commit-route texts say what really holds for the one-command commit with trailers.
+ const COMMIT_ROUTE_FILES = [
+   "templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md",
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 17fd01281fa4aefd775c551bfdfaf8dd5ec9c072..8ca8a4fca64cb1782b8d942d7483f3c49011cefb 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { readTargetProtectedRootsAdvice, readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
+-import { READ_TARGET_EXACT_FILE_ADVICE, nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
++import { READ_TARGET_CODE, READ_TARGET_EXACT_FILE_ADVICE, nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
+ import { isAllowedPassiveReadTarget, isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
+ import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+ import {
+@@ -440,7 +440,7 @@ export function foreignAntigravityExportReason({ input, command, projectRoot, to
+ // operands. Both resolve a relative operand against the project root and check the lexical AND the
+ // physical (symlink-resolved) identity.
+ // C19C-W169 (W5): the same alternative and protected-roots statement the Claude native lane prints (read-scope.mjs), on the first line's code unchanged.
+-const NATIVE_READ_TARGET_DENIAL = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
++const NATIVE_READ_TARGET_DENIAL = `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`
+   + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}`;
+ 
+ /** Path operands of one native read-only tool call. kind: "file" (contents of one file), "content"
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index e5202467e1d2211d8cc19a18146b86217a4e4205..cf6583a8553d92ee915ab9345db8e83395431f8f 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -20,7 +20,7 @@ import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, pa
+ import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
+ import {
+   GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE,
+-  READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY, READ_TARGET_EXACT_FILE_ADVICE,
++  READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY, READ_TARGET_CODE, READ_TARGET_EXACT_FILE_ADVICE,
+ } from "./guard/grammar-denials.mjs";
+ 
+ export const BRIEFING_PACKAGE_SCHEMA = "pipeline.dispatch-briefing-package.v1";
+@@ -327,8 +327,7 @@ export function obligationsReadSentence(obligationsPath) {
+ 
+ // C30J-J18 (consumer report: ~30 shell-guard refusals in a main run, ~70 in subagents; the admitted spellings were unknown beforehand).
+ // ONE block, read from the guard's own exports (lib/guard/grammar-denials.mjs) so that it prints exactly what a refusal prints and can
+-// never be typed a second time. The native read-tool refusal of the exact-file advice has no exported code constant, so its entry is led by
+-// that exported advice alone and its code name is not typed here (the wanted export is named in the held patch's notes). Pure: no input.
++// never be typed a second time. The native read-tool refusal's entry names its code from the exported READ_TARGET_CODE (C30J-J26). Pure: no input.
+ export function admittedShellShapesBlock() {
+   return [
+     "**Admitted shell shapes (read from the guard's own grammar; the text its refusals print):**",
+@@ -342,7 +341,7 @@ export function admittedShellShapesBlock() {
+     `- \`${READ_SCOPE_DENIAL_CODE}\`: ${READ_SCOPE_DENIAL_GUIDANCE}`,
+     ...READ_SCOPE_DENIAL_REMEDY.map((line) => `  - ${line}`),
+     "",
+-    `- A refused native Read, Glob or Grep call (the guard prints this advice): ${READ_TARGET_EXACT_FILE_ADVICE}`,
++    `- A refused native Read, Glob or Grep call (\`${READ_TARGET_CODE}\`; the guard prints this advice): ${READ_TARGET_EXACT_FILE_ADVICE}`,
+   ].join("\n");
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index 394e3cd7c92d6e11d146611bb9b75c79d02e70ee..1001f3530c643586f07db4e488044c989ca24e99 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -188,6 +188,10 @@ export const POWERSHELL_ADMITTED_SHAPES = [
+     example: "$env:PIPELINE_PLUGIN_ROOT = \"<plugin-root>\"; node \"$env:PIPELINE_PLUGIN_ROOT/scripts/pipeline-start-preflight.mjs\"" },
+ ];
+ 
++// C30J-J26: the code every native-read and PowerShell read refusal leads with, one constant for its three denial sites
++// (lib/guard/read-scope.mjs, lib/guard/powershell-dialect.mjs, hooks/antigravity-pretool-guard.mjs) and the generated briefing block.
++export const READ_TARGET_CODE = "GUARD-READ-TARGET";
++
+ // C18-8 (AC-239): GUARD-READ-TARGET for a native read tool (not a credential target) -- what a permitted read of a plugin file looks like.
+ export const READ_TARGET_EXACT_FILE_ADVICE = "Name one exact file path, without a wildcard: use the Read tool with file_path set to that file "
+   + "(plugin files are read this way, e.g. file_path <plugin root>/scripts/example.mjs), or Grep with path set to that one file. "
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index 8901a87bcd0cc40d466f8c4b7fc1849b5fbad7ad..2f25991d67aaf875f6e1bbdfa026714c5de1d432 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -9,7 +9,7 @@ import { exactReadyReceipt, verdict } from "./verdict.mjs";
+ import * as constants from "./constants.mjs";
+ import { PIPELINE_STATE_SCRIPT } from "./constants.mjs";
+ import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+-import { POWERSHELL_ADMITTED_SHAPES, POWERSHELL_GRAMMAR_EXAMPLES } from "./grammar-denials.mjs";
++import { POWERSHELL_ADMITTED_SHAPES, POWERSHELL_GRAMMAR_EXAMPLES, READ_TARGET_CODE } from "./grammar-denials.mjs";
+ import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
+ import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
+ 
+@@ -192,7 +192,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+     return (containedLiteralReadPath(target, root, dependencies, sessionReadScopeRoots(input, dependencies))
+       || (namesOnly && isSafeNamesOnlyDirectory(target, root, sessionReadScopeRoots(input, dependencies))))
+       ? verdict(0)
+-      : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
++      : verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`
+         + `Name one exact file or directory path without a wildcard, for example "${POWERSHELL_GRAMMAR_EXAMPLES.read}".\n`
+         + `${readTargetProtectedRootsAdvice()}\n`);
+   }
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index fbc69aa28ab2cea188464bb38d61df4a25ebbdf0..c2a5bd3c096b996e77766884e81dc46d7ac4ee30 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -4,7 +4,7 @@
+ import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
+ import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
+ import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+-import { nativeReadCredentialTargetDenialText, READ_TARGET_EXACT_FILE_ADVICE } from "./grammar-denials.mjs";
++import { nativeReadCredentialTargetDenialText, READ_TARGET_CODE, READ_TARGET_EXACT_FILE_ADVICE } from "./grammar-denials.mjs";
+ import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.mjs";
+ import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
+@@ -905,7 +905,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   if (pluginMissing !== null) {
+     return verdict(2, missingPluginFileDenialText(pluginMissing, `with Glob (path ${pluginMissing.listDirectory}, pattern *)`));
+   }
+-  return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
++  return verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`
+     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
+     + (toolName === "Glob"
+       ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), also with a name filter as the last part (<directory>/**/*ledger*), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 76d7a49d016837621cdd17f6ae00c4ae0396f3df..43c86e12e417db948ccf02f4343a5d83d2602998 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -887,7 +887,50 @@ test("C30J-J18 pin: the builder reads the grammar from the guard module and type
+   for (const code of [...Object.keys(g.GRAMMAR_DENIAL_GUIDANCE), g.READ_COMMAND_UNSUPPORTED_CODE, g.READ_SCOPE_DENIAL_CODE]) {
+     assert.ok(!source.includes(code), `the code ${code} is read from its export, not typed`);
+   }
+-  assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the one code without an exported constant is not typed either");
++  assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the read-target code is read from its export (READ_TARGET_CODE), not typed either");
++});
++
++// C30J-J26 (AC-112): GUARD-READ-TARGET becomes one exported constant used at its three denial sites; the briefing block names the code; the
++// denial bytes do not change. The earlier J18 case 1 and pin above stay as they are (they still hold); these cases add the code.
++const READ_TARGET_LEAD = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n";
++const codeLines = (source) => source.split("\n").filter((line) => !line.trim().startsWith("//"));
++
++test("C30J-J26 the read-target code is one exported constant, and the native Read denial bytes are identical", async () => {
++  const g = await guardGrammar();
++  assert.equal(g.READ_TARGET_CODE, "GUARD-READ-TARGET");
++  const { readToolScopeVerdict } = await import("../lib/guard/read-scope.mjs");
++  const root = mkdtempSync(join(tmpdir(), "j26-read-target-"));
++  try {
++    const result = readToolScopeVerdict({ tool_name: "Glob", tool_input: { pattern: "**", path: "." } }, root, {});
++    assert.equal(result.exitCode, 2);
++    assert.ok(result.stderr.startsWith(READ_TARGET_LEAD), "the first line is byte-identical to the previous literal");
++    assert.ok(result.stderr.startsWith(`BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${g.READ_TARGET_CODE}: use an exact passive path outside protected credential roots.\n`));
++    assert.ok(result.stderr.includes(g.READ_TARGET_EXACT_FILE_ADVICE), "the advice line still follows");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("C30J-J26 pin: the three denial sites read the code from the export and type no literal of it", () => {
++  for (const rel of [["lib", "guard", "read-scope.mjs"], ["lib", "guard", "powershell-dialect.mjs"], ["hooks", "antigravity-pretool-guard.mjs"]]) {
++    const source = readFileSync(join(HERE, "..", ...rel), "utf8");
++    const code = codeLines(source).join("\n");
++    assert.ok(/READ_TARGET_CODE[^;]*from "\.{1,2}\/(?:lib\/)?(?:guard\/)?grammar-denials\.mjs"/u.test(source), `${rel.join("/")} imports the constant`);
++    assert.ok(/\$\{READ_TARGET_CODE\}/u.test(code), `${rel.join("/")} uses the constant in its denial text`);
++    assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(code), `${rel.join("/")} types no literal of the code`);
++  }
++});
++
++test("C30J-J26 the briefing block names the read-target code in the native read entry, once, read from the export", async () => {
++  const { runDispatchBriefing } = await lib();
++  const g = await guardGrammar();
++  const { fx, argv } = packageFixture();
++  const { text } = runDispatchBriefing(argv, depsOf(fx));
++  const entry = `- A refused native Read, Glob or Grep call (\`${g.READ_TARGET_CODE}\`; the guard prints this advice): ${g.READ_TARGET_EXACT_FILE_ADVICE}`;
++  assert.equal(text.split(entry).length, 2, "the entry appears exactly once");
++  assert.equal(text.split(`\`${g.READ_TARGET_CODE}\``).length, 2, "the code is named once, in that entry");
++  const source = readFileSync(join(HERE, "..", "lib", "dispatch-briefing-build.mjs"), "utf8");
++  assert.ok(/READ_TARGET_CODE/u.test(source) && !/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the builder reads the code from its export");
+ });
+ 
+ // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 0dd0a6ce292f69da8e0c9a965866058497b0f268..66c9f8d4ca2b2b827a5f16c3e94e9090690c94ff 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -20,8 +20,9 @@ spends a tool use from the budget that is also the stop condition.
+ 
+ <!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's
+      exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/
+-     grammar-denials.mjs); the rest of this rule is stated, because no component
+-     exports the whole grammar as data. Source of truth:
++     grammar-denials.mjs); the prose of this rule is stated here. The same module exports the
++     admitted shell shapes as data (ADMITTED_GRAMMAR_SHAPES, GRAMMAR_DENIAL_REMEDY) and the
++     generated briefing carries them. Source of truth:
+      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
+      below ARE measured. -->
+ 
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 0dd0a6ce292f69da8e0c9a965866058497b0f268..66c9f8d4ca2b2b827a5f16c3e94e9090690c94ff 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -20,8 +20,9 @@ spends a tool use from the budget that is also the stop condition.
+ 
+ <!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's
+      exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/
+-     grammar-denials.mjs); the rest of this rule is stated, because no component
+-     exports the whole grammar as data. Source of truth:
++     grammar-denials.mjs); the prose of this rule is stated here. The same module exports the
++     admitted shell shapes as data (ADMITTED_GRAMMAR_SHAPES, GRAMMAR_DENIAL_REMEDY) and the
++     generated briefing carries them. Source of truth:
+      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
+      below ARE measured. -->
+ 
