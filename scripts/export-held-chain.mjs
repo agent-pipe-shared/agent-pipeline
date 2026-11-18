@@ -23,6 +23,27 @@ const git = (...args) => execFileSync("git", ["-C", resolve(clone), ...args], { 
 // A commit that only refreshes the derived files is left out of the chain: its patch is bound to the exact derived state of the build clone, which differs
 // from the state the PO's tree has after an earlier chain's own refresh (the 30k wave 2 rehearsal failed on exactly that); the apply script refreshes them itself at the end.
 const DERIVED_REFRESH_SUBJECT = /^chore\(inventory\): refresh the derived files/u;
+// A lane's own commit can carry derived-file hunks too (a Goldfish that ran the refresh in its clone): the Reader-input mirrors and the documentation snapshot are
+// wholly derived, and in the capability inventory the sourceBaseline block is. Those hunks are bound to the build clone's exact state and fail on the human's tree
+// (the 30k rehearsal failed on one), so they are dropped from the patch; the apply script's own refresh at its end writes them. Every other hunk is kept as it is.
+const DERIVED_FILES = /^plugins\/pipeline-core\/(reader-inputs\/|lib\/doc-reader-documentation-snapshot\.mjs$)/u;
+function withoutDerivedHunks(diff) {
+  const sections = diff.split(/^(?=diff --git )/mu).filter((section) => section.length > 0);
+  const kept = [];
+  for (const section of sections) {
+    const path = /^diff --git a\/(\S+) b\//u.exec(section)?.[1] ?? "";
+    if (DERIVED_FILES.test(path)) continue;
+    if (path === "docs/product-capability-inventory.json") {
+      const [header, ...hunks] = section.split(/^(?=@@ )/mu);
+      const keptHunks = hunks.filter((hunk) => !/"sourceBaseline"/u.test(hunk));
+      if (keptHunks.length === 0) continue;
+      kept.push(header + keptHunks.join(""));
+      continue;
+    }
+    kept.push(section);
+  }
+  return kept.join("");
+}
 const shas = git("rev-list", "--reverse", `${base}..HEAD`).split("\n").filter(Boolean)
   .filter((sha) => !DERIVED_REFRESH_SUBJECT.test(git("log", "-1", "--format=%s", sha).trim()));
 if (shas.length === 0) { console.error(`no commits in ${base}..HEAD`); process.exit(1); }
@@ -34,7 +55,7 @@ shas.forEach((sha, index) => {
   const number = String(index + 1).padStart(width, "0");
   const short = sha.slice(0, 9);
   const name = `${number}-${short}`;
-  const diff = git("diff", "--binary", "--full-index", `${sha}^`, sha);
+  const diff = withoutDerivedHunks(git("diff", "--binary", "--full-index", `${sha}^`, sha));
   writeFileSync(join(outDir, `${name}.patch`), diff);
   const subject = git("log", "-1", "--format=%s", sha).trim();
   let message = git("log", "-1", "--format=%B", sha).trimEnd();
