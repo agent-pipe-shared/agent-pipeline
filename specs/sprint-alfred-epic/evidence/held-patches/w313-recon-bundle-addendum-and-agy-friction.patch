@@ -1,0 +1,147 @@
+diff --git a/specs/sprint-alfred-epic/plans/recon-l6-l14-l17-bundle-addendum-and-agy-friction-2026-11-18.md b/specs/sprint-alfred-epic/plans/recon-l6-l14-l17-bundle-addendum-and-agy-friction-2026-11-18.md
+new file mode 100644
+index 000000000..54af73dc4
+--- /dev/null
++++ b/specs/sprint-alfred-epic/plans/recon-l6-l14-l17-bundle-addendum-and-agy-friction-2026-11-18.md
+@@ -0,0 +1,141 @@
++# Recon L6 + L14 to L17: bundle addendum, Critic prepare two-step, Antigravity child model notice, hook git timeout, Antigravity cost row (2026-11-18)
++
++Lane C31-R3 of candidate 31 (rows L6 and L14 to L17 of the [31 plan](candidate-31-plan-2026-11-18.md), read first). Status: **analysis only, no code and no test of the product ran**. The Critic is suspended by the PO for candidates of this repository and no Full Verify runs: the only check is the plain file test next to the held patch. Criterion binding: AC-112 is the closest existing accepted criterion; PRD and Spec stay unchanged (the K7 analysis already reported that the Spec row of AC-112 is about another item).
++
++Conventions. `PC/` = `plugins/pipeline-core/`. A reference is `file:line` of the 30k-stage tree this clone holds. **PROVEN** = read at that line. **INFERRED** = reasoned from what was read. **NOT MEASURED** = could not be settled by reading. Candidate 31 hard limits bind every build below: test first (the failing case is named per item), derive and never store, no new gate, no signature or approval change, no key or digest byte change, every refusal text names a runnable command or a named human step.
++
++## Summary
++
++| Lane | Premise of the plan | Verdict |
++|---|---|---|
++| L6 | a typed addendum next to the closed bundle is wanted | The typed, create-only follow-up already exists and the verifier already accepts an evidence-only one; the gap is the TRIGGER (push only) and one missing binding (manifest digest, a record-shape change: PO decision) |
++| L14 | `commit-required` is a two-step | The two calls are inherent (the commit must precede the second). The commit step is NOT prose-only work: an owned commit route that carries a manifest with its listed evidence has existed since 2026-11-11 and the preparation never names it |
++| L15 | `agy-native-child-model-mismatch` is wrong for `inherit` | The notice is a correct observation, only for Goldfish roles (their routes are `flash`, never `inherit`); its text gives no repair; one report fact contradicts the dispatch guard (open) |
++| L16 | `HGO-GIT` ETIMEDOUT needs a bounded retry | PROVEN: one fixed 5 s git helper, no retry, and the failure becomes an external-operator card. A per-call retry cannot bound the 10 s hook: a per-planning deadline is needed |
++| L17 | `cost-summary` writes no costs file for Antigravity | The premise name does not exist (case-insensitive search of plugin, scripts, templates, docs, harness, policies): no step writes `telemetry/costs.md` for ANY runner; the `--row` reader is Claude-only by design and the skill says so |
++
++## L6: bundle addendum
++
++### Facts (PROVEN unless marked)
++
++- **The first bundle is create-only.** `buildAuditBundle` writes with `wx` (`PC/lib/audit-bundle.mjs:386-389`); `manifest.json` and `README.md` are never rewritten (comment at :174-177).
++- **A typed, create-only follow-up already exists.** `writeAuditProofFollowUp` (`PC/lib/audit-proof-collection.mjs:98-126`) adds new files under `proofs/` plus one list `proofs/follow-up.json`, later `follow-up-NNN.json` (:119). The list is `pipeline.audit-bundle-followup.v1` with `candidate`, `approvedCommit`, `proofs`, `attributions` and an optional `evidence` array (`audit-bundle.mjs:180,198`). Evidence kinds are the closed set `final-verify` and `security-verdict` (`PC/lib/critical-action-authorization.mjs:625-628`), each admitted only by the digest the close recorded privately (:630-642).
++- **The verifier accepts an addendum without touching the first bundle.** `verifyAuditBundleSync` ends with `followUpFindings` (`audit-bundle.mjs:403`). Per list it checks the exact key set, the schema, `sameCandidate(list.candidate, manifest.candidate)` (:198), the byte digest of every evidence file (:200-203) and the signature of every proof (:199). A list with only `evidence` passes: the empty-list refusal is `proofs + attributions + evidence === 0` (:198). So an evidence-only list verifies with `manifest.json`, `README.md` and every artifact byte unchanged. Not run; read.
++- **Dedup and idempotence are already derived.** What an earlier list carried is not carried again: proofs by `intentSha256`, evidence by file sha256 (`audit-proof-collection.mjs:106-113`); a commit that already has a list gets `already-followed-up` (:105).
++- **Where the security verdict is produced.** At close, AFTER the one close commit: the one-shot runs Verify and the security scan in phase `candidate-frozen` (`PC/scripts/finish-feature.mjs:895-901`), writes the private `final-verification.json` plus byte copies of both records (:902-912) and moves on to `closed-local` (:925-948). The result message states the consequence: "reach the audit bundle only with the evidence follow-up of the next push" (`PC/lib/security-close-status.mjs:355`).
++- **Where the push-time records are produced.** `PC/scripts/audit-proof-followup.mjs:31-51` runs only after a push: it refuses unless the project is a consumer release project (:33), HEAD is the published tip (:36-37) and a push approval exists for HEAD (:39). The release route calls `prepareAuditProofFollowUp` too (K7 analysis, `release-preflight-cli.mjs:723`). The push guard admits exactly that one commit by its own list check (`authorizeAuditProofFollowUp`, `critical-action-authorization.mjs:644-744`).
++- **Run B, local-only:** neither caller fires, so a local-only close never carries the final Verify or the security verdict. PROVEN by the two guards above plus the sentence at `security-close-status.mjs:355`.
++- **30h to 30k changed:** the typed approval gaps reach the first bundle at close (`approvalGaps`, `audit-bundle.mjs:262-264,317`; `audit-proof-collection.mjs:68-77`, K15). Nothing moved the evidence follow-up off the push.
++- **Dispatch records of orchestrator-landed results.** The dispatch projection is written at close, before the close commit (`finish-feature.mjs:753-763`), from the git-ignored `evidence/dispatch-record-*.json` files read at that moment (`PC/lib/durable-evidence.mjs:125-126,188`), and carried as the item `dispatch-projection` (`audit-bundle.mjs:325-329`). PROVEN: a record that exists only after the close is in no bundle and no evidence kind names it. NOT MEASURED: whether a lifecycle ever lands a record after the close (the plan names it as a PO wish); see D3.
++
++### Binding by the manifest digest
++
++The list binds `candidate` (commit and tree), not the digest of `manifest.json` (:198). Adding a `manifestSha256` key changes the list's record shape: it needs the optional key in the verifier (:198) AND in the push guard's exact-key check (`critical-action-authorization.mjs:703`, a guard library), and in the writer (:120). Old lists keep verifying if the key stays optional. That is a record-shape change, so it is NOT built here (hard limit 2); see D1.
++
++### Smallest build (stage 1): write the evidence follow-up at close
++
++1. A function in `audit-proof-collection.mjs` that, for `approvedCommit` = HEAD at `closed-local`, calls the existing `collectFollowUpEvidence` (:129-143) and `writeAuditProofFollowUp` (:98) with no proofs and no attributions; it returns `no-bundle`, `nothing-to-carry` or `written` like its sibling.
++2. `finish-feature.mjs` calls it in the `closed-local` branch (:929) and returns the files and the commit steps (`writerCommitSteps`, `PC/lib/writer-commit-capability.mjs:48-56`) as a field next to `pushEvidence` (:947). It writes files only; the commit stays the caller's step, as for every close output (:886-887). No stored status, no new item name, no new schema.
++3. A later push follow-up stays correct: it adds a numbered list for its own `approvedCommit` and carries only what the earlier list did not (dedup above).
++4. Texts that become false and move with the build: `CLOSE_FOLLOWUP_SENTENCE` (`security-close-status.mjs:355`), the README sentence on the follow-up lists (`audit-bundle.mjs:78`) and the follow-up paragraph of `docs/audit-bundles.md` (:69). `close-coordinator.mjs`, `docs/audit-bundles.md` and `docs/audit-bundles-technical.md` were searched for the follow-up and addendum terms, not read in full.
++
++**Failing-first proof** (new case in the existing close test file; a new file would need Verify registration): a close fixture ending in `closed-local` with a recorded `final-verification.json` and an existing bundle. Before: no `proofs/follow-up.json`, the result has no follow-up field. After: the list holds two `evidence` entries whose sha256 match the private copies; `verifyAuditBundleSync` is `verified`; `manifest.json`, `README.md` and the artifacts hash identically before and after; a second call returns `nothing-to-carry`; a later `prepareAuditProofFollowUp` carries no duplicate evidence. A fixture with no bundle returns `no-bundle` and writes nothing.
++
++**Risks.** (a) The addendum commit moves HEAD past the frozen candidate: `pushEvidence` (Verify at HEAD, :335-342) must run after it, so the result's `next` must say so. (b) `recordedFinalEvidence` needs the candidate to be an ancestor of `approvedCommit` (`audit-proof-collection.mjs:132`): at `closed-local` HEAD is the candidate itself, which `merge-base --is-ancestor` accepts (INFERRED, not run). (c) Whether the commit needs an armed capability: `armWriterCommitCapability` arms only protected paths and returns `not-needed` otherwise (`writer-commit-capability.mjs:105`); whether `audit-bundles/**` is protected here was not checked (NOT MEASURED).
++
++## L14: Critic preparation, `commit-required`
++
++### Facts
++
++- The `critic` verb with `--label` produces the diagnostic evidence (`<label>.json`, `<label>.log`), registers it with `register-feature-package.mjs --add-diagnostic-evidence` and returns `commit-required` with `commitPaths` = evidence, log and the registration paths (`PC/scripts/prepare-dispatch.mjs:153-169`). The second identical call finds the evidence committed (`git log -1 -- <out>` non-empty, :159) and proceeds to the preflight (:170-172).
++- **The commit is inherent.** The branch is entered exactly while the evidence file has no commit in history (:159); the registration commit is derived from history afterwards (:46 help text). So the two calls cannot merge without the preparation committing, which its contract forbids ("never commits, pushes, signs or approves", :36).
++- **What the instruction says today:** prose only: "Commit exactly commitPaths in one evidence-only commit under this project's commit rules" (:168). No steps, no message, no trailers, no staging.
++- **An existing pattern solves exactly this for two sibling tools.** `finish-feature --one-shot` returns `commit.steps` from `writerCommitSteps` (:850) and has `--stage` (`stageOneShotCommit`, :958); `register-feature-package.mjs` has a trailing `--stage` that stages exactly `commitPaths` (`PC/scripts/register-feature-package.mjs:143-157`).
++- **An owned commit route exists and fits the shape (INFERRED fit, not run).** The registration lists the diagnostic JSON and its members (the targeted log) as `candidate-evidence` entries of the package manifest `specs/<feature>/lifecycle.json` and leaves all of them uncommitted (`PC/lib/feature-package-registration.mjs:527-529,552,585`). `commit-pipeline-owned.mjs --root <root> --agent` commits the owned manifest TOGETHER WITH every listed candidate-evidence file that is untracked with exactly the listed bytes (`carried`, `PC/scripts/commit-pipeline-owned.mjs:187-222`, used at :125-141), and its own message already says so (:35-36). It refuses when another tracked file is dirty (:112-116) and reports an untracked foreign file as `untouched`. The manifest counts as owned only while State binds the feature (`PC/lib/pipeline-owned-files.mjs:32-48`). Its `--dry-run` is read-only and returns `owned` and `carried` (:137). The carried rule landed 2026-11-11 (`f2dca7ed3`), so it was in the consumer's stage; the preparation never names it.
++- **Plain steps remain the fallback.** `finish-feature` prints `commit.steps` from `writerCommitSteps` (:850) and has `--stage` (:958); `register-feature-package.mjs` has a trailing `--stage` (:143-157). The `prepare-dispatch` outcome prints neither.
++- **30h to 30k:** `git log -S commit-required -- PC/scripts/prepare-dispatch.mjs` shows one commit, the one that introduced the verb (`f7aacd5f5`). The queue mentions `commit-required` once, for the one-shot close (`candidate-30-queue-2026-11-15.md:347`); a search of that queue and the 31 plan for `dispatch-prepare` and `verify-suite` finds nothing. Nothing in 30h to 30k changed this branch.
++
++### Smallest build
++
++In the `commit-required` outcome (:167) derive the commit step instead of prose: the preparation runs `commit-pipeline-owned.mjs --root <root> --agent --dry-run` (read-only) through its existing runner; when the result's `owned` plus `carried` cover `commitPaths`, `next` names that one command as the commit step; otherwise it prints `commit: { steps }` from the shared `writerCommitSteps(commitPaths, message)` and accepts the trailing `--stage` of the register verb. The identical rerun stays; the preparation still never commits; no trust classification widens.
++
++**Failing-first proof:** extend the case that asserts `status: "commit-required"` and `commitPaths` (`prepare-dispatch.test.mjs:131-141`) with a stubbed dry-run: (a) dry-run covers the paths: `result.commit.command` names `commit-pipeline-owned.mjs ... --agent` and no `git add`; (b) dry-run refuses (foreign tracked change): `result.commit.steps` is `git add -- <exactly the commitPaths>` then `git commit -F ... -- <same paths>`; (c) `--stage` stages one `git add -- <path>` per path and never commits. Red today (no `commit` key). A real-git case in the existing `commit-pipeline-owned.test.mjs` (it already pins `carried`, :96,:199) for a manifest whose evidence is a diagnostic JSON plus log would turn the INFERRED fit into PROVEN.
++
++**What stays a human or agent step:** running the printed commit and the identical rerun (two calls remain). INFERRED saving: the commit composition (trailers, message file) and one retry of a mis-composed commit per round; the consumer report shows only the second call, not retries.
++
++## L15: Antigravity child model notice
++
++### Facts
++
++- The notice is `AGY-NATIVE-CHILD-MODEL-NOTICE`, surfaced as the diagnostic `agy-native-child-model-mismatch` (`PC/hooks/antigravity-pretool-guard.mjs:668-669`). It is computed in `evaluateNativeChildCall` (`PC/lib/agy-native-goldfish.mjs:112-141`).
++- **Mapping.** `expected` is the registry cell of the child's duty: `goldfish-implementor` is `duty.implement`, `goldfish-deep` is `duty.deep`, `goldfish-mechanic` is `duty.mechanic` (:39, :98-104). The consumer's expected value `gemini-3.8-flash-medium` is the implementor cell (`pipeline.user.yaml:178`). `resolved` is the child's hook payload `modelName` (:130).
++- **Status.** `match` on equal normalized names, `tier-match` when both are the same `flash`, `flash-lite` or `pro` family, else `mismatch` (:133-134). `tierOf` knows only those three families, so `gemini-4-hydrogen-tiered-high` has no tier and is always a mismatch against a flash cell. Only a mismatch earns the notice (:136-140); it never denies (G20-43).
++- **Scope.** The check runs for the three code-writer roles only (:125); a Critic child returns before it. The Critic inherits by design and is never noticed.
++- **Which duties may be `inherit`.** The dispatch guard admits `inherit` or no Model only for a duty whose every Antigravity route `nativeTier` is `inherit` (`PC/lib/dispatch-model-enforcement.mjs:187-199`). The tier table gives `inherit` to `duty.critic_normal` and `duty.critic_high_risk` only; `duty.implement`, `duty.mechanic` and `duty.deep` are `flash` (`PC/lib/model-role-route-source.mjs:37-49`).
++- **Is it wrong for `inherit`?** No, for a Goldfish: the measured fact is that a child launched without a Model, or with `inherit`, runs on the session model (reference `antigravity-native-dispatch.md:45-51`), so the notice reports a true difference between the registry cell and the model the child ran on. It is not wrong; it is unhelpful: its text names no repair (:139).
++- **Open contradiction (NOT resolvable by reading).** Because the Goldfish tiers are `flash`, the dispatch guard refuses `inherit` and an omitted Model for a Goldfish with `DISPATCH-MODEL-MISSING` before the child exists (`dispatch-model-enforcement.mjs:200-205`), and the reference says Goldfish roles pass `Model: "flash"` (:26-29). If the consumer's call really passed `inherit`, that guard did not run or did not apply; if it passed `flash`, the host now resolves the alias to the session model (the reference records `flash` resolving to `gemini-3.8-flash-tiered`, :46, which would have been `tier-match`). Which one happened is NOT MEASURED. Also, the generated Antigravity next step names no `Model` at all (`prepare-dispatch.mjs:120`): that gap is lane L10b and is not duplicated here.
++- Config note, not traced: `PC/config/runner-mappings.json:47` names `gemini-3.8-flash-high` for `implement` while `pipeline.user.yaml:178` names flash-medium; which source the notice reads (`registeredFunctionalTaskRoutes`) was not followed.
++
++### Smallest build (text only)
++
++Extend the notice sentence (:139) with the two named repairs: "If the parent call passed `inherit` or no Model, re-issue it with `Model: "flash"` (the dispatch guard requires it for this role); if it passed `flash`, the host resolved the alias to the session model: nothing to repair, the observation is recorded in the verdict `modelCheck`." No change of the check, the families or the verdict shape.
++
++**Failing-first proof:** a case in the agy-native-goldfish test feeding `modelName: "gemini-4-hydrogen-tiered-high"` for `goldfish-implementor` and asserting the notice contains `Model: "flash"` and `modelCheck.status === "mismatch"`. Red today (no repair text). A `tier-match` input still yields no notice.
++
++The second half of the lane row (a `GUARD-PARSE-UNSUPPORTED` hint in the child's rules) was not examined beyond a file search: the code that prints the admitted shapes is `PC/lib/guard/grammar-denials.mjs`, and this very briefing carries them; whether an Antigravity child reads them is NOT MEASURED.
++
++## L16: `HGO-GIT` ETIMEDOUT in a PreToolUse hook
++
++### Facts
++
++- The code is `HGO-GIT`, thrown by the one helper `git(root, args, spawn)` in `PC/lib/human-guard-override.mjs:204-215`: fixed `timeout: 5000`, `shell: false`, one attempt, any non-zero status or spawn error throws `repository identity is unavailable (operation=rev-parse---show-toplevel, outcome=ETIMEDOUT)`. `outcome` is `result.error.code` first (:210-211), which is how `ETIMEDOUT` appears. There is no retry: a search of the file and of `PC/lib/git-cmd.mjs` finds none.
++- `topology()` (:224-229) is the first call of the override planning and runs `git rev-parse --show-toplevel` (:226). The helper serves `topology`, `repositoryObservation` (:988-995), the cross-repository probe (:1303) and the reconcile window (:6857-6913, including `write-tree`, an idempotent content-addressed object write). Two more spawns carry the same 5000 ms outside the helper (:965, :967) and one advisory (:1092).
++- **Why it hurts.** In the Antigravity and Codex pre-tool hooks the planning failure is classified as a host boundary and turned into `external-operator-required` / `HGO-EXTERNAL-REPOSITORY-OBSERVATION` (`PC/hooks/antigravity-pretool-guard.mjs:1219-1244`, same in `codex-pretool-guard.mjs:661`): a transient timeout under parallel load becomes a hand-over to the human, with no retry route. The existing tests pin `HGO-GIT` for `EPERM` and for a genuine failure (`human-guard-override.test.mjs:4748,5443,5633`), not for a timeout.
++- **Hook budget.** Most hook entries in `PC/hooks/hooks.json` carry `timeout: 10` seconds (e.g. :23, :45, :56); which entry covers the planning path and the Antigravity host's own hook limit were not traced. NOT MEASURED: what the host does when a hook overruns (the denial text may be lost), so the budget must not be exceeded.
++- **One planning makes several git calls.** `topology()` runs two (:226,:228); `repositoryObservation` runs four more through the helper (:988-995) and two outside it (:965,:967). A retry per call therefore cannot keep one planning under 10 s.
++
++### What would be safe
++
++A retry bounded per PLANNING, not per call: the helper keeps the first attempt at 5000 ms (so every other caller of the shared helper is unchanged) and retries once, only when `result.error?.code === "ETIMEDOUT"` (never on a non-zero exit status), and only while a deadline of about 9 s since the planning's first git call leaves at least 2 s, with the remaining time as the retry's timeout. The retried calls are read-only or idempotent (`write-tree` is content-addressed). On the final timeout keep today's `HGO-GIT` text and append the runnable step "retry the identical action once; if it repeats, run `git rev-parse --show-toplevel` in the project root and look at the machine load". No time-based expiry of any artifact, no signature or approval touched. The deadline needs a start carried by `topology()` (a design choice the dispatch makes, not this recon); the two spawns at :965 and :967 could route through the helper (optional rider).
++
++**Failing-first proof:** the helper takes an injected `spawn` and clock. Case 1: first call `{ error: { code: "ETIMEDOUT" } }`, second `{ status: 0, stdout }` returns the value (today it throws `HGO-GIT`). Case 2: two timeouts throw `HGO-GIT` with `outcome=ETIMEDOUT` and the spawn ran exactly twice. Case 3: `{ status: 128 }` is NOT retried (spawn ran once). Case 4: with the clock past the deadline, no retry. **Protected file:** `human-guard-override.mjs` is a guard library; whether it is on the shipped protected baseline was not checked (INFERRED yes), so the held patch is applied through the protected-source route.
++
++## L17: cost row for Antigravity
++
++### Facts
++
++- **No step writes `telemetry/costs.md` for any runner.** The one-shot close only digests the file when it exists (`finish-feature.mjs:879-882`). The row is a manual close step of the skill: `usage-ledger.mjs <claude projects dir> --latest --row <feature>` appended by hand (`PC/skills/close-feature/SKILL.md:44-56`). A search of `PC/`, `docs/` and `harness/` finds no `cost-summary` at all, so the plan's name does not match code; the lane's real question is the `--row` reader.
++- **The `--row` reader is Claude-only by design.** Its header and the skill say so: it "understands the Claude Code transcript layout only. On Codex or Antigravity it has no source: skip the step and say ... the telemetry row is unavailable for this runner" (`SKILL.md:50-53`; `usage-ledger.mjs:4-11,31-38`).
++- **What parses Antigravity:** only `--timeline` (`usage-ledger.mjs:40-45`): format detection includes the brain transcript (`USER_INPUT`, `PLANNER_RESPONSE`, `GENERIC` with `step_index`, :213-223) and the step reader takes `input_tokens`, `cache_read_tokens` and `output_tokens` per model step (:343-352). That output is counts, times and codes, not a costs row.
++- **Why a $ half cannot be derived:** the step events carry `model: null` (:352), so no per-model price applies. INFERRED from the reader; whether the real transcript names a model elsewhere is NOT MEASURED.
++- **`--row` is a top-level program, not a function.** The default and `--row` paths scan a Claude transcripts root into one `rows` map keyed by project, session and model, then call `renderRow()` or `renderTable()` (`usage-ledger.mjs:836-847`); `--timeline` is a separate early branch (:440). `--metering` takes sanitized bundle files (:484-486), a third route not read further.
++- 30h to 30k: no change found (no Antigravity branch in the `--row` path).
++
++### Smallest build
++
++A token-only row from the brain transcript: `usage-ledger.mjs --row <label> --antigravity-transcript <file>` that feeds the existing step reader's token sums into the same `rows` shape (one synthetic model key such as `antigravity-unrecorded`) and prints the MP-20 fragment with the dollar half marked unavailable ("model not recorded in this transcript"), never estimated. The transcript path stays an argument (GL-03). The skill step then names the Antigravity route instead of "skip". Effort is medium, not small: the `rows` aggregation is module top-level code, so the new input needs a branch before it or a small extraction, and the `renderRow` internals were not read (NOT MEASURED).
++
++**Failing-first proof:** a usage-ledger test with a two-record `PLANNER_RESPONSE` fixture and the new flag: red today (unknown flag); green: the row carries the summed input, output and cache-read tokens and the `$` marker "unavailable", with no path and no transcript text. A fixture without any `PLANNER_RESPONSE` prints the skip sentence and exits 0 (never fails the close).
++
++## PO decisions with defaults
++
++| # | Decision | Default |
++|---|---|---|
++| D1 | Bind the follow-up list by `manifestSha256` (the PO's wish): an optional key in the list, verifier and the push guard's exact-key check. A record-shape change, and the guard library is protected | No in this candidate: candidate commit and tree plus the bundle path bind it today. If yes: optional key, old lists still verify, applied through the protected-source route |
++| D2 | Write the close-time evidence follow-up automatically at `closed-local` (files written, commit steps printed) or only name a command | Automatic write, printed commit steps; one extra commit before `pushEvidence`, no new state |
++| D3 | A kind for dispatch records that land after the close (the plan's wish) | Defer, measure first: whether any lifecycle lands one after the close is NOT MEASURED; the projection carries those that exist at the close. Not built here |
++| D4 | Let the Critic preparation commit the evidence itself | No: it names the owned commit command (derived from its own dry-run) or prints the steps, the commit authority is unchanged |
++| D5 | A token-only Antigravity cost row (dollar half unavailable) | Yes, medium effort; otherwise keep the documented skip |
++| D6 | Retry budget for `HGO-GIT` | One retry inside a per-planning deadline of about 9 s, first attempt unchanged at 5 s |
++
++## Not reached or not measured
++
++The `renderRow` internals and `--metering` of `usage-ledger.mjs`; which hook entry covers the override planning path and what the host does on a hook overrun; whether `audit-bundles/**` is a protected path; the Antigravity child's rules text; whether the owned commit route really carries a diagnostic JSON plus log (the existing `carried` tests pin the manifest case only); whether any lifecycle lands a dispatch record after the close. No test of the product, no Full Verify and no Critic round ran; the held patch adds only this note.
++
++## Ranked build proposal (one stage each, test first, rollback by revert)
++
++1. **L14** `prepare-dispatch.mjs`: derive the commit step in `commit-required` (the owned commit command from its own dry-run, else printed steps and `--stage`); script and its test only, a step in every Critic round, not a guard file.
++2. **L16** bounded `ETIMEDOUT` retry inside a per-planning deadline in `human-guard-override.mjs` `git()` (four cases above). Highest pain per occurrence (a human hand-over), rare; protected file, so it applies through the PO's route.
++3. **L6 stage 1** close-time evidence follow-up (`audit-proof-collection.mjs` plus the `closed-local` branch of `finish-feature.mjs`, close test, the three texts of item 4). Closes the local-only gap with no new record type; D1 and D3 stay open.
++4. **L15** notice text with the two named repairs (one lib file and its test); the open contradiction goes to the next greenfield report, not to code.
++5. **L17** token-only Antigravity row (`usage-ledger.mjs`, skill text); medium effort for the smallest value.
