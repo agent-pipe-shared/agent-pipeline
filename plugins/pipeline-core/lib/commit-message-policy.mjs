@@ -120,6 +120,70 @@ export function parseCommitTrailerBlock(message) {
   return entries;
 }
 
+/** The one-command spelling every GIT-03 refusal teaches first; the message file (`git commit -F`) is the fallback for a long body. */
+export const ONE_COMMAND_TRAILER_FORM = 'git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"';
+const MESSAGE_FILE_FORM = "git commit -F scratch/<message-file>";
+
+// Git (trailer.c, find_trailer_block_start) appends `--trailer` entries to the LAST paragraph, without a blank line, when that paragraph
+// is itself a trailer block: every line is `Token: value` (token of letters, digits and `-`, optional blanks before the colon) or a
+// continuation, or at least a quarter of them are trailers and one carries a Git-generated prefix. The first paragraph is the title and
+// is never a trailer block. Only the built-in prefixes are modelled: a `trailer.*` key in the user's own Git config can recognise more,
+// which the unchanged `commit-msg` backstop still judges on the finished bytes.
+const GIT_GENERATED_TRAILER_PREFIXES = Object.freeze(["Signed-off-by: ", "(cherry picked from commit "]);
+
+function gitTrailerSeparatorIndex(line) {
+  let blankSeen = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === ":") return index;
+    if (!blankSeen && /[A-Za-z0-9-]/u.test(char)) continue;
+    if (index > 0 && (char === " " || char === "\t")) { blankSeen = true; continue; }
+    break;
+  }
+  return -1;
+}
+
+/** Would `git commit --trailer ...` glue its entries to the last paragraph of this (already cleaned) message? */
+export function gitReadsLastParagraphAsTrailerBlock(message) {
+  const lines = String(message ?? "").split("\n");
+  const titleEnd = lines.findIndex((line) => line.trim() === "");
+  if (titleEnd < 0) return false;
+  let trailerLines = 0;
+  let nonTrailerLines = 0;
+  let possibleContinuations = 0;
+  let recognizedPrefix = false;
+  let onlyBlanks = true;
+  for (let index = lines.length - 1; index >= titleEnd; index -= 1) {
+    const line = lines[index];
+    if (line.startsWith("#")) { nonTrailerLines += possibleContinuations; possibleContinuations = 0; continue; }
+    if (line.trim() === "") {
+      if (onlyBlanks) continue;
+      nonTrailerLines += possibleContinuations;
+      return (recognizedPrefix && trailerLines * 3 >= nonTrailerLines) || (trailerLines > 0 && nonTrailerLines === 0);
+    }
+    onlyBlanks = false;
+    if (GIT_GENERATED_TRAILER_PREFIXES.some((prefix) => line.startsWith(prefix))) {
+      trailerLines += 1; possibleContinuations = 0; recognizedPrefix = true; continue;
+    }
+    if (gitTrailerSeparatorIndex(line) >= 1 && !/\s/u.test(line[0])) { trailerLines += 1; possibleContinuations = 0; }
+    else if (/\s/u.test(line[0])) possibleContinuations += 1;
+    else { nonTrailerLines += 1 + possibleContinuations; possibleContinuations = 0; }
+  }
+  return false;
+}
+
+/** Git's `whitespace` cleanup, which `-m` and `-F` use: trailing blanks off each line, blank runs collapsed, outer blank lines dropped (an empty `-m ''` adds nothing). */
+function gitWhitespaceCleanup(text) {
+  const out = [];
+  for (const raw of text.replace(/\r\n/gu, "\n").split("\n")) {
+    const line = raw.replace(/[ \t]+$/u, "");
+    if (line === "" && (out.length === 0 || out.at(-1) === "")) continue;
+    out.push(line);
+  }
+  while (out.at(-1) === "") out.pop();
+  return out.join("\n");
+}
+
 const INTEGRATION_DISPATCH = /^quality-package-([a-f0-9]{64}) \(integration\)$/u;
 const messageDigest = (message) => createHash("sha256").update(String(message ?? "").replace(/\r\n/gu, "\n"), "utf8").digest("hex");
 
@@ -184,8 +248,8 @@ export function finishedCommitMessageFindings(message, {
       findings.push({
         code: "GIT-03-DISPATCH-MISSING",
         detail: splitAway
-          ? "no `Dispatch:` entry in the final Git trailer block: a `Dispatch:` line is in the message but a blank line separates it from the last block (each `-m` flag starts a new paragraph); write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`, both trailers as the last lines with no blank line between them"
-          : "no `Dispatch:` entry in the final Git trailer block; end the message with `AI-Assisted: true` and one `Dispatch:` line (`Dispatch: <task-id> (goldfish)` or `Dispatch: stage-0 (elephant)`) as the last lines, written with `git commit -F scratch/<message-file>`",
+          ? `no \`Dispatch:\` entry in the final Git trailer block: a \`Dispatch:\` line is in the message but a blank line separates it from the last block (each \`-m\` flag starts a new paragraph); commit with \`${ONE_COMMAND_TRAILER_FORM}\` (one \`-m\` per paragraph, the two trailers only as \`--trailer\` flags), or, for a long or multi-paragraph body, write the whole message to a file under scratch/ and commit with \`${MESSAGE_FILE_FORM}\`, both trailers as the last lines with no blank line between them`
+          : `no \`Dispatch:\` entry in the final Git trailer block; end the message with \`AI-Assisted: true\` and one \`Dispatch:\` line (\`Dispatch: <task-id> (goldfish)\` or \`Dispatch: stage-0 (elephant)\`) as the last lines, written with \`${ONE_COMMAND_TRAILER_FORM}\` (or, for a long or multi-paragraph body, \`${MESSAGE_FILE_FORM}\`)`,
       });
     } else if (dispatches.length > 1) {
       findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
@@ -396,8 +460,24 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
   // final trailer block.  Reconstruct precisely that shape so the pre-tool
   // inspection agrees with Git's finished commit and an agent need not pipe a
   // hand-built multi-line message through the shell just to satisfy GIT-03.
-  const message = `${parts.join("\n\n")}${trailers.length > 0 ? `${parts.length > 0 ? "\n\n" : ""}${trailers.join("\n")}` : ""}`;
+  // C30-19: the entries follow the cleaned message after a blank line, unless Git reads the last paragraph as a trailer block: then it
+  // appends to that paragraph with no blank line (the bytes below are what Git writes, and that shape is refused further down).
+  // A trailing run of blank and `#` lines is Git's comment footer: the entries go in front of it, not after it.
+  const cleaned = trailers.length > 0 ? gitWhitespaceCleanup(parts.join("\n\n")) : parts.join("\n\n");
+  const cleanedLines = cleaned.split("\n");
+  let bodyEnd = cleanedLines.length;
+  while (trailers.length > 0 && bodyEnd > 0 && (cleanedLines[bodyEnd - 1] === "" || cleanedLines[bodyEnd - 1].startsWith("#"))) bodyEnd -= 1;
+  const body = trailers.length > 0 ? cleanedLines.slice(0, bodyEnd).join("\n") : cleaned;
+  const footer = trailers.length > 0 && cleanedLines.slice(bodyEnd).some((line) => line.startsWith("#")) ? `\n${cleanedLines.slice(bodyEnd).join("\n")}` : "";
+  const glued = trailers.length > 0 && body !== "" && gitReadsLastParagraphAsTrailerBlock(body);
+  const message = `${body}${trailers.length > 0 ? `${body !== "" ? (glued ? "\n" : "\n\n") : ""}${trailers.join("\n")}${footer}` : ""}`;
   const findings = finishedCommitMessageFindings(message, { requireMarker, requireDispatch }).findings;
+  if (glued) {
+    findings.push({
+      code: "GIT-03-TRAILERS-GLUED-TO-BODY",
+      detail: `\`--trailer\` entries that Git would glue directly under the body: it reads the last body paragraph as a trailer block (every line looks like \`Key: value\`, or a \`Signed-off-by:\` line is among them), appends the entries with no blank line, and the body lines join the provenance block; end the body with a line of plain prose (not \`Key: value\`) or drop the body, and commit with \`${ONE_COMMAND_TRAILER_FORM}\`, or, for a long or multi-paragraph body, write the whole message to a file under scratch/ and commit with \`${MESSAGE_FILE_FORM}\``,
+    });
+  }
 
   for (const { path, reason } of unreadable) {
     findings.push({

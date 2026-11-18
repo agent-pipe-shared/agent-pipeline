@@ -271,7 +271,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings } from "../lib/commit-message-policy.mjs";
+import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings, ONE_COMMAND_TRAILER_FORM } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
 import { commitCommandPaths, runningGoldfishCommitNotice } from "../lib/running-goldfish-scope.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -1130,6 +1130,8 @@ let inspection;
     "GIT-03-DISPATCH-MISSING",
     "GIT-03-DISPATCH-AMBIGUOUS",
     "GIT-03-DISPATCH-MALFORMED",
+    // C30-19: a glued trailer block is a structure fault of the provenance convention, so it follows the same warn/off modes.
+    "GIT-03-TRAILERS-GLUED-TO-BODY",
   ]);
   const blocking = inspection.findings.filter((finding) => !conventionCodes.has(finding.code) || markerMode === "blocking");
   const warningOnly = inspection.findings.filter((finding) => conventionCodes.has(finding.code) && markerMode === "warn");
@@ -1143,8 +1145,9 @@ let inspection;
       // Candidate 19 (D7, AGY and Codex greenfield): repeated refusals because the text named the rule but not the accepted form.
       ...(blocking.some((f) => conventionCodes.has(f.code))
         ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own.",
+          // C30-19: the one plain command comes first (`--trailer` flags, which Git keeps in one final block); the message file is the fallback.
           // G20-21 (AGY greenfield): several `-m` flags each start a new paragraph, so the two trailers were split by a blank line and refused again.
-          "Write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`; do not split the trailers across several `-m` flags (each `-m` adds a blank line)."]
+          `Commit in one plain command: \`${ONE_COMMAND_TRAILER_FORM}\` - one \`-m\` per paragraph, the two trailers only as \`--trailer\` flags, never as \`-m\` (each \`-m\` adds a blank line). For a long or multi-paragraph body, or one with non-ASCII text, a backslash or a newline inside an argument (guard-push refuses a parenthesised \`Dispatch: <id> (goldfish)\` in such a command), write the whole message to a file under scratch/ and commit with \`git commit -F scratch/<message-file>\`.`]
         : []),
       "If the runner or host told you to add such lines (a commit-attribution reminder), the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md, commit messages).",
     ]);

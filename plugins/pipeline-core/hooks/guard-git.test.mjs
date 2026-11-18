@@ -859,6 +859,27 @@ check("GIT03-10 block  body lines cannot pose as the final provenance block",
     projectDir: GIT03_BLOCKING_DIR,
     stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
   });
+// C30-19: a commit with its provenance trailers is one plain command (-m paragraphs plus --trailer flags). The guard judges the bytes
+// real Git writes; a body whose last paragraph Git reads as a trailer block gets the trailers glued on, so it is refused with the repair.
+check("GIT03-17 allow  one command: -m subject, -m prose body, two --trailer flags (with a parenthesised Dispatch value)",
+  'git commit -m "feat(x): a thing" -m "Plain prose body." --trailer "AI-Assisted: true" --trailer "Dispatch: NVA-GIT03 (goldfish)"', ALLOW, {
+    projectDir: NO_CONFIG_DIR,
+  });
+check("GIT03-18 block  one command whose body ends in a Key: value paragraph glues the trailers to it",
+  'git commit -m "feat(x): a thing" -m "Why: it matters" --trailer "AI-Assisted: true" --trailer "Dispatch: NVA-GIT03 (goldfish)"', BLOCK, {
+    projectDir: NO_CONFIG_DIR,
+    stderrIncludes: ["GIT-03-TRAILERS-GLUED-TO-BODY", "Accepted form:", 'git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"', "plain prose", "git commit -F scratch/<message-file>"],
+  });
+check("GIT03-19 block  a missing Dispatch refusal names the one-command form before the message-file fallback",
+  'git commit -m "feat(x): a thing" --trailer "AI-Assisted: true"', BLOCK, {
+    projectDir: NO_CONFIG_DIR,
+    stderrIncludes: ["GIT-03-DISPATCH-MISSING", 'git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"', "git commit -F scratch/<message-file>", "long or multi-paragraph body"],
+  });
+check("GIT03-20 block  duplicated provenance entries and a provider co-author trailer stay refused in the one-command form",
+  'git commit -m "feat(x): a thing" --trailer "AI-Assisted: true" --trailer "AI-Assisted: true" --trailer "Dispatch: stage-0 (elephant)" --trailer "Co-Authored-By: Claude <noreply@anthropic.com>"', BLOCK, {
+    projectDir: NO_CONFIG_DIR,
+    stderrIncludes: ["GIT-03-MARKER-AMBIGUOUS", "GIT-03-PROVIDER-COAUTHOR"],
+  });
 // C23 (Antigravity greenfield F24): the hook process runs in the project root; the command runs in the child's own worktree, named by tool_input.cwd.
 const GIT03_CHILD_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-child-"));
 writeFileSync(join(GIT03_CHILD_DIR, "child-only.txt"),
@@ -900,6 +921,18 @@ check("GIT03-11 warn  provenance conventions stay non-blocking in warn mode",
     projectDir: GIT03_WARN_DIR,
     stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "commitTrailerPolicy is \"warn\""],
   });
+// C30-19: the glued-trailer refusal follows the project's mode like the other provenance conventions: a warning in `warn`, silent in `off`.
+const GIT03_GLUED_COMMAND = 'git commit -m "feat(x): a thing" -m "Fixes: #1" --trailer "Signed-off-by: A <a@example.invalid>"';
+check("GIT03-21 warn  a glued trailer block is only a warning in warn mode",
+  GIT03_GLUED_COMMAND, WARN, {
+    projectDir: GIT03_WARN_DIR,
+    stderrIncludes: ["GIT-03-TRAILERS-GLUED-TO-BODY", "commitTrailerPolicy is \"warn\""],
+  });
+const GIT03_OFF_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-off-"));
+mkdirSync(join(GIT03_OFF_DIR, ".claude"), { recursive: true });
+writeFileSync(join(GIT03_OFF_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
+check("GIT03-22 allow  a glued trailer block is not judged when the project opted out of the provenance conventions",
+  GIT03_GLUED_COMMAND, ALLOW, { projectDir: GIT03_OFF_DIR });
 
 // ---- GIT-01: commit subject must start with an admitted Conventional Commit type ----------
 //

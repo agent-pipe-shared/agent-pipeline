@@ -22,6 +22,10 @@ import {
   parseIntegrationTrailerBlock,
 } from "./commit-message-policy.mjs";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 let checks = 0;
 const check = (label, fn) => { cases.push({ id: `CMP${String(cases.length + 1).padStart(3, "0")}`, name: label, run: async () => { await fn(); checks += 1; process.stdout.write(`ok ${label}\n`); } }); };
@@ -383,6 +387,116 @@ check("CMP19 every trailer example in the conventional-commit skill is accepted 
   assert.ok(codes(finishedCommitMessageFindings(wrap("AI-Assisted: true"), opts)).includes("GIT-03-DISPATCH-MISSING"));
   for (const code of ["GIT-03-PROVIDER-COAUTHOR", "GIT-03-DISPATCH-MISSING"]) assert.ok(skill.includes(code), code);
   assert.match(skill, /must NOT be added/u);
+});
+
+// C30-19 (one plain command with its provenance trailers): the guard must judge the bytes REAL Git writes. These cases run
+// real `git commit` in a throwaway repository with an injected hook-free config and compare. Git appends `--trailer` entries to
+// the LAST paragraph when that paragraph is itself a trailer block (all lines `Token: value`, or a recognised prefix such as
+// `Signed-off-by:` on at least a quarter of the lines); only otherwise does it insert a blank line first.
+const POSIX_QUOTE = (value) => `'${String(value).replace(/'/gu, `'\\''`)}'`;
+const PROVENANCE_ARGS = ["--trailer", "AI-Assisted: true", "--trailer", "Dispatch: C30I-S4 (goldfish)"];
+const oneCommandArgs = (subject, bodies = []) => ["-m", subject, ...bodies.flatMap((body) => ["-m", body]), ...PROVENANCE_ARGS];
+const oneCommandText = (args) => `git commit ${args.map(POSIX_QUOTE).join(" ")}`;
+const STRICT = { requireMarker: true, requireDispatch: true };
+function realGitMessage(args) {
+  const dir = mkdtempSync(join(tmpdir(), "cmp-real-git-"));
+  try {
+    const env = {
+      PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, HOME: dir, USERPROFILE: dir,
+      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: join(dir, "gitconfig"), GIT_TERMINAL_PROMPT: "0",
+    };
+    writeFileSync(join(dir, "gitconfig"), "");
+    const git = (gitArgs) => {
+      const result = spawnSync("git", gitArgs, { cwd: dir, env, encoding: "utf8", shell: false });
+      assert.equal(result.status, 0, `git ${gitArgs[0]}: ${result.stderr}`);
+      return result.stdout;
+    };
+    git(["init", "-q"]);
+    git(["-c", "user.name=probe", "-c", "user.email=probe@example.invalid", "-c", `core.hooksPath=${join(dir, "no-hooks")}`,
+      "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", ...args]);
+    const raw = git(["cat-file", "commit", "HEAD"]);
+    return raw.slice(raw.indexOf("\n\n") + 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+check("CMP044 the accepted one-command spelling is admitted and the guard's message equals the bytes real Git writes", () => {
+  const prose = [
+    [], ["Explains why."], ["Explains why.", ""], ["para one.", "para two."], ["Why: x\nbecause plain prose."],
+    ["- bullet: x"], ["my_key: x"], ["see https://x.invalid now"], ["Why: x\n  continued\nthen prose."],
+  ];
+  for (const bodies of prose) {
+    const args = oneCommandArgs("feat(x): do a thing", bodies);
+    const result = run(oneCommandText(args), STRICT);
+    assert.deepEqual(codes(result), [], JSON.stringify(bodies));
+    const real = realGitMessage(args);
+    assert.equal(`${result.message}\n`, real, JSON.stringify(bodies));
+    assert.match(real, /\n\nAI-Assisted: true\nDispatch: C30I-S4 \(goldfish\)\n$/u, "real Git keeps the blank separator");
+    assert.deepEqual(parseCommitTrailerBlock(result.message), [
+      { key: "AI-Assisted", value: "true" }, { key: "Dispatch", value: "C30I-S4 (goldfish)" },
+    ], JSON.stringify(bodies));
+  }
+});
+
+check("CMP045 a body whose last paragraph Git reads as a trailer block is refused with the typed repair, on Git's real bytes", () => {
+  // Git also rewrites some glued lines (`Note : x` -> `Note: x`, `https://x` -> `https: //x`): those are refused, their bytes need not match.
+  const rewritten = [["https://x.invalid"], ["Note : x"], ["Why:x"]];
+  const glued = [
+    ["Why: x"], ["Note: a\nNote2: b"], ["Why: x\n  continued"], ["Why:"], ["Why: x\n# remark"],
+    ["Signed-off-by: A <a@example.invalid>\nprose one\nprose two"], ...rewritten,
+  ];
+  for (const bodies of glued) {
+    const args = oneCommandArgs("feat(x): do a thing", bodies);
+    const result = run(oneCommandText(args), STRICT);
+    const real = realGitMessage(args);
+    assert.doesNotMatch(real, /\n\nAI-Assisted: true\n/u, `real Git glues the trailers to the body for ${JSON.stringify(bodies)}`);
+    if (!rewritten.includes(bodies)) assert.equal(`${result.message}\n`, real, JSON.stringify(bodies));
+    const finding = result.findings.find((entry) => entry.code === "GIT-03-TRAILERS-GLUED-TO-BODY");
+    assert.ok(finding, JSON.stringify(bodies));
+    assert.match(finding.detail, /git commit -m <subject> \[-m <body>\] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"/u);
+    assert.match(finding.detail, /plain prose/u);
+    assert.match(finding.detail, /git commit -F scratch\/<message-file>/u);
+  }
+});
+
+check("CMP046 the guard's glue verdict agrees with real Git for each shape of last body paragraph", () => {
+  const shapes = [
+    "plain prose.", "Why: x\nplain prose.", "Why: x\nWhat: y", "intro\n  indented: x", "# remark", "Why: x\n# remark", "# remark\nWhy: x",
+    "prose.\n# remark", "# remark\nprose.", "# a\n\n# b", "para\n\n# tail comment", "Reviewed-by: A\nprose", "Signed-off-by: A\nx\nx\nx", "Signed-off-by: A\nx\nx\nx\nx", "(cherry picked from commit abc)\nprose\nprose",
+    ": x", "a b: c", "key_with_underscore: x", "-x: y", "Why: x\n\nplain closing paragraph.",
+    // The two real bodies of the 2026-11-17 commits that exposed the defect: the first starts `C30-19:` (a valid token, so Git glued
+    // the trailers on), the second starts with a sentence that merely contains a colon (blank line kept).
+    "C30-19: the guard already admits the one-command commit with --trailer; the refusal text still teaches the message file.",
+    "Found on the first real commit with the form: Git appended the trailers directly under the body paragraph.",
+  ];
+  for (const shape of shapes) {
+    const args = oneCommandArgs("feat(x): do a thing", [shape]);
+    const result = run(oneCommandText(args), STRICT);
+    const real = realGitMessage(args);
+    const realGlued = !/\n\nAI-Assisted: true\n/u.test(real);
+    assert.equal(result.findings.some((entry) => entry.code === "GIT-03-TRAILERS-GLUED-TO-BODY"), realGlued, JSON.stringify(shape));
+    // Git drops a `#` line that sits inside a glued trailer block, so only that one shape differs in bytes (it is refused either way).
+    if (shape !== "# remark\nWhy: x") assert.equal(`${result.message}\n`, real, JSON.stringify(shape));
+  }
+});
+
+check("CMP047 the one-command spelling keeps every other GIT-03 refusal exactly as before", () => {
+  const withArgs = (extra, bodies = []) => run(oneCommandText([...oneCommandArgs("feat(x): do a thing", bodies), ...extra]), STRICT);
+  assert.deepEqual(codes(withArgs(["--trailer", "AI-Assisted: true"])), ["GIT-03-MARKER-AMBIGUOUS"]);
+  assert.deepEqual(codes(withArgs(["--trailer", "Dispatch: C30I-S4 (goldfish)"])), ["GIT-03-DISPATCH-AMBIGUOUS"]);
+  assert.deepEqual(codes(run(oneCommandText(["-m", "feat(x): do a thing", "--trailer", "AI-Assisted: true"]), STRICT)), ["GIT-03-DISPATCH-MISSING"]);
+  assert.deepEqual(codes(run(oneCommandText(["-m", "feat(x): do a thing", "--trailer", "Dispatch: C30I-S4 (goldfish)"]), STRICT)), ["GIT-03-MARKER-MISSING"]);
+  assert.deepEqual(codes(withArgs(["--trailer", "Co-Authored-By: Claude <noreply@anthropic.com>"])), ["GIT-03-PROVIDER-COAUTHOR"]);
+  assert.deepEqual(codes(withArgs([], ["see https://claude.ai/code/session_01ABC"])), ["GIT-03-SESSION-URL"]);
+  assert.deepEqual(codes(withArgs(["--trailer", "Dispatch: invented (elephant)"])), ["GIT-03-DISPATCH-AMBIGUOUS"]);
+});
+
+check("CMP048 the Dispatch-missing repair names the one-command --trailer form first and the message file as the fallback", () => {
+  for (const message of ["feat(x): x\n\nDispatch: stage-0 (elephant)\n\nAI-Assisted: true\n", "feat(x): x\n\nAI-Assisted: true\n"]) {
+    const finding = finishedCommitMessageFindings(message, STRICT).findings.find((entry) => entry.code === "GIT-03-DISPATCH-MISSING");
+    const oneCommand = finding.detail.indexOf('git commit -m <subject> [-m <body>] --trailer "AI-Assisted: true" --trailer "Dispatch: <id>"');
+    const fileRoute = finding.detail.indexOf("git commit -F scratch/<message-file>");
+    assert.ok(oneCommand >= 0 && fileRoute > oneCommand, message);
+  }
 });
 
 afterTests(() => {

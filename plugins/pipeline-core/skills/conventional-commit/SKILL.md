@@ -91,10 +91,13 @@ A commit without a `Dispatch:` trailer is refused too (`GIT-03-DISPATCH-MISSING`
 Present the full message as a single fenced block. For a normal commit, give the
 caller the scratch-free form `git commit -m '<subject>' -m '<body paragraph>'
 --trailer 'AI-Assisted: true' -- <paths>`, adding a grounded `Dispatch:` trailer
-when the repository requires one. Name the same exact paths in `git add -- <paths>`
+when the repository requires one (a second flag, `--trailer 'Dispatch: <id> (goldfish)'`;
+a parenthesised value is admitted inside quotes while the whole command is printable ASCII on one line, with no backslash). Name the same exact paths in `git add -- <paths>`
 and in the commit. Keep each argument on one line; use repeated `-m` for separate
-body paragraphs. Use `-F` only when the content cannot safely be represented as
-single-line arguments. Render argument quoting for the actual shell (single
+body paragraphs, and never type the trailers as `-m` (each `-m` adds a blank line). Keep the
+last body paragraph plain prose: when every line of it reads `Key: value`, Git glues the
+trailers to it and the guard refuses it (`GIT-03-TRAILERS-GLUED-TO-BODY`). Use `-F` only when the content cannot safely be represented as
+single-line arguments (for example a long or multi-paragraph body). Render argument quoting for the actual shell (single
 quotes in POSIX shells and PowerShell; double quotes in `cmd.exe`) and never
 interpolate unreviewed shell syntax. State explicitly: "Proposed message — review and commit
 yourself; this skill does not run `git commit`." Never invoke `git commit` —
