@@ -1,0 +1,341 @@
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-card.mjs b/plugins/pipeline-core/lib/critical-action-approval-card.mjs
+index d307ca0d6..75e96eacc 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-card.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-card.mjs
+@@ -1,7 +1,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /**
+  * C30I-S5 (AC-112, queue C30-20): the plain-language card that opens the attended signature confirmation of
+- * `po-human-approval.mjs authorize-critical`, above the unchanged evidence lines and hashes.
++ * `po-human-approval.mjs authorize-critical`, above the unchanged evidence lines and hashes. C30J-J12 adds the same card for the two
++ * ceremonies that go through `sign-intent` (the guard-override signature digest and the design approval) as `signingCeremonyCard`.
+  *
+  * Pure and read-only: it is built ONLY from values the request already holds (the kind, the candidate commit and tree, the expiry, the
+  * feature id and the subject preimage when `--subject` or a kind builder supplied one). It reads nothing, runs no git command and changes no
+@@ -193,6 +194,90 @@ const SPECS = Object.freeze({
+ /** The kinds `authorize-critical` accepts; each has a card. A test pins this list to the command's own kind list. */
+ export const CARD_KINDS = Object.freeze(Object.keys(SPECS));
+ 
++// C30J-J12 (queue C30-20 gap): the two ceremonies that go through `sign-intent` instead of `authorize-critical`. They have their own table so the
++// twelve kinds above stay exactly as they were. Each entry is (facts, de) -> { what, why, allows, limits, closed }, and `facts` holds only what the
++// request already carries: a fact that is absent or malformed is left out, never guessed. A count must be a positive safe integer to be stated.
++const count = (value) => (Number.isSafeInteger(value) && value > 0 ? value : null);
++
++const CEREMONY_SPECS = Object.freeze({
++  // The signature digest of a guard override: facts { toolName, commandClass, expiresAt, pathCount } from the structured plan the request resolves to.
++  "guard-override": (f, de, language) => {
++    const tool = line(f.toolName); const klass = line(f.commandClass); const paths = count(f.pathCount); const expiry = line(f.expiresAt);
++    const call = [tool === null ? null : (de ? `Werkzeug "${tool}"` : `tool "${tool}"`), klass === null ? null : (de ? `Befehlsklasse "${klass}"` : `command class "${klass}"`)].filter(Boolean).join(", ");
++    const until = expiry === null
++      ? (de ? "Diese Bestätigung zeigt den Ablauf nicht an." : "This confirmation does not show the expiry.")
++      : (de ? `Das gilt bis ${expiryText(language, expiry)}; danach ist eine neue Anfrage mit neuer Signatur nötig.` : `This holds until ${expiryText(language, expiry)}; after that a new request and a new signature are needed.`);
++    return {
++      what: de
++        ? `Ihre Signatur unter eine Freigabe, mit der der Agent genau einen von einem Guard abgelehnten Werkzeugaufruf${call === "" ? "" : ` (${call})`} wiederholen darf${paths === null ? "" : `; ${paths} ${plural(paths, "zulässiger Pfad", "zulässige Pfade")} stehen unten`}.`
++        : `Your signature on an authorization that lets the agent retry exactly one tool call that a guard denied${call === "" ? "" : ` (${call})`}${paths === null ? "" : `; ${paths} eligible ${plural(paths, "path is", "paths are")} listed below`}.`,
++      why: de ? "Eine Ablehnung durch einen Guard lässt sich nur mit Ihrer Signatur unter genau diese Anfrage aufheben (ADR-0059, ADR-0061)." : "A guard denial can be lifted only by your signature on exactly this request (ADR-0059, ADR-0061).",
++      allows: de
++        ? `Danach darf der Agent authorize-by-signature ausführen; das schaltet die Freigabe für eine einzige Verwendung genau dieses Aufrufs in identischen Bytes scharf, und die erste Verwendung verbraucht sie. ${until}`
++        : `After you sign, the agent may run authorize-by-signature, which arms the override for one use of that byte-identical call; the first use consumes it. ${until}`,
++      limits: de ? "Ein anderer Werkzeugaufruf, eine andere Befehlsklasse, eine zweite Verwendung oder ein Aufruf nach dem Ablauf ist nicht abgedeckt; es ist keine Push-, Release- oder Design-Freigabe." : "A different tool call, another command class, a second use or a call after the expiry is not covered; it is not a push, release or design approval.",
++      closed: de ? "die Ablehnung des Guards und der blockierte Aufruf bleiben bestehen" : "the guard denial and the blocked call stay as they are",
++      reading: de
++        ? "Die Zeilen oben sind die Bedeutung. Die Zeilen darunter sind der Beleg, an den die Signatur gebunden ist: der Intent-Digest, den Ihr Schlüssel signiert, die aufgezeichnete Anfrage, die zulässigen Pfade, die Begründung des ablehnenden Guards und der signierte Ablauf sowie Pfad und Digest des vollständigen Prüfmaterials."
++        : "The lines above are the meaning. The lines below are the evidence this signature is bound to: the intent digest your key signs, the recorded request, the eligible paths, the denying guard's rationale and the signed expiry, and the path and digest of the full review material.",
++    };
++  },
++  // The design approval: facts { featureId, prdPath, specPath, companionCount, receiptCount, verdict, openFindingCount, candidateCommit } from its binding.
++  "design-approval": (f, de) => {
++    const feature = line(f.featureId); const prd = line(f.prdPath); const spec = line(f.specPath); const commit = line(f.candidateCommit);
++    const companions = count(f.companionCount); const receipts = count(f.receiptCount); const open = f.verdict === "open-findings" ? count(f.openFindingCount) : null;
++    const package_ = [prd === null ? null : `PRD ${prd}`, spec === null ? null : `Spec ${spec}`].filter(Boolean).join(de ? " und " : " and ");
++    const extras = [
++      companions === null ? null : (de ? `${companions} ${plural(companions, "Begleitdatei", "Begleitdateien")}` : `${companions} ${plural(companions, "companion file", "companion files")}`),
++      receipts === null ? null : (de ? `${receipts} ${plural(receipts, "Bereitschafts-Prüfrunde", "Bereitschafts-Prüfrunden")}` : `${receipts} readiness ${plural(receipts, "review round", "review rounds")}`),
++      commit === null ? null : (de ? `Commit ${short(commit)}` : `commit ${short(commit)}`),
++    ].filter(Boolean).join(", ");
++    return {
++      what: de
++        ? `Ihre Freigabe des geprüften Designs${feature === null ? "" : ` von Feature ${feature}`}${package_ === "" ? "" : `: ${package_}`}${extras === "" ? "" : ` (${extras})`}.`
++        : `Your approval of the reviewed design${feature === null ? "" : ` of feature ${feature}`}${package_ === "" ? "" : `: ${package_}`}${extras === "" ? "" : ` (${extras})`}.`,
++      why: de ? "Der Schritt vom Design zur Umsetzung braucht Ihre Signatur unter genau das geprüfte Paket (ADR-0085); kein Agent kann sie für Sie geben." : "The step from design to implementation needs your signature on exactly the reviewed package (ADR-0085); no agent can give it for you.",
++      allows: (de
++        ? "Der Agent darf diese signierte Entscheidung zu approve-plan bringen, das sie unabhängig verbrauchen muss, damit die Umsetzung unter dem unten gebundenen Paket beginnen kann. Die Anfrage trägt keinen Ablauf; sie gilt genau für diese Quellen, Prüfberichte und diesen Commit, und jede Änderung daran braucht eine neue Freigabe."
++        : "The agent may take this signed decision to approve-plan, which must consume it independently, so that implementation can start under the package bound below. The request carries no expiry; it holds for exactly these sources, reviews and this commit, and a change of any of them needs a new approval.")
++        + (open === null ? "" : (de ? ` Sie signieren über ${open} blockierende ${plural(open, "Feststellung", "Feststellungen")}, die nach der letzten erlaubten Prüfrunde offen ${plural(open, "ist", "sind")}; die Signatur nimmt sie wissentlich hin.` : ` You sign over ${open} blocking ${plural(open, "finding", "findings")} still open after the last allowed review round; signing accepts ${plural(open, "it", "them")} knowingly.`)),
++      limits: de ? "Es ist keine Push-, Release- oder Veröffentlichungs-Freigabe und keine Guard-Freigabe, und es ändert weder PRD noch Spec." : "It is not a push, release or publication approval and not a guard override, and it changes neither the PRD nor the Spec.",
++      closed: de ? "der Plan bleibt ohne Freigabe und approve-plan hat keine signierte Entscheidung zu verbrauchen" : "the plan stays unapproved and approve-plan has no signed decision to consume",
++      reading: de
++        ? "Die Zeilen oben sind die Bedeutung. Die Zeilen darunter sind der Beleg, an den die Signatur gebunden ist: der Intent-Digest, den Ihr Schlüssel signiert, Commit und Tree des Kandidaten, der Digest der Design-Bindung, die Prüfberichte und die vollständige begrenzte Design-Bindung."
++        : "The lines above are the meaning. The lines below are the evidence this signature is bound to: the intent digest your key signs, the candidate commit and tree, the design binding digest, the review reports and the complete bounded design binding.",
++    };
++  },
++});
++
++/** The ceremony kinds `sign-intent` can open with a card; kept apart from CARD_KINDS (the twelve `authorize-critical` kinds). */
++export const CEREMONY_CARD_KINDS = Object.freeze(Object.keys(CEREMONY_SPECS));
++
++/**
++ * The card for a `sign-intent` ceremony, as lines ending in CARD_END_LINE; an unknown kind has no card (empty list). `facts` is what the request
++ * holds for that kind (see CEREMONY_SPECS); the decline part covers both ways of saying no, since a passphrase-protected key has no typed token.
++ */
++export function signingCeremonyCard({ kind, facts, language } = {}) {
++  const spec = Object.hasOwn(CEREMONY_SPECS, kind) ? CEREMONY_SPECS[kind] : null;
++  if (spec === null) return [];
++  const lang = Object.hasOwn(LABELS, language) ? language : "en";
++  const de = lang === "de";
++  const labels = LABELS[lang];
++  const parts = spec(isObject(facts) ? facts : {}, de, lang);
++  const decline = de
++    ? `Nichts wird signiert und kein Nachweis geschrieben, solange Sie nicht bestätigen (bei einem passphrasengeschützten Schlüssel: solange Sie die Passphrase nicht eingeben). Die Anfrage bleibt ohne Signatur in scratch/ und gewährt nichts; ${parts.closed}.`
++    : `Nothing is signed and no proof is written unless you confirm (with a passphrase-protected key: unless you enter the passphrase). The request file stays in scratch/ without a signature and grants nothing; ${parts.closed}.`;
++  return [
++    `${labels[0]} ${parts.what}`,
++    `${labels[1]} ${parts.why}`,
++    `${labels[2]} ${parts.allows}`,
++    `${labels[3]} ${parts.limits}`,
++    `${labels[4]} ${decline}`,
++    `${labels[5]} ${parts.reading}`,
++    CARD_END_LINE,
++  ];
++}
++
+ /**
+  * The card as lines (without indentation), ending in CARD_END_LINE. An unknown kind has no card (empty list).
+  * `subject` is the subject preimage the request holds (or null); `language` is the resolved human-facing language.
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs b/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs
+index 7af9f30e5..a4d149424 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-card.test.mjs
+@@ -4,9 +4,16 @@
+ // Registration note: this FILE is new and is not run by Verify until it is listed in harness/verify-suites.json (the Coordinator does that);
+ // the same criterion is also pinned by the registered cases in scripts/po-human-approval.test.mjs.
+ import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
+ import test from "node:test";
++import { fileURLToPath } from "node:url";
+ 
+-import { CARD_END_LINE, CARD_KINDS, criticalActionApprovalCard } from "./critical-action-approval-card.mjs";
++import * as cardModule from "./critical-action-approval-card.mjs";
++import * as approvalModule from "../scripts/po-human-approval.mjs";
++
++const { CARD_END_LINE, CARD_KINDS, criticalActionApprovalCard } = cardModule;
++// Namespace access (not named imports) so a missing export fails its own cases instead of the whole file.
++const signingConfirmationCard = (input) => approvalModule.signingConfirmationCard(input);
+ 
+ const CANDIDATE = Object.freeze({ commit: "a1b2c3d4e5f6".padEnd(40, "a"), tree: "0f9e8d7c6b5a".padEnd(40, "b") });
+ const EXPIRES = "2026-11-18T10:30:00.000Z";
+@@ -135,6 +142,123 @@ test("C30I-S5: kind-specific limits the code knows are stated", () => {
+   assert.match(card("acknowledge-maintenance-red-check", FIXTURES["acknowledge-maintenance-red-check"].subject), /test or tooling paths only/u);
+ });
+ 
++// ---------------------------------------------------------------------------------------------------------------------
++// C30J-J12 (AC-112 closest accepted criterion, queue C30-20 gap): the same six-part card for the two ceremonies that go through
++// `sign-intent` instead of `authorize-critical` -- the guard-override signature digest and the design approval. The new kinds live in a
++// separate table (the twelve `authorize-critical` kinds above stay pinned); the facts come only from the request the ceremony already holds.
++// ---------------------------------------------------------------------------------------------------------------------
++const OVERRIDE_FACTS = Object.freeze({ toolName: "Write", commandClass: "in-root-write", expiresAt: EXPIRES, pathCount: 2 });
++const DESIGN_FACTS = Object.freeze({ featureId: FEATURE, prdPath: "specs/feature-a/prd.md", specPath: "specs/feature-a/spec.md", companionCount: 3, receiptCount: 2, verdict: "pass", openFindingCount: 0, candidateCommit: CANDIDATE.commit });
++const ceremony = (kind, facts, language = "en") => cardModule.signingCeremonyCard({ kind, facts, language });
++const ceremonyText = (kind, facts, language = "en") => ceremony(kind, facts, language).join("\n");
++
++test("C30J-J12: the two ceremony kinds have their own table; the twelve authorize-critical kinds stay exactly as they were", () => {
++  assert.deepEqual([...cardModule.CEREMONY_CARD_KINDS].sort(), ["design-approval", "guard-override"]);
++  assert.equal(CARD_KINDS.length, 12);
++  for (const kind of cardModule.CEREMONY_CARD_KINDS) assert.ok(!CARD_KINDS.includes(kind), kind);
++  assert.deepEqual(ceremony("no-such-ceremony", OVERRIDE_FACTS), []);
++});
++
++test("C30J-J12: the guard-override card has the six labelled parts in both languages and states the tool call class, the one-use arming and the stored expiry", () => {
++  for (const language of ["en", "de"]) {
++    const text = ceremonyText("guard-override", OVERRIDE_FACTS, language);
++    const labels = language === "en" ? EN_LABELS : DE_LABELS;
++    let at = -1;
++    for (const label of labels) { const found = text.indexOf(label); assert.ok(found > at, `${language}: label ${label} missing or out of order`); at = found; }
++    for (const fact of ['"Write"', '"in-root-write"', EXPIRES, "authorize-by-signature", "2 "]) assert.ok(text.includes(fact), `${language}: ${fact}`);
++    assert.ok(!/undefined|\bnull\b|NaN|\[object|\$\{|<[a-z-]+>/u.test(text), `${language}: no placeholder`);
++  }
++  assert.match(ceremonyText("guard-override", OVERRIDE_FACTS), /once|one use|one retry/iu);
++  assert.match(ceremonyText("guard-override", OVERRIDE_FACTS), /18 November 2026, 10:30 UTC \(stored as 2026-11-18T10:30:00\.000Z\)/u);
++  assert.match(ceremonyText("guard-override", OVERRIDE_FACTS, "de"), /18\. November 2026, 10:30 Uhr UTC \(gespeichert als 2026-11-18T10:30:00\.000Z\)/u);
++  const en = ceremonyText("guard-override", OVERRIDE_FACTS); const de = ceremonyText("guard-override", OVERRIDE_FACTS, "de");
++  assert.notEqual(en, de);
++  assert.doesNotMatch(en, /\b(Sie|Ihr|nicht|und)\b/u);
++  assert.match(de, /Sie|Ihr/u);
++});
++
++test("C30J-J12: the design-approval card names the package, the stored absence of an expiry, what the approval releases and what it does not", () => {
++  for (const language of ["en", "de"]) {
++    const text = ceremonyText("design-approval", DESIGN_FACTS, language);
++    const labels = language === "en" ? EN_LABELS : DE_LABELS;
++    let at = -1;
++    for (const label of labels) { const found = text.indexOf(label); assert.ok(found > at, `${language}: label ${label} missing or out of order`); at = found; }
++    for (const fact of [FEATURE, "specs/feature-a/prd.md", "specs/feature-a/spec.md", "a1b2c3d4e5f6", "approve-plan", "ADR-0085"]) assert.ok(text.includes(fact), `${language}: ${fact}`);
++    assert.ok(!/undefined|\bnull\b|NaN|\[object|\$\{|until unknown/u.test(text), `${language}: no placeholder`);
++  }
++  const en = ceremonyText("design-approval", DESIGN_FACTS);
++  assert.match(en, /no expiry/u, "the request holds no expiry and the card says so instead of inventing one");
++  assert.match(en, /3 companion/u);
++  assert.match(en, /2 (readiness )?review/u);
++  assert.doesNotMatch(en, /open finding|blocking finding/u, "a passing review states no open findings");
++  const open = ceremonyText("design-approval", { ...DESIGN_FACTS, verdict: "open-findings", openFindingCount: 2 });
++  assert.match(open, /2 blocking finding/u);
++  assert.match(open, /knowingly/u);
++});
++
++test("C30J-J12: a fact the request does not hold is left out of the ceremony card, never guessed", () => {
++  const bareOverride = ceremonyText("guard-override", {});
++  for (const label of EN_LABELS) assert.ok(bareOverride.includes(label), label);
++  assert.ok(!/tool "|class "|until|UTC|\b\d+ eligible/u.test(bareOverride), `no tool, class, time or count may be invented: ${bareOverride}`);
++  assert.match(bareOverride, /does not show the expiry/u);
++  const malformed = ceremonyText("guard-override", { toolName: "Wr\nite", commandClass: 5, expiresAt: 7, pathCount: -1 });
++  assert.ok(!malformed.includes("Wr\nite") && !/\b5\b|\b7\b|-1/u.test(malformed));
++  const bareDesign = ceremonyText("design-approval", {});
++  for (const label of EN_LABELS) assert.ok(bareDesign.includes(label), label);
++  assert.ok(!/specs\/|a1b2c3d4e5f6|companion|review round/u.test(bareDesign), `no package fact may be invented: ${bareDesign}`);
++});
++
++test("C30J-J12: the ceremony decline part covers both ways of saying no (no typed token with a passphrase key) and never names the authorize-critical request directory", () => {
++  for (const [kind, facts] of [["guard-override", OVERRIDE_FACTS], ["design-approval", DESIGN_FACTS]]) {
++    for (const language of ["en", "de"]) {
++      const lines = ceremony(kind, facts, language);
++      const line = lines.find((entry) => entry.startsWith(language === "en" ? "IF YOU DECLINE:" : "WENN SIE ABLEHNEN:"));
++      if (language === "en") {
++        assert.match(line, /Nothing is signed and no proof is written/u, kind);
++        assert.match(line, /passphrase/u, kind);
++      } else assert.match(line, /Nichts wird signiert und kein Nachweis geschrieben/u, kind);
++      assert.doesNotMatch(line, /approval directory|overwritten by the next run|agent is told|notif/iu, kind);
++      assert.equal(lines.at(-1), CARD_END_LINE);
++      assert.equal(lines.filter((entry) => entry === CARD_END_LINE).length, 1);
++    }
++  }
++});
++
++test("C30J-J12: signingConfirmationCard builds the guard-override card from the structured plan the signature request holds, and only from it", () => {
++  const record = { resolved: true, lines: ["recorded request: x"], fullReviewMaterial: { toolName: "Write", commandClass: "in-root-write", expiresAt: EXPIRES, eligiblePaths: ["a.txt", "b.txt"], preview: { guardRationale: [{ guard: "g", rationale: "SECRET-RATIONALE" }] } } };
++  const lines = signingConfirmationCard({ requestSchema: "pipeline.human-guard-override-signature-digest.v1", request: { schema: "pipeline.human-guard-override-signature-digest.v1" }, record, language: "en" });
++  const text = lines.join("\n");
++  assert.equal(lines.at(-1), CARD_END_LINE);
++  for (const fact of ['"Write"', '"in-root-write"', EXPIRES, "2 "]) assert.ok(text.includes(fact), fact);
++  assert.ok(!text.includes("SECRET-RATIONALE") && !text.includes("a.txt"), "raw paths and the rationale stay in the redacting evidence lines");
++  // The bare-digest route resolves display lines only: no structured plan, so no card and no guess.
++  assert.deepEqual(signingConfirmationCard({ requestSchema: undefined, request: null, record: { resolved: true, lines: ["recorded request: x", "window expires at (signed, absolute): " + EXPIRES] }, language: "en" }), []);
++  assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.human-guard-override-signature-digest.v1", request: {}, record: { resolved: true, lines: [] }, language: "en" }).length > 0, true, "the signature request without a plan still gets a card that says the facts are not shown");
++  assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.human-guard-override-signature-digest.v1", request: {}, record: { resolved: false, lines: [] }, language: "en" }), []);
++  assert.deepEqual(signingConfirmationCard({ requestSchema: "pipeline.signed-quality-package.v1", request: {}, record, language: "en" }), [], "another request schema gets no ceremony card");
++});
++
++test("C30J-J12: signingConfirmationCard builds the design-approval card from the validated request binding, in the configured language", () => {
++  const request = { schema: "pipeline.design-approval-request.v1", binding: { featureId: FEATURE, sources: { prd: { path: "specs/feature-a/prd.md", sha256: SHA("1") }, spec: { path: "specs/feature-a/spec.md", sha256: SHA("2") }, companions: [{ path: "specs/feature-a/c1.md", sha256: SHA("3") }] }, reviewReceipts: [{ round: 1 }], verdict: "open-findings", openFindingIds: ["DCC-1", "DCC-2"] }, approvalIntent: { value: { candidate: CANDIDATE }, sha256: SHA("4") } };
++  const en = signingConfirmationCard({ requestSchema: request.schema, request, record: { resolved: true, lines: [] }, language: "en" }).join("\n");
++  const de = signingConfirmationCard({ requestSchema: request.schema, request, record: { resolved: true, lines: [] }, language: "de" }).join("\n");
++  for (const fact of [FEATURE, "specs/feature-a/prd.md", "specs/feature-a/spec.md", "a1b2c3d4e5f6", "1 companion", "2 blocking finding"]) assert.ok(en.includes(fact), fact);
++  assert.ok(de.includes("WAS SIE UNTERSCHREIBEN:") && de.includes(FEATURE));
++  assert.deepEqual(signingConfirmationCard({ requestSchema: request.schema, request: { schema: request.schema }, record: { resolved: true, lines: [] }, language: "en" }).length > 0, true, "a request without a readable binding still gets a card that states no package fact");
++});
++
++test("C30J-J12: sign-intent prints the card above the unchanged evidence lines, for the typed confirmation and for the passphrase-only route alike", () => {
++  const source = readFileSync(fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)), "utf8");
++  assert.ok(source.includes("const disclosureLines = compactSigningDisclosure({ intentSha256, record, materialArtifact });"), "the evidence lines are still produced by the unchanged compact disclosure");
++  const printed = source.slice(source.indexOf("const disclosureLines = compactSigningDisclosure({ intentSha256, record, materialArtifact });"));
++  const upto = printed.indexOf("const manual = {");
++  const region = printed.slice(0, upto);
++  assert.match(region, /signingConfirmationCard\(\{ requestSchema, request: scratchRequestRecord, record, language: humanFacingLanguage \}\)/u);
++  assert.match(region, /printDisclosureOnly\(confirmationLines, humanFacingLanguage\)/u);
++  assert.match(region, /requireExplicitConfirmation\(confirmationLines, dependencies, humanFacingLanguage\)/u);
++  assert.match(region, /\[\.\.\.signingConfirmationCard\([^\n]*\), \.\.\.disclosureLines\]/u, "card first, then the evidence lines byte for byte");
++});
++
+ test("C30I-S5: a long finding list or change list is bounded and says how many were left out", () => {
+   const findings = Array.from({ length: 14 }, (_, index) => ({ severity: "minor", id: `F-${index + 1}` }));
+   const text = card("accept-residual-critic-findings", { findings });
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 566c03868..98bf89e80 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -435,6 +435,18 @@ test("AC-264: signing through that command discloses the design purpose: no HGO-
+   assert.ok(disclosure.includes(f.candidate), "the disclosure names the candidate commit");
+   assert.doesNotMatch(disclosure, /HGO-/u, "no guard-override (HGO-) code reaches the PO");
+   assert.doesNotMatch(disclosure, /no recorded request resolves|purpose unavailable/u, "the unresolved-request fallback is never shown for a design approval");
++  // C30J-J12 (AC-112 closest accepted criterion, queue C30-20): the fixture's configured human-facing language is German, so the one
++  // signing command opens with the six-part plain-language card in German, built from the request's own binding, and every evidence
++  // line the PO saw before is still there after the card's end line, in the same order (QG-04: an added assertion, none weakened).
++  const cardEnd = disclosure.indexOf("\n  -----\n");
++  assert.ok(cardEnd > 0, "the card ends in its fixed delimiter line before the evidence lines");
++  const cardText = disclosure.slice(0, cardEnd);
++  for (const label of ["WAS SIE UNTERSCHREIBEN:", "WARUM JETZT GEFRAGT WIRD:", "WAS DAS ERLAUBT, UND BIS WANN:", "WAS DAS NICHT ERLAUBT:", "WENN SIE ABLEHNEN:", "SO LESEN SIE DIE ZEILEN DARUNTER:"]) assert.ok(cardText.includes(label), `card part ${label}`);
++  assert.ok(cardText.includes(f.request.binding.featureId) && cardText.includes(f.request.binding.sources.prd.path) && cardText.includes(f.request.binding.sources.spec.path), "the card names the feature, the PRD and the Spec the request binds");
++  assert.ok(cardText.includes(f.candidate.slice(0, 12)), "the card names the candidate commit");
++  const evidence = disclosure.slice(cardEnd + "\n  -----\n".length);
++  assert.ok(evidence.startsWith(`  intent sha256: ${f.request.approvalIntent.sha256}\n  action: approve the exact reviewed design-to-implementation plan decision\n`), "the evidence lines follow the card unchanged, digest first");
++  assert.ok(disclosure.indexOf("PO-FREIGABE BESTÄTIGEN") < disclosure.indexOf("WAS SIE UNTERSCHREIBEN:"), "the card sits inside the confirmation frame, under its header");
+ });
+ 
+ test("G20-30: the proof is awaited and imported by the agent after the PO signs, with no reply from the PO", () => {
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 0bfa02066..47a9cb6c2 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -31,7 +31,7 @@ import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-ga
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+ import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+-import { criticalActionApprovalCard } from "../lib/critical-action-approval-card.mjs";
++import { criticalActionApprovalCard, signingCeremonyCard } from "../lib/critical-action-approval-card.mjs";
+ import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
+ import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+@@ -531,6 +531,31 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
+     "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
+   ];
+ }
++/**
++ * C30J-J12 (queue C30-20 gap): the plain-language card that opens the `sign-intent` confirmation for the two ceremonies that are not
++ * `authorize-critical`: the guard-override signature digest and the design approval. Pure and read-only: the facts come ONLY from values
++ * the ceremony already holds (the structured plan the signature request resolved to, or the validated request binding); it reads nothing,
++ * changes no request, digest or proof, and the evidence lines printed after the card are not its business. Any other request (the bare
++ * `--intent-sha256` route included, which resolves display lines only) gets no card rather than facts parsed out of display text.
++ */
++export function signingConfirmationCard({ requestSchema, request, record, language } = {}) {
++  if (requestSchema === "pipeline.human-guard-override-signature-digest.v1") {
++    if (record?.resolved !== true) return [];
++    const planned = record.fullReviewMaterial;
++    return signingCeremonyCard({ kind: "guard-override", language,
++      facts: { toolName: planned?.toolName, commandClass: planned?.commandClass, expiresAt: planned?.expiresAt, pathCount: Array.isArray(planned?.eligiblePaths) ? planned.eligiblePaths.length : undefined } });
++  }
++  if (requestSchema === DESIGN_APPROVAL_REQUEST_SCHEMA) {
++    const binding = request?.binding;
++    return signingCeremonyCard({ kind: "design-approval", language,
++      facts: { featureId: binding?.featureId, prdPath: binding?.sources?.prd?.path, specPath: binding?.sources?.spec?.path,
++        companionCount: Array.isArray(binding?.sources?.companions) ? binding.sources.companions.length : undefined,
++        receiptCount: Array.isArray(binding?.reviewReceipts) ? binding.reviewReceipts.length : undefined,
++        verdict: binding?.verdict, openFindingCount: Array.isArray(binding?.openFindingIds) ? binding.openFindingIds.length : undefined,
++        candidateCommit: request?.approvalIntent?.value?.candidate?.commit } });
++  }
++  return [];
++}
+ function nonPushCriticalHandoff(result) {
+   return { proofPath: result.externalPaths?.proof ?? null,
+     requestPath: result.externalPaths?.request ?? null, authorityPath: result.externalPaths?.authority ?? null,
+@@ -3010,6 +3035,9 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+       }
+     };
+     const disclosureLines = compactSigningDisclosure({ intentSha256, record, materialArtifact });
++    // C30J-J12: the plain-language card (guard-override and design-approval requests only) opens the confirmation; the evidence lines
++    // after it are exactly the compact disclosure above, byte for byte, and nothing bound by the signature changes.
++    const confirmationLines = [...signingConfirmationCard({ requestSchema, request: scratchRequestRecord, record, language: humanFacingLanguage }), ...disclosureLines];
+     // NVA-SIGNONCE-1: one human decision, not two. When the private key about to
+     // sign is passphrase-protected, entering that passphrase at the OpenSSL
+     // prompt below IS the deliberate human act, so the typed confirmation this
+@@ -3021,9 +3049,9 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+     // would leave none.
+     revalidateSigningDisclosure();
+     if (isPrivateKeyPassphraseProtected(paths.privateKey, dependencies)) {
+-      printDisclosureOnly(disclosureLines, humanFacingLanguage);
++      printDisclosureOnly(confirmationLines, humanFacingLanguage);
+     } else {
+-      requireExplicitConfirmation(disclosureLines, dependencies, humanFacingLanguage);
++      requireExplicitConfirmation(confirmationLines, dependencies, humanFacingLanguage);
+     }
+     // A shared external key directory is normal: it must never make one
+     // ceremony overwrite the proof returned by an earlier ceremony.  The
