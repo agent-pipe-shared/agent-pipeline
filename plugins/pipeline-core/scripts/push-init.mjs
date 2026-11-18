@@ -138,7 +138,18 @@ export const PUSH_INIT_SCRIPT_PATH = fileURLToPath(import.meta.url);
 export const RECONCILIATION_SCRIPT_RELATIVE_PATH = "harness/scripts/check-doc-reconciliation.mjs";
 
 export function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]] [--transport-kind ssh-key|credential-helper|configured-default [--transport-reference <key path or helper name>]]";
+  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]] [--transport-kind ssh-key|credential-helper|configured-default [--transport-reference <key path or helper name>]]\n--transport-reference value: ssh-key: path of the private key file (never its content); credential-helper: name of the configured Git credential helper; configured-default: none.";
+}
+
+const REFERENCE_HINTS = {
+  "ssh-key": { meaning: "the path of the private key file, never its content", placeholder: "<path-to-private-key-file>" },
+  "credential-helper": { meaning: "the name of the configured Git credential helper", placeholder: "<helper-name>" },
+};
+
+function missingReferenceMessage(kind) {
+  const hint = REFERENCE_HINTS[kind];
+  if (!hint) return `${kind} requires --transport-reference`;
+  return `${kind} requires --transport-reference: the value is ${hint.meaning}. Example: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> --transport-kind ${kind} --transport-reference ${hint.placeholder}`;
 }
 
 export function parseArgs(argv) {
@@ -169,7 +180,7 @@ export function parseArgs(argv) {
     const kind = output["transport-kind"];
     const reference = output["transport-reference"] ?? null;
     if (!PUSH_TRANSPORT_KINDS.includes(kind)) return { error: `--transport-kind requires one of: ${PUSH_TRANSPORT_KINDS.join(", ")}` };
-    if ((kind === "configured-default") !== (reference === null)) return { error: kind === "configured-default" ? "configured-default takes no --transport-reference" : `${kind} requires --transport-reference` };
+    if ((kind === "configured-default") !== (reference === null)) return { error: kind === "configured-default" ? "configured-default takes no --transport-reference" : missingReferenceMessage(kind) };
     output.transport = { kind, reference };
   }
   for (const required of ["root", "by", "remote", "destination"]) {

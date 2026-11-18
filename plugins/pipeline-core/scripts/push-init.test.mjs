@@ -25,7 +25,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, main, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
+import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, main, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH, usage } from "./push-init.mjs";
 import { observeCurrentPlanApprovalForCalibration, readState, run as pipelineStateRun } from "./pipeline-state.mjs";
 import { compileDecisionSummary } from "./architecture-baseline.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
@@ -637,6 +637,22 @@ test("C28-ONBOARDING-QUESTIONS: --transport-kind / --transport-reference parse a
   const seen = [];
   main([...base, "--transport-kind", "ssh-key", "--transport-reference", "id_fixture"], { write: () => {}, writeError: () => {}, drive: (options) => { seen.push(options); return { outcome: "usage-error" }; } });
   assert.deepEqual(seen[0].transport, { kind: "ssh-key", reference: "id_fixture" });
+});
+
+test("C30K-K23: a missing --transport-reference says what the value is per kind and shows one example; usage explains it", () => {
+  const base = ["--root", "/x", "--by", "t", "--remote", "origin", "--destination", "refs/heads/main"];
+  const ssh = parseArgs([...base, "--transport-kind", "ssh-key"]).error;
+  assert.match(ssh, /^ssh-key requires --transport-reference/);
+  assert.match(ssh, /path of the private key file/);
+  assert.match(ssh, /never its content/);
+  assert.match(ssh, /--transport-kind ssh-key --transport-reference <path-to-private-key-file>/);
+  const helper = parseArgs([...base, "--transport-kind", "credential-helper"]).error;
+  assert.match(helper, /^credential-helper requires --transport-reference/);
+  assert.match(helper, /name of the configured Git credential helper/);
+  assert.match(helper, /--transport-kind credential-helper --transport-reference <helper-name>/);
+  assert.equal(parseArgs([...base, "--transport-kind", "configured-default", "--transport-reference", "k"]).error, "configured-default takes no --transport-reference");
+  assert.match(usage(), /ssh-key: path of the private key file/);
+  assert.match(usage(), /credential-helper: name of the configured Git credential helper/);
 });
 
 test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
