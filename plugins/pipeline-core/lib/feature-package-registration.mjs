@@ -38,7 +38,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
 import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
-import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, featurePackageDigestRoute, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { COURSE_EVIDENCE_GAP_CODES, FEATURE_ID, courseEvidenceGapText, discardedFeatureIdsOfState, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
@@ -72,6 +72,8 @@ const PROFILE_RIGOR = Object.freeze({ mini: 1, feature: 1, epic: 2 });
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const refused = (code, reason, extra = {}) => ({ schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "refused", code, reason, ...extra });
+// C30I-S7 (AC-110): a refusal for an invalid manifest whose findings are stale digests also names the sanctioned route to bind the manifest to the changed bytes (never a hand edit); any other invalidity keeps its text.
+const withDigestRoute = (root, manifestPath, reason) => { const route = featurePackageDigestRoute(root, manifestPath); return route === null ? reason : `${reason}. ${route}`; };
 
 /** A repository-relative, forward-slash path with no parent segment: the only kind this writer ever names. */
 const repositoryRelative = (path) => typeof path === "string" && path !== "" && !isAbsolute(path) && !/^[A-Za-z]:/u.test(path)
@@ -307,7 +309,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
       const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
       return refused("FPR-MANIFEST-CONFLICT", checked.ok
         ? "a valid manifest exists but does not register this envelope as candidate-evidence; it is never overwritten"
-        : "a manifest exists but is invalid; it is never overwritten", { manifestPath, envelopePath, findings: checked.findings });
+        : withDigestRoute(root, manifestPath, "a manifest exists but is invalid; it is never overwritten"), { manifestPath, envelopePath, findings: checked.findings });
     }
   }
 
@@ -469,7 +471,7 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
   const manifestRead = inspect(root, manifestPath);
   if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>), which writes the review unit with it`, { manifestPath });
   const checked = validateFeaturePackage(root, manifestPath);
-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
   let manifest;
   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
   if (manifest.artifacts.some((entry) => entry.path === unitPath)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-present", manifestPath, reviewUnitPath: unitPath };
@@ -550,7 +552,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
     const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === diagnosticRel && entry.class === "candidate-evidence") : null;
     const present = registered ? inspect(root, diagnosticRel) : null;
     if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-DIAG-IMMUTABLE", `${diagnosticRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: diagnosticRel });
-    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+    return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
   }
   // A path under the feature's evidence directory, a regular file, no symlink on the way.
   const pathProblem = (path) => {
@@ -635,7 +637,7 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
     const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === evidenceRel && entry.class === "candidate-evidence") : null;
     const present = registered ? inspect(root, evidenceRel) : null;
     if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-VERIFY-IMMUTABLE", `${evidenceRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: evidenceRel });
-    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+    return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
   }
   // Registered candidate evidence is read back by the course history (CCA-REGISTRATION-SHAPE requires specs/<feature>/evidence/), so a path
   // directly under the package directory would register here and then end the Critic carry-forward at push time (VEP-CVL-CARRY-RANGE).
@@ -697,7 +699,7 @@ export function addSpecAddendum({ root: rootInput, state, approvalPath, readAcce
   let manifest;
   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
   const checked = validateFeaturePackage(root, manifestPath);
-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
   const where = { manifestPath, path: approvalPath };
   if (!SPEC_ADDENDUM_APPROVAL_FILE.test(approvalPath) || !approvalPath.startsWith(`specs/${featureId}/evidence/`)) {
     return refused("FPR-SPEC-ADDENDUM-PATH", `${approvalPath} is not a Spec addendum approval record of this feature (specs/${featureId}/evidence/spec-addendum-approval-<sha256>.json, written by pipeline-state.mjs approve-spec-addendum)`, where);
@@ -808,7 +810,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
   const manifestRead = inspect(root, manifestPath);
   const checked = validateFeaturePackage(root, manifestPath);
-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
   let manifest;
   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
   // Idempotent replay: a registered lineage record of this packet is the answer, before anything is compiled.
@@ -1049,7 +1051,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
   const manifestRead = inspect(root, manifestPath);
   const checked = validateFeaturePackage(root, manifestPath);
-  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", withDigestRoute(root, manifestPath, "the manifest does not validate; it is never amended"), { manifestPath, findings: checked.findings });
   let manifest;
   try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
   // The registered history tail: the lineage record with the highest round.

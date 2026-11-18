@@ -30,7 +30,7 @@ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } fro
 import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
-import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+import { featurePackageDigestRoute, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
   assertPrivateRegularFile,
   ensurePrivateDirectory,
@@ -735,7 +735,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
       const checked = validateFeaturePackage(root, registeredManifest);
       if (!checked.ok) {
         const digestOnly = checked.findings.every((finding) => /: digest does not bind file bytes$/u.test(finding));
-        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256 and whether the agent runs it or the PO signs it), then plan this transition again on the same lifecycle` : ""}`);
+        // C30I-S7 (AC-110): the refusal names the entry, both digests and the sanctioned route (never a hand edit of the manifest).
+        const digestRoute = digestOnly ? featurePackageDigestRoute(root, registeredManifest) : null;
+        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256 and whether the agent runs it or the PO signs it), then plan this transition again on the same lifecycle` : ""}${digestRoute === null ? "" : `. ${digestRoute}`}`);
       }
       const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
       for (const [kind, path, digest] of [

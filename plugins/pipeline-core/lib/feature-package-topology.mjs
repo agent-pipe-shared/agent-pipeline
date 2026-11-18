@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
 
 export const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
@@ -224,6 +225,46 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
   if (["superseded", "retained"].includes(value?.state) && value?.supersedes === null) findings.push("FTP-SUPERSEDES: retained/superseded packages require a relationship");
   const receipt = { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: digest(readFileSync(join(root, manifest))), featureId: SAFE_ID.test(id ?? "") ? id : null, state: FEATURE_STATES.includes(value?.state) ? value.state : null, candidate: value?.candidate ?? null, artifactCount: Array.isArray(value?.artifacts) ? value.artifacts.length : 0, findingCount: findings.length };
   return { ok: findings.length === 0, findings, receipt, rebinds };
+}
+
+const STATE_WRITER_PATH = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+
+/**
+ * C30I-S7 (AC-110): the sanctioned route for a manifest whose bound digests no longer match the bytes of its files, as text for the refusals that carry the
+ * `FTP-ARTIFACT-<n>: digest does not bind file bytes` finding (the finding strings themselves stay as they are: other readers compare them). Read-only: it
+ * names, never rebinds. `null` when no entry is stale.
+ *
+ * It adds no way to rebind a digest. A `mutable` entry has its explicit agent-run verb (`feature-package-rebind-mutable`, PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND);
+ * an `immutable` or `append-only` entry stays with the PO-signed `feature-package-reconcile` ceremony, whose signing command and plan digest the owning command
+ * (`continuity-result-bootstrap-plan`, which calls `planFeaturePackageReconcile` and renders the critical-action request) prints, so they are named, never recomputed here.
+ */
+export function featurePackageDigestRoute(rootDir = process.cwd(), manifestPath) {
+  const root = resolve(rootDir);
+  let value;
+  try { value = JSON.parse(readFileSync(join(root, manifestPath), "utf8")); } catch { return null; }
+  const id = value?.feature?.id;
+  if (!SAFE_ID.test(id ?? "") || !Array.isArray(value?.artifacts)) return null;
+  const stale = [];
+  for (const [index, artifact] of value.artifacts.entries()) {
+    if (!object(artifact) || !SHA256.test(artifact.sha256 ?? "") || !featurePackageArtifactPath(root, id, artifact.class, artifact.path)) continue;
+    const file = regularFile(root, artifact.path, [], "FTP-ROUTE");
+    if (!file) continue;
+    const current = digest(readFileSync(join(root, file)));
+    if (current !== artifact.sha256) stale.push({ index, path: artifact.path, class: artifact.class, mutability: artifact.mutability, bound: artifact.sha256, current });
+  }
+  if (stale.length === 0) return null;
+  const mutable = stale.filter((entry) => entry.mutability === "mutable");
+  const gated = stale.filter((entry) => entry.mutability !== "mutable");
+  const named = (entries) => entries.map((entry) => entry.path).join(", ");
+  const parts = [
+    `Stale digest in ${manifestPath} (feature ${id}): ${stale.map((entry) => `FTP-ARTIFACT-${entry.index} ${entry.path} (${entry.class}, ${entry.mutability}) is bound to ${entry.bound} but its bytes hash to ${entry.current}`).join("; ")}.`,
+    "The manifest is never edited by hand. If the file as it is now is the intended content, the manifest is the stale side and the Pipeline's own route rebinds its digest; if the file is not the intended content, restore the bytes that hash to the bound digest instead.",
+  ];
+  if (mutable.length > 0) parts.push(`Mutable (${named(mutable)}): run node ${STATE_WRITER_PATH} feature-package-rebind-mutable --root ${root} --manifest ${manifestPath} (agent-run, no signature; it rebinds only mutable entries and prints each before and after digest).`);
+  if (gated.length > 0) {
+    parts.push(`Immutable or append-only (${named(gated)}): the digest is rebound only by the feature-package-reconcile ceremony, which needs the PO's own signature in an attended terminal, never the agent's. Read the pending plan with node ${STATE_WRITER_PATH} continuity-result-bootstrap-plan in the project root ${root} (read-only, no flags; for a feature with Continuity authority it prints preview, planSha256, signatureCommand and reconcileCommand while the package lags its bytes). Hand the PO exactly the signatureCommand line; afterwards run reconcileCommand (feature-package-reconcile --root ${root} --manifest ${manifestPath} --plan-sha256 <planSha256>, with the PO's name and the three proof files the signing step printed). A plan whose preview.requiredAuthority is "agent" moves only the Result entry and needs no signature: run its reconcileCommand as printed. A signature names HEAD: commit nothing between it and the reconcile.`);
+  }
+  return parts.join(" ");
 }
 
 /**

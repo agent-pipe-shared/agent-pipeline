@@ -363,6 +363,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     // checkpointed, so the one-shot opens that lifecycle itself and drives the entries through the route. A rerun finds the open lifecycle again, also one an agent started by hand.
     const coordinatorOf = (lifecycle) => { try { return command(runner, process.execPath, [COORDINATOR, "inspect", "--root", root, "--lifecycle", lifecycle], "ONESHOT-INSPECT"); } catch { return null; } };
     const ownerRouteRequired = (() => { try { return existsSync(join(common(), "agent-pipeline", "session-authority", "catalogue.json")); } catch { return false; } })();
+    // C30I-S7 (AC-110): a PO-run `session-authority-repair.mjs move-aside` retains the whole registry, catalogue included, under session-authority-abandoned (the directory name ends in
+    // `-repair-move-aside`) and leaves an open Close lifecycle behind. `ownerRouteRequired` is then false, and that is right for the ROUTE (the owner route refuses COR-NO-CATALOGUE; the State entries run
+    // directly), but the RESUME of the lifecycle the owner-route close opened must not turn into a direct close of a different kind: it is adopted and requalified exactly as before the move-aside.
+    // The signal is the retained aside, so a repository that never had an owner-route close (no such directory) keeps its direct behaviour unchanged.
+    const ownerRouteMovedAside = !ownerRouteRequired && (() => { try { return readdirSync(join(common(), "agent-pipeline", "session-authority-abandoned")).some((name) => name.endsWith("-repair-move-aside")); } catch { return false; } })();
+    const ownerRouteResume = ownerRouteRequired || ownerRouteMovedAside;
     const onlyOpenLifecycle = () => {
       let names;
       try { names = readdirSync(join(common(), "agent-pipeline", "publication-close")); } catch { return null; }
@@ -372,7 +378,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       });
       return open.length === 1 ? open[0] : null;
     };
-    if (ownerRouteRequired && resumeLifecycleId === null) resumeLifecycleId = onlyOpenLifecycle();
+    if (ownerRouteResume && resumeLifecycleId === null) resumeLifecycleId = onlyOpenLifecycle();
     const ensureOwnerLifecycle = () => {
       const lifecycle = resumeLifecycleId ?? `${featureId}-close`;
       const flags = ["--root", root, "--lifecycle", lifecycle, "--actor", actor];
@@ -385,7 +391,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     };
     // The first pass stopped before it wrote the requests a resume reads (an agent's hand-started lifecycle has none either): the evidence stages still have to run.
     const firstPassUnfinished = () => !existsSync(resolve(root, auditRequestPath)) || (state.continuity !== null && typeof state.continuity === "object" && !existsSync(resolve(root, closeRequestPath)));
-    const requalify = resumeLifecycleId !== null && (packageAt().moved || (ownerRouteRequired && firstPassUnfinished())) && coordinatorStillBeforePrepared();
+    const requalify = resumeLifecycleId !== null && (packageAt().moved || (ownerRouteResume && firstPassUnfinished())) && coordinatorStillBeforePrepared();
     const again = requalify ? resumeLifecycleId : null;
     if (resumeLifecycleId === null || requalify) {
       let accepted = null;

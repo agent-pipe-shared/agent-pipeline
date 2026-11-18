@@ -279,7 +279,7 @@ const SIGNATURE_COMMAND = { executable: "node", argv: ["po-human-approval.mjs", 
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false, movedAside = false } = {}) {
   // C30D-G1: `bootstrap` names what the Result bootstrap stand-ins answer (a refused plan by default, so the cases written before the close ran the bootstrap itself keep their stop); `ownerRoute` gives the repository a session-authority catalogue.
   const independenceChecks = []; const gateChangeChecks = []; const ownerRouteCalls = []; let retired = false; let bootstrapped = false;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
@@ -298,13 +298,24 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
   if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
   if (ownerRoute) { mkdirSync(join(root, ".git/agent-pipeline/session-authority"), { recursive: true }); writeFileSync(join(root, ".git/agent-pipeline/session-authority/catalogue.json"), "{}\n"); mkdirSync(join(root, ".git/agent-pipeline/publication-close/lc-1"), { recursive: true }); }
+  // C30I-S7 (AC-110): `movedAside` is the repository after a PO-run `session-authority-repair.mjs move-aside`: the catalogue is gone, the registry sits retained under session-authority-abandoned (the directory name is the one the move-aside writes), and the close lifecycle lc-1 stays open.
+  if (movedAside) {
+    const aside = join(root, ".git/agent-pipeline/session-authority-abandoned/20261117101500-0a1b2c3d-repair-move-aside");
+    mkdirSync(aside, { recursive: true }); writeFileSync(join(aside, "catalogue.json"), "{}\n"); writeFileSync(join(aside, "repair.json"), `${JSON.stringify({ schema: "pipeline.session-authority-repair-move-aside.v1", reason: "fixture", movedAt: "2026-11-17T10:15:00.000Z" })}\n`);
+    mkdirSync(join(root, ".git/agent-pipeline/publication-close/lc-1"), { recursive: true });
+  }
   const calls = []; let phase = startPhase ?? "none"; let addendaPending = addendaWritten;
   const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
   const flag = (argv, name) => argv[argv.indexOf(name) + 1];
   const runner = (executable, argv) => {
     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
     // The owner route forwards the State argv after `--` to the same State writer stand-ins.
-    if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs") { const inner = argv.slice(argv.indexOf("--") + 1); ownerRouteCalls.push(inner); return runner(executable, [STATE_WRITER, ...inner]); }
+    // C30I-S7: like the real route (COR-NO-CATALOGUE), the stand-in refuses a repository without a catalogue, so a close that picks the owner route there cannot pass green.
+    if (argv[0].split("/").at(-1) === "continuity-owner-route.mjs") {
+      const inner = argv.slice(argv.indexOf("--") + 1); ownerRouteCalls.push(inner);
+      if (!existsSync(join(root, ".git/agent-pipeline/session-authority/catalogue.json"))) return { status: 2, stdout: "", stderr: "COR-NO-CATALOGUE: this project has no session-authority catalogue, so the entry needs no owner: run it on the direct route\n" };
+      return runner(executable, [STATE_WRITER, ...inner]);
+    }
     const script = argv[0].split("/").at(-1); const sub = argv[1];
     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
@@ -1198,6 +1209,64 @@ test("C22 CGR-06: a resumed close never asks (the question belongs to the eviden
     const resumed = oneShotClose({ ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
     assert.notEqual(resumed.stop?.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(resumed).slice(0, 300));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ---- C30I-S7 (AC-110): a close resumed after a move-aside keeps the owner-route resume behaviour ----
+// The first pass wrote the audit request and then stopped before the close request existed (a PO-run move-aside removed the catalogue in between).
+const firstPassStopped = (f) => writeFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), `${JSON.stringify({ criticVerifyLifecycleId: "d".repeat(64) })}\n`);
+const closeRequestOf = (f) => join(f.root, "specs/feature-abc/evidence/close-request.json");
+
+test("C30I-S7: a resume after a move-aside requalifies and writes the close request on the direct route instead of ending in CLOSE-PATH-MISSING", () => {
+  const f = oneShotFixture({ continuity: true, movedAside: true, startPhase: "checkpointed" });
+  try {
+    firstPassStopped(f);
+    assert.equal(existsSync(closeRequestOf(f)), false);
+    const result = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 600));
+    assert.ok(result.stages.includes("requalify-candidate"), result.stages.join());
+    assert.equal(existsSync(closeRequestOf(f)), true, "the close request the coordinator reads was written");
+    assert.equal(JSON.parse(readFileSync(closeRequestOf(f), "utf8")).schema, "pipeline.continuity-close.v0");
+    assert.deepEqual(f.ownerRouteCalls, [], "no catalogue, so the State entries run on the direct route (the owner route refuses COR-NO-CATALOGUE)");
+    assert.equal(f.calls.includes("close-coordinator plan-start"), false, "the open lifecycle is continued, never restarted");
+    assert.equal(result.resumeLifecycleId, "lc-1");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30I-S7: a run without --resume-lifecycle-id finds the one open lifecycle after a move-aside and continues it instead of starting a second close", () => {
+  const f = oneShotFixture({ continuity: true, movedAside: true, startPhase: "checkpointed" });
+  try {
+    firstPassStopped(f);
+    const result = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 600));
+    assert.equal(result.resumeLifecycleId, "lc-1", "the open lifecycle was adopted");
+    assert.equal(f.calls.includes("close-coordinator plan-start"), false, "no second lifecycle was started");
+    assert.equal(existsSync(closeRequestOf(f)), true);
+    assert.deepEqual(f.ownerRouteCalls, []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30I-S7: a repository that never had an owner route keeps its direct resume exactly as it was (no requalify, no close request written)", () => {
+  const f = oneShotFixture({ continuity: true, startPhase: "checkpointed" });
+  try {
+    firstPassStopped(f);
+    const result = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
+    assert.equal(result.stages?.includes("requalify-candidate") ?? false, false, JSON.stringify(result).slice(0, 300));
+    assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false);
+    assert.equal(existsSync(closeRequestOf(f)), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30I-S7: after a move-aside a lifecycle past the prepared phase, or a first pass that did finish, is not requalified", () => {
+  for (const options of [{ startPhase: "tracked-close-finalized" }, { startPhase: "checkpointed", finished: true }]) {
+    const f = oneShotFixture({ continuity: true, movedAside: true, startPhase: options.startPhase });
+    try {
+      firstPassStopped(f);
+      if (options.finished) writeFileSync(closeRequestOf(f), "{}\n");
+      const result = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
+      assert.equal(result.stages?.includes("requalify-candidate") ?? false, false, JSON.stringify(options));
+      assert.equal(f.calls.includes("verify-evidence-producer.mjs"), false, JSON.stringify(options));
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
 });
 
 // ---- C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form, and a decline route that returns the feature to a correction round ----

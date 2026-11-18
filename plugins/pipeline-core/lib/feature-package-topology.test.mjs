@@ -317,3 +317,43 @@ try {
   assert.match(foreign.findings.join("\n"), /FTP-ARTIFACT-0: path must be canonical within specs\/renamed-feature\/ or, for the approved PRD or Spec, within another specs\/ folder that is no feature package/u);
   console.log("feature-package-topology: approved PRD/Spec path outside the package, 12 passed, 0 failed");
 } finally { rmSync(approvedPathRoot, { recursive: true, force: true }); }
+
+// ---- C30I-S7 (AC-110): a stale artifact digest is reported with the sanctioned route, never as a bare finding ----
+// The finding strings themselves stay byte-identical (other readers compare them); the route rides in a separate helper the refusal sites call.
+const routeRoot = mkdtempSync(join(tmpdir(), "feature-topology-route-"));
+try {
+  const id = "route-feature"; const base = `specs/${id}`; const manifestPath = `${base}/lifecycle.json`;
+  const topology = await import("./feature-package-topology.mjs");
+  const artifacts = [
+    ["prd", "prd.md", true, "mutable", "active"], ["spec", "spec.md", true, "mutable", "active"], ["acceptance", "acceptance.md", true, "mutable", "active"], ["result", "result.md", true, "append-only", "active"], ["candidate-evidence", "evidence/verify.json", false, "immutable", "retain"],
+  ].map(([klass, name, authority, mutability, retention]) => ({ class: klass, ...fileIn(routeRoot, `${base}/${name}`, `${klass}\n`), authority, mutability, retention }));
+  fileIn(routeRoot, manifestPath, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "implementing", artifacts, candidate: null, supersedes: null })}\n`);
+  assert.equal(validateFeaturePackage(routeRoot, manifestPath).ok, true);
+  assert.equal(topology.featurePackageDigestRoute(routeRoot, manifestPath), null, "a package whose digests bind its bytes has no route to name");
+  const manifestBefore = readFileSync(join(routeRoot, manifestPath), "utf8");
+  // The reported case: the acceptance entry and the Result entry were committed after the registration, so the manifest binds their OLD bytes.
+  const acceptance = artifacts[2]; const result = artifacts[3];
+  const acceptanceNow = fileIn(routeRoot, acceptance.path, "acceptance edited later\n"); const resultNow = fileIn(routeRoot, result.path, "result with the reconciliation fence\n");
+  const findings = validateFeaturePackage(routeRoot, manifestPath).findings;
+  assert.ok(findings.includes("FTP-ARTIFACT-2: digest does not bind file bytes") && findings.includes("FTP-ARTIFACT-3: digest does not bind file bytes"), "the finding strings stay as they are");
+  const route = topology.featurePackageDigestRoute(routeRoot, manifestPath);
+  assert.equal(typeof route, "string");
+  for (const expected of [acceptance.path, result.path, acceptance.sha256, acceptanceNow.sha256, result.sha256, resultNow.sha256, "FTP-ARTIFACT-2", "FTP-ARTIFACT-3", id]) assert.ok(route.includes(expected), `names ${expected}`);
+  assert.match(route, /never edited by hand/u);
+  assert.match(route, /file as it is now is the intended content[\s\S]*manifest is the stale side/u);
+  // mutable entry: the explicit agent-run rebind verb, with its arguments filled
+  assert.match(route, new RegExp(`feature-package-rebind-mutable --root ${routeRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")} --manifest ${manifestPath.replace(/\./gu, "\\.")}`, "u"));
+  // append-only entry: the PO-signed reconcile, read from the plan the owning command prints; the signature is the PO's, in an attended terminal
+  assert.match(route, /continuity-result-bootstrap-plan/u);
+  assert.match(route, /feature-package-reconcile/u);
+  assert.match(route, /PO's own signature[\s\S]*attended terminal/u);
+  assert.equal(readFileSync(join(routeRoot, manifestPath), "utf8"), manifestBefore, "naming the route never writes the manifest");
+  // only a mutable entry stale: no PO signature is demanded; only an append-only entry stale: no rebind-mutable verb is named
+  fileIn(routeRoot, result.path, "result\n");
+  const mutableOnly = topology.featurePackageDigestRoute(routeRoot, manifestPath);
+  assert.match(mutableOnly, /feature-package-rebind-mutable/u); assert.doesNotMatch(mutableOnly, /attended terminal|feature-package-reconcile/u);
+  fileIn(routeRoot, acceptance.path, "acceptance\n"); fileIn(routeRoot, result.path, "result with the reconciliation fence\n");
+  const appendOnly = topology.featurePackageDigestRoute(routeRoot, manifestPath);
+  assert.match(appendOnly, /attended terminal/u); assert.doesNotMatch(appendOnly, /feature-package-rebind-mutable/u);
+  console.log("feature-package-topology: stale digest names its route, 1 passed, 0 failed");
+} finally { rmSync(routeRoot, { recursive: true, force: true }); }

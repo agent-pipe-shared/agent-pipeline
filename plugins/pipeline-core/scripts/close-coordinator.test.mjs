@@ -582,6 +582,35 @@ test("process: registered package digest drift blocks close preparation before a
   assert.equal(f.refused.code, "CLOSE-PACKAGE");
 });
 
+// C30I-S7 (AC-110): the same refusal names the entry, both digests and the sanctioned route (the PO-signed reconcile for an append-only Result entry), never a hand edit of the manifest.
+test("process: a stale registered package at the close names the entry, both digests and the PO-signed reconcile route", () => {
+  const f = processFixture("package-drift-route", {
+    beforePrepared({ root, paths }) {
+      writeFileSync(join(root, "specs/feature", "acceptance.md"), "acceptance.md\n");
+      writeFileSync(join(root, "specs/feature", "candidate-evidence.md"), "candidate-evidence.md\n");
+      const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: digest(readFileSync(join(root, path))), authority, mutability, retention: "active" });
+      writeJson(join(root, "specs/feature/lifecycle.json"), {
+        schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
+        artifacts: [
+          artifact("prd", paths.prd, true, "mutable"), artifact("spec", paths.spec, true, "immutable"),
+          artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
+          { ...artifact("result", paths.result, true, "append-only"), sha256: h("f") },
+          artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
+        ], candidate: null, supersedes: null,
+      });
+    },
+    expectPreparedRefusal: "CLOSE-PACKAGE",
+  });
+  const manifest = JSON.parse(readFileSync(join(f.root, "specs/feature/lifecycle.json"), "utf8"));
+  const result = manifest.artifacts[3];
+  const message = f.refused.message;
+  assert.match(message, /FTP-ARTIFACT-3: digest does not bind file bytes/u, "the finding is still printed as it was");
+  for (const expected of [result.path, h("f"), digest(readFileSync(join(f.root, result.path))), "feature-package-reconcile", "continuity-result-bootstrap-plan"]) assert.ok(message.includes(expected), `names ${expected}: ${message}`);
+  assert.match(message, /PO's own signature[\s\S]*attended terminal/u);
+  assert.match(message, /never edited by hand/u);
+  assert.doesNotMatch(message, /feature-package-rebind-mutable/u, "no mutable entry is stale, so no rebind verb is named");
+});
+
 // N31/N32 (D210): the refusal for a Continuity close request that is not bound to the close-ready State names the rule
 // that failed (the three closeEvidence rules) and the skill section that carries the whole ordered route.
 test("process: a close request whose closeEvidence is the Result is refused with the closeEvidence rules and the skill section named", () => {

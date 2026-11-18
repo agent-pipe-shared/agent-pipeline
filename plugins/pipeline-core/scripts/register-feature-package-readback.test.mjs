@@ -12,7 +12,7 @@ import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatMo
 import {
   PUSH_THREAT_MODEL_UNCHANGED_MARKER, collectPushThreatModelFacts, isPushThreatModelTemplateUnchanged, renderPushThreatModel,
 } from "../lib/push-threat-model-materialize.mjs";
-import { registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import { PLAN_SUBMISSION_SCHEMA, RETAINED_APPROVAL_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { REGISTER_FEATURE_PACKAGE_HELP, pushThreatModelReadback, runRegisterFeaturePackage } from "./register-feature-package.mjs";
@@ -306,6 +306,61 @@ test("SUP9: a re-approval rebuilds a flagged manifest only with the same flag: t
   assert.equal(rebuilt.status, "registered", JSON.stringify(rebuilt));
   assert.equal(JSON.parse(sameBytes(root)).supersedes, PREDECESSOR);
   assert.equal(validateFeaturePackage(root, `specs/${SUCCESSOR}/lifecycle.json`).ok, true);
+});
+
+// C30I-S7 (AC-110): the manifest of a registered package binds the Result and acceptance bytes of the registration; committed later, they leave it stale. Every
+// FPR-MANIFEST-CONFLICT of that state names the entry, both digests and the sanctioned route, and the manifest is never touched.
+function staleRegistered() {
+  const root = successorRoot(), state = approvedState(root);
+  // A successor of a discarded feature: its flagged manifest is never rebuilt by a plain re-approval (SUP9), so a stale one meets FPR-MANIFEST-CONFLICT.
+  assert.equal(register(root, state, PREDECESSOR).status, "registered");
+  const manifest = JSON.parse(sameBytes(root));
+  const bound = (kind) => manifest.artifacts.find((entry) => entry.class === kind);
+  // The registration binds the generated acceptance pointer and Result record as immutable entries (a rebuilt manifest binds found ones as mutable and append-only) and the Spec as mutable.
+  const acceptance = bound("acceptance"), result = bound("result"), spec = bound("spec");
+  assert.deepEqual([acceptance.mutability, result.mutability, spec.mutability], ["immutable", "immutable", "mutable"]);
+  const second = approvedState(root, { tag: "two" });
+  put(root, acceptance.path, "acceptance entry committed after the registration\n");
+  put(root, result.path, "# Result\n\nresult-reconciliation fence committed after the registration\n");
+  put(root, spec.path, "# Spec\nAC-1 behavior, edited after the registration\n");
+  return { root, state, second, acceptance, result, spec, once: sameBytes(root) };
+}
+function assertRouteNamed(reason, f) {
+  assert.match(reason, /it is never (amended|overwritten)/u, "the refusal itself is unchanged");
+  for (const entry of [f.acceptance, f.result, f.spec]) for (const expected of [entry.path, entry.sha256, sha(readFileSync(join(f.root, entry.path)))]) assert.ok(reason.includes(expected), `the reason names ${expected}: ${reason}`);
+  assert.ok(reason.includes(SUCCESSOR));
+  assert.match(reason, /feature-package-rebind-mutable --root \S+ --manifest specs\/feature-b\/lifecycle\.json/u, "the mutable Spec entry has its agent-run verb");
+  assert.match(reason, /feature-package-reconcile[\s\S]*PO's own signature[\s\S]*attended terminal/u, "the immutable acceptance and Result entries need the PO's signature");
+  assert.match(reason, /never edited by hand/u);
+}
+
+test("S7-1: a registration that meets a manifest stale against committed acceptance and Result bytes names the route with both digests, and writes nothing", () => {
+  const f = staleRegistered();
+  const result = register(f.root, f.second);
+  assert.equal(result.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(result));
+  assertRouteNamed(result.reason, f);
+  assert.equal(sameBytes(f.root), f.once, "the manifest is never amended by the refusal");
+});
+
+test("S7-2: the Verify evidence registration and the review-unit registration name the same route", () => {
+  const f = staleRegistered();
+  const evidence = addVerifyEvidence({ root: f.root, state: f.state, path: `specs/${SUCCESSOR}/evidence/verify-candidate.json`, readAcceptedDeliveryContract: envelopeReader });
+  assert.equal(evidence.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(evidence));
+  assertRouteNamed(evidence.reason, f);
+  const unit = addCriticReviewUnit({ root: f.root, state: f.state, readAcceptedDeliveryContract: envelopeReader });
+  assert.equal(unit.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(unit));
+  assertRouteNamed(unit.reason, f);
+  assert.equal(sameBytes(f.root), f.once);
+});
+
+test("S7-3: a manifest that is invalid for another reason keeps its refusal text unchanged (no route is invented)", () => {
+  const root = successorRoot(), state = approvedState(root);
+  assert.equal(register(root, state, PREDECESSOR).status, "registered");
+  const broken = JSON.parse(sameBytes(root)); broken.artifacts[0].retention = "nonsense";
+  put(root, `specs/${SUCCESSOR}/lifecycle.json`, `${JSON.stringify(broken, null, 2)}\n`);
+  const result = register(root, approvedState(root, { tag: "two" }));
+  assert.equal(result.code, "FPR-MANIFEST-CONFLICT", JSON.stringify(result));
+  assert.equal(result.reason, "a manifest exists but is invalid; it is never overwritten");
 });
 
 test("SUP10: the CLI accepts exactly --root <root> --supersedes <id> as the new shape, names it in the help, and refuses every other composition FPR-ARGS", () => {
