@@ -144,6 +144,22 @@ const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId
 // source-issued only when there is exactly one bound record per split entry and the finalized verdict is the merge of exactly those verdicts; the children of a split packet
 // cannot be re-run inside it (a second record for an entry refuses, so a caller can never keep the better of two runs), and a record that names no entry of the split refuses too.
 const SPLIT_RECORD_KEYS = Object.freeze([...ORIGINAL_SOURCE_RETURN_KEYS, "splitSha256", "entryId", "verdict"]);
+/**
+ * C30J-J20: the refusal for a split round with a child that has no Source return. Derived from the records alone (nothing is stored). The CLI keeps only the first line, cut to 200
+ * characters, and turns anything starting with a slash into <path>, so the first line names the missing entry ids and the one step that dispatches only those children (the packet
+ * of a split stays open for every child), in plain script names; the next-round alternative is the second line. Pure.
+ */
+export function splitChildMissingMessage(ids) {
+  const head = "no Source return for split entry ";
+  const tail = "; repair: dispatch ONLY those Critics (split.entries of critic-dispatch-preflight.mjs), then critic-split-merge.mjs --packet <id>, finalize";
+  const room = 200 - head.length - tail.length;
+  let shown = ids.length;
+  const moreText = () => (shown < ids.length ? ` and ${ids.length - shown} more` : "");
+  while (shown > 1 && ids.slice(0, shown).join(", ").length + moreText().length > room) shown -= 1;
+  const names = `${ids.slice(0, shown).join(", ")}${moreText()}`;
+  // One id longer than the room is clipped, so that the step after it is never the part the CLI cut removes.
+  return `${head}${names.length > room ? `${names.slice(0, room - 3)}...` : names}${tail}\nor: ${SPLIT_NEXT_ROUND_REPAIR}`;
+}
 function splitOriginGate(query, context, deps, controlRoot) {
   let records = [];
   try { records = (deps.readSplitSourceReturnsFn ?? ((q) => readCriticSplitSourceReturns({ controlRoot, packetId: q.packetId })))(query) ?? []; } catch { records = []; }
@@ -167,7 +183,7 @@ function splitOriginGate(query, context, deps, controlRoot) {
     byEntry.set(record.entryId, record.verdict);
   }
   const missing = context.split.entries.filter((entry) => !byEntry.has(entry.id)).map((entry) => entry.id);
-  if (missing.length > 0) fail("SCF-SPLIT-CHILD-MISSING", `no Source return record for split entry ${missing.join(", ")}; repair: run that entry's Critic, or ${SPLIT_NEXT_ROUND_REPAIR}`);
+  if (missing.length > 0) fail("SCF-SPLIT-CHILD-MISSING", splitChildMissingMessage(missing));
   const merged = mergeSplitVerdicts(context.split, [...byEntry].map(([entryId, verdict]) => ({ entryId, verdict })));
   if (!merged.ok) fail("SCF-SPLIT-MERGE", `${merged.code}: ${merged.message}`);
   if (criticSplitDigest(merged.verdict) !== criticSplitDigest(context.verdict)) fail("SCF-SPLIT-MERGE-MISMATCH", "the verdict is not the merge of exactly the returned child verdicts; repair: finalize the output of critic-split-merge.mjs unchanged");

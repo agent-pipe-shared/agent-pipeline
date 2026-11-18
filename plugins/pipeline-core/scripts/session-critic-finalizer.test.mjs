@@ -3074,6 +3074,74 @@ test("G20-72 finalize refuses a split round with a missing child, two records fo
   assert.equal(none.output.independence, "caller-authored-fallback");
 });
 
+// C30J-J20 (AC-112, consumer report: one Critic group of a split round was dispatched three times because the finalisation stopped with SCF-SPLIT-CHILD-MISSING and named no way
+// to rerun only the missing child). The refusal now names exactly the missing entry ids and the one step that dispatches only those children; the packet of a split stays open
+// for every child, so the rerun of just that child finalizes the same round. The CLI keeps only the first 200 characters of the first line and turns anything starting with a
+// slash into <path>, so the whole step must survive that cut. Written before the implementation existed.
+test("C30J-J20 a split round that lacks one child names that child and the step that dispatches only it; running only that child then finalizes the same packet", async () => {
+  const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    g2072Hook(fx, criticReturn(kids[0][1]));
+    g2072Hook(fx, criticReturn(kids[1][1]));
+    assert.equal(g2072Records(admitted).length, 2);
+    const merged = await g2072Merge(admitted, kids);
+    assert.equal(merged.ok, true, JSON.stringify(merged));
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(merged.verdict)}\n`);
+    const finalizeArgv = ["finalize", "--root", fx.root, "--request", admitted.requestPath];
+    const refused = runSessionCriticFinalizerCli(finalizeArgv);
+    assert.equal(refused.exitCode, 2);
+    assert.equal(refused.output.code, "SCF-SPLIT-CHILD-MISSING");
+    const detail = refused.output.detail;
+    assert.match(detail, /split entry shared\b/u, "the one missing entry is named");
+    assert.doesNotMatch(detail, /\bapi\b|\bcore\b/u, "the entries that returned are not named");
+    assert.match(detail, /dispatch ONLY those Critics/u, "the step dispatches only the missing child");
+    assert.match(detail, /critic-dispatch-preflight\.mjs/u, "the verb that prints the entry's dispatch input is named");
+    assert.match(detail, /critic-split-merge\.mjs --packet <id>, finalize$/u, "the step ends in the merge of the returned children and the same finalize");
+    assert.doesNotMatch(detail, /<path>/u, "no part of the step is mangled by the path filter of the CLI error line");
+    // The second action after the error: the named verb still prints the entry to dispatch, only the missing child runs inside the same packet, the named merge and the
+    // same finalize then complete, source-issued.
+    assert.equal(g2072Records(admitted).length, 2, "the refused finalize wrote no record");
+    const again = preflightCriticDispatchWithAdmitRequest(options(fx).preflightInput, { env: {} });
+    assert.equal(again.split?.entries.find((entry) => entry.id === "shared")?.scopeMarker, "scope:shared", "the preflight still prints the missing entry's dispatch input");
+    g2072Hook(fx, criticReturn(kids[2][1]));
+    assert.equal(g2072Records(admitted).length, 3);
+    rmSync(join(fx.root, "evidence", "critic-verdict.json"), { force: true }); // --out names a new file: the verdict that was merged by hand above is replaced by the packet merge
+    const mergedAgain = spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId, "--out", "evidence/critic-verdict.json"], { encoding: "utf8" });
+    assert.equal(mergedAgain.status, 0, mergedAgain.stderr);
+    const rerun = runSessionCriticFinalizerCli(finalizeArgv);
+    assert.equal(rerun.exitCode, 0, JSON.stringify(rerun.output));
+    assert.equal(rerun.output.independence, "source-issued-origin");
+  } finally { cleanup(fx); }
+});
+
+test("C30J-J20 with two children missing the refusal names both and no returned one; a long list keeps the whole step inside the cut line", async () => {
+  const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    g2072Hook(fx, criticReturn(kids[0][1]));
+    const merged = await g2072Merge(admitted, kids);
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(merged.verdict)}\n`);
+    const refused = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(refused.output.code, "SCF-SPLIT-CHILD-MISSING");
+    assert.match(refused.output.detail, /split entry core, shared;/u);
+    assert.doesNotMatch(refused.output.detail, /\bapi\b/u);
+  } finally { cleanup(fx); }
+  const { splitChildMissingMessage } = await import("./session-critic-finalizer.mjs");
+  const many = Array.from({ length: 40 }, (_unused, index) => `module-${String(index).padStart(2, "0")}`);
+  const [firstLine, ...rest] = splitChildMissingMessage(many).split("\n");
+  assert.ok(firstLine.length <= 200, `the step line is ${firstLine.length} characters`);
+  assert.match(firstLine, /^no Source return for split entry module-00(?:, module-\d\d)* and \d+ more; repair: dispatch ONLY those Critics/u, "the list says how many more are missing instead of being cut");
+  assert.match(firstLine, /critic-split-merge\.mjs --packet <id>, finalize$/u);
+  assert.match(splitChildMissingMessage(["group-1"]).split("\n")[0], /^no Source return for split entry group-1; repair: dispatch ONLY those Critics/u, "one id is listed whole");
+  const clipped = splitChildMissingMessage(["x".repeat(120), "y"]).split("\n")[0];
+  assert.ok(clipped.length <= 200, `the step line is ${clipped.length} characters`);
+  assert.match(clipped, /\.\.\.; repair: dispatch ONLY those Critics .*critic-split-merge\.mjs --packet <id>, finalize$/u, "an id longer than the room is clipped, never the step");
+  assert.match(rest.join("\n"), /release this packet/u, "the next-round alternative stays in the full message");
+});
+
 // CGR-09 (candidate 22): a child that is resumed (the same agent id) and returns again is a resumption, not a second run: its later return stands for its entry. A second
 // DIFFERENT child (or a child whose identity is not recorded) for one entry stays refused: that is verdict shopping, as before.
 test("CGR-09 a resumed child's second return replaces its first for the entry, and a different child for the same entry still refuses", () => {
