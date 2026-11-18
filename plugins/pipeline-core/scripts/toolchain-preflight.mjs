@@ -70,7 +70,11 @@ import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
 import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
 import { probeTrivy, TRIVY_REQUIRED_FLAGS } from "./security-readiness/trivy-readiness.mjs";
-import { trivyTriggerFiles, triggerCount } from "./security-adapters/trivy.mjs";
+import { trivyTriggerFiles, triggerCount, isInstalled as trivyInstalled } from "./security-adapters/trivy.mjs";
+import { isInstalled as gitleaksInstalled } from "./security-adapters/gitleaks.mjs";
+import { isInstalled as osvScannerInstalled } from "./security-adapters/osv-scanner.mjs";
+import { isInstalled as semgrepInstalled } from "./security-adapters/semgrep.mjs";
+import { assessTrustedExecutablePath, untrustedToolFix } from "../lib/trusted-tool-resolution.mjs";
 import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { meetsVersionFloor, toolchainDocAnchor, toolchainDocPointer, toolchainEntry } from "../lib/toolchain-registry.mjs";
@@ -110,7 +114,18 @@ function semver(value) { const match = typeof value === "string" && value.match(
 function result(tool, status, observed = {}) {
   return { tool, status, version: observed.handle?.version ?? null, capabilities: observed.handle?.capabilities ?? [], preparedHandleDigest: status === "ready" ? observed.handle.digest : null, guidance: null };
 }
-function actionableResult(entry, platform, installers = new Set()) {
+// C30J-J19: the same two steps the scan takes before it reports `SKIPPED untrusted_path` -- the adapter's own PATH discovery, then the one trust rule
+// (assessTrustedExecutablePath). A tool the resolver did not find that the PATH holds at a refused location is installed-but-untrusted, with its fix.
+const ADAPTER_INSTALLED = Object.freeze({ gitleaks: gitleaksInstalled, "osv-scanner": osvScannerInstalled, semgrep: semgrepInstalled, trivy: trivyInstalled });
+function untrustedFixOf(tool, platform, deps) {
+  // A mocked foreign platform never reads this host's PATH.
+  const find = deps.findInstalledFn ?? (platform === process.platform ? (name) => ADAPTER_INSTALLED[name](process.env) : () => ({ installed: false }));
+  const found = find(tool);
+  if (found?.installed !== true || typeof found.path !== "string") return null;
+  const assessed = (deps.assessExecutableFn ?? assessTrustedExecutablePath)(found.path, { platform });
+  return assessed?.ok === false && assessed.status === "untrusted_path" ? untrustedToolFix(tool, found.path, { platform }) : null;
+}
+function actionableResult(entry, platform, installers = new Set(), untrustedFixes = {}) {
   const prerequisiteMissing = !["ready", "not_required"].includes(entry.status);
   const hostBoundaryFailure = ["execution_environment", "probe_timeout", "probe_error"].includes(entry.status);
   const installCommand = null;
@@ -133,7 +148,7 @@ function actionableResult(entry, platform, installers = new Set()) {
   const baseGuidance = hostBoundaryFailure
     ? `Rerun the no-flag setup or self-application preflight through the host-authorized local read-only boundary; do not reinstall ${entry.tool} from this result.`
     : entry.status === "untrusted_path"
-      ? `Use a direct .exe for ${entry.tool} in a named Windows system root; wrappers, user, repository, and temporary paths are not accepted.`
+      ? untrustedFixes[entry.tool] ?? `Use a direct .exe for ${entry.tool} in a named Windows system root; wrappers, user, repository, and temporary paths are not accepted.`
     : prerequisiteMissing
     ? entry.status === "input_missing"
       ? `Create the configured project inputs required by ${entry.tool}.`
@@ -250,6 +265,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const installers = new Set(INSTALLER_NAMES.filter((name) => installerResolver(name, { platform }) !== null));
   // C29e (ADR-0103): Trivy is needed only where the tracked files hold infrastructure or container files, the same rule the close scan applies
   // (security-adapters/trivy.mjs trivyTriggerFiles). Without one it stays not_required; a tree whose applicability cannot be decided is a probe error.
+  const untrustedFixes = {};
   let trivyApplicable = false;
   if (enabled.includes("trivy")) {
     const triggers = (deps.trivyTriggerFilesFn ?? trivyTriggerFiles)(root);
@@ -259,7 +275,11 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   for (const tool of ["gitleaks", "osv-scanner", "semgrep", "trivy"]) {
     if (!enabled.includes(tool)) continue;
     if (tool === "trivy" && !trivyApplicable) continue;
-    const trusted = resolvedTool(resolver, tool, platform);
+    let trusted = resolvedTool(resolver, tool, platform);
+    if (!trusted.ok && trusted.status === "binary_missing") {
+      const fix = untrustedFixOf(tool, platform, deps);
+      if (fix !== null) { untrustedFixes[tool] = fix; trusted = { ok: false, status: "untrusted_path" }; }
+    }
     const observed = !trusted.ok ? trusted : probes[tool]({ executablePath: trusted.path, rootDir: root, tempDir }, { now });
     baseResults[tool] = readyCompatibility(tool, observed); if (baseResults[tool].status === "ready") handles[tool] = observed.handle;
   }
@@ -275,7 +295,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
     manifest: { status: loaded.status, digest: manifestDigest(root) },
     securityGate: gateMode,
     platform: selectedPlatform,
-    results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform, installers)),
+    results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform, installers, untrustedFixes)),
     preparedHandles: handles,
     exitCode,
   };
@@ -509,7 +529,10 @@ const scannerProbe = (tool) => (context) => {
     status: "attended",
     cause: `${tool} prerequisite status: ${status}${deferral === null ? "" : `; installing it was deferred on this machine (${deferral.deferredAt})`}`,
     repair: {
-      ...attendedPrerequisite(`${tool}-installed`, `${GUIDANCE[platformName(context.platform)][tool]} ${toolchainDocPointer(tool) ?? ""}`.trim()),
+      // C30J-J19: an installed tool at a refused location is not told to be installed; the preflight already holds its fix.
+      ...(status === "untrusted_path" && entry?.guidance
+        ? attendedPrerequisite(`${tool}-trusted-location`, entry.guidance)
+        : attendedPrerequisite(`${tool}-installed`, `${GUIDANCE[platformName(context.platform)][tool]} ${toolchainDocPointer(tool) ?? ""}`.trim())),
       toolClass: toolchainEntry(tool)?.class ?? null,
       installDoc: toolchainDocAnchor(tool),
       deferred: deferral !== null,

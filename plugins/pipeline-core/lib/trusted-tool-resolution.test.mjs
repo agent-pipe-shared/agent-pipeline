@@ -257,4 +257,22 @@ check("trusted roots (real files): a symlinked root or a symlinked config file i
     }
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+// C30J-J19: the fix text for a tool that is installed but refused by the trust rule; it is built next to the rule it names.
+import { untrustedToolFix } from "./trusted-tool-resolution.mjs";
+const UT_DIR = "D:\\Tools\\bin"; const UT_EXE = `${UT_DIR}\\osv-scanner.exe`;
+check("untrusted tool fix: a direct .exe names its directory, the roots file and the exact JSON, and that JSON makes the trust rule accept the tool", () => {
+  const fix = untrustedToolFix("osv-scanner", UT_EXE, { platform: "win32", trustedRootsFile: CFG_FILE });
+  assert.ok(fix.includes(UT_EXE) && fix.includes(CFG_FILE) && fix.includes(TRUSTED_TOOL_ROOTS_SCHEMA), fix);
+  const parsed = JSON.parse(fix.match(/\{"schema":.*?\]\}/u)[0]);
+  assert.equal(parsed.schema, TRUSTED_TOOL_ROOTS_SCHEMA); assert.deepEqual(parsed.roots, [UT_DIR]);
+  const base = { platform: "win32", homeDir: "C:\\Users\\none", fsOps: fixture({ [UT_EXE]: file }) };
+  assert.deepEqual(assessTrustedExecutablePath(UT_EXE, { ...base, extraRoots: [] }), { ok: false, status: "untrusted_path" });
+  assert.deepEqual(assessTrustedExecutablePath(UT_EXE, { ...base, extraRoots: parsed.roots }), { ok: true, path: UT_EXE });
+});
+check("untrusted tool fix: a wrapper names the direct .exe requirement before any registration", () => {
+  const wrapper = `${UT_DIR}\\osv-scanner.cmd`;
+  const fix = untrustedToolFix("osv-scanner", wrapper, { platform: "win32", trustedRootsFile: CFG_FILE });
+  assert.ok(fix.includes(wrapper), fix); assert.match(fix, /direct osv-scanner\.exe/u); assert.ok(fix.includes(CFG_FILE), fix);
+  assert.equal(fix.includes(`"roots":["${UT_DIR.replaceAll("\\", "\\\\")}"]`), false, "a wrapper's directory is not offered as the registration");
+});
 process.stdout.write(`${passed}/${passed} checks passed.\n`);

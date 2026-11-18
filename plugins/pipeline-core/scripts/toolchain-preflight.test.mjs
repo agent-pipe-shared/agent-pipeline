@@ -940,4 +940,54 @@ check("W7-2d: the readiness status values are unchanged by the capability contra
     else assert.equal(result.status, "binary_missing", `${mode}/${result.tool}`);
   }
 });
+// C30J-J19: a tool the PATH holds but the trust rule refuses is judged by the rule the scan uses (assessTrustedExecutablePath) and its fix is named.
+import { trustedToolRootsFilePath as j19RootsFile } from "../lib/trusted-tool-resolution.mjs";
+const J19_DIR = "D:\\Tools\\bin";
+const j19Missing = () => ({ ok: false, status: "binary_missing" });
+const j19Run = (repo, platform, deps) => runToolchainPreflight({ rootDir: repo, platform, manifestResult: manifest({ "osv-scanner": { enabled: true } }) }, { probeNodeFn: nodeReady, probeGitFn: gitReady, resolveInstallerFn: () => null, scannerProbes: W7_SCANNER_OBSERVED(), ...deps });
+const j19Osv = (result) => result.results.find(({ tool }) => tool === "osv-scanner");
+check("J19a: installed on the PATH at a location the trust rule refuses is untrusted_path (not missing) and the guidance names the directory, the roots file and the JSON", () => {
+  const repo = root();
+  try {
+    const result = j19Run(repo, "win32", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: true, path: `${J19_DIR}\\osv-scanner.exe` }) });
+    const entry = j19Osv(result);
+    assert.equal(result.code, "TCP-UNTRUSTED-PATH"); assert.equal(result.exitCode, 2); assert.equal(entry.status, "untrusted_path"); assert.equal(entry.installCommand, null);
+    assert.ok(entry.guidance.includes(J19_DIR) && entry.guidance.includes(j19RootsFile()) && entry.guidance.includes("pipeline.trusted-tool-roots.v1"), entry.guidance);
+    assert.ok(entry.guidance.includes(JSON.stringify([J19_DIR])), entry.guidance);
+    assert.match(entry.guidance, /direct osv-scanner\.exe/u);
+    assert.doesNotMatch(entry.guidance, /probe: osv-scanner --version/u, "an installed tool is not told to be installed");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+check("J19b: an installed wrapper is untrusted_path and the guidance asks for a direct osv-scanner.exe", () => {
+  const repo = root();
+  try {
+    const entry = j19Osv(j19Run(repo, "win32", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: true, path: `${J19_DIR}\\osv-scanner.cmd` }) }));
+    assert.equal(entry.status, "untrusted_path"); assert.match(entry.guidance, /direct osv-scanner\.exe/u); assert.ok(entry.guidance.includes(`${J19_DIR}\\osv-scanner.cmd`), entry.guidance);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+check("J19c: a missing tool and a tool the trust rule accepts stay exactly as before", () => {
+  const repo = root();
+  try {
+    const bare = j19Run(repo, "win32", { resolveExecutableFn: j19Missing });
+    const notFound = j19Run(repo, "win32", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: false, reason: "not found on PATH" }) });
+    assert.equal(j19Osv(notFound).status, "binary_missing"); assert.deepEqual({ ...notFound, candidate: null }, { ...bare, candidate: null });
+    // The scan's own rule accepts it (the file is not there to refuse on a POSIX path): not untrusted, still the old verdict.
+    const accepted = j19Run(repo, "linux", { resolveExecutableFn: j19Missing, findInstalledFn: () => ({ installed: true, path: join(repo, "no-such-dir", "osv-scanner") }) });
+    assert.equal(j19Osv(accepted).status, "binary_missing");
+    const trusted = j19Run(repo, "win32", { resolveExecutableFn: () => ({ ok: true, path: "C:\\Program Files\\OSV-Scanner\\osv-scanner.exe" }), findInstalledFn: () => { throw new Error("a trusted tool must not be searched for on the PATH"); } });
+    assert.equal(j19Osv(trusted).status, "ready"); assert.equal(trusted.ok, true); assert.equal(j19Osv(trusted).guidance, "");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+check("J19d: the environment readiness finding of an installed but untrusted scanner names the fix, not an install", async () => {
+  await r77WithFixtureRepo(async (repo) => {
+    const deps = { ...w7ScannerDeps(j19Missing), findInstalledFn: (tool) => tool === "osv-scanner" ? { installed: true, path: `${J19_DIR}\\osv-scanner.exe` } : { installed: false } };
+    const report = await toolchainModule.runEnvironmentReadinessReport({ rootDir: repo, platform: "win32" }, deps);
+    const finding = r77Finding(report, "scanner-osv-scanner");
+    r77AssertFinding(finding, "untrusted osv-scanner");
+    assert.equal(finding.status, "attended"); assert.match(finding.cause, /untrusted_path/u);
+    assert.ok(finding.repair.summary.includes(J19_DIR) && finding.repair.summary.includes(j19RootsFile()), finding.repair.summary);
+    assert.doesNotMatch(finding.repair.summary, /^Install /u);
+    assert.equal(r77Finding(report, "scanner-gitleaks").status, "attended");
+  });
+});
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

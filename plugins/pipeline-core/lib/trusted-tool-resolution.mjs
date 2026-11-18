@@ -84,6 +84,18 @@ export function trustedToolRepairHint(name, file = trustedToolRootsFilePath()) {
   return `Add the directory containing ${name} to ${file} as {"schema":"${TRUSTED_TOOL_ROOTS_SCHEMA}","roots":["<absolute directory>"]} (at most ${TTR_MAX_ROOTS} roots, additive to the built-in roots).`;
 }
 
+/** The fix for a tool that IS installed (found at `foundPath`) but that `assessTrustedExecutablePath` refuses (status `untrusted_path`): a direct .exe whose directory the person registers in the roots file. Text only; nothing is written. */
+export function untrustedToolFix(name, foundPath, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const pathMod = platform === "win32" ? winPath : posixPath;
+  const file = trustedToolRootsFilePath(options);
+  const direct = platform !== "win32" || foundPath.toLowerCase().endsWith(".exe");
+  const register = (directory) => `add the directory of the direct ${name}.exe to ${file} as ${JSON.stringify({ schema: TRUSTED_TOOL_ROOTS_SCHEMA, roots: [directory] })} (at most ${TTR_MAX_ROOTS} roots, a directory outside any Git repository), then re-read the preflight`;
+  return direct
+    ? `${name} is installed at ${foundPath}, but that location is not trusted. Human step: ${register(pathMod.dirname(foundPath))}.`
+    : `${name} is installed at ${foundPath}, but the trust rule accepts only a direct ${name}.exe, never a .cmd, .bat or .ps1 wrapper. Human step: install or copy the real ${name}.exe, then ${register("<absolute directory of that .exe>")}.`;
+}
+
 /** Fixed Windows roots; environment data must never expand the trust boundary. */
 export const WINDOWS_SYSTEM_TOOL_ROOTS = Object.freeze([
   "C:\\Program Files\\Git\\cmd",
