@@ -1,0 +1,292 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 1791acb0b..3fd5c84b9 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -730,6 +730,34 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
+   }
+ }
+ 
++/**
++ * C31-M3 (L11, AC-112): the baseline boundary policy of the path classes no module is meant to own. Two consumer runs went red in Verify (`unowned-path`) on source-extension files under
++ * public/ and docs/ and then wrote the policy late with `architecture-boundary-check.mjs --write-policy`, which changed the tree and cost an extra Critic round. materialize-architecture now
++ * writes it in the same step. It uses `excludedPaths` (the policy's own field for trees that hold no project source), because the files of these classes do not exist yet when the design
++ * is materialized, so per-file exceptions could not cover them. A class is left out as soon as a module's ownedPaths reach into it (a directory, a glob or a source file): excluding it would
++ * also drop that module's line bound and import checks. An owned document file (docs/contract.md) does not count. Derived from the design alone, so the companion's sealed bytes and the
++ * writer's bytes are equal. Null when nothing is left to cover: no empty policy is written.
++ */
++export const BASELINE_BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
++const BASELINE_BOUNDARY_CLASSES = Object.freeze([
++  ["docs", "documentation, decision records and contracts, not project source"],
++  ["public", "static assets served as they are, not module source"],
++  ["static", "static assets served as they are, not module source"],
++  ["assets", "static assets served as they are, not module source"],
++]);
++export function baselineBoundaryPolicy(modules) {
++  const reaches = (directory) => modules.some(module => (module.ownedPaths ?? []).some((owned) => {
++    const glob = /\/\*\*?$/u.test(owned);
++    const base = owned.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
++    if (base !== directory && !base.startsWith(`${directory}/`)) return false;
++    return glob || base === directory || !DOCUMENT_OWNED_FILE.test(base);
++  }));
++  const excludedPaths = BASELINE_BOUNDARY_CLASSES.filter(([directory]) => !reaches(directory))
++    .map(([directory, reason]) => ({ pattern: `${directory}/**`, reason: `${reason}; written by materialize-architecture` }));
++  return excludedPaths.length === 0 ? null
++    : { schema: "pipeline.architecture-boundary-policy.v1", lineBound: 1000, excludedPaths, exceptions: [] };
++}
++
+ /** Fixed target writer; caller must hold the sanctioned lifecycle writer's selected State lock. */
+ /** Read-only exact inventory shared by the Source companion and the locked writer. */
+ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
+@@ -743,13 +771,17 @@ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
+   if (!prospective.ok) return { ok: false, status: "blocked", code: prospective.code };
+   const receiptTarget = inspected.receipt ? { path: "architecture/design-materialization.json", bytes: json(inspected.receipt),
+     ...(inspected.receiptPreimageSha256 ? { preimageSha256: inspected.receiptPreimageSha256 } : {}) } : null;
++  // C31-M3: create-only, never part of the receipt (a later policy edit is no artifact drift), and only while the policy is absent, so a settled or hand-adopted map is never touched again.
++  const policy = inspected.receipt && inspected.status === "materialization-required" && !existsSync(join(root, BASELINE_BOUNDARY_POLICY_PATH))
++    ? baselineBoundaryPolicy(inspected.input.modules) : null;
++  const policyTargets = policy === null ? [] : [{ path: BASELINE_BOUNDARY_POLICY_PATH, bytes: json(policy) }];
+   const mapTargets = inspected.receipt && inspected.status === "materialization-required"
+-    ? [...inspected.targets, receiptTarget] : [];
++    ? [...inspected.targets, ...policyTargets, receiptTarget] : [];
+   // The retained authority is the final publication of the single transaction.
+   const targets = [...prospective.targets.filter(target => target.path !== prospective.referencePath),
+     ...mapTargets, ...prospective.targets.filter(target => target.path === prospective.referencePath)];
+   requireValue(new Set(targets.map(target => target.path)).size === targets.length, "ARCHITECTURE-DESIGN-DUPLICATE-TARGET");
+-  const mapInventory = inspected.receipt ? [...inspected.targets, receiptTarget] : [];
++  const mapInventory = inspected.receipt ? [...inspected.targets, ...policyTargets, receiptTarget] : [];
+   const prospectiveInventory = prospective.inventoryTargets ?? [];
+   const sealedTargets = [...prospectiveInventory.filter(target => target.path !== prospective.referencePath),
+     ...mapInventory, ...prospectiveInventory.filter(target => target.path === prospective.referencePath)];
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index 614d1d71c..4a07cf0e4 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -726,3 +726,65 @@ test("G20-65: the document suffix set of the check validator equals the one of t
+   const { DOCUMENT_CHECK_FILE } = await import("./native-goldfish-host-return.mjs");
+   assert.equal(DOCUMENT_CHECK_FILE.source, mod.DOCUMENT_OWNED_FILE.source, "the two copies of the document suffix set must not drift");
+ });
++
++// C31-M3 (L11, AC-112): materialize-architecture writes the baseline boundary policy of the non-module path classes in the same step, so the tree does not change later.
++const M3_POLICY = "architecture/boundary-policy.json";
++const m3Lock = (root) => {
++  const lockPath = join(root, "project", "pipeline-state.json.lock");
++  writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: "token-1", ownerNonce: "nonce-1" }));
++  return { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" };
++};
++function m3Design(ownedPaths) {
++  const input = hf9Design();
++  input.modules[0].ownedPaths = ownedPaths;
++  input.fitnessModel.modules[0].ownedPaths = ownedPaths;
++  return input;
++}
++
++test("M3-06 a fresh materialization writes the baseline policy with the map, as part of the same publication, and the boundary check then passes", async () => {
++  const { stage, mod } = await hf9Load();
++  const { checkArchitectureBoundaries } = await import("../scripts/architecture-boundary-check.mjs");
++  const fixture = hf9Fixture(stage, { block: true, scaffold: "exact" });
++  const inventory = mod.inspectArchitectureMaterializationTargets(fixture.root, {});
++  assert.equal(inventory.ok, true, inventory.code);
++  assert.ok(inventory.targets.some((target) => target.path === M3_POLICY), "the policy is a publication target of the step");
++  assert.ok(inventory.sealedTargets.some((target) => target.path === M3_POLICY), "and is declared with the sealed targets of the companion route");
++  assert.equal(inventory.inspected.receipt.targets.some((target) => target.path === M3_POLICY), false, "the receipt digests the design, not the policy: a later policy edit is never artifact drift");
++  const published = mod.materializeArchitectureDesign(fixture.root, { lock: m3Lock(fixture.root) });
++  assert.equal(published.status, "materialized", published.code);
++  const policy = JSON.parse(readFileSync(join(fixture.root, M3_POLICY), "utf8"));
++  assert.equal(policy.schema, "pipeline.architecture-boundary-policy.v1");
++  assert.deepEqual(policy.excludedPaths.map((entry) => entry.pattern), ["docs/**", "public/**", "static/**", "assets/**"], "an owned document file (docs/contract.md) does not hide the docs class");
++  for (const [file, text] of Object.entries({ "src/application.mjs": "export {};\n", "tests/application.test.mjs": "export {};\n", "public/app.js": "export {};\n", "assets/logo.mjs": "export {};\n" })) hf9Put(fixture.root, file, text);
++  const files = readdirSync(fixture.root, { recursive: true }).map((entry) => String(entry).split("\\").join("/")).filter((entry) => /\.(?:mjs|js)$/u.test(entry) && /^(?:src|tests|public|assets)\//u.test(entry));
++  const checked = checkArchitectureBoundaries({ rootDir: fixture.root }, { listFiles: () => files });
++  assert.equal(checked.status, "pass", JSON.stringify(checked.violations));
++  const settled = mod.inspectArchitectureMaterializationTargets(fixture.root, {});
++  assert.deepEqual(settled.targets, [], "the step is settled, nothing is published a second time");
++  assert.equal(mod.materializeArchitectureDesign(fixture.root, { lock: m3Lock(fixture.root) }).status, "materialized");
++  assert.equal(JSON.stringify(JSON.parse(readFileSync(join(fixture.root, M3_POLICY), "utf8"))), JSON.stringify(policy), "a repeated step changes no byte");
++});
++
++test("M3-07 an existing policy is never replaced by a materialization, and a refresh over a settled map writes the missing one once", async () => {
++  const { stage, mod } = await hf9Load();
++  const own = (r, f) => ({ ...r, featureId: HF9_FEATURE, planPath: HF9_PLAN, planSha256: "a".repeat(64), specSha256: hf9Sha(HF9_SPEC_TEXT) });
++  const kept = f1Fixture(stage, { edit: own });
++  hf9Put(kept.root, M3_POLICY, '{"accepted":"by the project"}\n');
++  assert.equal(mod.inspectArchitectureMaterializationTargets(kept.root, {}).targets.some((target) => target.path === M3_POLICY), false, "an existing policy is not a target");
++  assert.equal(mod.materializeArchitectureDesign(kept.root, { lock: m3Lock(kept.root) }).status, "materialized");
++  assert.equal(readFileSync(join(kept.root, M3_POLICY), "utf8"), '{"accepted":"by the project"}\n', "not one byte of an existing policy changes");
++  const missing = f1Fixture(stage, { edit: own });
++  assert.equal(mod.materializeArchitectureDesign(missing.root, { lock: m3Lock(missing.root) }).status, "materialized");
++  assert.equal(JSON.parse(readFileSync(join(missing.root, M3_POLICY), "utf8")).schema, "pipeline.architecture-boundary-policy.v1");
++});
++
++test("M3-08 a design whose modules own every non-module class gets no policy, and a settled materialization is never given one later", async () => {
++  const { stage, mod } = await hf9Load();
++  const all = hf9Fixture(stage, { block: true, scaffold: "exact", designInput: m3Design(["src/**", "tests/**", "docs/**", "public/**", "static/**", "assets/**"]) });
++  assert.equal(mod.inspectArchitectureMaterializationTargets(all.root, {}).targets.some((target) => target.path === M3_POLICY), false);
++  assert.equal(mod.materializeArchitectureDesign(all.root, { lock: m3Lock(all.root) }).status, "materialized");
++  assert.equal(readdirSync(join(all.root, "architecture")).includes("boundary-policy.json"), false, "no empty or noise policy");
++  const settled = f1Fixture(stage, {});
++  assert.equal(mod.inspectArchitectureDesign(settled.root, null, {}).status, "materialized");
++  assert.deepEqual(mod.inspectArchitectureMaterializationTargets(settled.root, {}).targets, [], "a materialized map is not touched again, so the tree never changes later");
++});
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 0920655ec..9a6ced983 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -9,7 +9,7 @@
+  * and applies three rules to every tracked source file:
+  *   - `unowned-path` / `ambiguous-ownership`: the file belongs to exactly one module's `ownedPaths`
+  *     (the longest matching pattern wins, as in `resolveModuleForPath`; a tie between two modules is
+- *     ambiguous);
++ *     ambiguous); a test file in no module's `ownedPaths` counts to the module it tests (derived on read, see `testOwners`);
+  *   - `forbidden-dependency`: a relative import (`./`, `../`) stays inside its module or reaches a
+  *     module listed in `allowedDependencies`; package and `node:` imports are not the map's concern;
+  *   - `over-line-bound`: the file has at most `lineBound` lines.
+@@ -130,6 +130,24 @@ function lineCount(text) {
+ const exceptionKey = (rule, file, target = null) => JSON.stringify([rule, file, target]);
+ const order = (a, b) => a.file.localeCompare(b.file) || a.rule.localeCompare(b.rule) || String(a.target ?? "").localeCompare(String(b.target ?? ""));
+ 
++// C31-M3 (L2, AC-112): a test file counts to the module it tests. Derived on read from what the checker sees, never stored and never an exception: a file in no module's ownedPaths that is
++// a test (a .test/.spec infix, a _test suffix, a test_ prefix, or a test/tests/__tests__/spec directory) is owned by the module that (1) declares it in verificationEntryPoints; else by
++// the module(s) (2) it is named after (its stem or one of its directories is the module id) or whose owned source file it mirrors (same stem). Two modules stay ambiguous-ownership.
++const TEST_DIRECTORIES = new Set(["test", "tests", "__tests__", "spec"]);
++const isTestFile = (file) => /\.(?:test|spec)\.[^./]+$/u.test(file) || /_test\.[^./]+$/u.test(file) || /(?:^|\/)test_[^/]+$/u.test(file)
++  || file.split("/").slice(0, -1).some((segment) => TEST_DIRECTORIES.has(segment));
++const testStem = (file) => path.posix.basename(file).replace(/\.[^./]+$/u, "").replace(/\.(?:test|spec)$/u, "").replace(/_test$/u, "").replace(/^test_/u, "");
++
++function testOwners(file, modules, mirrored) {
++  const declared = modules.filter((mod) => (mod.verificationEntryPoints ?? []).includes(file));
++  if (declared.length > 0) return declared;
++  const stem = testStem(file);
++  const directories = file.split("/").slice(0, -1);
++  const named = new Set(modules.filter((mod) => mod.id === stem || directories.includes(mod.id)).map((mod) => mod.id));
++  for (const id of mirrored.get(stem) ?? []) named.add(id);
++  return modules.filter((mod) => named.has(mod.id));
++}
++
+ /** All raw violations of the tree, before exceptions. */
+ function observe(root, modules, policy, listed, readFile, extensions) {
+   const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
+@@ -137,9 +155,24 @@ function observe(root, modules, policy, listed, readFile, extensions) {
+   const violations = [];
+   const usage = new Map(); // module id -> { files, lines } of its source files
+   const edges = new Map(); // module id -> Set of module ids its source files really import (allowed or not)
++  const mirrored = new Map(); // stem -> Set of module ids owning a non-test source file of that stem
+   for (const file of sources) {
++    if (isTestFile(file)) continue;
+     const owners = owningModules(file, modules);
+-    if (owners.length === 0) {
++    if (owners.length !== 1) continue;
++    const stem = testStem(file);
++    mirrored.set(stem, (mirrored.get(stem) ?? new Set()).add(owners[0].id));
++  }
++  for (const file of sources) {
++    let owners = owningModules(file, modules);
++    const tested = owners.length === 0 && isTestFile(file) ? testOwners(file, modules, mirrored) : [];
++    if (tested.length > 1) {
++      const ids = tested.map((owner) => owner.id).sort();
++      violations.push({ file, module: ids.join(", "), rule: "ambiguous-ownership", detail: `${file} is a test of ${ids.join(" and ")} equally (by declared entry point, name, directory or mirrored source file)` });
++      owners = tested;
++    } else if (tested.length === 1) {
++      owners = tested;
++    } else if (owners.length === 0) {
+       violations.push({ file, module: null, rule: "unowned-path", detail: `${file} is in no module's ownedPaths` });
+     } else if (owners.length > 1) {
+       const ids = owners.map((owner) => owner.id).sort();
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index 41d3f9224..2f2761d59 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -24,18 +24,18 @@ const SCRIPT = fileURLToPath(new URL("./architecture-boundary-check.mjs", import
+ const roots = [];
+ after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+ 
+-function concept(id, ownedPaths, allowedDependencies = []) {
++function concept(id, ownedPaths, allowedDependencies = [], entryPoints = []) {
+   const list = (values) => (values.length ? `\n${values.map((value) => `  - ${value}`).join("\n")}` : " []");
+-  return `---\ntype: Governed Module\nid: ${id}\nresponsibility: ${id} module\nnonResponsibilities: []\nownedPaths:${list(ownedPaths)}\npublicContracts: []\nallowedDependencies:${list(allowedDependencies)}\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n\n# ${id}\n`;
++  return `---\ntype: Governed Module\nid: ${id}\nresponsibility: ${id} module\nnonResponsibilities: []\nownedPaths:${list(ownedPaths)}\npublicContracts: []\nallowedDependencies:${list(allowedDependencies)}\nauthorityEffects: []\nverificationEntryPoints:${list(entryPoints)}\nadrReferences: []\n---\n\n# ${id}\n`;
+ }
+ 
+-function fixture({ modules = { app: ["src/app/**"], lib: ["src/lib/**"] }, deps = { app: ["lib"] }, files = {}, policy = null, map = true } = {}) {
++function fixture({ modules = { app: ["src/app/**"], lib: ["src/lib/**"] }, deps = { app: ["lib"] }, entries = {}, files = {}, policy = null, map = true } = {}) {
+   const root = mkdtempSync(path.join(os.tmpdir(), "arch-boundary-"));
+   roots.push(root);
+   const write = (rel, text) => { mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); writeFileSync(path.join(root, rel), text); };
+   if (map) {
+     write("architecture/map/index.md", "# Map\n");
+-    for (const [id, owned] of Object.entries(modules)) write(`architecture/map/${id}.md`, concept(id, owned, deps[id] ?? []));
++    for (const [id, owned] of Object.entries(modules)) write(`architecture/map/${id}.md`, concept(id, owned, deps[id] ?? [], entries[id] ?? []));
+   }
+   for (const [rel, text] of Object.entries(files)) write(rel, text);
+   if (policy) write(BOUNDARY_POLICY_PATH, JSON.stringify(policy));
+@@ -303,3 +303,71 @@ test("ABC15 the preview names a PRD it cannot read as a typed refusal, never a p
+   assert.equal(both.status, 2);
+   assert.equal(existsSync(path.join(root, BOUNDARY_POLICY_PATH)), false, "nothing is written");
+ });
++
++// C31-M3 (L2, AC-112): a test file counts to the module it tests, derived on read from what the checker sees; nothing is stored and no exception is written.
++test("M3-01 a test file named after its module, inside a directory named after it, mirroring an owned file or declared as an entry point is owned by that module", () => {
++  const root = fixture({
++    entries: { app: ["tests/e2e/flow.test.mjs"] },
++    files: {
++      "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n",
++      "tests/app.test.mjs": "export {};\n", "tests/lib/x.test.mjs": "export {};\n", "tests/main.test.mjs": "export {};\n", "tests/e2e/flow.test.mjs": "export {};\n",
++    },
++  });
++  const result = checkArchitectureBoundaries({ rootDir: root });
++  assert.equal(result.status, "pass", JSON.stringify(result.violations));
++  assert.equal(result.counts.sourceFiles, 6);
++  assert.deepEqual([...result._measured.usage].map(([id, row]) => [id, row.files]).sort(), [["app", 4], ["lib", 2]], "each test counts to its module");
++  assert.equal(existsSync(path.join(root, BOUNDARY_POLICY_PATH)), false, "no exception or policy is stored for a test");
++});
++
++test("M3-02 a test that maps to two modules stays ambiguous-ownership, a test that maps to none and a non-test file stay unowned-path", () => {
++  const root = fixture({
++    files: {
++      "src/app/shared.mjs": "export {};\n", "src/lib/shared.mjs": "export {};\n",
++      "tests/shared.test.mjs": "export {};\n", "tests/orphan.test.mjs": "export {};\n", "tools/loose.mjs": "export {};\n",
++    },
++  });
++  const result = checkArchitectureBoundaries({ rootDir: root });
++  assert.deepEqual(rules(result), [
++    ["unowned-path", "tests/orphan.test.mjs", null], ["ambiguous-ownership", "tests/shared.test.mjs", null], ["unowned-path", "tools/loose.mjs", null],
++  ]);
++  assert.equal(result.violations.find((violation) => violation.file === "tests/shared.test.mjs").module, "app, lib");
++});
++
++test("M3-03 a derived-owned test is held to its module's allowedDependencies like any owned file", () => {
++  const files = { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n", "tests/app.test.mjs": 'import "../src/lib/x.mjs";\n' };
++  assert.equal(checkArchitectureBoundaries({ rootDir: fixture({ files }) }).status, "pass");
++  const refused = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files }) });
++  assert.deepEqual(rules(refused), [["forbidden-dependency", "tests/app.test.mjs", "src/lib/x.mjs"]]);
++});
++
++// C31-M3 (L11, AC-112): the baseline policy materialize-architecture writes for the non-module path classes.
++const design = await import("../lib/architecture-design.mjs");
++const m3Modules = (owned) => Object.entries(owned).map(([id, ownedPaths]) => ({ id, ownedPaths }));
++
++test("M3-04 the baseline policy covers docs and static assets, never a path a module owns, and a second --write-policy changes no byte", () => {
++  const policy = design.baselineBoundaryPolicy(m3Modules({ app: ["src/**", "tests/**", "docs/contract.md"] }));
++  assert.equal(policy.schema, BOUNDARY_POLICY_SCHEMA);
++  assert.equal(policy.lineBound, DEFAULT_LINE_BOUND);
++  assert.deepEqual(policy.exceptions, []);
++  assert.deepEqual(policy.excludedPaths.map((entry) => entry.pattern), ["docs/**", "public/**", "static/**", "assets/**"], "an owned document does not hide the docs class");
++  const files = { "src/main.mjs": "export {};\n", "public/app.js": "export {};\n", "docs/contracts/schema.mjs": "export {};\n", "docs/adr/0001.mjs": "export {};\n" };
++  const before = fixture({ modules: { app: ["src/**", "tests/**", "docs/contract.md"] }, deps: {}, files });
++  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: before })).map(([rule]) => rule), ["unowned-path", "unowned-path", "unowned-path"], "without the policy the check is red");
++  const root = fixture({ modules: { app: ["src/**", "tests/**", "docs/contract.md"] }, deps: {}, files, policy });
++  const covered = checkArchitectureBoundaries({ rootDir: root });
++  assert.equal(covered.status, "pass", JSON.stringify(covered.violations));
++  const bytes = readFileSync(path.join(root, BOUNDARY_POLICY_PATH), "utf8");
++  const again = spawnSync(process.execPath, [SCRIPT, "--root", root, "--write-policy"], { encoding: "utf8" });
++  assert.equal(again.status, 1);
++  assert.match(again.stderr, /never overwritten/u);
++  assert.equal(readFileSync(path.join(root, BOUNDARY_POLICY_PATH), "utf8"), bytes, "the manual route is a no-op over a written policy");
++});
++
++test("M3-05 a class a module owns source in is left out, and a map with no module-less class gets no policy", () => {
++  const web = design.baselineBoundaryPolicy(m3Modules({ app: ["src/**"], web: ["public/**", "docs/guide.mjs"] }));
++  assert.deepEqual(web.excludedPaths.map((entry) => entry.pattern), ["static/**", "assets/**"], "public/** and docs/ (an owned source file) stay checked");
++  const root = fixture({ modules: { app: ["src/**"], web: ["public/**"] }, deps: {}, files: { "public/big.js": lines(DEFAULT_LINE_BOUND + 1) }, policy: web });
++  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: root })), [["over-line-bound", "public/big.js", null]], "an owned tree keeps its line bound");
++  assert.equal(design.baselineBoundaryPolicy(m3Modules({ app: ["docs/**", "public/**", "static/**", "assets/**"] })), null, "nothing left to cover writes nothing");
++});
