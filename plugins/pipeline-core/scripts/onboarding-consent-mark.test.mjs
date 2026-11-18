@@ -228,7 +228,7 @@ test("G20-45: the review-receipt stop that names prepare-seal and present-plan c
     const covered = coverOnboardingOutput({ nextAction: stop }, { rootDir: root }).nextAction;
     assert.deepEqual(covered.coveredBy.steps, ["prepare-seal", "present-plan"]);
     assert.match(covered.escalationJustifications["prepare-seal"], /^covered by the user's recorded onboarding consent \(\.claude\/\.pipeline-install-consent-session-1\.json\): prepare the seal plan \(prepare-seal\); no further approval before the design approval$/u);
-    assert.match(covered.escalationJustifications["present-plan"], /present the design to you for approval \(present-plan\); no further approval/u);
+    assert.match(covered.escalationJustifications["present-plan"], /present the design for your approval \(present-plan\); no further approval/u);
     const other = { kind: "collect-input", code: "SOMETHING-ELSE" };
     assert.deepEqual(coverOnboardingOutput({ nextAction: other }, { rootDir: root }), { nextAction: other });
   });

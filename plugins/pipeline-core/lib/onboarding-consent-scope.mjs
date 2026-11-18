@@ -37,8 +37,8 @@ const STATE = "pipeline-state.mjs";
 export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   Object.freeze({
     id: "install",
-    en: "install the Pipeline into this project (portable authority seed, runtime initialization and readbacks; on Windows the new project folder gets rights for you alone)",
-    de: "die Pipeline in dieses Projekt installieren (portable Authority-Seed, Runtime-Initialisierung und Readbacks; unter Windows bekommt der neue Projektordner nur für Sie Rechte)",
+    en: "install the Pipeline (portable authority seed, runtime initialization, readbacks; on Windows the new project folder gets rights for you alone)",
+    de: "die Pipeline installieren (portable Authority-Seed, Runtime-Initialisierung, Readbacks; unter Windows bekommt der neue Projektordner nur für Sie Rechte)",
     routes: Object.freeze([
       { script: ONBOARDING, verbs: ["plan", "apply-portable-seed", "initialize-runtime", "apply-readback"] },
       { script: "onboarding-init.mjs", verbs: null },
@@ -48,14 +48,14 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   // as a question of its own later. It names no action route: it is a consent the first answer records (`advisorExportConsentFromRecord`).
   Object.freeze({
     id: ADVISOR_EXPORT_STEP_ID,
-    en: "let the Pipeline's same-runner Advisor read scoped repository material for a concrete consultation (this export consent is part of using the Pipeline, so it is not asked again separately)",
-    de: "dem Advisor der Pipeline (derselbe Runner) für eine konkrete Beratung ausgewählte Repository-Inhalte zeigen (diese Exportfreigabe gehört zur Nutzung der Pipeline und wird nicht noch einmal gesondert gefragt)",
+    en: "the same-runner Advisor read scoped repository material for a concrete consultation (part of using the Pipeline, not asked separately)",
+    de: "dem Advisor der Pipeline (derselbe Runner) für eine konkrete Beratung ausgewählte Repository-Inhalte einzusehen (gehört zur Nutzung der Pipeline, nicht gesondert gefragt)",
     routes: Object.freeze([]),
   }),
   Object.freeze({
     id: "hooks",
-    en: "activate and refresh the git hooks, plus the runner's own refresh step",
-    de: "die Git-Hooks aktivieren und aktualisieren, dazu den eigenen Refresh-Schritt des Runners",
+    en: "activate and refresh git hooks and the runner's own refresh step",
+    de: "Git-Hooks aktivieren und aktualisieren, dazu den Refresh-Schritt des Runners",
     routes: Object.freeze([
       { script: "clone-hook-readiness.mjs", verbs: null },
       { script: "refresh-mandatory-hooks.mjs", verbs: null },
@@ -65,34 +65,34 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   // in their own terminal or defers, and only the deferral record is a covered action (an old record without this id simply does not cover it).
   Object.freeze({
     id: "toolchain",
-    en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy where the project has infrastructure or container files; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
-    de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
+    en: "check the tools needed on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy where the project has infrastructure or container files; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record you install it later",
+    de: "die auf diesem Rechner benötigten Werkzeuge prüfen (Node.js, Git, gitleaks, osv-scanner, semgrep; Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
     routes: Object.freeze([{ script: "toolchain-defer.mjs", verbs: null }]),
     // C30-1: the question shows this step as a lead line with one bullet per tool and a closing bullet; every item is a literal
     // substring of `en`/`de`, so the two renderings cannot drift on the tool list (pinned in onboarding-consent-mark.test.mjs).
     bullets: Object.freeze({
       en: Object.freeze({
-        lead: "check the tools the Pipeline needs on this machine:",
+        lead: "check the tools needed on this machine:",
         items: Object.freeze(["Node.js", "Git", "gitleaks", "osv-scanner", "semgrep", "Trivy where the project has infrastructure or container files", "OpenSSL where you sign"]),
-        tail: "for a missing tool, I show you its install route to run together, or record that you install it later",
+        tail: "for a missing one, I show its install route to run together or record you install it later",
       }),
       de: Object.freeze({
-        lead: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht:",
+        lead: "die auf diesem Rechner benötigten Werkzeuge prüfen:",
         items: Object.freeze(["Node.js", "Git", "gitleaks", "osv-scanner", "semgrep", "Trivy, wo das Projekt Infrastruktur- oder Container-Dateien hat", "OpenSSL dort, wo Sie signieren"]),
-        tail: "bei einem fehlenden Werkzeug zeige ich Ihnen den Installationsweg, den wir gemeinsam gehen, oder halte fest, dass Sie es später installieren",
+        tail: "bei einem fehlenden zeige ich den Installationsweg, den wir gemeinsam gehen, oder halte fest, dass Sie es später installieren",
       }),
     }),
   }),
   Object.freeze({
     id: "onboarding-commits",
-    en: "make the onboarding commits",
-    de: "die Onboarding-Commits anlegen",
+    en: "make onboarding commits",
+    de: "Onboarding-Commits anlegen",
     routes: Object.freeze([]),
   }),
   Object.freeze({
     id: "intake-kickoff",
-    en: "write the intake and kickoff artifacts",
-    de: "die Intake- und Kickoff-Artefakte schreiben",
+    en: "write intake and kickoff artifacts",
+    de: "Intake- und Kickoff-Artefakte schreiben",
     routes: Object.freeze([
       {
         script: ONBOARDING,
@@ -105,16 +105,16 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   }),
   Object.freeze({
     id: "bind-draft",
-    en: "bind the PRD and the Spec as an unsealed draft (bootstrap-bind-plan and bootstrap-bind-apply)",
-    de: "PRD und Spec als unversiegelten Entwurf binden (bootstrap-bind-plan und bootstrap-bind-apply)",
+    en: "bind PRD and Spec as an unsealed draft (bootstrap-bind-plan, bootstrap-bind-apply)",
+    de: "PRD und Spec als unversiegelten Entwurf binden (bootstrap-bind-plan, bootstrap-bind-apply)",
     routes: Object.freeze([
       { script: ONBOARDING, verbs: ["bootstrap-bind-plan", "bootstrap-bind-apply", "kickoff-promote-plan", "kickoff-promote-apply"] },
     ]),
   }),
   Object.freeze({
     id: "design-review",
-    en: "run the design review, readiness and advisor rounds and record their receipts",
-    de: "die Design-Review-, Readiness- und Advisor-Runden durchführen und ihre Belege festhalten",
+    en: "run design review, readiness and advisor rounds, recording receipts",
+    de: "die Design-Review-, Readiness- und Advisor-Runden durchführen und Belege festhalten",
     routes: Object.freeze([
       { script: "design-review-receipt.mjs", verbs: null },
       { script: "design-course-session.mjs", verbs: null },
@@ -122,26 +122,26 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   }),
   Object.freeze({
     id: "submit-plan",
-    en: "register the feature and submit the plan (set-feature, submit-plan)",
-    de: "das Feature registrieren und den Plan einreichen (set-feature, submit-plan)",
+    en: "register the feature, submit the plan (set-feature, submit-plan)",
+    de: "Feature registrieren, Plan einreichen (set-feature, submit-plan)",
     routes: Object.freeze([{ script: STATE, verbs: ["set-feature", "submit-plan"] }]),
   }),
   Object.freeze({
     id: "prepare-seal",
     en: "prepare the seal plan (prepare-seal)",
-    de: "den Siegelplan vorbereiten (prepare-seal)",
+    de: "Siegelplan vorbereiten (prepare-seal)",
     routes: Object.freeze([{ script: STATE, verbs: ["prepare-seal"] }]),
   }),
   Object.freeze({
     id: "present-plan",
-    en: "present the design to you for approval (present-plan)",
-    de: "Ihnen das Design zur Freigabe vorlegen (present-plan)",
+    en: "present the design for your approval (present-plan)",
+    de: "das Design zu Ihrer Freigabe vorlegen (present-plan)",
     routes: Object.freeze([{ script: STATE, verbs: ["present-plan"] }]),
   }),
 ]);
 
 export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
-  Object.freeze({ id: "design-approval", en: "your approval of the design", de: "Ihre Freigabe des Designs" }),
+  Object.freeze({ id: "design-approval", en: "your design approval", de: "Ihre Design-Freigabe" }),
   Object.freeze({ id: "push", en: "any push", de: "jeder Push" }),
   Object.freeze({ id: "release", en: "any release", de: "jedes Release" }),
   Object.freeze({ id: "guard-override", en: "any human-guard override", de: "jede menschliche Guard-Freigabe (Override)" }),
@@ -152,8 +152,8 @@ export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
 // its own paragraph, and the exclusions as a closing bullet list. The scope itself is unchanged (ADR-0092, ADR-0103).
 const bulletList = (entries) => entries.map((entry) => `- ${entry}`).join("\n");
 const QUESTION_FRAME = Object.freeze({
-  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it?\n\nIf you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval:\n${covered}\n\nYour yes also lets me ${advisor}.\n\nYour yes does not cover these; they stay your own decisions:\n${excluded}`,
-  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen?\n\nWenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird:\n${covered}\n\nIhr Ja erlaubt außerdem, ${advisor}.\n\nIhr Ja deckt nicht ab (das bleiben Ihre eigenen Entscheidungen):\n${excluded}`,
+  en: (covered, advisor, excluded) => `Should this project use Agent Pipeline, a structured, verifiable delivery workflow?\n\nIf you say yes, I do these steps without asking again:\n${covered}\n\nYour yes also lets ${advisor}.\n\nYour yes does not cover (your decisions):\n${excluded}`,
+  de: (covered, advisor, excluded) => `Soll dieses Projekt Agent Pipeline nutzen, einen strukturierten, nachprüfbaren Lieferablauf?\n\nWenn Sie ja sagen, führe ich diese Schritte aus, ohne erneut zu fragen:\n${covered}\n\nIhr Ja erlaubt außerdem ${advisor}.\n\nIhr Ja deckt nicht ab (Ihre Entscheidungen):\n${excluded}`,
 });
 
 /** One covered step as a bullet; a step with `bullets` gets a lead line, one sub-bullet per item and a closing sub-bullet. */
