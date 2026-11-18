@@ -149,6 +149,8 @@ that overlaps a running dispatch (`DBG-SCOPE-OVERLAP`), naming that dispatch,
 the overlapping paths and the repair (narrow the scope, wait for the other
 dispatch, finalize an abandoned record, or use a worktree).
 
+**Recovery commits, the host-commit route and the overlap rule (candidate 30k, C30K-K14).** Coordinator rule: land a recovery commit only while `node <plugin-root>/scripts/session-authority-repair.mjs inspect --root <root>` (read-only) shows no native item reservation of another lane still in flight; otherwise wait until that lane ends. A running lane's own host commit refuses an ordinary commit on a path of a lane it still counts as in flight (`native-concurrent-unowned-head`), because that commit may be the lane's host commit whose proof is not written yet, so the rule holds even for a lane that is finished but not yet released. Premise correction: the governed admission, the baseline-dirty refusal (`AGY-HOST-BASELINE-DIRTY`), the sibling-commit exception and the admission budget are steps of the shared-tree host-commit route, paid whether the lane edits the real tree or a scratch clone; the clone-slice route adds only the patch export and the chain steps (held patch, chain apply by the PO). Overlap note: the guard skips the overlap check for an isolated call (`isolation: "worktree"`), and the queue reservation covers that gap for governed items, so the text rule above that a planned path overlap waits stays the Elephant's duty for any other work.
+
 **Recon before a re-dispatch after a wrong-premise stop (PO decision D75 (A)).**
 When the governed slice queue holds a slice cancelled with `--class wrong-premise`
 for the same item, the briefing generator refuses a new briefing for that item

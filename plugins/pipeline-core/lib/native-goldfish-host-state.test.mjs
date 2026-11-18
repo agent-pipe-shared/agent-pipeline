@@ -2187,6 +2187,20 @@ const cases = [
     assert.throws(() => runtime.run(baseline), (error) => /native-authority-missing-pending/u.test(`${error.code} ${error.reason} ${error.message}`), "no retained aside names it, so the fault stays");
   }) },
 
+  // C30K-K14 stage 0 (AC-112, closest accepted criterion): the dispatch reference states the Coordinator rule for a recovery commit against a running sibling,
+  // the corrected premise of the clone-slice route and the overlap-rule note; the operating tools document carries the premise correction in one sentence.
+  { id: "NGHSK14", name: "C30K-K14: workflow-dispatch.md names the recovery-commit rule with its inspection command, the host-commit premise correction and the isolated-call overlap note; operating-tools.md carries the premise correction", run: () => {
+    const dispatch = readFileSync(new URL("../skills/pipeline-start/references/workflow-dispatch.md", import.meta.url), "utf8").replace(/\s+/gu, " ");
+    assert.match(dispatch, /recovery commit[^.]*only while[^.]*session-authority-repair\.mjs inspect[^.]*in flight/iu, "the rule: land a recovery commit only while the read-only inspection shows nothing in flight");
+    assert.match(dispatch, /admission[^.]*baseline-dirty[^.]*sibling-commit exception[^.]*admission budget[^.]*host[- ]commit route/iu, "the premise: these steps belong to the host-commit route");
+    assert.match(dispatch, /clone-slice route adds only[^.]*patch export[^.]*chain/iu, "the clone-slice route adds only the patch export and chain steps");
+    assert.match(dispatch, /skips the overlap check for an isolated call[^.]*queue reservation[^.]*governed/iu, "the overlap-rule note: the guard skips the check for an isolated call and the queue reservation covers governed items");
+    const tools = readFileSync(new URL("../../../docs/operating-tools.md", import.meta.url), "utf8"), start = tools.indexOf("## Clone-slice route");
+    assert.ok(start >= 0, "the Clone-slice route section exists");
+    const section = tools.slice(start, tools.indexOf("\n## ", start + 1)).replace(/\s+/gu, " ");
+    assert.match(section, /admission[^.]*baseline-dirty[^.]*sibling-commit exception[^.]*host[- ]commit route[^.]*not (?:of|part of) the clone-slice route/iu, "the premise correction sits in the Clone-slice route section");
+  } },
+
 ];
 
 /** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */

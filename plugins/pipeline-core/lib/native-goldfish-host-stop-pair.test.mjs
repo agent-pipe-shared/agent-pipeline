@@ -472,6 +472,21 @@ const cases = [
     assert.match(message, new RegExp(`host commit of ${first.id} \\(host commit ${failed.commit.slice(0, 12)}\\)`), message);
     assert.match(message, /Recover that sibling first/u, message);
   }) },
+
+  // C30K-K14 (AC-112, closest accepted criterion): a recovery commit of the Coordinator on a path of a lane that is still unsettled (no integrated or cancelled queue row)
+  // stays refused for a running sibling's host commit: it may be that lane's own host commit whose proof is not written yet (the settle rule of C19K-W246).
+  { id: "NGSPK14A", name: "C30K-K14 (AC-112): a sibling that is still unsettled keeps refusing an ordinary commit on its paths by name, and nothing is committed", run: () => fixture(({ root }) => {
+    const { runtime, launch } = setup(root);
+    const [first, second] = [launch(0), launch(1)];
+    for (const one of [first, second]) assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true, one.id);
+    writeFileSync(join(root, first.file), first.content); git(root, "add", "--", first.file); git(root, "commit", "-q", "-m", "docs: a commit on the running lane's path");
+    const head = git(root, "rev-parse", "HEAD");
+    writeFileSync(join(root, second.file), second.content);
+    const refused = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: second.returned }, { lockWait: { budgetMs: 0 } }));
+    assert.notEqual(refused.status, "authored-commit-recorded", JSON.stringify(refused));
+    assert.equal(refused.detail?.reason, "native-concurrent-unowned-head", JSON.stringify(refused));
+    assert.equal(git(root, "rev-parse", "HEAD"), head, "nothing was committed on top of the commit");
+  }) },
 ];
 
 const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

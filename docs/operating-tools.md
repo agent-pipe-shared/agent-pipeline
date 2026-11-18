@@ -92,7 +92,7 @@ Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied 
 
 ## Clone-slice route
 
-Candidate 18 was built as held patches from scratch clones (`git clone --shared`, never links, see below). The tools are one plain `node` command each, because the shell grammar refuses `git apply`, cross-directory git and pipelines. Tracked sources: `scripts/clone-slice/`. The route runs them from `scratch/agent-out/` (the Goldfish shell guard admits that path), so on a fresh machine copy `scripts/clone-slice/*.mjs` there first (`rehearse.mjs` to `scratch/agent-out/w24reh/`, its repository-root arithmetic counts three levels).
+Candidate 18 was built as held patches from scratch clones (`git clone --shared`, never links, see below). The tools are one plain `node` command each, because the shell grammar refuses `git apply`, cross-directory git and pipelines. Tracked sources: `scripts/clone-slice/`. The route runs them from `scratch/agent-out/` (the Goldfish shell guard admits that path), so on a fresh machine copy `scripts/clone-slice/*.mjs` there first (`rehearse.mjs` to `scratch/agent-out/w24reh/`, its repository-root arithmetic counts three levels). The governed admission, the baseline-dirty refusal, the sibling-commit exception and the admission budget are steps of the shared-tree host-commit route that a clone-slice lane pays too when its three deliverables land in the real tree; they are not part of the clone-slice route, which adds only the patch export and the chain steps (`workflow-dispatch.md`, "Recovery commits, the host-commit route and the overlap rule").
 
 | Tool | Purpose |
 |---|---|
