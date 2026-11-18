@@ -595,11 +595,42 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
   } catch { return false; }
 }
 
-/** The per-commit decision of the classifier below, shared with `classifyEvidenceOnlyFollowers` so that there is one rule for "evidence-only". */
-function registeredEvidenceOnlyCommit(root, commit, manifestPath, featureId, admitCriticExports, readReceipt, admitClose = admitCriticExports) {
-  return evidenceOnlyCommit(root, commit, manifestPath, featureId)
-    || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readReceipt)
-      || criticAddendumOnlyCommit(root, commit) || (admitClose === true && criticCloseCommit(root, commit, featureId, readReceipt))));
+/**
+ * C30J-J5 (C12 / SM-10, the definition only): the ONE per-commit definition of "evidence-only", with the three flag sets the callers use, named.
+ * A manifest registration is always evidence-only; `exports` adds the export of a consumed review and a disposition addendum, `close` the
+ * feature close commit, `administration` the pass-over of an administration or documentation commit (reported as "administration").
+ *   counters   course counters (classifyRegisteredEvidenceOnlyCommits without the carry option): registrations only.
+ *   carry      the Critic carry-forward (the same function with admitCriticExports): exports, addendum, close and administration.
+ *   followers  the Critic diagnostic's HEAD (classifyEvidenceOnlyFollowers): exports and addendum, never the close commit or an administration
+ *              commit, because the diagnostic binds the spec and guardrails of the candidate.
+ * This only names what each caller already decided. Every check that needs the exact HEAD (the package candidate, the Verify evidence, the
+ * exact capture head of a registered diagnostic) has no profile and keeps its exact HEAD.
+ */
+export const EVIDENCE_ONLY_PROFILES = Object.freeze({
+  counters: Object.freeze({ exports: false, close: false, administration: false }),
+  carry: Object.freeze({ exports: true, close: true, administration: true }),
+  followers: Object.freeze({ exports: true, close: false, administration: false }),
+});
+// Exact-value flags (`=== true`), as before the profiles had names: a profile that is not one of these shapes decides "not evidence-only".
+function evidenceOnlyKind(root, commit, manifestPath, featureId, profile, readReceipt) {
+  if (evidenceOnlyCommit(root, commit, manifestPath, featureId)) return "registered";
+  if (profile?.exports === true && (criticExportOnlyCommit(root, commit, [featureId], readReceipt)
+    || criticAddendumOnlyCommit(root, commit) || (profile.close === true && criticCloseCommit(root, commit, featureId, readReceipt)))) return "registered";
+  // AC-108: with the carry profile, a commit that changes only administration and documentation paths is passed over as well.
+  if (profile?.exports === true && profile.administration === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] })) return "administration";
+  return null;
+}
+/**
+ * "registered", "administration" (only under a profile that passes administration commits over) or null (a correction) for one commit; never throws.
+ * The course counters, the carry-forward and the follower check of the Critic diagnostic decide through `evidenceOnlyKind`, the function this
+ * export wraps (resolving the repository and refusing malformed input); it is exported so the one definition can be tested and read. `profile`
+ * must be one of the named profiles above (by identity): a flag set a caller invented is not evidence-only, so no caller can widen a definition.
+ */
+export function classifyEvidenceOnlyCommit({ repoRoot, featureId, commit, profile, readConsumedCandidateReceiptFn = readConsumedCandidateReceipt }) {
+  try {
+    if (!Object.values(EVIDENCE_ONLY_PROFILES).includes(profile) || !OID.test(commit ?? "") || !FEATURE_ID.test(featureId ?? "")) return null;
+    return evidenceOnlyKind(realpathSync(repoRoot), commit, `specs/${featureId}/lifecycle.json`, featureId, profile, readConsumedCandidateReceiptFn);
+  } catch { return null; }
 }
 
 /**
@@ -618,7 +649,9 @@ export function classifyEvidenceOnlyFollowers({ repoRoot, featureId, candidateCo
     const commits = gitBytes(root, ["rev-list", "--reverse", `${candidateCommit}..${headCommit}`], "CCA-RANGE-READ").toString("utf8").trim().split("\n").filter(Boolean);
     if (commits.length === 0 || commits.length > 512 || commits.some((oid) => !OID.test(oid))) return result(false, "unreadable", null, []);
     const manifestPath = `specs/${featureId}/lifecycle.json`;
-    for (const commit of commits) if (!registeredEvidenceOnlyCommit(root, commit, manifestPath, featureId, true, readConsumedCandidateReceiptFn, false)) return result(false, "not-evidence-only", commit, []);
+    // The walk (ancestry, bound, first offender) is this function's own: the course source of `classifyRegisteredEvidenceOnlyCommits` needs a retained
+    // course whose last candidate is the base (CCA-PARENT), which a diagnostic produced for a new candidate does not have. The verdict per commit is shared.
+    for (const commit of commits) if (evidenceOnlyKind(root, commit, manifestPath, featureId, EVIDENCE_ONLY_PROFILES.followers, readConsumedCandidateReceiptFn) === null) return result(false, "not-evidence-only", commit, []);
     return result(true, null, null, commits);
   } catch { return result(false, "unreadable", null, []); }
 }
@@ -636,12 +669,11 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
   const evidenceOnly = [];
   const correction = [];
   const administration = [];
+  const profile = admitCriticExports === true ? EVIDENCE_ONLY_PROFILES.carry : EVIDENCE_ONLY_PROFILES.counters;
   for (const commit of source.rangeCommits) {
-    const registered = registeredEvidenceOnlyCommit(root, commit, source.manifestPath, featureId, admitCriticExports, readConsumedCandidateReceiptFn);
-    // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
-    const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
-    if (passedOver && !registered) administration.push(commit);
-    (passedOver ? evidenceOnly : correction).push(commit);
+    const kind = evidenceOnlyKind(root, commit, source.manifestPath, featureId, profile, readConsumedCandidateReceiptFn);
+    if (kind === "administration") administration.push(commit);
+    (kind !== null ? evidenceOnly : correction).push(commit);
   }
   return Object.freeze({
     ...source,

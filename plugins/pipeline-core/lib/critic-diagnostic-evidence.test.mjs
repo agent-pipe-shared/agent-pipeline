@@ -568,3 +568,95 @@ test("C30F-G2C followerRoot: inside a candidate-only repository the follower is 
     assert.equal(run(header(head, f.candidate.tree), f.root)?.code, "CDI-DIGEST");
   } finally { rmSync(f.root, { recursive: true, force: true }); rmSync(only, { recursive: true, force: true }); }
 });
+
+// C30J-J5 (C12 / SM-10, the definition only): one per-commit definition of "evidence-only" with three named profiles, shared by the callers that
+// already accept such a commit. Each kind is committed on top of the candidate of the follower fixture; the table is what each profile decides.
+import * as courseAdmission from "./critic-course-admission.mjs";
+import { canonicalJson as packetCanonicalJson } from "../scripts/critic-packet-preflight.mjs";
+const kindCommit = (f, make) => {
+  git(f.root, ["reset", "-q", "--hard", f.candidate.commit]);
+  make(f);
+  // `evidenceFollower` commits by itself; the other kinds leave a change to commit.
+  return git(f.root, ["status", "--porcelain"]) === "" ? git(f.root, ["rev-parse", "HEAD"]) : commitAll(f.root, "kind");
+};
+const addFile = (f, path, text) => { mkdirSync(join(f.root, path, ".."), { recursive: true }); writeFileSync(join(f.root, path), text); };
+// The one input that separates `followers` from `counters`: the export of a consumed Critic review, bound to a receipt the injected reader returns.
+const J5_PACKET = "c".repeat(32);
+const J5_RECEIPT = { packetId: J5_PACKET, candidate: { commit: "d".repeat(40), tree: "e".repeat(40) }, reviewPass: 1, findingCount: 0 };
+const j5Reader = () => ({ receipt: J5_RECEIPT });
+const addExport = (f) => {
+  const dir = `specs/${FEATURE}/evidence/critic/${J5_PACKET}`, report = "Report\n", receipt = packetCanonicalJson(J5_RECEIPT);
+  addFile(f, `${dir}/report.md`, report); addFile(f, `${dir}/receipt.json`, receipt);
+  addFile(f, `${dir}/index.json`, `${JSON.stringify({ schema: "pipeline.session-critic-evidence-index.v1", packetId: J5_PACKET, receiptSha256: diagnosticDigestOf(receipt), reportSha256: diagnosticDigestOf(report), candidate: J5_RECEIPT.candidate, reviewPass: 1, findingCount: 0 })}\n`);
+};
+const J5_KINDS = [
+  // [name, make, counters, carry, followers]: the verdicts of the three profiles; null means "not evidence-only" (a correction).
+  ["a manifest registration of one evidence file", f => { evidenceFollower(f, "kind-one"); }, "registered", "registered", "registered"],
+  ["the export of a consumed Critic review", addExport, null, "registered", "registered"],
+  ["a source change", f => addFile(f, "src/code.mjs", "export const delivered = 2;\n"), null, null, null],
+  ["a registration with a source change in the same commit", f => { addFile(f, "src/code.mjs", "export const delivered = 3;\n"); evidenceFollower(f, "kind-mixed"); }, null, null, null],
+  ["a feature close commit (a file under specs/<feature>/)", f => addFile(f, `specs/${FEATURE}/result.md`, "Result\n"), null, "registered", null],
+  ["an administration-only commit (a backlog file that is no close document)", f => addFile(f, "backlog/items/x.json", "{}\n"), null, "administration", null],
+];
+const J5_PROFILES = ["counters", "carry", "followers"];
+test("C30J-J5 (a) one definition: the three named profiles are exactly the flag sets of the callers, and the per-commit verdict is the table", () => {
+  assert.equal(typeof courseAdmission.classifyEvidenceOnlyCommit, "function", "the single per-commit definition is exported");
+  assert.deepEqual(courseAdmission.EVIDENCE_ONLY_PROFILES, {
+    counters: { exports: false, close: false, administration: false },
+    carry: { exports: true, close: true, administration: true },
+    followers: { exports: true, close: false, administration: false },
+  });
+  assert.ok(Object.isFrozen(courseAdmission.EVIDENCE_ONLY_PROFILES) && J5_PROFILES.every(name => Object.isFrozen(courseAdmission.EVIDENCE_ONLY_PROFILES[name])), "no caller can widen a profile");
+  const f = followerFixture();
+  try {
+    for (const [name, make, ...verdicts] of J5_KINDS) {
+      const commit = kindCommit(f, make);
+      J5_PROFILES.forEach((profile, index) => assert.equal(
+        courseAdmission.classifyEvidenceOnlyCommit({ repoRoot: f.root, featureId: FEATURE, commit, profile: courseAdmission.EVIDENCE_ONLY_PROFILES[profile], readConsumedCandidateReceiptFn: j5Reader }),
+        verdicts[index], `${name}: ${profile}`));
+    }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30J-J5 (b) the callers answer exactly what the single definition says: course counters, carry and the follower check agree commit by commit", () => {
+  const f = followerFixture();
+  try {
+    for (const [name, make, ...verdicts] of J5_KINDS) {
+      const commit = kindCommit(f, make);
+      const counters = courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: f.root, featureId: FEATURE, baseCommit: f.candidate.commit, candidateCommit: commit, readConsumedCandidateReceiptFn: j5Reader });
+      const carry = courseAdmission.classifyRegisteredEvidenceOnlyCommits({ repoRoot: f.root, featureId: FEATURE, baseCommit: f.candidate.commit, candidateCommit: commit, admitCriticExports: true, readConsumedCandidateReceiptFn: j5Reader });
+      const followers = courseAdmission.classifyEvidenceOnlyFollowers({ repoRoot: f.root, featureId: FEATURE, candidateCommit: f.candidate.commit, headCommit: commit, readConsumedCandidateReceiptFn: j5Reader });
+      assert.equal(counters.evidenceOnlyCommits.includes(commit), verdicts[0] === "registered", `${name}: course counters`);
+      assert.equal(counters.administrationDocumentationCommits.length, 0, `${name}: the counters never pass an administration commit over`);
+      assert.equal(carry.evidenceOnlyCommits.includes(commit), verdicts[1] !== null, `${name}: carry`);
+      assert.equal(carry.administrationDocumentationCommits.includes(commit), verdicts[1] === "administration", `${name}: carry administration`);
+      assert.equal(followers.ok, verdicts[2] === "registered", `${name}: followers`);
+      assert.equal(followers.offending ?? null, verdicts[2] === "registered" ? null : commit, `${name}: the offending commit is named`);
+    }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30J-J5 (c) the definition never throws and refuses on anything it cannot read: a bad commit, a bad feature id, a missing or unknown profile", () => {
+  const f = followerFixture();
+  try {
+    const commit = kindCommit(f, f => { evidenceFollower(f, "kind-garbage"); });
+    const ask = (over) => courseAdmission.classifyEvidenceOnlyCommit({ repoRoot: f.root, featureId: FEATURE, commit, profile: courseAdmission.EVIDENCE_ONLY_PROFILES.followers, ...over });
+    assert.equal(ask({}), "registered", "premise: the same call with good input answers");
+    for (const over of [{ commit: "not-an-oid" }, { commit: "a".repeat(40) }, { featureId: "../escape" }, { featureId: undefined }, { profile: undefined }, { profile: { exports: "yes", close: 1, administration: {} } }, { repoRoot: join(f.root, "missing") }]) {
+      assert.equal(ask(over), null, JSON.stringify(Object.keys(over)));
+    }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("C30J-J5 (d) every exact-HEAD check keeps its exact HEAD: a capture made at a follower HEAD is refused for an exact-head caller, the profile table has no package or Verify entry", () => {
+  const f = followerFixture();
+  try {
+    const head = evidenceFollower(f, "exact-one");
+    const headTree = git(f.root, ["rev-parse", `${head}^{tree}`]);
+    const log = `command: node check\nlabel: targeted-check\nexitCode: 0\nhead: ${head}\ntree: ${headTree}\ndirty: false\n--- stdout ---\nok\n--- stderr ---\n`;
+    const value = { schema: "pipeline.critic-diagnostic-evidence.v1", producer: "critic-diagnostic-evidence", assurance: "captured-process-output-not-host-attested", candidate: f.candidate,
+      spec: { path: `specs/${FEATURE}/spec.md`, sha256: diagnosticDigestOf("Frozen specification\n") }, guardrails: [{ path: "guard.md", sha256: diagnosticDigestOf("Frozen guardrail\n") }], fullVerify: { status: "not-run", evidence: null },
+      targeted: { label: "targeted-check", status: "passed", exitCode: 0, log: { path: `specs/${FEATURE}/evidence/exact.log`, sha256: diagnosticDigestOf(log) } }, pending: ["full-verify"] };
+    const run = (extra) => refusal(() => validateCriticDiagnostic(value, { root: f.root, candidate: f.candidate, readArtifact: () => Buffer.from(log), ...extra })) ?? "accepted";
+    assert.equal(run({}), "accepted", "premise: the default caller admits the evidence-only follower HEAD");
+    assert.equal(run({ exactCaptureHead: true })?.code, "CDI-DIGEST", "the exact-head caller does not");
+    assert.deepEqual(Object.keys(courseAdmission.EVIDENCE_ONLY_PROFILES), J5_PROFILES, "a package candidate or a Verify result has no profile: those checks stay bound to the exact commit");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
