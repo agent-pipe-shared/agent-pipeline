@@ -506,6 +506,10 @@ export const AGY_RUNNER_MODEL_MAP = Object.freeze({ sonnet: 'flash', haiku: 'fla
 // `unknown component: tool "Read" not found in registry`, so no pipeline subagent could start. The frontmatter `tools:` list is rewritten through
 // this second closed table; the names come from the runner's own registry as reported by that run (a real Antigravity smoke run is still open).
 export const AGY_RUNNER_TOOL_MAP = Object.freeze({ Read: 'read_file', Write: 'write_file', Edit: 'edit_file', Bash: 'run_command', Grep: 'grep_search', Glob: 'find_by_name' });
+// C30I-S1B (AC-108): every agent of the runner view is a subagent only (a role agent is never the main session agent), and the two
+// inherited defaults that decide what it may execute and which hooks it inherits are pinned explicitly. `inheritMcp` is left alone
+// (open PO question). A source that already carries one of these keys is refused AGV-AGENT-KEY-CONFLICT, never overwritten.
+const AGY_RUNNER_PINNED_KEYS = Object.freeze(['mainAgent: false', 'subagent: true', 'commandExecutionPolicy: sandbox', 'inheritCustomizations: true']);
 const VIEW_DIR = 'agy-runner-view';
 const VIEW_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 const AGENT_FILE = /^agents\/[^/]+\.md$/;
@@ -527,7 +531,10 @@ export function transformAgyRunnerAgent(relPath, bytes) {
   }
   if (hits.length > 1) throw fail('AGV-AGENT-MODEL-AMBIGUOUS', relPath);
   if (toolHits.length > 1) throw fail('AGV-AGENT-TOOLS-AMBIGUOUS', relPath);
-  if (hits.length === 0 && toolHits.length === 0) return bytes;
+  const pinned = AGY_RUNNER_PINNED_KEYS.map((line) => line.slice(0, line.indexOf(':')));
+  for (let index = 1; index < close; index++) {
+    if (pinned.some((key) => lines[index].startsWith(`${key}:`))) throw fail('AGV-AGENT-KEY-CONFLICT', relPath);
+  }
   if (hits.length === 1) {
     const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
     if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
@@ -540,6 +547,8 @@ export function transformAgyRunnerAgent(relPath, bytes) {
     if (names.some((name) => !Object.hasOwn(AGY_RUNNER_TOOL_MAP, name))) throw fail('AGV-AGENT-TOOL-UNMAPPED', relPath);
     lines[toolHits[0]] = `tools: [${names.map((name) => AGY_RUNNER_TOOL_MAP[name]).join(', ')}]${match[2]}`;
   }
+  const eol = lines[close].endsWith('\r') ? '\r' : '';
+  lines.splice(close, 0, ...AGY_RUNNER_PINNED_KEYS.map((line) => `${line}${eol}`));
   return Buffer.from(lines.join('\n'), 'utf8');
 }
 

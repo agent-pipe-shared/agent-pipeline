@@ -18,6 +18,8 @@ or `pro`, of the registry route; a Gemini model id is refused there). A read-onl
 `pipeline.role-dispatch-request.v1` packet (`transport: "antigravity"`, `resultDestination: { kind: "return" }`) for the prepare step
 below; a code-writing Goldfish takes its provider, model and scope from the generated briefing and the registry route alone.
 
+The runner view marks every shipped Pipeline agent subagent-only: besides the `model:` and `tools:` rewrites it writes `mainAgent: false`, `subagent: true`, `commandExecutionPolicy: sandbox` and `inheritCustomizations: true` before the closing frontmatter line (the Claude source files are unchanged; a source that already carries one of the four keys is refused `AGV-AGENT-KEY-CONFLICT`). So `agy --agent <name>` and `/agents` must not offer a role agent as the main session agent, which stays the Elephant, while `invoke_subagent` still starts it. `inheritMcp` is not set (open PO question). Open, an attended PO step: a real `invoke_subagent` per role on runner 1.5.10 and whether `mainAgent: false` changes what `agy agents` lists are not provable here.
+
 ### Native Goldfish dispatch (measured, candidate 20 G20-8 B)
 
 Measured shape of the host tool (`w252-agy-native-subagent-measurement.md`): `invoke_subagent` takes FLAT arguments, `TypeName`, `Role`
