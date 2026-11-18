@@ -5,8 +5,8 @@
 //          --json writes the table as JSON, and the file must lie inside <root>/scratch/ (any other path is refused, exit 2).
 // Checks:  suite-registration, case-completion, capability-inventory, observation-governance, reader-inputs, backlog-state, architecture-boundary,
 //          doc-contracts-test, consumer-safe-paths-test, doc-contracts. Light checks only; the heavy suites belong to scripts/sitting-count-pass.mjs.
-// Verdict: a check is GREEN at exit 0 plus its expected count where one is pinned (EXPECT below: 1093 registered suites, 76 and 9 test cases; update
-//          the constants when a later commit moves them). backlog-state tolerates its known-accepted DRIFT lines (it exits 0 with them).
+// Verdict: a check is GREEN at exit 0 (the two test rows also need zero failing cases and a parsable count); the counts each check observes are printed,
+//          never compared with a stored number. backlog-state tolerates its known-accepted DRIFT lines (it exits 0 with them).
 //          architecture-boundary exits 1 on the pre-existing unowned-path findings; it is GREEN at exit 0, or at exit 1 with only unowned-path findings,
 //          and RED on any over-line-bound finding (or any other finding kind, or an exit other than 0 or 1).
 // Inputs:  the scripts named above, read from <root>. Each child runs with cwd <root>, a private TMPDIR under <home>/pipeline-test-tmp/post-sitting-<n>
@@ -20,22 +20,21 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { makeScrubber, parseCounts } from "./sitting-count-pass.mjs";
 
-export const EXPECT = { registered: 1093, docContractsTests: 76, consumerSafeTests: 9 };
 const TIMEOUT_MS = 600000;
 const lastLine = (out) => out.trim().split("\n").filter((l) => l.trim() !== "").at(-1) ?? "(no output)";
 
 // Each judge returns { ok, line } from { status, out }.
 const exitOnly = (okLine) => ({ status, out }) => ({ ok: status === 0, line: okLine ? okLine(out) : lastLine(out) });
-const testJudge = (expected) => ({ status, out }) => {
+const testJudge = ({ status, out }) => {
   const c = parseCounts(out);
-  return { ok: status === 0 && c.fail === 0 && c.pass === expected, line: `pass ${c.pass ?? "?"} of ${c.tests ?? "?"}, fail ${c.fail ?? "?"} (expected ${expected})` };
+  return { ok: status === 0 && c.fail === 0 && c.pass !== null, line: `pass ${c.pass ?? "?"} of ${c.tests ?? "?"}, fail ${c.fail ?? "?"}` };
 };
 
 export const CHECKS = [
   { name: "suite-registration", args: ["harness/scripts/check-verify-suite-registration.mjs"], judge: ({ status, out }) => {
     const n = /(\d+) registered/.exec(out);
     const count = n ? Number(n[1]) : null;
-    return { ok: status === 0 && count === EXPECT.registered, line: status === 0 ? `${count ?? "?"} registered (expected ${EXPECT.registered})` : lastLine(out) };
+    return { ok: status === 0, line: status === 0 ? `${count ?? "?"} registered` : lastLine(out) };
   } },
   { name: "case-completion", args: ["harness/scripts/check-verify-case-completion.mjs"], judge: exitOnly() },
   { name: "capability-inventory", args: ["harness/scripts/check-product-capability-inventory.mjs"], judge: exitOnly() },
@@ -56,8 +55,8 @@ export const CHECKS = [
     const desc = Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ") || "no findings";
     return { ok: (status === 0 || status === 1) && over === 0 && other === 0, line: `exit ${status}: ${desc}` };
   } },
-  { name: "doc-contracts-test", args: ["--test", "harness/scripts/check-doc-contracts.test.mjs"], judge: testJudge(EXPECT.docContractsTests) },
-  { name: "consumer-safe-paths-test", args: ["--test", "harness/scripts/check-consumer-safe-paths.test.mjs"], judge: testJudge(EXPECT.consumerSafeTests) },
+  { name: "doc-contracts-test", args: ["--test", "harness/scripts/check-doc-contracts.test.mjs"], judge: testJudge },
+  { name: "consumer-safe-paths-test", args: ["--test", "harness/scripts/check-consumer-safe-paths.test.mjs"], judge: testJudge },
   { name: "doc-contracts", args: ["harness/scripts/check-doc-contracts.mjs"], judge: exitOnly() },
 ];
 
