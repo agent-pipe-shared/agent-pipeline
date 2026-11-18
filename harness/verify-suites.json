@@ -4600,6 +4600,12 @@
       "nonOverlapNote": "Unique cases: lib/close-quality-readback.mjs; the close coordinator suite pins its drive and audit-index output"
     },
     {
+      "name": "spec-risk-trace-tests",
+      "file": "plugins/pipeline-core/lib/spec-risk-trace.test.mjs",
+      "invariantPinned": "The pure reader of the Spec risk table returns per row covered, residual-stated, not-applicable, untraced, stale or malformed, an absent table is not-applicable overall and never missing, a table inside a fenced block is ignored, and a throwing reader propagates; it stores nothing and refuses nothing (C30K, AC-112)",
+      "nonOverlapNote": "Unique cases: lib/spec-risk-trace.mjs; the close quality readback suite pins the report-only row that uses it"
+    },
+    {
       "name": "session-authority-registry-fsync-tests",
       "file": "plugins/pipeline-core/lib/session-authority-registry-fsync.test.mjs",
       "invariantPinned": "On win32 a directory fsync that fails with EPERM, EINVAL, EISDIR, EACCES or ENOTSUP counts as a succeeded registry write and reports durability unsupported with the error code, while the same codes on another platform and any other code on win32 still throw (C18-6, AC-127)",

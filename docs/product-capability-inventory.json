@@ -1166,6 +1166,7 @@
         "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-risk-trace-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-capability-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
