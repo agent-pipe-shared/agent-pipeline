@@ -1,0 +1,123 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 20c840137..e5202467e 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -18,6 +18,10 @@ import { existsSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
+ import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
++import {
++  GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE,
++  READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY, READ_TARGET_EXACT_FILE_ADVICE,
++} from "./guard/grammar-denials.mjs";
+ 
+ export const BRIEFING_PACKAGE_SCHEMA = "pipeline.dispatch-briefing-package.v1";
+ export const BRIEFING_BUILD_SCHEMA = "pipeline.dispatch-briefing.build.v1";
+@@ -321,6 +325,27 @@ export function obligationsReadSentence(obligationsPath) {
+     : "Read `templates/prompts/agent-obligations.md` at the repository root first (a project that has no such file reads the identical copy at `${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md`)";
+ }
+ 
++// C30J-J18 (consumer report: ~30 shell-guard refusals in a main run, ~70 in subagents; the admitted spellings were unknown beforehand).
++// ONE block, read from the guard's own exports (lib/guard/grammar-denials.mjs) so that it prints exactly what a refusal prints and can
++// never be typed a second time. The native read-tool refusal of the exact-file advice has no exported code constant, so its entry is led by
++// that exported advice alone and its code name is not typed here (the wanted export is named in the held patch's notes). Pure: no input.
++export function admittedShellShapesBlock() {
++  return [
++    "**Admitted shell shapes (read from the guard's own grammar; the text its refusals print):**",
++    "",
++    `- \`${READ_COMMAND_UNSUPPORTED_CODE}\`: ${READ_COMMAND_UNSUPPORTED_GUIDANCE} ${READ_COMMAND_UNSUPPORTED_NOTE}`,
++    ...Object.entries(GRAMMAR_DENIAL_GUIDANCE).map(([code, guidance]) => `- \`${code}\`: ${guidance}`),
++    "",
++    "What every shell grammar refusal prints (repair and the complete list of admitted shapes):",
++    ...GRAMMAR_DENIAL_REMEDY,
++    "",
++    `- \`${READ_SCOPE_DENIAL_CODE}\`: ${READ_SCOPE_DENIAL_GUIDANCE}`,
++    ...READ_SCOPE_DENIAL_REMEDY.map((line) => `  - ${line}`),
++    "",
++    `- A refused native Read, Glob or Grep call (the guard prints this advice): ${READ_TARGET_EXACT_FILE_ADVICE}`,
++  ].join("\n");
++}
++
+ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }, obligationsPath = null) {
+   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
+     `- Estimated tool calls for the whole test-first cycle: ${pkg.estimatedToolCalls}${budget.raised ? ` (above the requested tier's cap, so this dispatch is bound to ${generated.binding.agentType})` : ""}.`,
+@@ -334,6 +359,8 @@ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { r
+     : `- Final integrated Verify — Coordinator owner, after the local candidate exists: \`${calibration.verify}\`; not yours to run.`;
+   const body = `${obligationsReadSentence(obligationsPath)} and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+ 
++${admittedShellShapesBlock()}
++
+ ${generated.block}
+ 
+ ${NATIVE_GOLDFISH_HOST_DIRECTIVE}
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 9ab11d721..b1a59a768 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -830,6 +830,66 @@ test("PF-100 the generated briefing names the readable copy of the obligations f
+   assert.match(fallback, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
+ });
+ 
++// C30J-J18 (AC-112; consumer report: ~30 shell-guard refusals in a main run and ~70 in subagents, the admitted spellings unknown beforehand).
++// The generated briefing carries ONE block of the admitted shell shapes. Every line of it is read from the guard's own exported constants
++// (lib/guard/grammar-denials.mjs) and never typed a second time; the block is part of the briefing bytes and therefore of its digest.
++const SHAPES_HEADING = "**Admitted shell shapes (read from the guard's own grammar; the text its refusals print):**";
++const guardGrammar = () => import("../lib/guard/grammar-denials.mjs");
++
++test("C30J-J18 the generated briefing carries the admitted shell shapes once, every line read from the guard's exports", async () => {
++  const { runDispatchBriefing } = await lib();
++  const g = await guardGrammar();
++  const { fx, argv } = packageFixture();
++  const { text } = runDispatchBriefing(argv, depsOf(fx));
++  const once = (needle, label) => assert.equal(text.split(needle).length, 2, `${label} appears exactly once`);
++  once(SHAPES_HEADING, "the block heading");
++  for (const line of g.GRAMMAR_DENIAL_REMEDY) once(line, `grammar line: ${line.slice(0, 50)}`);
++  for (const shape of g.ADMITTED_GRAMMAR_SHAPES) {
++    once(shape.spelling, `shape: ${shape.example}`);
++    assert.ok(text.includes(shape.example), shape.example);
++  }
++  for (const line of g.READ_SCOPE_DENIAL_REMEDY) once(line, `read-scope line: ${line.slice(0, 50)}`);
++  once(g.READ_COMMAND_UNSUPPORTED_NOTE, "unsupported-command note");
++  once(g.READ_TARGET_EXACT_FILE_ADVICE, "exact-file advice");
++  for (const code of [...Object.keys(g.GRAMMAR_DENIAL_GUIDANCE), g.READ_COMMAND_UNSUPPORTED_CODE, g.READ_SCOPE_DENIAL_CODE]) {
++    assert.ok(text.includes(`\`${code}\``), `the refusal ${code} is named`);
++  }
++  assert.ok(text.includes(`up to ${g.MAX_AND_CHAIN_SEGMENTS} "&&"-chained segments`), "the && bound comes from the exported constant");
++  assert.ok(text.indexOf(SHAPES_HEADING) < text.indexOf("## Briefing ALF-T1"), "the block precedes the six fields");
++  const first = text.split("\n").find((l) => l.startsWith("Read `")) ?? "";
++  assert.match(first, /follow it: it carries the closed shell grammar/u, "the obligations sentence stays the first Read line");
++});
++
++test("C30J-J18 two builds are byte-identical, the block is covered by the digest, and one changed block byte fails the verification", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { verifyGeneratedBriefing } = await buildLib();
++  const { fx, argv } = packageFixture();
++  const one = runDispatchBriefing(argv, depsOf(fx));
++  const two = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(one.text, two.text);
++  assert.equal(one.sha256, two.sha256);
++  assert.deepEqual(verifyGeneratedBriefing(one.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
++  const g = await guardGrammar();
++  const edited = one.text.replace(g.READ_TARGET_EXACT_FILE_ADVICE, g.READ_TARGET_EXACT_FILE_ADVICE.replace("Name one", "Name two"));
++  assert.notEqual(edited, one.text);
++  assert.equal(verifyGeneratedBriefing(edited).code, "DBG-GENERATED-DIGEST-MISMATCH");
++  assert.equal(parseNativeGoldfishBriefing(one.text).ok, true, "the host parser still reads the binding");
++});
++
++test("C30J-J18 pin: the builder reads the grammar from the guard module and types none of it", async () => {
++  const g = await guardGrammar();
++  const source = readFileSync(join(HERE, "..", "lib", "dispatch-briefing-build.mjs"), "utf8");
++  assert.match(source, /from "\.\/guard\/grammar-denials\.mjs"/u);
++  for (const shape of g.ADMITTED_GRAMMAR_SHAPES) {
++    assert.ok(!source.includes(shape.spelling.slice(0, 40)), `no typed copy of: ${shape.spelling.slice(0, 40)}`);
++    assert.ok(!source.includes(shape.example), `no typed copy of: ${shape.example}`);
++  }
++  for (const code of [...Object.keys(g.GRAMMAR_DENIAL_GUIDANCE), g.READ_COMMAND_UNSUPPORTED_CODE, g.READ_SCOPE_DENIAL_CODE]) {
++    assert.ok(!source.includes(code), `the code ${code} is read from its export, not typed`);
++  }
++  assert.ok(!/GUARD-READ-TARGET(?!-MISSING)/u.test(source), "the one code without an exported constant is not typed either");
++});
++
+ // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
+ // check routes in the order targeted -> quick -> final Verify, never invents a quick command, and leaves the final
+ // Verify to the Coordinator. The template wording is pinned in lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs;
