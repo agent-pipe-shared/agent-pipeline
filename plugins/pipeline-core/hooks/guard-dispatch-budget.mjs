@@ -225,6 +225,7 @@ import { parallelReminderPreToolUseStdout, readParallelReminderEvery, tickParall
 import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
 import { criticExcludedRole } from "../lib/critic-correction-input-bindings.mjs";
+import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
 import { allowContextStdout, checkpointNoticeText, criticResumeRefusalText, criticResumeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
 import {
   CLOSING_ALLOWANCE,
@@ -1732,7 +1733,7 @@ function criticReadRefusal(input, rootDir, dependencies) {
     : [toolInput.file_path, toolInput.path, toolInput.pattern].filter((value) => typeof value === "string");
   const root = String(rootDir ?? "").replaceAll("\\", "/").replace(/\/+$/u, "");
   let calibration = null;
-  for (const name of ["project/pipeline.json", ".claude/pipeline.json"]) {
+  for (const name of CALIBRATION_PATHS) {
     try { calibration = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(join(rootDir, ...name.split("/")), "utf8")); break; } catch { /* the next calibration location, or none */ }
   }
   for (const word of words) {

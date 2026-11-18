@@ -54,7 +54,7 @@ import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestinatio
 import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
 import { PUSH_THREAT_MODEL_TEMPLATE_NOTICE, PUSH_THREAT_MODEL_TEMPLATE_STATE, pushThreatModelFileUnchanged, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { declaredRepositoryMode } from "./repository-freshness.mjs";
-import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { CALIBRATION_PATHS, LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { exportHandoverQueue, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
@@ -370,8 +370,9 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
   if (declared?.mode !== "local-only") return null;
   const remotes = (gitOutput(dir, ["remote"], deps) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
   if (!remotes.includes(remote)) return null;
-  const file = existsSync(join(dir, "project", "pipeline.json")) ? "project/pipeline.json" : ".claude/pipeline.json";
-  const mirror = existsSync(join(dir, "project", "pipeline.json")) && existsSync(join(dir, ".claude", "pipeline.json")) ? " and in its byte-equal mirror .claude/pipeline.json" : "";
+  const [neutralCalibration, legacyCalibration] = CALIBRATION_PATHS;
+  const file = existsSync(join(dir, neutralCalibration)) ? neutralCalibration : legacyCalibration;
+  const mirror = existsSync(join(dir, neutralCalibration)) && existsSync(join(dir, legacyCalibration)) ? ` and in its byte-equal mirror ${legacyCalibration}` : "";
   return {
     id: "repository-mode",
     code: "PUSH-REPOSITORY-MODE-MISMATCH",

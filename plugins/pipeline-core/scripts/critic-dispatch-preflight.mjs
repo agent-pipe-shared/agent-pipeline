@@ -33,7 +33,7 @@ import {
   deriveRequiredCriticGuardrails,
 } from "../lib/critic-required-guardrails.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
+import { CALIBRATION_PATHS, resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
 import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
@@ -220,7 +220,7 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
   const historyPaths = historyPathsInBindings(derived);
   if (historyPaths.length > 0) {
     const reason = `The range changes block-history-shaped file(s) that are neither a built-in project-state record (${[...PROJECT_STATE_CONVENTION_FILES, ...PROJECT_STATE_CONVENTION_DIRECTORIES].join(", ")}) nor listed in criticFindingRecordPaths: ${historyPaths.join(", ")}. The Critic may not read history, so the review would stop after its packet was reserved.`;
-    const repair = `Add ${historyPaths.map((path) => JSON.stringify(path)).join(", ")} to criticFindingRecordPaths in project/pipeline.json AND to its byte-equal mirror .claude/pipeline.json (each a PO-signed step), commit both, rebuild the candidate and rerun the preflight; or keep the file out of the reviewed range.`;
+    const repair = `Add ${historyPaths.map((path) => JSON.stringify(path)).join(", ")} to criticFindingRecordPaths in ${CALIBRATION_PATHS[0]} AND to its byte-equal mirror ${CALIBRATION_PATHS[1]} (each a PO-signed step), commit both, rebuild the candidate and rerun the preflight; or keep the file out of the reviewed range.`;
     fail("CDP-HISTORY-IN-RANGE", reason, { reason, paths: historyPaths, repair });
   }
   if (reference === null || reference === undefined) {
@@ -618,14 +618,14 @@ const fillPlaceholder = (path, hint) => `<FILL ${path}: ${hint}>`;
 /** The calibration project name in the form admit accepts (SAFE_ID, lower case), or null. Read-only. */
 // Read here rather than through repository-freshness.mjs, whose imports would take this preflight out of its write-free closure (CDPF086). The first readable calibration decides, as in calibrationProjectId.
 function calibrationRepositoryMode(root) {
-  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
+  for (const relativePath of CALIBRATION_PATHS) {
     try { return JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.repositoryMode ?? null; } catch { /* no readable calibration at this path */ }
   }
   return null;
 }
 
 function calibrationProjectId(root) {
-  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
+  for (const relativePath of CALIBRATION_PATHS) {
     try {
       const project = JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.project;
       if (typeof project === "string" && SAFE_ID.test(project.toLowerCase())) return project.toLowerCase();

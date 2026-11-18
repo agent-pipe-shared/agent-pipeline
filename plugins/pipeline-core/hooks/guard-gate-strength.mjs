@@ -64,6 +64,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { designReviewReceiptWriteRefusal } from "../lib/design-review-receipt-write-guard.mjs";
 import { privateStateWriteRefusal } from "../lib/private-state-write-guard.mjs";
@@ -95,6 +96,10 @@ import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "..
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+const [NEUTRAL_CALIBRATION_FILE, LEGACY_CALIBRATION_FILE] = CALIBRATION_PATHS;
+const CALIBRATION_VERIFY_ROUTE = "To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. ";
+const calibrationMirrorRule = (mirrorPath, mirrorRuleId) => `For any other key: its byte-equal mirror ${mirrorPath} (${mirrorRuleId}) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.`;
 
 export const GATE_STRENGTH_PATHS = Object.freeze([
   Object.freeze({
@@ -154,15 +159,17 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
   // (project/guard-config.json, guard-lifecycle-ready.mjs,
   // guard-gate-strength-origin-attestation.test.mjs), so those keep their numbers and the
   // Nova entries are appended after them.
+  // GS-10/GS-11 name each other as the mirror: both names come from the one shared calibration list (neutral first), and the sentence that says
+  // so is written once (CALIBRATION_MIRROR_RULE) instead of twice.
   Object.freeze({
     id: "GS-10",
-    path: "project/pipeline.json",
-    reason: "the project authority configuration declares verify and core settings and must not be edited directly. To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. For any other key: its byte-equal mirror .claude/pipeline.json (GS-11) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
+    path: NEUTRAL_CALIBRATION_FILE,
+    reason: `the project authority configuration declares verify and core settings and must not be edited directly. ${CALIBRATION_VERIFY_ROUTE}${calibrationMirrorRule(LEGACY_CALIBRATION_FILE, "GS-11")}`,
   }),
   Object.freeze({
     id: "GS-11",
-    path: ".claude/pipeline.json",
-    reason: "the legacy-tier project authority configuration declares verify and core settings. To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. For any other key: its byte-equal mirror project/pipeline.json (GS-10) is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.",
+    path: LEGACY_CALIBRATION_FILE,
+    reason: `the legacy-tier project authority configuration declares verify and core settings. ${CALIBRATION_VERIFY_ROUTE}${calibrationMirrorRule(NEUTRAL_CALIBRATION_FILE, "GS-10")}`,
   }),
   Object.freeze({
     id: "GS-12",

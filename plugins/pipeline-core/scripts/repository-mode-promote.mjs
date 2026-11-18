@@ -23,8 +23,10 @@ import { randomBytes } from "node:crypto";
 import { closeSync, constants, fsyncSync, lstatSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { CALIBRATION_PATHS } from "../lib/project-authority-read.mjs";
 
-export const TWIN_PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
+// Both twins are read and written, so the order of the shared list changes no result (it stays neutral first, as before).
+export const TWIN_PATHS = CALIBRATION_PATHS;
 const SCHEMA = "pipeline.repository-mode-promotion.v1";
 const MAX_BYTES = 1_048_576;
 const SIGNED_ROUTE = "any other change to the calibration stays on the signed route: plan it with node <plugin-root>/scripts/guard-human-override.mjs plan";

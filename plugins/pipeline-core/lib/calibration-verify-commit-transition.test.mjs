@@ -18,6 +18,8 @@ import * as authorityFacade from "./project-authority.mjs";
 import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority.mjs";
 import { readCalibrationStakes } from "./security-close-status.mjs";
 import { closeQualityReadback } from "./close-quality-readback.mjs";
+import { TWIN_PATHS } from "../scripts/repository-mode-promote.mjs";
+import { GATE_STRENGTH_PATHS } from "../hooks/guard-gate-strength.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -109,6 +111,52 @@ test("the four remaining calibration path lists use the shared one: no quoted ca
   const offenders = CALIBRATION_LIST_MODULES_J17.filter((name) => readFileSync(join(here, name), "utf8").split("\n")
     .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/u.test(line)).some((line) => literal.test(line)));
   assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import CALIBRATION_PATHS of project-authority-read.mjs");
+});
+
+// C30K-K11 (finding K1-04, stage 2): the five lists J9 and J17 left, and the two mirror-rule guard texts.
+// Read rules kept per site (not changed): repository-mode-promote writes/reads BOTH twins (order irrelevant to the result); critic-dispatch-preflight reads
+// the first READABLE twin (repositoryMode) and the first twin with a valid project name; guard-dispatch-budget parses the first READABLE twin; push-prepare
+// names the neutral file when it exists, else the legacy one, plus the mirror sentence only when both exist.
+const CALIBRATION_LIST_SITES_K11 = [
+  ["scripts", "repository-mode-promote.mjs"],
+  ["scripts", "critic-dispatch-preflight.mjs"],
+  ["hooks", "guard-dispatch-budget.mjs"],
+  ["scripts", "push-prepare.mjs"],
+  ["hooks", "guard-gate-strength.mjs"],
+];
+const CALIBRATION_TEXT_SITES_K11 = [
+  ["scripts", "critic-dispatch-preflight.mjs"],
+  ["scripts", "push-prepare.mjs"],
+  ["hooks", "guard-gate-strength.mjs"],
+];
+const codeLines = (parts) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", ...parts), "utf8").split("\n")
+  .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/u.test(line));
+
+test("the five remaining calibration lists use the shared one: no quoted calibration literal is left in their sources", () => {
+  const literal = /["'`](?:project|\.claude)\/pipeline\.json(?::[^"'`]*)?["'`]/u;
+  const offenders = CALIBRATION_LIST_SITES_K11.filter((parts) => codeLines(parts).some((line) => literal.test(line))).map((parts) => parts.join("/"));
+  assert.deepEqual(offenders, [], "each of these keeps a private copy of a calibration path; import CALIBRATION_PATHS of project-authority-read.mjs");
+});
+
+test("the mirror-rule texts name the two calibration files through the shared list, not as retyped names", () => {
+  const anywhere = /(?:project|\.claude)\/pipeline\.json/u;
+  const offenders = CALIBRATION_TEXT_SITES_K11.filter((parts) => codeLines(parts).some((line) => anywhere.test(line))).map((parts) => parts.join("/"));
+  assert.deepEqual(offenders, [], "a text that names both calibration files is built from CALIBRATION_PATHS of project-authority-read.mjs");
+});
+
+test("the exported twin list of repository-mode-promote is the shared list", () => {
+  assert.deepEqual([...TWIN_PATHS], [...authorityRead.CALIBRATION_PATHS]);
+  assert.equal(Object.isFrozen(TWIN_PATHS), true);
+});
+
+test("the guard texts of the two calibration mirrors read byte for byte as before (GS-10 and GS-11)", () => {
+  const tail = " is a separate protected file: a change to one needs the same change in the other, each with its own PO-approved override, otherwise PCI-CALIBRATION-DRIFT turns Verify red. Every override binds to the exact HEAD, so commit this file first, only then touch the mirror and plan its override; run Verify after both commits.";
+  const route = "To set the project verify command use the sanctioned route node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command>; to replace a configured one during implementation add --replace (it runs the new command once, then one PO signature covers both mirrors and the Pipeline writes them, ADR-0100) -- never two overrides for a verify-command change. For any other key: its byte-equal mirror ";
+  const byId = new Map(GATE_STRENGTH_PATHS.map((rule) => [rule.id, rule]));
+  assert.equal(byId.get("GS-10").path, "project/pipeline.json");
+  assert.equal(byId.get("GS-10").reason, `the project authority configuration declares verify and core settings and must not be edited directly. ${route}.claude/pipeline.json (GS-11)${tail}`);
+  assert.equal(byId.get("GS-11").path, ".claude/pipeline.json");
+  assert.equal(byId.get("GS-11").reason, `the legacy-tier project authority configuration declares verify and core settings. ${route}project/pipeline.json (GS-10)${tail}`);
 });
 
 test("the calibration read orders stay what each reader did: neutral first, and the file resolver is not the same rule", () => {
