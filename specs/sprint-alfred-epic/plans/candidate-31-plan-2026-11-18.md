@@ -62,6 +62,20 @@ The closed bundle stays byte-identical. A follow-up addendum is appended next to
 
 L11 to L13 move into wave 1 once their recon is written (they touch guard, hook and state sources: clone-slice route).
 
+## L20: course continuity blocker of the Codex consumer (30k stage, PO 2026-11-18: solve sustainably in 31, with the follow-up steps)
+
+Consumer B (Codex runner, installed 30k) is blocked at the close. Facts (read from its handover, neutral labels): feature P (a DISCARDED predecessor, its manifest and review unit preserved) and feature S (the active successor, manifest `supersedes: null`, first review base lies BEFORE the inherited implementation and before S's manifest). The review of S was admitted with `review.courseContext.successorOf: <P>` (the finalization request holds it) and consumed (allPacketsConsumed true, no open packets, courseHistoryRegistered false, registeredRounds 0). Then:
+
+1. `register-feature-package.mjs --add-review-lineage --packet <id> --feature <S>` fails `FPR-LINEAGE-COMPILE` / `CCA-MANIFEST-READ`: `addCriticReviewLineage` (`lib/feature-package-registration.mjs`, about line 829) builds `identityInput` WITHOUT `successorOf` and calls `resolveRegisteredCriticCourseIdentity`; the resolver (`lib/critic-course-admission.mjs`, about lines 941 and 953 to 956) can rebuild the successor base only from a present predecessor or an already registered course binding. Before the first registered lineage neither exists, so it reads S's manifest at the historical review base and fails. Without the selector the outer result stays `FPR-LINEAGE-FEATURE-AMBIGUOUS` (two features hold a review unit). Confirmed here: `successorOf` does not occur in `lib/feature-package-registration.mjs` at all.
+2. The delta path (about line 1006) has the same assumption (`features.length !== 1` gives `FPR-DELTA-FEATURE`).
+3. Replaying the identical `finalize` after the consume is refused `SCF-PRELAUNCH-ADMISSION` (cause `CPP-GIT`), cause not diagnosed: needs an idempotent second readback for an already consumed successor review.
+4. `scripts/dispatch-authorship-verify.mjs --range` takes its git cwd from the plugin install path (`REPO_ROOT`, about lines 136 and 971), not from the consumer project; it has no `--root`: it fails `fatal: not a git repository` from a consumer. The critic template asks for prose-free dispatch projections but the preflight offers no parameter for author evidence: provide or document the intended consumer route (never raw dispatch reports to the Critic).
+Wanted: the sealed successor/course binding of the consumed packet is carried into the first lineage resolution and compilation and into the next delta round, with the selector kept; a test with a preserved discarded predecessor, an existing successor manifest with `supersedes: null`, a first review base before that manifest, admission through `--successor-of`, a consumed review, then only evidence and handover commits: the lineage registers and is repeatable without rewriting a manifest, restarting a review or changing the historical base. This lane has first priority of wave 1.
+
+## Priority order (PO 2026-11-18: the two time levers are P1 and P2 of run B)
+
+M1 L20 (unblocks consumer B), M2 L10a+L12 delta preparation (P1), M3 L2+L11 boundary baseline (P2), then L7+L8 briefing, L9 renderer, L10b references, then the remaining wave 1 and wave 2 lanes.
+
 ## Persisted rules
 
 - The two free-text conditions of the PO (scaffold never blocked; bundle as an addendum) bind L5 and L6.
