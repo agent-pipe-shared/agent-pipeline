@@ -41,16 +41,67 @@ test("CGF-23 the architecture-fitness evidence labels the observation and lists 
   assert.equal(rows(full())["architecture-fitness"].status, "present", "a bare projection stays present, typed unobserved");
 });
 
-test("AC-239: exactly the five ids, in order, with the closed row shape", () => {
+// QG-04 restatement (candidate 30k K16, AC-112): the six ids above keep their order and shape; the readback gained a seventh, appended,
+// report-only row "risk-trace" (cases below). `full()` carries no Spec reader, so journey-coverage and risk-trace are "unknown" here.
+test("AC-239: exactly the seven ids, in order, with the closed row shape", () => {
   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
-  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
+  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
   assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
   for (const row of list) {
     assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
     assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
   }
-  assert.ok(list.filter((r) => r.id !== "journey-coverage").every((r) => r.status === "present"), JSON.stringify(list));
+  assert.ok(list.filter((r) => r.id !== "journey-coverage" && r.id !== "risk-trace").every((r) => r.status === "present"), JSON.stringify(list));
   assert.equal(list.find((r) => r.id === "journey-coverage").status, "unknown");
+  assert.equal(list.find((r) => r.id === "risk-trace").status, "unknown");
+});
+
+// AC-112 (candidate 30k K16, stage S2): the report-only risk-trace row reads the Spec's closed risk table through inspectSpecRiskTrace.
+const SPEC_PATH = `specs/${FEATURE}/spec.md`;
+const TRACE_TEST = "plugins/pipeline-core/lib/x.test.mjs";
+const riskSpec = (...rows) => Buffer.from(`# Spec\n\n| id | source | statement | trace |\n|---|---|---|---|\n${rows.map((r) => `| ${r} |`).join("\n")}\n`);
+const withSpec = (bytes, over = {}) => full({
+  readBytes: (p) => { if (p !== SPEC_PATH) throw new Error("absent"); if (bytes === null) throw new Error("unreadable"); return bytes; },
+  exists: (p) => new Set([SEC, SEC_VERDICT, `${CRITIC_DIR}/pk-1/report.md`, "docs/state.md", TRACE_TEST]).has(p),
+  ...over,
+});
+
+test("AC-112 risk-trace: unknown when the Spec cannot be read or a read throws, never present without a signal", () => {
+  const row = rows(withSpec(null))["risk-trace"];
+  assert.equal(row.status, "unknown");
+  assert.match(row.remedy, /Spec/u);
+  assert.equal(rows(full())["risk-trace"].status, "unknown");
+  const thrown = rows(withSpec(riskSpec(`R-1 | PRD | s | ${TRACE_TEST}`), { exists: () => { throw new Error("boom"); } }))["risk-trace"];
+  assert.equal(thrown.status, "unknown");
+});
+
+test("AC-112 risk-trace: not-applicable when the Spec has no risk table (a Spec older than the table never reads missing)", () => {
+  const row = rows(withSpec(Buffer.from("# Spec\n\nno table\n")))["risk-trace"];
+  assert.equal(row.status, "not-applicable");
+  assert.equal(row.remedy, null);
+});
+
+test("AC-112 risk-trace: a fully traced table is present and the evidence lists each row's status", () => {
+  const row = rows(withSpec(riskSpec(`R-1 | PRD | s | ${TRACE_TEST}`, "R-2 | PRD | s | not-applicable: runner never offers it")))["risk-trace"];
+  assert.equal(row.status, "present");
+  assert.ok(row.evidence.includes(SPEC_PATH) && row.evidence.includes("R-1: covered") && row.evidence.includes("R-2: not-applicable"), row.evidence);
+  assert.equal(row.remedy, null);
+});
+
+test("AC-112 risk-trace: untraced rows make the row missing with the ids listed and a named step; stale and malformed rows too", () => {
+  const untraced = rows(withSpec(riskSpec(`R-1 | PRD | s | ${TRACE_TEST}`, "R-2 | PRD | s | ", "R-3 | PRD | s | gone.test.mjs", "R-4 | PRD | s | see the PRD")))["risk-trace"];
+  assert.equal(untraced.status, "missing");
+  for (const part of ["R-1: covered", "R-2: untraced", "R-3: stale", "R-4: malformed"]) assert.ok(untraced.evidence.includes(part), untraced.evidence);
+  assert.match(untraced.remedy, /R-2, R-3, R-4/u);
+  assert.match(untraced.remedy, /trace/u);
+  assert.doesNotMatch(untraced.remedy, /R-1/u);
+});
+
+test("AC-112 risk-trace: report-only, the six earlier rows are unchanged beside a missing risk-trace row", () => {
+  const withMissing = rows(withSpec(riskSpec("R-1 | PRD | s | ")));
+  const without = rows(withSpec(Buffer.from("no table")));
+  for (const id of QUALITY_ROW_IDS.filter((i) => i !== "risk-trace")) assert.deepEqual(withMissing[id], without[id], id);
+  assert.equal(withMissing["risk-trace"].status, "missing");
 });
 
 test("AC-239 security-scan: present with the envelope path, missing with the scan command, unknown when unreadable", () => {

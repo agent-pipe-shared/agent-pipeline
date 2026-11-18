@@ -13,6 +13,9 @@
 //   journey-coverage      (G20-27) per user-facing criterion of specs/<feature>/spec.md: covered when it names journeys and an asserted effect, else not covered.
 //                         The evidence lists every such criterion as `AC-n: covered` / `AC-n: not covered`; present when none is not covered, not-applicable
 //                         when the Spec has no user-facing criterion, unknown when the Spec cannot be read.
+//   risk-trace            (AC-112, report-only) per row of the Spec's closed risk table (lib/spec-risk-trace.mjs): present when every row is covered,
+//                         residual-stated or not-applicable; missing, with the untraced / stale / malformed ids listed, when any row is not;
+//                         not-applicable when the Spec has no such table; unknown when the Spec or a named path cannot be read.
 // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
@@ -20,10 +23,11 @@ import { createHash } from "node:crypto";
 import { SCANNER_EXCEPTIONS_PATH, closeSecurityScopeNote, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
 import { LEGACY_CALIBRATION, NEUTRAL_CALIBRATION } from "./project-authority-read.mjs";
 import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
+import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
 import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
 
 export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
-export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
+export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
 export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
 export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
 
@@ -147,6 +151,21 @@ function journeyRow(readers, specPath) {
   return coverage.notCovered.length === 0 ? row(id, "present", `${specPath} (${listing})`) : row(id, "missing", `${specPath} (${listing})`, JOURNEY_REPAIR);
 }
 
+// AC-112 (candidate 30k K16): per row of the Spec's closed risk table, how the accepted risk is traced (covered / residual-stated /
+// not-applicable / untraced / stale / malformed), derived on read from the Spec bytes. Report-only: nothing is stored and nothing refuses.
+const RISK_TRACE_REPAIR = (ids) => `in the Spec's risk table (header \`${RISK_TRACE_HEADER}\`) give row ${ids.join(", ")} a trace: a test path, \`command:<id>\`, \`residual: backlog/items/<item>.md\` or \`not-applicable: <reason>\`; on an approved Spec this is a registered Spec addendum, never an edit of approved bytes`;
+const RISK_TRACE_READ_REPAIR = "restore the Spec as a readable file at its recorded path (check `git status`), commit it, and run the close readback again";
+function riskTraceRow(readers, specPath) {
+  const id = "risk-trace";
+  const bytes = call(readers.readBytes, specPath);
+  if (!bytes.ok) return unknown(id, RISK_TRACE_READ_REPAIR);
+  let trace;
+  try { trace = inspectSpecRiskTrace(Buffer.from(bytes.value).toString("utf8"), { exists: readers.exists }); } catch { return unknown(id, RISK_TRACE_READ_REPAIR); }
+  if (trace.status === "not-applicable") return row(id, "not-applicable");
+  const listing = `${specPath} (${trace.rows.map((entry) => `${entry.id}: ${entry.status}`).join("; ")})`;
+  return trace.open.length === 0 ? row(id, "present", listing) : row(id, "missing", listing, RISK_TRACE_REPAIR(trace.open));
+}
+
 function handoverRow(readers, handoverPath) {
   const id = "handover-freshness";
   const updated = call(readers.handoverUpdatedMs);
@@ -163,6 +182,7 @@ export function closeQualityReadback({ featureId, handoverPath = "docs/state.md"
     criticRow(readers, featureId),
     handoverRow(readers, handoverPath),
     journeyRow(readers, specPath),
+    riskTraceRow(readers, specPath),
   ];
 }
 
