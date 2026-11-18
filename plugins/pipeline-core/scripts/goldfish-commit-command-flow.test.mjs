@@ -288,8 +288,9 @@ for (const { id, title, input: scenario } of COMMITFLOW_SCENARIOS) {
 
 // PRODUCER-T -- Ruling 150 (specs/sprint-alfred-epic/plans/0.7-execution-order.md): the producer emits the
 // message-file route. Today its commit step is `git commit -m <subject> -m <body>... --trailer "Dispatch: <ID> (goldfish)"
-// --trailer "AI-Assisted: true" -- <paths>`, which guard-push refuses (the parenthesised trailer value), so the route
-// the template mandates has never been executable. Every case below is RED BY DESIGN until PRODUCER-F
+// --trailer "AI-Assisted: true" -- <paths>`. guard-push admits one plain printable-ASCII commit on one line, no backslash,
+// no global option, with a QUOTED parenthesised trailer (PGC-T82b); the dispatched route still stays the message file,
+// because guard-dispatch-budget's closing-act check rejects parentheses. Every case below is RED BY DESIGN until PRODUCER-F
 // (lib/goldfish-commit-command-flow.mjs) changes the route. Do not weaken or skip them to make the suite green.
 //
 // Assumptions, named so the fix may revisit a FIELD NAME but not the route:
@@ -317,7 +318,7 @@ const PRODUCER_T_CLI_ARGS = ["--task-id", input.taskId, "--type", input.type, "-
   "--summary", input.summary, ...input.bodyParagraphs.flatMap((body) => ["--body", body]),
   ...input.paths.flatMap((path) => ["--path", path])];
 const PRODUCER_T_REASON = "Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` "
-  + "(guard-push refuses -m with a parenthesised --trailer)";
+  + "(a dispatched closing act stays the message file: guard-dispatch-budget's closing-act check rejects parentheses)";
 
 function assertMessageFileRoute(result) {
   assert.equal(result.ok, true);

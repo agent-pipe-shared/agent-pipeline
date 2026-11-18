@@ -365,31 +365,6 @@ export function advanceCloseCoordinator(state, args) {
   validateCloseCoordinator(post); return post;
 }
 
-export function createCloseJournal(input) {
-  assertKeys(input, ["lifecycleId", "candidateOid", "candidateTree", "authority", "afkComplete", "recoveryPending"], "create journal");
-  if (input.afkComplete !== true || input.recoveryPending !== false) throw new Error("close blockers active");
-  const journal = { schema: JOURNAL_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "pending", candidateOid: input.candidateOid, candidateTree: input.candidateTree, authority: structuredClone(input.authority), effects: [] };
-  validateCloseJournal(journal);
-  return journal;
-}
-
-export function advanceCloseJournal(journal, args) {
-  validateCloseJournal(journal);
-  assertKeys(args, ["expectedRevision", "expectedStateSha256", "phase", "inputDigest", "observedDigest"], "advance arguments");
-  assertCas(journal, args.expectedRevision, args.expectedStateSha256, "close-journal");
-  assertHex(args.inputDigest, "inputDigest", true); assertHex(args.observedDigest, "observedDigest", true);
-  if (args.phase === journal.phase && journal.phase !== "pending") {
-    const prior = journal.effects.at(-1);
-    if (prior.inputDigest === args.inputDigest && prior.observedDigest === args.observedDigest) return journal;
-    throw new Error("conflicting close phase replay");
-  }
-  const nextPhase = JOURNAL_PHASES[JOURNAL_PHASES.indexOf(journal.phase) + 1];
-  if (args.phase !== nextPhase) throw new Error("close phase invalid");
-  const post = { ...journal, revision: journal.revision + 1, priorStateSha256: args.expectedStateSha256, phase: args.phase, effects: [...journal.effects, { phase: args.phase, inputDigest: args.inputDigest, observedDigest: args.observedDigest }] };
-  validateCloseJournal(post);
-  return post;
-}
-
 function validatePrerequisites(value) {
   assertKeys(value, ["d2", "closePostimageDigest", "afk", "recoveryPending"], "publication prerequisites");
   assertKeys(value.d2, ["phase", "receiptDigest", "closePostimageDigest"], "D2 prerequisite");
@@ -585,25 +560,7 @@ function durableReplace(path, value) {
   }
 }
 
-export function storeCloseJournal({ gitCommonDir, journal, expectedRawSha256 }) {
-  validateCloseJournal(journal);
-  const paths = publicationClosePaths(gitCommonDir, journal.lifecycleId);
-  return withLock(paths, () => {
-    const exists = existsSync(paths.journal);
-    if (!exists && expectedRawSha256 !== null) throw new Error("close journal missing for CAS");
-    if (exists) {
-      const current = readMode0600(paths.journal, validateCloseJournal);
-      if (current.rawDigest !== expectedRawSha256) throw new Error("stale close journal raw CAS");
-      const wanted = jsonBytes(journal);
-      if (current.raw.equals(Buffer.from(wanted))) return { path: paths.journal, rawDigest: current.rawDigest, written: false };
-      if (journal.revision !== current.value.revision + 1 || journal.priorStateSha256 !== hash(current.value) || journal.lifecycleId !== current.value.lifecycleId || journal.candidateOid !== current.value.candidateOid || journal.candidateTree !== current.value.candidateTree || canonical(journal.authority) !== canonical(current.value.authority)) throw new Error("close journal transition invalid");
-    } else if (expectedRawSha256 !== null) throw new Error("stale close journal raw CAS");
-    else if (journal.revision !== 0) throw new Error("initial close journal revision invalid");
-    const stored = durableReplace(paths.journal, journal);
-    return { path: paths.journal, rawDigest: stored.rawDigest, written: true };
-  });
-}
-
+// Read side only: the legacy journal has no writer any more, an old journal file stays readable.
 export function readCloseJournal(gitCommonDir, lifecycleId) {
   const paths = publicationClosePaths(gitCommonDir, lifecycleId);
   const stored = readMode0600(paths.journal, validateCloseJournal);

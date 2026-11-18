@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { approvePublication, authorizePublication, closePublication, observePublication, preparePublication, publicationDigest, startReadback } from "../lib/publication-bundle.mjs";
-import { advanceCloseJournal, createCloseJournal, createPublicationLifecycle, importPublicationChannel, lifecycleDigest, publicationClosePaths, readCloseJournal, readPublicationLifecycle, recordCleanup, storeCloseJournal, storePublicationLifecycle } from "./publication-close-journal.mjs";
+import * as journalModule from "./publication-close-journal.mjs";
+import { JOURNAL_SCHEMA, createPublicationLifecycle, importPublicationChannel, lifecycleDigest, publicationClosePaths, readCloseJournal, readPublicationLifecycle, recordCleanup, storePublicationLifecycle, validateCloseJournal } from "./publication-close-journal.mjs";
 const h = (char, length = 64) => char.repeat(length);
 const rawDigest = (value) => createHash("sha256").update(`${JSON.stringify(value, null, 2)}\n`).digest("hex");
 const authority = { implementationResultDigest: h("1"), prdDigest: h("2"), specDigests: [h("3"), h("4"), h("5"), h("6"), h("7"), h("8")], verifyDigest: h("9"), criticDigest: h("a"), d2ReceiptDigest: h("b"), privateIntentDigest: h("c"), publicIntentDigest: h("d") };
@@ -22,25 +23,18 @@ function receipt(channel, char) {
   return closePublication(state, { expectedRevision: 4, expectedStateSha256: publicationDigest(state), fetchedRef: "refs/heads/main", fetchedOid: oid, fetchedTree: tree, completedAt: 4 });
 }
 let tests = 0; const check = (name, fn) => { fn(); tests++; };
-let journal = createCloseJournal({ lifecycleId: "batman", candidateOid: h("a", 40), candidateTree: h("b", 40), authority, afkComplete: true, recoveryPending: false });
+// The write side of the legacy close journal is removed; only the readers stay, so an old journal file (AC-047-27 compatibility) remains readable.
+check("the legacy close-journal write side is gone", () => { for (const name of ["createCloseJournal", "advanceCloseJournal", "storeCloseJournal"]) assert.equal(name in journalModule, false, name); });
+check("the legacy close-journal readers stay exported", () => { assert.equal(typeof journalModule.validateCloseJournal, "function"); assert.equal(typeof journalModule.readCloseJournal, "function"); });
+const pendingJournal = { schema: JOURNAL_SCHEMA, lifecycleId: "batman", revision: 0, priorStateSha256: null, phase: "pending", candidateOid: h("a", 40), candidateTree: h("b", 40), authority, effects: [] };
+const legacyJournal = { ...pendingJournal, revision: 1, priorStateSha256: lifecycleDigest(pendingJournal), phase: "implementation-result-bound", effects: [{ phase: "implementation-result-bound", inputDigest: h("c"), observedDigest: h("d") }] };
 const common = mkdtempSync(join(tmpdir(), "publication-close-"));
-const initial = storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: null });
-journal = advanceCloseJournal(journal, { expectedRevision: 0, expectedStateSha256: lifecycleDigest(journal), phase: "implementation-result-bound", inputDigest: h("c"), observedDigest: h("d") });
-check("ordered close phase", () => assert.equal(journal.phase, "implementation-result-bound"));
-check("identical phase replay is zero-state-change", () => assert.equal(advanceCloseJournal(journal, { expectedRevision: 1, expectedStateSha256: lifecycleDigest(journal), phase: "implementation-result-bound", inputDigest: h("c"), observedDigest: h("d") }), journal));
-check("conflicting replay blocks", () => assert.throws(() => advanceCloseJournal(journal, { expectedRevision: 1, expectedStateSha256: lifecycleDigest(journal), phase: "implementation-result-bound", inputDigest: h("e"), observedDigest: h("d") }), /conflicting/));
-const first = storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: initial.rawDigest });
-check("durable journal is mode 0600", () => assert.equal(statSync(first.path).mode & 0o777, 0o600));
-const before = statSync(first.path).mtimeMs;
-const replayStore = storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: first.rawDigest });
-check("identical durable replay does not replace journal", () => { assert.equal(replayStore.written, false); assert.equal(statSync(first.path).mtimeMs, before); });
-check("stale raw CAS blocks", () => assert.throws(() => storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: h("0") }), /stale/));
-check("recovery names only next phase", () => assert.equal(readCloseJournal(common, "batman").nextPhase, "feature-closed"));
-const lockPath = publicationClosePaths(common, "batman").lock;
-writeFileSync(lockPath, "foreign-lock\n", { mode: 0o600 });
-check("foreign writer lock is never removed", () => { assert.throws(() => storeCloseJournal({ gitCommonDir: common, journal, expectedRawSha256: first.rawDigest }), /EEXIST/); assert.equal(existsSync(lockPath), true); });
-unlinkSync(lockPath);
-writeFileSync(first.path, "torn\n", { mode: 0o600 });
+const legacyPaths = publicationClosePaths(common, "batman");
+mkdirSync(legacyPaths.directory, { recursive: true, mode: 0o700 });
+writeFileSync(legacyPaths.journal, `${JSON.stringify(legacyJournal, null, 2)}\n`, { mode: 0o600 });
+check("an old journal file stays valid", () => assert.equal(validateCloseJournal(legacyJournal), true));
+check("recovery of an old journal names only the next phase", () => { const read = readCloseJournal(common, "batman"); assert.equal(read.nextPhase, "feature-closed"); assert.equal(read.journal.phase, "implementation-result-bound"); });
+writeFileSync(legacyPaths.journal, "torn\n", { mode: 0o600 });
 check("torn state blocks recovery", () => assert.throws(() => readCloseJournal(common, "batman"), /torn/));
 rmSync(common, { recursive: true, force: true });
 let lifecycle = createPublicationLifecycle({ lifecycleId: "batman", epicId: "epic", featureId: "feature", prerequisites: prerequisite });
@@ -65,5 +59,14 @@ check("receipt raw digest is recomputed", () => assert.throws(() => importPublic
 lifecycle = recordCleanup(lifecycle, { expectedRevision: 2, expectedStateSha256: lifecycleDigest(lifecycle), status: "uncertain", evidenceDigest: h("f") });
 storedLifecycle = storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: storedLifecycle.rawDigest });
 check("cleanup uncertainty blocks without erasing receipts", () => { assert.equal(lifecycle.status, "blocked"); assert.notEqual(lifecycle.channels.private, null); });
+// Restated (QG-04) from the removed journal writer cases: the shared lock/CAS/replay paths, now through the lifecycle writer.
+const lifecycleMtime = statSync(storedLifecycle.path).mtimeMs;
+const lifecycleReplay = storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: storedLifecycle.rawDigest });
+check("identical durable replay does not replace the lifecycle", () => { assert.equal(lifecycleReplay.written, false); assert.equal(statSync(storedLifecycle.path).mtimeMs, lifecycleMtime); });
+check("stale raw CAS blocks", () => assert.throws(() => storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: h("0") }), /stale/));
+const lifecycleLock = publicationClosePaths(lifecycleCommon, "batman").lock;
+writeFileSync(lifecycleLock, "foreign-lock\n", { mode: 0o600 });
+check("foreign writer lock is never removed", () => { assert.throws(() => storePublicationLifecycle({ gitCommonDir: lifecycleCommon, lifecycle, expectedRawSha256: storedLifecycle.rawDigest }), /EEXIST/); assert.equal(existsSync(lifecycleLock), true); });
+unlinkSync(lifecycleLock);
 rmSync(lifecycleCommon, { recursive: true, force: true });
 console.log(`publication-close-journal: ${tests} tests passed`);

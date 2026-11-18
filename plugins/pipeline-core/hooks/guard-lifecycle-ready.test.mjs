@@ -2817,8 +2817,9 @@ test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and stat
     // the same paths in each. AC-197 group G (QG-04 justification, bounded to the last two
     // assertions of this block): PO decision D24 (po-decisions-2026-10-18) made the generator
     // recommend a message file, git commit -F <msgfile> -- <paths>, for a parenthesised Dispatch
-    // role, because guard-push refuses the parenthesised --trailer spelling the old assertion
-    // required. The file-free form keeps the AI-Assisted trailer; the refused spelling must not return.
+    // role, because the dispatched route stays the message file (guard-dispatch-budget's closing-act
+    // check rejects parentheses; guard-push itself admits a quoted parenthesised trailer on one plain
+    // printable-ASCII line, PGC-T82b). The file-free form keeps the AI-Assisted trailer; the old spelling must not return.
     assert.match(result.stderr, /git add -- <paths>/u);
     assert.match(result.stderr, /git commit -m /u);
     assert.match(result.stderr, /--trailer 'AI-Assisted: true'/u);
