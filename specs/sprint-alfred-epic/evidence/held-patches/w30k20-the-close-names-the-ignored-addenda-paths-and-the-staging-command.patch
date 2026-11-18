@@ -1,0 +1,90 @@
+diff --git a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+index b33eaf842..a1655214d 100644
+--- a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+@@ -8,7 +8,7 @@
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { basename, dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -857,7 +857,10 @@ function assertWrittenAndUncommitted(root, outcome, taskIds, head) {
+     assert.ok(existsSync(join(root, entry.addendumPath)) && existsSync(join(root, entry.evidencePath)), `${entry.taskId}: both files are in the working tree`);
+   }
+   for (const path of reported.commitPaths) assert.ok(outcome.body.message.includes(path), `the message names ${path}: ${outcome.body.message}`);
+-  assert.ok(outcome.body.message.includes(`git add -f -- ${reported.commitPaths.join(" ")}`), outcome.body.message);
++  // C30K-K20: no written path is ignored in this fixture, so the staging command is the plain one and every path is named as shown by git status.
++  assert.ok(outcome.body.message.includes(`git add -- ${reported.commitPaths.join(" ")}`), outcome.body.message);
++  assert.ok(!outcome.body.message.includes("git add -f"), outcome.body.message);
++  for (const path of reported.commitPaths) assert.ok(outcome.body.message.includes(`${path} (not ignored: git status shows it)`), outcome.body.message);
+   assert.match(outcome.body.message, /nothing was staged or committed/u);
+   assert.match(outcome.body.message, /plan this transition again after that commit/u);
+   assert.equal(reported.planAgain, true);
+@@ -914,6 +917,44 @@ test("(k1) CFC-3: an addendum for a record no receipt covers stays as it is", ()
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++test("(k20) C30K-K20: an addendum path the ignore rules hide is named as ignored and staged with the forced command; a visible one is named as shown", () => {
++  const fx = w9Course({ label: "k20", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
++  try {
++    const { root } = fx;
++    const hidden = criticDispositionAddendumPath("TASK-ONE");
++    appendFileSync(join(root, ".git", "info", "exclude"), `/${hidden}\n`);
++    const head = git(root, ["rev-parse", "HEAD"]);
++    const first = w9CloseSession(root).planPrepared();
++    assert.equal(first.status, 2, JSON.stringify(first.body));
++    assert.equal(first.body.code, "CLOSE-CRITIC-ADDENDA-WRITTEN", JSON.stringify(first.body));
++    const paths = first.body.criticAddenda.commitPaths;
++    assert.ok(paths.includes(hidden));
++    const message = first.body.message;
++    assert.ok(message.includes(`git add -f -- ${paths.join(" ")}`), message);
++    assert.ok(message.includes(`${hidden} (ignored: git status does not show it)`), message);
++    assert.ok(paths.some((path) => path !== hidden && message.includes(`${path} (not ignored: git status shows it)`)), message);
++    assert.equal(git(root, ["diff", "--cached", "--name-only"]), "");
++    assert.equal(git(root, ["rev-parse", "HEAD"]), head);
++    // the emitted object keeps its shape: the facts live in the message text only
++    assert.deepEqual(Object.keys(first.body.criticAddenda).sort(), ["commitInstruction", "commitPaths", "planAgain", "schema", "written"]);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("(k20b) C30K-K20: the critic-addenda verb object carries the forced command and the ignored wording in its message and keeps its keys", () => {
++  const fx = w9Course({ label: "k20b", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
++  try {
++    const { root } = fx;
++    const hidden = criticDispositionAddendumPath("TASK-TWO");
++    appendFileSync(join(root, ".git", "info", "exclude"), `/${hidden}\n`);
++    const out = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
++    assert.equal(out.status, 0, out.text);
++    assert.equal(out.body.status, "written", out.text);
++    assert.deepEqual(Object.keys(out.body).sort(), ["commitPaths", "message", "schema", "status", "subject"]);
++    assert.ok(out.body.message.includes(`git add -f -- ${out.body.commitPaths.join(" ")}`), out.body.message);
++    assert.ok(out.body.message.includes(`${hidden} (ignored: git status does not show it)`), out.body.message);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("(k) D223 chain: three slices, a three-round Critic course, plan writes the addenda, the agent commits them, the second plan succeeds and applies", () => {
+   const fx = w9Course({ label: "pos", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO", "TASK-THREE"] });
+   try {
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 262cab6be..f50a81bf2 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -631,7 +631,14 @@ function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = fa
+     const derived = deriveAddenda ? deriveCriticAddenda(root, coverage.requiredTaskIds) : { written: [], commitPaths: [] };
+     if (derived.written.length > 0) {
+       const remaining = coverage.requiredTaskIds.filter((id) => !derived.written.some((entry) => entry.taskId === id));
+-      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Commit exactly these paths in one evidence-only commit: git add -f -- ${derived.commitPaths.join(" ")}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
++      // C30K-K20: derive (never store) which written paths the project's ignore rules hide from git status; the force flag only when one is.
++      // A failing check-ignore must not hide this stop: every path is then treated as possibly ignored (forced staging is always safe).
++      let ignoredPaths;
++      try { ignoredPaths = new Set(derived.commitPaths.length > 0 ? git(root, ["check-ignore", "--", ...derived.commitPaths], { accept: [0, 1] }).split("\n").map((line) => line.trim()).filter(Boolean) : []); }
++      catch { ignoredPaths = new Set(derived.commitPaths); }
++      const visibility = derived.commitPaths.map((path) => `${path} (${ignoredPaths.has(path) ? "ignored: git status does not show it" : "not ignored: git status shows it"})`).join("; ");
++      const stageCommand = `git add ${ignoredPaths.size > 0 ? "-f " : ""}-- ${derived.commitPaths.join(" ")}`;
++      const commitInstruction = `The Critic disposition addenda and their evidence files were written into the working tree and nothing was staged or committed. Written paths: ${visibility}. Commit exactly these paths in one evidence-only commit: ${stageCommand}; then git commit (suggested subject: ${ADDENDA_COMMIT_SUBJECT}), and plan this transition again after that commit.`;
+       const covered = derived.written.map((entry) => `${entry.taskId} (Critic packet ${entry.criticPacketId})`).join(", ");
+       fail("CLOSE-CRITIC-ADDENDA-WRITTEN", `feature close preparation wrote the byte-bound Critic addendum for ${covered}, because exactly one passed, consumed Critic receipt (or one registered Critic course) covers each of these records and no other does. ${commitInstruction}${remaining.length > 0 ? ` Still uncovered after that commit: ${missingMessage(remaining)}` : ""}`,
+         { criticAddenda: { schema: "pipeline.close-critic-addenda-written.v1", written: derived.written, commitPaths: derived.commitPaths, commitInstruction, planAgain: true } });
