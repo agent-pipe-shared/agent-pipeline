@@ -2,7 +2,9 @@
 
 > Agent-Pipeline · Sprint Alfred · 2026-11-18
 
-**Status:** proposed (2026-11-18). Nothing below is decided. The PO releases or rejects it; until then Option A (today's behaviour) stays in force and no code changes. Origin: PO tile E1-1 ("yes, ADR first") of the state-machine simplification analysis (items C12 and B3, class C7). The closest existing accepted criterion is AC-112; the PRD and the Spec are unchanged by this draft.
+**Status:** accepted (2026-11-18, PO: Option A, the exact-commit binding stays). The PO first released Option B; two build attempts stopped on recon, and the PO then kept Option A. Finding 1: rule 3 (no path of the Verify's input set) cannot be derived, because the registered `pipeline.verify-evidence.v0` record has no input set, the per-suite receipts that list inputs are private, unregistered and machine-local, and every Tier A suite declares the whole tree as its input; rule 3 could only be a path-class policy. Finding 2: rule 2 (written by the owned commit route) cannot be tested from anything committed or registered, because a hand commit reproduces the owned message byte for byte, the close writes its own final output commit through printed git steps and not through `commit-pipeline-owned.mjs`, and the writer-capability store is private and not written for evidence paths. Rule 4 exists only in the weaker form "prior manifest entries byte-identical, digests match the bytes". A future Option B needs a stored provenance field and therefore a new ADR. The original text below is kept as the record of the options. Origin: PO tile E1-1 ("yes, ADR first") of the state-machine simplification analysis (items C12 and B3, class C7). The closest existing accepted criterion is AC-112; the PRD and the Spec are unchanged by this decision.
+
+*Original status line (superseded):* proposed (2026-11-18); until released, Option A stays in force and no code changes. Origin: PO tile E1-1 ("yes, ADR first") of the state-machine simplification analysis (items C12 and B3, class C7). The closest existing accepted criterion is AC-112; the PRD and the Spec are unchanged by this draft.
 
 **Context source:** the Critic diagnostic already accepts a HEAD that is the checked candidate plus evidence-only follower commits (classifier `classifyRegisteredEvidenceOnlyCommits`, 30f wave). The package candidate does not: it is bound to exactly HEAD.
 
@@ -57,4 +59,4 @@ Recommend keeping Option A until the PO weighs the cost against the risk. If the
 
 ## Consequences
 
-- Nothing changes until the PO releases this ADR. The status is proposed, the row in the index says so, and no code, test or check is touched by this draft.
+- Option A stays: no code, test or check changes. The status is accepted, and the row in the index says so. The recommendation above is adopted; a future Option B needs a stored provenance field and its own ADR.
