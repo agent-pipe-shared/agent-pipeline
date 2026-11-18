@@ -67,6 +67,32 @@ export function foreignChangesReason(others) {
     + "`Dispatch: administrative (elephant)` is refused without independently inspected evidence.";
 }
 
+// C30J-J7 (queue C30-24 item 9, AC-112): the refusal for a tracked file that is deleted or modified named no way back. The recovery is derived from the porcelain codes and only worded: nothing is committed, restored or deleted by this command.
+// The push-approval record is left out (push-prepare folds it); an untracked file never refuses here.
+export function foreignChangesRepair(statusOut, blocking) {
+  const codes = new Map();
+  for (const line of String(statusOut ?? "").split("\n")) { if (line === "" || line.startsWith("?? ")) continue; for (const path of porcelainPaths(line)) codes.set(path, line.slice(0, 2)); }
+  const listed = (Array.isArray(blocking) ? blocking : []).filter((path) => path !== PUSH_APPROVAL_RECORD && codes.has(path));
+  const deleted = listed.filter((path) => codes.get(path).includes("D"));
+  const modified = listed.filter((path) => !codes.get(path).includes("D") && /[MT]/u.test(codes.get(path)));
+  // A staged change needs the index restored as well; an unstaged one is the plain form.
+  const restore = (paths) => `git restore ${paths.some((path) => codes.get(path)[0] !== " ") ? "--source=HEAD --staged --worktree " : ""}-- ${paths.join(" ")}`;
+  const parts = [];
+  if (deleted.length) {
+    parts.push(`Deleted tracked file(s) (${bounded(deleted)}): put the ORIGINAL bytes back with ${restore(deleted)}; HEAD holds them. If HEAD no longer holds a file, git log --oneline --all -- <path> names it and git restore --source=<commit> -- <path> brings it back from that commit.`
+      + (deleted.some((path) => /^specs\/[^/]+\/evidence\//u.test(path))
+        ? ` A file the feature manifest lists as candidate evidence has a digest fixed at registration, so a new Verify run cannot stand in for it (FPR-VERIFY-IMMUTABLE). If the original bytes are gone for good: ${courseEvidenceGapText("CCA-EVIDENCE-READ", null)}`
+        : ""));
+  }
+  if (modified.length) {
+    const acceptance = modified.filter((path) => /^specs\/[^/]+\/acceptance\.md$/u.test(path));
+    parts.push(`Modified tracked file(s) (${bounded(modified)}): if the change is not wanted, first copy the file outside the work tree (nothing is deleted), then run ${restore(modified)}.`
+      + (acceptance.length ? ` ${acceptance.join(", ")} ${acceptance.length === 1 ? "is" : "are"} written by the close (the human's recorded answer): after the restore, rerun the identical close command (finish-feature.mjs --one-shot, with the arguments the stop printed), it writes the record again.` : "")
+      + " If the change is wanted, it needs its own commit by the route that owns that file; this command commits only the Pipeline's own state files.");
+  }
+  return parts.length ? parts.join(" ") : undefined;
+}
+
 export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const parsed = parse(argv);
   if (parsed.error) return { status: "refused", code: "CPO-ARGS", reason: parsed.error };
@@ -85,7 +111,8 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const untouched = others.filter((path) => untracked.has(path));
   if (blocking.length) {
     const left = untouched.length ? { untouched } : {};
-    return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
+    const recovery = foreignChangesRepair(status.stdout, blocking);
+    return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: `${foreignChangesReason(blocking)}${recovery === undefined ? "" : ` ${recovery}`}`, others: blocking, owned, ...(recovery === undefined ? {} : { repair: recovery }), ...left };
   }
   const evidence = manifestEvidence(root, owned, untracked, git);
   if (evidence.refusal) {
@@ -151,7 +178,9 @@ function manifestEvidenceRepair({ root, groups, trackedDirty, untracked, git }) 
     // Read in register-feature-package (lib/feature-package-registration.mjs addVerifyEvidence): a listed path whose bytes differ from the registered digest is FPR-VERIFY-IMMUTABLE, so a new Verify run cannot replace it.
     return `The committed manifest ${manifestPath} already lists ${bounded(kept)}, so a restore does not remove the entry. Its digest is fixed and registered evidence is never replaced (FPR-VERIFY-IMMUTABLE), so a new Verify run cannot stand in for the file. `
       + `If you still hold the original file, put it back at its path with exactly the listed bytes and run node ${SELF} --root ${root} --agent again: it commits the file together with the manifest. `
-      + `If the file is gone for good: ${courseEvidenceGapText("CCA-EVIDENCE-READ", null)}`;
+      // C30J-J7: Git may still hold the bytes in an earlier commit; the same command then carries them in.
+      + `If Git held it once, git log --oneline --all -- ${kept[0]} names the commit that held them and git restore --source=<commit> -- ${kept[0]} puts them back (check the bytes against the listed digest), then run the same command again. `
+      + "If the file is gone for good: " + courseEvidenceGapText("CCA-EVIDENCE-READ", null);
   }).join(" ");
 }
 

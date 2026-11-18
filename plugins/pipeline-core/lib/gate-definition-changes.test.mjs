@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ACKNOWLEDGEMENT_LABEL, CONFIGURE_VERIFY_LABEL, GATE_CHANGE_ACKNOWLEDGEMENT_KIND, buildGateChangeAcknowledgementSubject, describeGateDefinitionChange,
-  gateChangeAcknowledgementConfirmationLines, gateChangeAcknowledgementRepair, gateChangeListDigest, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
+  gateChangeAcknowledgementConfirmationLines, gateChangeAcknowledgementRepair, gateChangeListDigest, gateChangeWayOutText, gateDefinitionChangeReadback, gateDefinitionRuleFor, specDirectoryOf } from "./gate-definition-changes.mjs";
 
 const roots = [];
 after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -170,4 +170,18 @@ test("C30G-D2: the repair of an unproven gate-definition change orders the clean
   let from = 0;
   for (const part of order) { const found = part.exec(text.slice(from)); assert.ok(found, `${part} in order`); from += found.index + found[0].length; }
   assert.match(gateChangeAcknowledgementRepair(), /commit-pipeline-owned\.mjs --root/u, "the default spelling names the script");
+});
+
+test("C30J-J7: the way out of an unproven gate-definition change is derived text: the acknowledgement is the one way, a modified file gets its exact restore, the order hint stays", () => {
+  const plain = gateChangeWayOutText();
+  assert.match(plain, /the change is committed history[\s\S]*history is never rewritten[\s\S]*a revert is a new change that needs its own proof[\s\S]*the acknowledgement above is the one way the close passes with it/u);
+  assert.match(plain, /Calibration changes belong before the feature starts or in their own block, never while a close is running/u);
+  assert.doesNotMatch(plain, /git restore/u, "no modified file is named: no restore is offered");
+  const one = gateChangeWayOutText({ restorePaths: ["project/pipeline.yaml"] });
+  assert.match(one, /project\/pipeline\.yaml is modified in the work tree and not committed/u);
+  assert.match(one, /copy the file outside the work tree first \(nothing is deleted\), then run git restore -- project\/pipeline\.yaml/u);
+  const two = gateChangeWayOutText({ restorePaths: ["a.yaml", "b.json"] });
+  assert.match(two, /a\.yaml, b\.json are modified in the work tree and not committed/u);
+  assert.match(two, /git restore -- a\.yaml b\.json/u);
+  assert.match(two, /one more unproven change/u, "keeping the edit adds a change to the same list");
 });

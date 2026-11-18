@@ -28,6 +28,7 @@ import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatch
 import { closeSbom, sbomFindingHelp } from "../lib/sbom-close.mjs";
 import { SBOM_OVERRIDE_CODES, createSbomOverrideRequest, verifySbomOverrideProof } from "../lib/sbom-override-authority.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { gateChangeWayOutText, gateDefinitionRuleFor } from "../lib/gate-definition-changes.mjs";
 import { diagnoseResultCloseBinding } from "./pipeline-state.mjs";
 
 const HERE = new URL(".", import.meta.url);
@@ -305,7 +306,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const porcelain = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
     const dirty = porcelain?.status === 0 ? String(porcelain.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)) : [];
     if (dirty.length === 0) return null;
-    const steps = [`(1) the Pipeline's own outputs go in with node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent (when it refuses with CPO-MANIFEST-EVIDENCE, its result carries the repair to follow), everything else is moved out of the work tree, never deleted`];
+    const steps = [`(1) the Pipeline's own outputs go in with node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent (when it refuses with CPO-MANIFEST-EVIDENCE or CPO-FOREIGN-CHANGES, its result carries the repair to follow, git restore for a deleted or modified tracked file), everything else is moved out of the work tree, never deleted`];
     if (sign !== null) steps.push(`(${steps.length + 1}) ${sign} (the signature is made on the clean tree at the current HEAD: commit nothing between the signature and its command)`);
     steps.push(`(${steps.length + 1}) ${then}`);
     return `the work tree has ${dirty.length} uncommitted path(s) (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}) and ${refuses} refuses a dirty tree, so in this order: ${steps.join("; ")}`;
@@ -356,6 +357,19 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       const head = rawGit(["rev-parse", "HEAD"]);
       return { state: value?.state ?? null, moved: typeof value?.candidate?.commit === "string" && head !== null && head !== value.candidate.commit };
     };
+    // C28 (PO decision 2026-11-11) and C30J-J7 (analysis C6, SM-4): the package record must not keep saying `verifying` or `completed` while State proves a correction round (a retirement of the reason declined-acceptance, no Result bound).
+    // The planner admits `implementing` for exactly that feature (`correctionRoundFeatureId`, proven from State by the writer, which stays the authority); the second move to `verifying` rebinds the candidate as always.
+    // Idempotent: a record already past this step (implementing, draft, ...) is left alone, so every run that finds the round may call it. Throws the typed refusal; the callers decide whether it blocks.
+    const packageBackToCorrection = () => {
+      let packageState = null;
+      try { const value = JSON.parse(readFileSync(resolve(root, packageManifest), "utf8")).state; packageState = typeof value === "string" ? value : null; } catch { packageState = null; }
+      if (packageState !== "verifying" && packageState !== "completed") return null;
+      stages.push("package-correction-round");
+      const plan = command(runner, process.execPath, [STATE_WRITER, "feature-package-plan", "--root", root, "--manifest", packageManifest, "--next-state", "implementing"], "ONESHOT-PACKAGE-PLAN");
+      if (typeof plan.planSha256 !== "string") fail("ONESHOT-PACKAGE-PLAN", "The package plan for the correction round returned no plan digest.");
+      command(runner, process.execPath, [STATE_WRITER, "feature-package-apply", "--root", root, "--manifest", packageManifest, "--next-state", "implementing", "--plan-sha256", plan.planSha256], "ONESHOT-PACKAGE-APPLY");
+      return { manifest: packageManifest, from: packageState, to: "implementing" };
+    };
     const coordinatorStillBeforePrepared = () => {
       try { return new Set(["active", "checkpointed"]).has(command(runner, process.execPath, [COORDINATOR, "inspect", "--root", root, "--lifecycle", resumeLifecycleId], "ONESHOT-INSPECT")?.coordinator?.phase); } catch { return false; }
     };
@@ -394,6 +408,23 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const requalify = resumeLifecycleId !== null && (packageAt().moved || (ownerRouteResume && firstPassUnfinished())) && coordinatorStillBeforePrepared();
     const again = requalify ? resumeLifecycleId : null;
     if (resumeLifecycleId === null || requalify) {
+      // C30J-J7 (analysis C6, SM-4; E2-16: a rerun did not retry the decline's move): when State proves a correction round (no Result bound, a declined-acceptance retirement on record) a package record still saying `verifying` or
+      // `completed` is moved back FIRST, before any other stop of this run can leave the lag standing. The move writes the package manifest, so the call is entered once more (the one re-entry, like the Result bootstrap's)
+      // and every stop of it says so: its "nothing was written" counts from the move on. A refused move stops here with the typed refusal and the hand route; the rerun retries it.
+      if (deps.packageMovedBack === undefined && humanDecline === null && state.continuity !== null && typeof state.continuity === "object" && !state.continuity.authority?.result
+        && Array.isArray(state.continuity.resultRetirements) && state.continuity.resultRetirements.some((entry) => entry?.reason === "declined-acceptance")) {
+        let moved = null;
+        try { moved = packageBackToCorrection(); } catch (error) {
+          return stopResult("package-correction-round", error.refusalCode ?? error.code, `The package record of ${featureId} still says verifying or completed although State proves a correction round (the acceptance was declined and the Result retired), and its move back to implementing was refused: ${error.refusalMessage ?? error.message}`,
+            `nothing was written; ${repairFor(error, again)}. To read the typed refusal run: node ${STATE_WRITER} feature-package-plan --root ${root} --manifest ${packageManifest} --next-state implementing (the feature-package-apply it names finishes the move by hand)`);
+        }
+        if (moved !== null) {
+          const note = `This call first moved the package record ${moved.manifest} from ${moved.from} back to implementing, because State proves a correction round; that change is written but not committed yet (the owned commit this close names commits it), and every "nothing was written" below counts from that move on.`;
+          const entered = oneShotClose({ rootDir: root, by: actor, architectureImpact, criticPacketId, resumeLifecycleId, humanAcceptance, humanDecline, openChecks, sbomOverrideProof }, { ...deps, packageMovedBack: moved });
+          if (entered.status === "stopped") return Object.freeze({ ...entered, stop: Object.freeze({ ...entered.stop, repair: `${note} ${entered.stop.repair}` }), packageBack: moved });
+          return Object.freeze({ ...entered, ...(Array.isArray(entered.stages) ? { stages: ["package-correction-round", ...entered.stages] } : {}), packageBack: entered.packageBack ?? moved });
+        }
+      }
       let accepted = null;
       let packet = criticPacketId;
       if (packet === null && requalify) packet = packetOfAuditRequest(auditRequestPath);
@@ -548,8 +579,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         const repairText = String(gateChanges.repair ?? "").replaceAll("pipeline-state.mjs", STATE_WRITER).replaceAll("commit-pipeline-owned.mjs --root <the project root>", `${commitOwnedPath} --root ${root}`);
         // C30G-D2: on a dirty tree the coordinator's own order sentence is replaced by the route below (it names the dirty paths), so the signing step is the repair up to that sentence.
         const route = cleanTreeRoute({ refuses: "the signing command", sign: repairText.split(". The signing command refuses a dirty tree")[0], then: `rerun the identical command: ${rerun(again)}` });
+        // C30J-J7 (queue C30-24 item 10): the way out, named on every tree. A gate-definition file that is only modified (tracked, uncommitted) is not in the range the PO signs, so its exact restore is named; derived from the porcelain, nothing is written.
+        const dirtyGate = (() => { const out = runner("git", ["status", "--porcelain=v1", "--untracked-files=no"]); return out?.status === 0 ? String(out.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)).filter((path) => gateDefinitionRuleFor(path) !== null) : []; })();
+        const wayOut = gateChangeWayOutText({ restorePaths: dirtyGate });
         return stopResult("gate-changes", "CLOSE-GATE-CHANGE-UNPROVEN", `${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${listed}${gateChanges.unproven.length > 8 ? "; ..." : ""}.`,
-          `nothing was written; ${route ?? `${repairText}; then rerun the identical command: ${rerun(again)}`}`);
+          `nothing was written; ${route ?? `${repairText}; then rerun the identical command: ${rerun(again)}`}. ${wayOut}`);
       }
       // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
       let addenda = null;
@@ -627,21 +661,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         // correction round. State now proves the round (a retirement of the reason declined-acceptance, no Result bound), so the planner admits the move to `implementing`; the second
         // move to `verifying` rebinds the candidate as always. Idempotent: a package that is already past this step (implementing, draft, ...) is left alone.
         let packageBack = null;
-        try {
-          const packageManifest = `specs/${featureId}/lifecycle.json`;
-          let packageState = null;
-          try { const value = JSON.parse(readFileSync(resolve(root, packageManifest), "utf8")).state; packageState = typeof value === "string" ? value : null; } catch { packageState = null; }
-          if (packageState === "verifying" || packageState === "completed") {
-            stages.push("package-correction-round");
-            const plan = command(runner, process.execPath, [STATE_WRITER, "feature-package-plan", "--root", root, "--manifest", packageManifest, "--next-state", "implementing"], "ONESHOT-PACKAGE-PLAN");
-            if (typeof plan.planSha256 !== "string") fail("ONESHOT-PACKAGE-PLAN", "The package plan for the correction round returned no plan digest.");
-            command(runner, process.execPath, [STATE_WRITER, "feature-package-apply", "--root", root, "--manifest", packageManifest, "--next-state", "implementing", "--plan-sha256", plan.planSha256], "ONESHOT-PACKAGE-APPLY");
-            packageBack = { manifest: packageManifest, from: packageState, to: "implementing" };
-          }
-        } catch (error) {
-          // Never a stop: the decline itself (the record and the retired Result) is done and must not be blocked by this side step. The failure is reported in the result, and the four-status
-          // projection (`featureStatus.recordLag`) keeps the lagging record visible until the move to `implementing` is made by hand (feature-package-plan / feature-package-apply).
-          packageBack = { manifest: `specs/${featureId}/lifecycle.json`, to: "implementing", error: String(error.refusalCode ?? error.code ?? "ONESHOT-PACKAGE"), detail: String(error.message ?? "").slice(0, 300) };
+        try { packageBack = packageBackToCorrection(); } catch (error) {
+          // Never a stop: the decline itself (the record and the retired Result) is done and must not be blocked by this side step. The failure is reported in the result, and the next one-shot run (C30J-J7) retries
+          // the move before anything else; the four-status projection (`featureStatus.recordLag`) keeps the lagging record visible meanwhile (feature-package-plan / feature-package-apply move it by hand).
+          packageBack = { manifest: packageManifest, to: "implementing", error: String(error.refusalCode ?? error.code ?? "ONESHOT-PACKAGE"), detail: String(error.message ?? "").slice(0, 300) };
         }
         // The decline's own outputs travel in one commit through the writer-commit capability the close uses; none of them is an output the leftover rollback below names.
         const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${featureId}`]);

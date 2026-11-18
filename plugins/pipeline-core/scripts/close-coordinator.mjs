@@ -39,7 +39,7 @@ import {
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
 import { describeLapsedFinding, lapsedFindingsRepair, readLapsedCriticFindings } from "../lib/critic-lapsed-findings.mjs";
-import { describeGateDefinitionChange, gateChangeAcknowledgementRepair, gateDefinitionChangeReadback, specDirectoryOf } from "../lib/gate-definition-changes.mjs";
+import { describeGateDefinitionChange, gateChangeAcknowledgementRepair, gateChangeWayOutText, gateDefinitionChangeReadback, specDirectoryOf } from "../lib/gate-definition-changes.mjs";
 import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
 import { maintenanceSlicesLackingGreenVerify } from "../lib/maintenance-delivery.mjs";
 import { CLOSE_SECURITY_COVERAGE } from "../lib/security-close-status.mjs";
@@ -762,7 +762,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     // ADR-0096 (D248, Claude test run 3 L4): every gate-definition change of the range carries a proof; no cut-off (PO tile).
     const gateChanges = gateDefinitionChangeReadback({ rootDir: root, featureId: observed.feature.id, commonDir: common,
       specDirectory: specDirectoryOf(snapshot.state.planApproval?.poGateAuthority?.specPath ?? snapshot.state.continuity?.authority?.spec?.path) });
-    if (gateChanges.status === "unproven") fail("CLOSE-GATE-CHANGE-UNPROVEN", `feature close preparation is blocked: ${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${gateChanges.unproven.slice(0, 5).map(describeGateDefinitionChange).join("; ")}${gateChanges.unproven.length > 5 ? `; and ${gateChanges.unproven.length - 5} more` : ""}. Repair: ${gateChangeAcknowledgementRepair()}`);
+    if (gateChanges.status === "unproven") fail("CLOSE-GATE-CHANGE-UNPROVEN", `feature close preparation is blocked: ${gateChanges.unproven.length} change(s) of a gate-definition file in this feature's range carry no proof: ${gateChanges.unproven.slice(0, 5).map(describeGateDefinitionChange).join("; ")}${gateChanges.unproven.length > 5 ? `; and ${gateChanges.unproven.length - 5} more` : ""}. Repair: ${gateChangeAcknowledgementRepair()}. ${gateChangeWayOutText()}`);
     if (gateChanges.status === "unavailable") fail("CLOSE-GATE-CHANGE-UNREADABLE", `feature close preparation is blocked: the gate-definition changes of this feature's range could not be read (${gateChanges.reason}); a close never passes an unread range`);
     if (lapsed.status === "open") fail("CLOSE-CRITIC-EARLIER-FINDINGS-OPEN", `feature close preparation is blocked: ${lapsed.open.length} blocker/major finding(s) of an earlier Critic round were never corrected in a reviewed round: ${lapsed.open.slice(0, 5).map(describeLapsedFinding).join("; ")}${lapsed.open.length > 5 ? `; and ${lapsed.open.length - 5} more` : ""}. Repair: ${lapsedFindingsRepair({ open: lapsed.open })}`);
     // A missing slice queue says nothing about whether the whole candidate

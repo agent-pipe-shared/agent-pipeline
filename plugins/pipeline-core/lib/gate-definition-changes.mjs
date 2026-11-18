@@ -307,6 +307,19 @@ export function describeGateDefinitionChange(change) {
   return `${what}: ${change.proof.kind}${change.proof.ref ? ` ${String(change.proof.ref).slice(0, 16)}` : ""}${change.proof.label ? ` (${change.proof.label})` : ""}`;
 }
 
+/**
+ * C30J-J7 (queue C30-24 item 10, AC-112): the way out the refusal of an unproven gate-definition change names for a change made during the close.
+ * Derived text only: nothing is read, written, signed or restored here. A committed change cannot be taken back (history is never rewritten and a
+ * revert is one more change), so the acknowledgement is the one way; a gate-definition file that is only modified in the work tree is not yet in the
+ * range, so its exact restore is named, after a copy outside the work tree (nothing is deleted).
+ */
+export function gateChangeWayOutText({ restorePaths = [] } = {}) {
+  const paths = (Array.isArray(restorePaths) ? restorePaths : []).filter((path) => typeof path === "string" && path !== "");
+  const uncommitted = paths.length === 0 ? ""
+    : ` ${paths.join(", ")} ${paths.length === 1 ? "is" : "are"} modified in the work tree and not committed, so the list the PO signs (committed changes only) does not hold ${paths.length === 1 ? "it" : "them"} yet: to drop the edit, copy the file outside the work tree first (nothing is deleted), then run git restore -- ${paths.join(" ")} (a staged edit needs git restore --source=HEAD --staged --worktree -- ${paths.join(" ")}); to keep it, it needs its own commit by the route that owns that file, and that commit becomes one more unproven change in the same list.`;
+  return `Way out if this change was made during the close and was not meant: the change is committed history, history is never rewritten and a revert is a new change that needs its own proof, so the acknowledgement above is the one way the close passes with it.${uncommitted} Calibration changes belong before the feature starts or in their own block, never while a close is running.`;
+}
+
 /** The repair the close and inspect name for an unproven list: the PO's one acknowledgement of exactly that list. */
 export function gateChangeAcknowledgementRepair({ stateWriter = "pipeline-state.mjs", commitOwned = "commit-pipeline-owned.mjs" } = {}) {
   return `the PO acknowledges the unproven gate-definition changes once for this range: run node ${stateWriter} approve-gate-change-acknowledgement --by <the label the PO gives for this command>, `

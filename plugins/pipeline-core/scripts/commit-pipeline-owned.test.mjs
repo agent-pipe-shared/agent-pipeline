@@ -201,6 +201,70 @@ test("C30G-D2: when the manifest at HEAD already lists the missing file a new Ve
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// C30J-J7 (queue C30-24 item 9, AC-112): a person deleted a listed evidence file, or changed acceptance.md. The refusal names the way back where it happens; nothing is committed and nothing is deleted by it.
+function committedFeature(name) {
+  const repo = featureRepo(name);
+  repo.run("add", "-A"); repo.run("commit", "-q", "-m", "feature with its evidence");
+  return repo;
+}
+
+test("C30J-J7: a deleted tracked evidence file names the route: the ORIGINAL bytes back with git restore, else a new feature and the PO's discard; following it ends clean", () => {
+  const { root, run, evidencePath } = committedFeature("deleted-tracked");
+  try {
+    rmSync(join(root, evidencePath));
+    const head = run("rev-parse", "HEAD").trim();
+    const refused = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(refused.status, "refused"); assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, [evidencePath]);
+    assert.equal(typeof refused.repair, "string", JSON.stringify(refused));
+    assert.ok(refused.reason.endsWith(refused.repair), "the reason ends with the recovery");
+    assert.ok(refused.repair.includes(`git restore -- ${evidencePath}`), refused.repair);
+    assert.match(refused.repair, /ORIGINAL bytes/u);
+    assert.match(refused.repair, /git log --oneline --all -- \S+ names it and git restore --source=<commit> -- \S+/u, "when HEAD no longer holds the file");
+    assert.match(refused.repair, /FPR-VERIFY-IMMUTABLE/u, "a new run cannot stand in for registered evidence");
+    assert.match(refused.repair, /new feature of rigor 1[\s\S]*discard-feature/u, "gone for good");
+    assert.equal(run("rev-parse", "HEAD").trim(), head, "a refusal commits nothing");
+    run("restore", "--", evidencePath);
+    assert.equal(commitPipelineOwned(["--root", root, "--agent"]).status, "nothing-to-commit");
+    assert.equal(run("status", "--porcelain").trim(), "");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C30J-J7: a modified tracked acceptance.md names its recovery: copy aside, restore, rerun the identical close, which writes the record again", () => {
+  const { root, run, put } = committedFeature("modified-acceptance");
+  try {
+    put("specs/feat-1/acceptance.md", "# Acceptance\n"); run("add", "--", "specs/feat-1/acceptance.md"); run("commit", "-q", "-m", "acceptance");
+    put("specs/feat-1/acceptance.md", "# Acceptance\nedited by hand\n");
+    const refused = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, ["specs/feat-1/acceptance.md"]);
+    assert.match(refused.repair, /first copy the file outside the work tree \(nothing is deleted\), then run git restore -- specs\/feat-1\/acceptance\.md/u, refused.repair);
+    assert.match(refused.repair, /specs\/feat-1\/acceptance\.md is written by the close[\s\S]*rerun the identical close command/u);
+    assert.doesNotMatch(refused.repair, /ORIGINAL bytes|FPR-VERIFY-IMMUTABLE/u, "no deletion: the evidence route is not offered");
+    run("restore", "--", "specs/feat-1/acceptance.md");
+    assert.equal(commitPipelineOwned(["--root", root, "--agent"]).status, "nothing-to-commit");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C30J-J7: the push-approval record refusal never offers a restore (that record is folded by push-prepare), and a mixed list restores only the other paths", () => {
+  const alone = refusedFor(" M project/pipeline-state.json\n");
+  assert.doesNotMatch(alone.reason, /git restore/u); assert.equal(alone.repair, undefined);
+  const mixed = refusedFor(" M project/pipeline-state.json\n D src/gone.mjs\n");
+  assert.ok(mixed.repair.includes("git restore -- src/gone.mjs") && !mixed.repair.includes("pipeline-state.json"), mixed.repair);
+});
+
+test("C30J-J7: a committed manifest that lists a file gone from the work tree names where the original bytes may sit in Git: the commit that held them", () => {
+  const { root, run, put, evidencePath } = featureRepo("head-lists-git");
+  try {
+    run("add", "--", "specs/feat-1/lifecycle.json"); run("commit", "-q", "-m", "manifest alone", "--", "specs/feat-1/lifecycle.json");
+    rmSync(join(root, evidencePath));
+    put("specs/feat-1/lifecycle.json", `${readFileSync(join(root, "specs/feat-1/lifecycle.json"), "utf8")}\n`);
+    const refused = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(refused.code, "CPO-MANIFEST-EVIDENCE", JSON.stringify(refused));
+    assert.match(refused.repair, /git log --oneline --all -- specs\/feat-1\/evidence\/final-candidate-verify\.json names the commit that held them[\s\S]*git restore --source=<commit> -- specs\/feat-1\/evidence\/final-candidate-verify\.json/u, refused.repair);
+    assert.match(refused.repair, /new feature of rigor 1[\s\S]*discard-feature/u, "the gone-for-good route stays");
+    assert.match(refused.repair, /If the file is gone for good: The Critic course of this feature cannot be read/u, "the sentence is joined with one space");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("K98 row 7/7: a refusal for any other foreign file keeps the plain reason", () => {
   const result = refusedFor(" M other.txt\n");
   assert.equal(result.code, "CPO-FOREIGN-CHANGES");

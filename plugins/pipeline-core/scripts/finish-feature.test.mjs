@@ -279,7 +279,7 @@ const SIGNATURE_COMMAND = { executable: "node", argv: ["po-human-approval.mjs", 
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false, movedAside = false } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false, gateChangesUnproven = false, bootstrap = "refused", ownerRoute = false, movedAside = false, correctionRound = false } = {}) {
   // C30D-G1: `bootstrap` names what the Result bootstrap stand-ins answer (a refused plan by default, so the cases written before the close ran the bootstrap itself keep their stop); `ownerRoute` gives the repository a session-authority catalogue.
   const independenceChecks = []; const gateChangeChecks = []; const ownerRouteCalls = []; let retired = false; let bootstrapped = false;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
@@ -289,7 +289,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
   const resultSha = sha256Of("# Result\n");
   const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" }, ...(residualOnRecord ? { residualAcceptance: { lastAccepted: { findings: [] } } } : {}),
-    ...(continuity ? { continuity: { revision: retired || bootstrapped ? 4 : 3, ...(language === null ? {} : { runtime: { humanFacingLanguage: language } }), queueHead: { nextAction }, authority: { result: (resultBound || bootstrapped) && !retired ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+    ...(continuity ? { continuity: { revision: retired || bootstrapped ? 4 : 3, ...(correctionRound ? { resultRetirements: [{ reason: "declined-acceptance" }] } : {}), ...(language === null ? {} : { runtime: { humanFacingLanguage: language } }), queueHead: { nextAction }, authority: { result: (resultBound || bootstrapped) && !retired ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
   if (handover) { mkdirSync(join(root, "project")); mkdirSync(join(root, "docs")); writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`); writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n"); }
@@ -877,6 +877,118 @@ test("C30G-D2: a refused bootstrap commit carries the typed repair the commit co
     assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-COMMIT", JSON.stringify(stopped).slice(0, 400));
     assert.match(stopped.stop.repair, /run git restore -- specs\/feature-abc\/lifecycle\.json/u);
     assert.match(stopped.stop.repair, /commit-pipeline-owned\.mjs --root [^ ]+ --agent/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// C30J-J7 (queue C30-24 items 9 and 10, AC-112): the way out of a refusal is named where the refusal happens. Only text and a derived read: no stored status, no gate or signature behaviour changes.
+test("C30J-J7: the bootstrap commit stop carries the recovery of a CPO-FOREIGN-CHANGES refusal (deleted evidence back by git restore) in the same way as the manifest one", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, bootstrap: "stuck" });
+  try {
+    const runner = (executable, argv) => (argv[0]?.endsWith("commit-pipeline-owned.mjs")
+      ? { status: 2, stdout: JSON.stringify({ schema: "pipeline.commit-pipeline-owned.v1", status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted", others: ["specs/feature-abc/evidence/verify-candidate.json"], owned: [STATE_PATH], repair: "put the ORIGINAL bytes back with git restore -- specs/feature-abc/evidence/verify-candidate.json" }), stderr: "" }
+      : f.runner(executable, argv));
+    const stopped = oneShotClose(f.input, { runCommand: runner });
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-BOOTSTRAP-COMMIT", JSON.stringify(stopped).slice(0, 400));
+    assert.match(stopped.stop.repair, /follow it: put the ORIGINAL bytes back with git restore -- specs\/feature-abc\/evidence\/verify-candidate\.json/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30J-J7: the ordered clean-tree route names where a refusal of the owned commit carries its recovery, for a manifest AND for a deleted or modified tracked file", () => {
+  const f = oneShotFixture({ acknowledgementMissing: true });
+  try {
+    writeFileSync(join(f.root, "untracked-note.md"), "note\n");
+    const repair = oneShotClose(f.input, { runCommand: f.runner }).stop.repair;
+    assert.match(repair, /CPO-MANIFEST-EVIDENCE/u);
+    assert.match(repair, /CPO-FOREIGN-CHANGES[^;]*git restore/u, repair);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30J-J7: CLOSE-GATE-CHANGE-UNPROVEN names the way out on a clean and on a dirty tree, and a modified gate-definition file gets its exact restore step; the order hint stays", () => {
+  const clean = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    const stopped = oneShotClose(clean.input, { runCommand: clean.runner });
+    assert.equal(stopped.stop.code, "CLOSE-GATE-CHANGE-UNPROVEN");
+    assert.match(stopped.stop.repair, /the change is committed history[\s\S]*a revert is a new change that needs its own proof[\s\S]*the acknowledgement above is the one way the close passes with it/u, stopped.stop.repair);
+    assert.match(stopped.stop.repair, /Calibration changes belong before the feature starts or in their own block, never while a close is running/u);
+    assert.doesNotMatch(stopped.stop.repair, /git restore/u, "no gate-definition file is dirty: no restore is offered");
+    assert.match(stopped.stop.repair, /^nothing was written; the PO acknowledges the unproven gate-definition changes once for this range: run node \S+pipeline-state\.mjs approve-gate-change-acknowledgement --by/u, "the acknowledgement stays the first step");
+  } finally { rmSync(clean.root, { recursive: true, force: true }); }
+  const f = oneShotFixture({ gateChangesUnproven: true });
+  try {
+    writeFileSync(join(f.root, "pipeline.user.yaml"), "gates: {}\n"); f.git("add", "--", "pipeline.user.yaml"); f.git("commit", "-q", "-m", "calibration");
+    writeFileSync(join(f.root, "pipeline.user.yaml"), "gates: { changed: true }\n"); writeFileSync(join(f.root, "leftover.md"), "x\n");
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stop.code, "CLOSE-GATE-CHANGE-UNPROVEN");
+    assert.match(stopped.stop.repair, ORDERED_ROUTE, "the ordered route is unchanged");
+    assert.match(stopped.stop.repair, /pipeline\.user\.yaml is modified in the work tree and not committed/u, stopped.stop.repair);
+    assert.match(stopped.stop.repair, /copy the file outside the work tree first[^.]*git restore -- pipeline\.user\.yaml/u, stopped.stop.repair);
+    assert.ok(!stopped.stop.repair.includes("git restore -- leftover.md"), "only the gate-definition file gets the restore");
+    assert.deepEqual(f.calls, [], "the way out changes no stage order and writes nothing");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// C30J-J7 (analysis C6, SM-4, E2-16): the package record of a correction round is moved back by EVERY one-shot run that finds the State proving the round, not only by the decline call.
+// E2-16 settled: before this change a rerun did not retry the move (no `package-correction-round` stage outside the decline branch); the requalify moves after the bootstrap carried a `completed` record forward instead.
+function packageRecordFixture(f, packageState) {
+  const manifest = join(f.root, "specs/feature-abc/lifecycle.json");
+  writeFileSync(manifest, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "feature-abc" }, state: packageState })}\n`);
+  const moves = []; let refuse = false;
+  const runner = (executable, argv) => {
+    if (argv[0]?.endsWith("pipeline-state.mjs") && argv[1] === "feature-package-plan") { moves.push(`plan ${argv[argv.indexOf("--next-state") + 1]}`); if (refuse) return { status: 2, stdout: "", stderr: "Error: feature-package-plan refused (invalid-current-package)\n" }; }
+    if (argv[0]?.endsWith("pipeline-state.mjs") && argv[1] === "feature-package-apply") { moves.push(`apply ${argv[argv.indexOf("--next-state") + 1]}`); writeFileSync(manifest, `${JSON.stringify({ ...JSON.parse(readFileSync(manifest, "utf8")), state: argv[argv.indexOf("--next-state") + 1] })}\n`); }
+    return f.runner(executable, argv);
+  };
+  return { runner, moves, state: () => JSON.parse(readFileSync(manifest, "utf8")).state, refuse: (value) => { refuse = value; } };
+}
+test("C30J-J7 (C6): a rerun that finds the State proving a correction round moves a completed or verifying package record back to implementing first, once (idempotent)", () => {
+  for (const from of ["completed", "verifying"]) {
+    const f = oneShotFixture({ continuity: true, resultBound: false, correctionRound: true });
+    try {
+      const p = packageRecordFixture(f, from);
+      const first = oneShotClose(f.input, { runCommand: p.runner });
+      assert.equal(first.stage, "result-bootstrap", JSON.stringify(first).slice(0, 400));
+      assert.deepEqual(p.moves, ["plan implementing", "apply implementing"], `${from}: the admitted move ran first`);
+      assert.equal(p.state(), "implementing");
+      // The move wrote the manifest, so the stop that follows must not claim that nothing was written: its note says what moved and that it is uncommitted.
+      assert.match(first.stop.repair, new RegExp(`^This call first moved the package record specs/feature-abc/lifecycle\\.json from ${from} back to implementing[^.]*; that change is written but not committed yet[\\s\\S]*"nothing was written" below counts from that move on`, "u"), first.stop.repair);
+      assert.deepEqual(first.packageBack, { manifest: "specs/feature-abc/lifecycle.json", from, to: "implementing" });
+      assert.match(f.git("status", "--porcelain"), /specs\/feature-abc\/lifecycle\.json/u, "the move is the one uncommitted owned output");
+      assert.ok(f.calls.indexOf("pipeline-state feature-package-plan") < f.calls.indexOf("pipeline-state continuity-result-bootstrap-plan"), "before the bootstrap");
+      const second = oneShotClose(f.input, { runCommand: p.runner });
+      assert.equal(second.stage, "result-bootstrap");
+      assert.deepEqual(p.moves, ["plan implementing", "apply implementing"], `${from}: a package that is already past this step is left alone`);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test("C30J-J7 (C6): the move comes first: a correction-round run that stops at an earlier gate (the Critic round did not pass) has moved the record and says so", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false, correctionRound: true, criticStanding: { status: "failed", blockers: 1, majors: 0, minors: 0 } });
+  try {
+    const p = packageRecordFixture(f, "completed");
+    const stopped = oneShotClose(f.input, { runCommand: p.runner });
+    assert.equal(stopped.stage, "critic-standing", JSON.stringify(stopped).slice(0, 400)); assert.equal(stopped.stop.code, "ONESHOT-CRITIC-NOT-PASSED");
+    assert.deepEqual(p.moves, ["plan implementing", "apply implementing"]); assert.equal(p.state(), "implementing");
+    assert.match(stopped.stop.repair, /^This call first moved the package record[\s\S]*not committed yet[\s\S]*nothing was written; correct the findings/u, stopped.stop.repair);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C30J-J7 (C6): no move without the State's proof of a correction round, and a refused move is a typed stop with the hand route and the rerun, never a silent lag", () => {
+  const first = oneShotFixture({ continuity: true, resultBound: false });
+  try {
+    const p = packageRecordFixture(first, "completed");
+    oneShotClose(first.input, { runCommand: p.runner });
+    assert.deepEqual(p.moves, [], "no declined-acceptance retirement in State: the record is not touched");
+    assert.equal(p.state(), "completed");
+  } finally { rmSync(first.root, { recursive: true, force: true }); }
+  const f = oneShotFixture({ continuity: true, resultBound: false, correctionRound: true });
+  try {
+    const p = packageRecordFixture(f, "completed"); p.refuse(true);
+    const stopped = oneShotClose(f.input, { runCommand: p.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400)); assert.equal(stopped.stage, "package-correction-round");
+    assert.match(stopped.stop.repair, /feature-package-plan --root \S+ --manifest specs\/feature-abc\/lifecycle\.json --next-state implementing/u);
+    assert.match(stopped.stop.repair, /rerun the identical command/u);
+    assert.ok(!f.calls.includes("pipeline-state continuity-result-bootstrap-plan"), "nothing else ran");
+    assert.equal(p.state(), "completed", "nothing was written");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
