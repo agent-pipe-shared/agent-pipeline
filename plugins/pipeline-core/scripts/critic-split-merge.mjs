@@ -67,6 +67,8 @@ function readJsonFile(root, path, label) {
 
 /** Pure-ish entry for tests and the CLI: parse argv, read the files, merge, optionally write. Returns `{ exitCode, stdout, stderr }`. */
 export function runCriticSplitMergeCli(argv) {
+  // C32 (Codex greenfield report): a lone --help prints the usage and exits zero, like the other scripts of the close.
+  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) return { exitCode: 0, stdout: `Usage: critic-split-merge.mjs --root <repo> --packet <packetId> [--out <merged verdict file>]\n       critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> [--child ...] [--out <merged verdict file>]\nMerges the verdicts of the module Critics of one split round into the verdict the session finalizer takes; --packet reads each child's Source return, so no verdict is copied by hand. --out creates the file exclusively.\n`, stderr: "" };
   try {
     const flags = { child: [] };
     for (let index = 0; index < argv.length; index += 2) {

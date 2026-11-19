@@ -1028,7 +1028,11 @@ function parse(argv) {
   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], auditRequest: value["--audit-request"], criticVerifyLifecycle: value["--critic-verify-lifecycle"], continuityCloseRequest: value["--continuity-close-request"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes("--one-shot")) {
+// C32 (Codex greenfield report): a lone --help prints the usage and exits zero, like the other scripts of the close.
+const FINISH_HELP = "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override-proof scratch/sbom-override-proof-<16 hex>.json] [--stage]\n       finish-feature.mjs --root <repo> --by <name> --architecture-impact <value> --audit-request <repo-relative-json> --critic-verify-lifecycle <receipt-id> [--continuity-close-request <repo-relative-json>] [--resume-lifecycle-id <id>]\nThe first form is the normal close on every runner: it collects the evidence itself and stops with the next step; the second takes every input already at hand. Each prints one JSON object on stdout; a stop prints its repair on stderr and exits 2.";
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) {
+  process.stdout.write(`${FINISH_HELP}\n`);
+} else if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes("--one-shot")) {
   // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
   try {
     if (process.argv.slice(2).filter((entry) => entry === "--one-shot").length !== 1) fail("FINISH-USAGE", "--one-shot may be given once");

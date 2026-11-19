@@ -167,6 +167,20 @@ function usage(msg) {
 //        everything else is an optional flag. ---
 const argv = process.argv.slice(2);
 
+// C32 (Codex greenfield report): a lone --help prints the usage on stdout and exits zero (usage() above is the error path and exits 1).
+if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) {
+  process.stdout.write([
+    "Usage: usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>]",
+    "       usage-ledger.mjs --metering <sanitized-bundle.json...>",
+    "       usage-ledger.mjs --timeline <transcript-file> [--json]",
+    "       usage-ledger.mjs --row [label] --antigravity-transcript <transcript-file> [--model <name>]",
+    "       usage-ledger.mjs --row [label] --codex-rollout <transcript-file>",
+    "Reads session transcripts and prints a usage table, a close-block cost row or a run timeline; it writes nothing.",
+    "",
+  ].join("\n"));
+  process.exit(0);
+}
+
 function readMeteringBundle(file) {
   let descriptor;
   try {
