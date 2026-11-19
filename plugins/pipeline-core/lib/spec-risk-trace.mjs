@@ -24,6 +24,8 @@
  */
 
 export const RISK_TRACE_HEADER = '| id | source | statement | trace |';
+/** The forms a `trace` cell may take, in prose; the Spec template and the readiness reviewer quote this list (stage S3), so a text and the reader cannot drift. */
+export const RISK_TRACE_FORMS = Object.freeze(['a test path', 'command:<id>', 'residual: backlog/items/<item>.md', 'not-applicable: <reason>']);
 
 const HEADER_CELLS = Object.freeze(['id', 'source', 'statement', 'trace']);
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/u;
@@ -98,7 +100,7 @@ function classify(trace, deps) {
   if (TEST_PATH.test(value) && !value.split('/').some((part) => part === '' || part === '.' || part === '..')) {
     return exists(value) ? { status: 'covered' } : { status: 'stale', reason: `the test file ${value} does not exist` };
   }
-  return { status: 'malformed', reason: 'the trace is none of: a test path, command:<id>, residual: backlog/items/<item>.md, not-applicable: <reason>' };
+  return { status: 'malformed', reason: `the trace is none of: ${RISK_TRACE_FORMS.join(', ')}` };
 }
 
 /**

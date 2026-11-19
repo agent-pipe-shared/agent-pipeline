@@ -120,6 +120,22 @@ guardrails against future hallucinations and repeat debates.}}
 | {{ALTERNATIVE_1}} | {{REASON}} |
 | {{ALTERNATIVE_2}} | {{REASON}} |
 
+### 3a. Accepted risks and assumptions (when the PRD accepts any)
+
+{{One row per risk or assumption the PRD accepts (its "Risks & mitigation" and
+"Assumptions" blocks), so a risk reaches a test or a stated residual instead of
+staying prose. The `trace` cell is exactly one of: a test path, `command:<id>`,
+`residual: backlog/items/<item>.md`, or `not-applicable: <reason>`. A row whose
+`trace` names nothing is reported as "without behaviour" (the readiness question,
+the close readback row and the Critic inspection hint); it is never a refusal, a
+gate or a stored status. A risk that becomes an acceptance criterion points to its
+`AC-n` in `statement` instead of restating it. Delete this section when the PRD
+accepts no risk.}}
+
+| id | source | statement | trace |
+|---|---|---|---|
+| R-1 | {{PRD section}} | {{the accepted risk or assumption, one sentence}} | {{trace}} |
+
 ### 4. Detailed Implementation (every file + rationale)
 
 {{Enumerate EACH file to be created/changed/deleted. This list is the contract:

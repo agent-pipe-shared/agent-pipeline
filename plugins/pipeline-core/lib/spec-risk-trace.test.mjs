@@ -5,7 +5,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
+import * as reader from "./spec-risk-trace.mjs";
 
 const TEST_FILE = "plugins/pipeline-core/lib/x.test.mjs";
 const BACKLOG = "backlog/items/2026-11-18-some-residual.md";
@@ -98,4 +100,44 @@ test("AC-112 S1: the reader never claims what it cannot read, is pure, and leave
   const text = spec(table(`R-1 | PRD | s | ${TEST_FILE}`));
   const frozen = Object.freeze({ exists: () => true });
   assert.deepEqual(inspectSpecRiskTrace(text, frozen), inspectSpecRiskTrace(text, frozen));
+});
+
+// AC-112 stage S3 (candidate 31, lane L3): the template texts quote the reader's own constants, so a text and the reader cannot drift. The cases come from
+// the plan's stage S3 row (the Spec template gets the table skeleton, the PRD template an "Assumptions" line, the readiness reviewer ONE question),
+// never from the texts. Text only: no gate, no stored status.
+const root = (rel) => readFileSync(new URL(`../../../${rel}`, import.meta.url), "utf8");
+const count = (text, needle) => text.split(needle).length - 1;
+
+test("AC-112 S3: the accepted trace forms are one exported list the reader's malformed reason quotes", () => {
+  assert.deepEqual(reader.RISK_TRACE_FORMS, ["a test path", "command:<id>", "residual: backlog/items/<item>.md", "not-applicable: <reason>"]);
+  const malformed = inspectSpecRiskTrace(spec(table("R-1 | PRD | s | see the PRD")), present());
+  assert.equal(malformed.rows[0].reason, `the trace is none of: ${reader.RISK_TRACE_FORMS.join(", ")}`);
+});
+
+test("AC-112 S3: the Spec template carries the table skeleton the reader recognises, with the reader's header and forms", () => {
+  const text = root("templates/spec.md");
+  assert.ok(text.includes(RISK_TRACE_HEADER), "the template quotes the reader's header marker");
+  for (const form of reader.RISK_TRACE_FORMS) assert.ok(text.includes(form), `the template names the trace form: ${form}`);
+  const read = inspectSpecRiskTrace(text, present());
+  assert.equal(read.status, "applicable", "the reader finds the skeleton as a closed table outside a fence");
+  assert.ok(read.rows.length >= 1 && read.rows.every((row) => row.status === "untraced"), "an unfilled skeleton row reads untraced, never malformed");
+});
+
+test("AC-112 S3: the PRD template has an Assumptions line that points to the Spec table by the reader's header", () => {
+  const text = root("templates/prd.md");
+  assert.match(text, /^## Assumptions\b/mu);
+  assert.equal(count(text, RISK_TRACE_HEADER), 1, "one technical line names the Spec table");
+  assert.ok(text.indexOf("## Assumptions") < text.indexOf("## Alternatives considered"), "it sits with Non-goals and Risks, before the alternatives");
+});
+
+test("AC-112 S3: the readiness reviewer asks exactly ONE question about untraced accepted risks, never a block, inside its delta contract", () => {
+  const text = root("plugins/pipeline-core/agents/readiness-reviewer.md");
+  assert.equal(count(text, RISK_TRACE_HEADER), 1, "exactly one place names the risk table");
+  const paragraph = text.split(/\n\n/u).find((block) => block.includes(RISK_TRACE_HEADER)) ?? "";
+  for (const form of reader.RISK_TRACE_FORMS) assert.ok(paragraph.includes(form), `the question names the trace form: ${form}`);
+  assert.match(paragraph, /question/u);
+  assert.match(paragraph, /never a block/u);
+  assert.match(paragraph, /full round/u);
+  assert.match(paragraph, /delta round/u, "the delta contract: asked again only when the correction changed the table");
+  assert.equal(count(text.slice(0, text.indexOf("## What to check")), RISK_TRACE_HEADER), 0, "the blocking-finding definition is unchanged");
 });

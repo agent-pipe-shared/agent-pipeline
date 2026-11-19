@@ -67,6 +67,12 @@ in the running text.>
 ## Risks & mitigation
 <The 2–4 most important risks, each with a countermeasure.>
 
+## Assumptions
+<What this plan takes for granted and what happens if it turns out wrong; one line each.
+A risk or assumption the PRD accepts gets one row in the Spec's risk table, so it ends
+in a test or a stated residual, not only in this text. Compact italicized technical
+line: *Spec table `| id | source | statement | trace |` (spec.md, section 3a).*>
+
 ## Alternatives considered
 <Considered & rejected, each with a one-sentence rationale (solo-memory element).>
 

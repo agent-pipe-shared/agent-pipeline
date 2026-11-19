@@ -123,6 +123,15 @@ the design makes such a choice and no module names an ADR path for it in
 and point to the `architecture-decision` skill. This is a question, never a
 block; the close only reports which named ADR paths exist.
 
+Accepted risks: when the Spec carries the closed risk table (header
+`| id | source | statement | trace |`), read its `trace` cells. A risk row needs a
+test reference (a test path or `command:<id>`) or an explicit residual statement
+(`residual: backlog/items/<item>.md` or `not-applicable: <reason>`). When a row
+names none of these, raise ONE question to the Elephant naming those row ids: what
+test or stated residual covers each. This is a question, never a block, and a Spec
+without the table is not asked. Ask it in the full round; in a delta round only
+when the correction changed that table.
+
 Return one concise readiness review with references in the report shape above.
 The host, not this agent, creates the sanitized, dispatch-bound duty and
 execution receipts; never return or persist raw prompts, answers, paths,
