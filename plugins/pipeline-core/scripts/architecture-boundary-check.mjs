@@ -47,7 +47,7 @@ export const BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
 export const DEFAULT_LINE_BOUND = 1000;
 export const BOUNDARY_RULES = Object.freeze(["unowned-path", "ambiguous-ownership", "forbidden-dependency", "over-line-bound"]);
 /** What a pass of this check does and does not say (Codex greenfield report): a green verdict must not read as "every dependency was seen". */
-export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, import paths built at runtime, and whether code honours a module's contract.";
+export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, relative imports written in JavaScript or TypeScript files, and the local <script src> of HTML files that belong to a module. Not seen: runtime or browser globals, CSS references, scripts an inline script loads, bundler output, imports in other languages, import paths built at runtime, and whether code honours a module's contract.";
 export const DEFAULT_SOURCE_EXTENSIONS = Object.freeze([
   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".go", ".rs", ".java", ".kt",
   ".rb", ".cs", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".php", ".scala",
@@ -218,7 +218,41 @@ function observe(root, modules, policy, listed, readFile, extensions, keepUnowne
         detail: `module ${caller.id} imports ${target} of module ${targetOwners[0].id}, which is not in its allowedDependencies [${allowed.join(", ")}]` });
     }
   }
+  // C32 (Codex greenfield report): a classic browser app composes its modules in an HTML file with <script src>, not with imports, so the import rule above never saw its edges. An HTML file that
+  // belongs to exactly one module is read the same way: each local script it loads that lies in another module is an edge, and a forbidden one is a finding at the HTML file.
+  for (const file of listed.filter((entry) => MARKUP_EXTENSIONS.has(path.extname(entry)) && !excluded(entry)).sort()) {
+    const owners = owningModules(file, modules);
+    if (owners.length !== 1) continue;
+    let text;
+    try { text = readFile(path.join(root, file)); } catch { continue; }
+    const caller = owners[0];
+    const allowed = caller.allowedDependencies ?? [];
+    for (const spec of new Set(extractScriptSources(text))) {
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
+      if (target.startsWith("../") || isGeneratedArtifact(target)) continue;
+      const targetOwners = owningModules(target, modules);
+      if (targetOwners.length !== 1 || targetOwners[0].id === caller.id) continue;
+      if (!edges.has(caller.id)) edges.set(caller.id, new Set());
+      edges.get(caller.id).add(targetOwners[0].id);
+      if (allowed.includes(targetOwners[0].id)) continue;
+      violations.push({ file, module: caller.id, rule: "forbidden-dependency", target,
+        detail: `module ${caller.id} loads the script ${target} of module ${targetOwners[0].id} from ${file}, which is not in its allowedDependencies [${allowed.join(", ")}]` });
+    }
+  }
   return { sources, violations: violations.sort(order), usage, edges };
+}
+
+const MARKUP_EXTENSIONS = new Set([".html", ".htm"]);
+const SCRIPT_SRC = /<script\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/giu;
+/** The local, relative script sources of an HTML text: comments are ignored; an absolute URL, a protocol-relative or site-root path, a data URI, a query and a fragment are not part of a project path. */
+export function extractScriptSources(text) {
+  const found = [];
+  for (const match of text.replace(/<!--[\s\S]*?-->/gu, "").matchAll(SCRIPT_SRC)) {
+    const raw = (match[1] ?? match[2] ?? "").trim().split(/[?#]/u)[0];
+    if (raw === "" || raw.startsWith("/") || /^[a-z][a-z0-9+.-]*:/iu.test(raw)) continue;
+    found.push(raw);
+  }
+  return found;
 }
 
 function headCandidate(rootDir) {

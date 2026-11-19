@@ -15,6 +15,7 @@ import {
   DEFAULT_LINE_BOUND,
   checkArchitectureBoundaries,
   exitCodeForBoundaryCheck,
+  extractScriptSources,
   measureArchitecture,
   owningModules,
   previewArchitectureBoundaries,
@@ -57,7 +58,8 @@ test("ABC01 a project without an architecture map is not-applicable, never faile
 test("ABC13 every verdict states what the check does not see, in the result and on the human output", () => {
   const root = fixture({ files: { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n" } });
   const result = checkArchitectureBoundaries({ rootDir: root });
-  assert.match(result.coverage, /Not seen: runtime or browser globals, HTML and CSS references/u);
+  // QG-04 restatement (candidate 32, Codex greenfield report): the local <script src> of an HTML file is now read, so it leaves the list of what is not seen.
+  assert.match(result.coverage, /the local <script src> of HTML files that belong to a module\. Not seen: runtime or browser globals, CSS references/u);
   const run = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
   assert.match(run.stdout, /Not seen: runtime or browser globals/u);
 });
@@ -419,6 +421,31 @@ test("ABC18 a generated bundle, a minified file and everything under dist are no
   assert.equal(result.counts.sourceFiles, 1, "generated output is not counted as a source of the project");
   assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/main.mjs": big } }) })), [["over-line-bound", "src/app/main.mjs", null]], "hand-written code keeps the bound");
   assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/bundler.mjs": big } }) })), [["over-line-bound", "src/app/bundler.mjs", null]], "a name that only contains 'bundle' is hand-written");
+});
+
+// C32 (Codex greenfield report): a classic browser app composes its modules in an HTML file, with no import statement for the check to read.
+test("ABC20 the local script sources of an HTML file of a module are edges to the modules that own those scripts", () => {
+  const page = (...sources) => `<!doctype html>\n<html><body>\n${sources.map((src) => `<script src="${src}"></script>`).join("\n")}\n</body></html>\n`;
+  const files = { "src/app/index.html": page("../lib/x.js?v=3", "main.js"), "src/app/main.js": "export {};\n", "src/lib/x.js": "export {};\n" };
+  const allowed = checkArchitectureBoundaries({ rootDir: fixture({ files }) });
+  assert.equal(allowed.status, "pass", JSON.stringify(rules(allowed)));
+  const measured = measureArchitecture({ rootDir: fixture({ files }) });
+  assert.deepEqual(measured.measurement.modules.find((entry) => entry.id === "app").measuredDependencies, ["lib"], "the HTML edge is measured like an import");
+  const forbidden = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files }) });
+  assert.deepEqual(rules(forbidden), [["forbidden-dependency", "src/app/index.html", "src/lib/x.js"]], "a query string is no part of the path");
+  assert.match(forbidden.violations[0].detail, /module app loads the script src\/lib\/x\.js of module lib from src\/app\/index\.html/u);
+  const excepted = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files, policy: { schema: BOUNDARY_POLICY_SCHEMA, exceptions: [{ rule: "forbidden-dependency", path: "src/app/index.html", target: "src/lib/x.js", reason: "known" }] } }) });
+  assert.equal(excepted.status, "pass");
+  assert.equal(excepted.counts.excepted, 1);
+});
+
+test("ABC21 what is no project script is no edge: URLs, site-root paths, comments, inline scripts, generated bundles and an HTML file of no module", () => {
+  const html = `<!-- <script src="../lib/x.js"></script> -->\n<script src="https://cdn.example/x.js"></script>\n<script src="//cdn.example/x.js"></script>\n<script src="/lib/x.js"></script>\n<script src='data:text/javascript,1'></script>\n<script>import("../lib/x.js")</script>\n<script src="../lib/x.bundle.js"></script>\n`;
+  const files = { "src/app/index.html": html, "src/lib/x.js": "export {};\n", "src/lib/x.bundle.js": "export {};\n", "index.html": '<script src="src/lib/x.js"></script>\n' };
+  const result = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files }) });
+  assert.equal(result.status, "pass", JSON.stringify(rules(result)));
+  assert.deepEqual(extractScriptSources(html), ["../lib/x.bundle.js"], "only a local, relative, non-comment script source is read");
+  assert.deepEqual(extractScriptSources("<script defer src = \"a.js#top\"></script><SCRIPT SRC='b/c.js'></SCRIPT>"), ["a.js", "b/c.js"]);
 });
 
 test("ABC19 a test file has no hard line bound, but its ownership and imports are still checked", () => {
