@@ -15,6 +15,8 @@ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import { closeSbom } from "../lib/sbom-close.mjs";
 import { applyAcceptanceSection, readAcceptanceRecord, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
 import { syncPublicCurrentState } from "./pipeline-state.mjs";
+import { buildAuditBundle, planAuditBundle, verifyAuditBundleSync } from "../lib/audit-bundle.mjs";
+import { prepareAuditProofFollowUp } from "../lib/audit-proof-collection.mjs";
 
 function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
 function closeAction(criticVerifyLifecycle) {
@@ -1264,11 +1266,11 @@ test("CGF-21: closed-local names the Critic-bound push Verify with the packet of
 const ACCEPTANCE_FILE = "specs/feature-abc/acceptance.md"; const SPEC_POINTER = "# Acceptance pointer: feature-abc\n\nThe criteria are the approved Spec's (specs/feature-abc/spec.md).\n";
 const EMPTY_DIGEST = sha256Of("");
 const headOf = (f) => f.git("rev-parse", "HEAD").trim();
-function packageFixture(f, { acceptanceAuthority = false } = {}) {
+function packageFixture(f, { acceptanceAuthority = false, candidate = { commit: "a".repeat(40), tree: "b".repeat(40) } } = {}) {
   const base = join(f.root, "specs/feature-abc"); const bytes = { "prd.md": "prd\n", "spec.md": "spec\n", "acceptance.md": SPEC_POINTER, "result.md": "# Result\n", "evidence/candidate.json": "{}\n" };
   for (const [name, text] of Object.entries(bytes)) writeFileSync(join(base, name), text);
   const entry = (cls, name, authority, mutability) => ({ class: cls, path: `specs/feature-abc/${name}`, sha256: sha256Of(bytes[name]), authority, mutability, retention: "active" });
-  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: "feature-abc", rigor: 1 }, state: "completed", artifacts: [entry("prd", "prd.md", true, "mutable"), entry("spec", "spec.md", true, "mutable"), entry("acceptance", "acceptance.md", acceptanceAuthority, "immutable"), entry("result", "result.md", false, "immutable"), entry("candidate-evidence", "evidence/candidate.json", false, "immutable")], candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, supersedes: null };
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: "feature-abc", rigor: 1 }, state: "completed", artifacts: [entry("prd", "prd.md", true, "mutable"), entry("spec", "spec.md", true, "mutable"), entry("acceptance", "acceptance.md", acceptanceAuthority, "immutable"), entry("result", "result.md", false, "immutable"), entry("candidate-evidence", "evidence/candidate.json", false, "immutable")], candidate, supersedes: null };
   writeFileSync(join(base, "lifecycle.json"), `${JSON.stringify(manifest, null, 2)}\n`); f.git("add", "-A"); f.git("commit", "-q", "-m", "package");
   return { manifestPath: "specs/feature-abc/lifecycle.json", pointerSha: sha256Of(SPEC_POINTER) };
 }
@@ -1992,8 +1994,8 @@ test("R8: closed-local states what the security result covers, read from the v2 
     assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
     assert.equal(none.securityScope.status, "unavailable");
     assert.match(none.message, /Security scope: unavailable \(the v2 security verdict could not be read\); what the security result covers is open\./u); // C29 (C3): said, not left out.
-    // C29e T4: the last sentence names where the security verdict and final Verify reach the bundle.
-    assert.match(none.message, /reach the audit bundle only with the evidence follow-up of the next push; until then this feature's audit bundle holds no security evidence\.$/u);
+    // C29e T4, restated in place (QG-04, C31-B4): the close writes the evidence follow-up itself now, so the last sentence says what it did; this fixture has no audit bundle.
+    assert.match(none.message, /This feature has no audit bundle, so no evidence follow-up was written\.$/u);
     mkdirSync(join(f.root, "evidence"), { recursive: true });
     // The shape a real scan writes: scanners under capabilityOutcomes, only the checks without a capability under controls.
     writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: ["cap.sast", "cap.secrets"], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
@@ -2162,4 +2164,87 @@ test("C31-L9: no printed rerun or signing command of finish-feature is a node-pl
   assert.match(source, /human-command-render\.mjs/u, "the shared renderer is imported");
   assert.doesNotMatch(source, /`node \$\{fileURLToPath\(import\.meta\.url\)\}/u, "the rerun command is not concatenated");
   assert.doesNotMatch(source, /node \$\{PO_HUMAN_APPROVAL\} sign-intent/u, "the PO signing command is not concatenated");
+});
+
+// C31-B4 (AC-112, closest accepted criterion; lane L6 stage 1 of the candidate 31 plan): the close writes the evidence follow-up of the audit bundle at closed-local, as new files next to the
+// closed bundle, and prints the commit; it never writes the commit itself. A local-only close never reaches a push, so a push could not be the only trigger.
+const BUNDLE_PACK = { schema: "pipeline.organization-policy-pack.v1", packId: "security-baseline", revision: "a".repeat(64),compatibility: { minimumCoreVersion: "0.4.0", maximumCoreVersion: "0.5.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] };
+const FINAL_VERIFY = `${JSON.stringify({ schema: "pipeline.verify-evidence.v0", mode: "candidate", exitCode: 0 })}\n`;
+const FINAL_SECURITY = `${JSON.stringify({ schema: "pipeline.security-verdict.v2", verdict: { blocking: false } })}\n`;
+async function closedLocalBundleFixture({ bundle = true, finalRecord = true } = {}) {
+  const f = closedLocalFixture();
+  const candidate = { commit: headOf(f), tree: f.git("rev-parse", "HEAD^{tree}").trim() };
+  packageFixture(f, { candidate });
+  const dir = `audit-bundles/feature-abc/${candidate.commit}`;
+  if (bundle) {
+    mkdirSync(join(f.root, "audit-bundles/feature-abc"), { recursive: true });
+    const plan = planAuditBundle({ repositoryRoot: f.root, manifestPath: "specs/feature-abc/lifecycle.json", bundleId: "feature-abc", coreVersion: "0.4.7", packs: [BUNDLE_PACK], candidate });
+    await buildAuditBundle({ repositoryRoot: f.root, outputPath: dir, plan });
+    f.git("add", "-A"); f.git("commit", "-q", "-m", "chore(close): close feature feature-abc");
+  }
+  const privateDirectory = join(f.root, ".git/agent-pipeline/publication-close/lc-1/evidence");
+  if (finalRecord) {
+    mkdirSync(privateDirectory, { recursive: true });
+    writeFileSync(join(privateDirectory, "final-verify.record.json"), FINAL_VERIFY); writeFileSync(join(privateDirectory, "final-security-verdict.record.json"), FINAL_SECURITY);
+    writeFileSync(join(privateDirectory, "final-verification.json"), `${JSON.stringify({ schema: "pipeline.close-final-verification.v1", candidateOid: headOf(f), candidateTree: f.git("rev-parse", "HEAD^{tree}").trim(), verifyStatus: "green", verifySha256: sha256Of(FINAL_VERIFY), securityStatus: "green", securitySha256: sha256Of(FINAL_SECURITY) })}\n`);
+  }
+  const bundleRoot = join(f.root, dir);
+  const readBundle = () => { const files = {}; for (const name of ["manifest.json", "README.md"]) files[name] = readFileSync(join(bundleRoot, name)); for (const name of readdirSync(join(bundleRoot, "artifacts")).sort()) files[`artifacts/${name}`] = readFileSync(join(bundleRoot, "artifacts", name)); return files; };
+  const commitFollowUp = (paths) => { f.git("add", "--", ...paths); f.git("commit", "-q", "-m", "chore(close): add the evidence follow-up", "--", ...paths); };
+  return { f, dir, bundleRoot, readBundle, commitFollowUp };
+}
+
+test("C31-B4: the close writes the typed evidence follow-up at closed-local as new files, verifies, leaves manifest, README and artifacts byte for byte, and prints the commit", async () => {
+  const { f, dir, bundleRoot, readBundle, commitFollowUp } = await closedLocalBundleFixture();
+  try {
+    const before = readBundle();
+    assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified");
+    assert.equal(existsSync(join(bundleRoot, "proofs/follow-up.json")), false, "the closed bundle holds no follow-up before the close ends");
+    const done = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+    assert.equal(done.followUp.status, "written", JSON.stringify(done.followUp));
+    const list = JSON.parse(readFileSync(join(bundleRoot, "proofs/follow-up.json"), "utf8"));
+    assert.deepEqual(list.proofs, []); assert.deepEqual(list.attributions, []);
+    assert.equal(list.approvedCommit, headOf(f));
+    assert.deepEqual(list.evidence.map((entry) => [entry.kind, entry.sha256]), [["final-verify", sha256Of(FINAL_VERIFY)], ["security-verdict", sha256Of(FINAL_SECURITY)]], "the two evidence entries match the private copies of the close");
+    for (const entry of list.evidence) assert.equal(sha256Of(readFileSync(join(bundleRoot, entry.path))), entry.sha256);
+    assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified", JSON.stringify(verifyAuditBundleSync({ bundleRoot })));
+    assert.deepEqual(readBundle(), before, "manifest.json, README.md and every artifact are unchanged");
+    // the files, and the commit that stays the caller's step
+    assert.deepEqual(done.followUp.files.map((file) => file.path).sort(), [`${dir}/proofs/001-final-verify.json`, `${dir}/proofs/002-security-verdict.json`, `${dir}/proofs/follow-up.json`]);
+    assert.deepEqual([...done.followUp.commit.paths].sort(), done.followUp.files.map((file) => file.path).sort());
+    assert.equal(done.followUp.commit.steps[0], `git add -- ${done.followUp.commit.paths.join(" ")}`);
+    assert.match(done.followUp.commit.steps.join("\n"), /git commit -F scratch\/commit-msg\/writer-output\.txt -- /u);
+    assert.equal(f.git("status", "--porcelain", "--untracked-files=all", "--", dir).split("\n").filter(Boolean).length, done.followUp.files.length, "written, not committed");
+    assert.match(done.next, /commit/u); assert.match(done.next, /pushEvidence/u); assert.match(done.next, /runs AFTER that commit/u);
+    assert.match(done.message, /The close wrote the evidence follow-up of the audit bundle \(followUp\)[^]*Commit them with followUp\.commit\.steps; the final Verify at HEAD \(pushEvidence\) runs after that commit\.$/u);
+    assert.match(before["README.md"].toString("utf8"), /the close adds the final Verify and Security records at its end, and a push or release approval adds its proofs/u, "the README of a new bundle no longer says only a push adds them");
+    assert.deepEqual(forbidden(f.calls), []);
+    // a rerun before the commit writes nothing new and still names the commit
+    const again = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(again.followUp.status, "already-followed-up"); assert.deepEqual(again.followUp.commit.paths, done.followUp.commit.paths);
+    // after the caller's commit: nothing is carried twice, by the close or by the later push follow-up
+    commitFollowUp(done.followUp.commit.paths);
+    const third = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(third.followUp.status, "nothing-to-carry", JSON.stringify(third.followUp)); assert.equal(third.followUp.commit, undefined); assert.equal(third.next, undefined);
+    assert.match(third.message, /Nothing is left to add to the audit bundle at this close[^]*\.$/u);
+    const later = prepareAuditProofFollowUp({ root: f.root, featureId: "feature-abc", approvedCommit: headOf(f), common: join(f.root, ".git"), releaseProof: null, releaseApproval: null });
+    assert.equal(later.status, "nothing-to-carry", "a later push follow-up carries no duplicate evidence");
+    assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified"); assert.deepEqual(readBundle(), before);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C31-B4: a close without a bundle, or without a recorded final record, writes nothing and never blocks", async () => {
+  const none = await closedLocalBundleFixture({ bundle: false });
+  try {
+    const done = oneShotClose(none.f.resumed, { runCommand: none.f.runner });
+    assert.equal(done.status, "closed-local"); assert.equal(done.followUp.status, "no-bundle"); assert.equal(done.followUp.commit, undefined); assert.equal(done.next, undefined);
+    assert.equal(existsSync(join(none.f.root, "audit-bundles")), false, "no bundle and nothing written");
+  } finally { rmSync(none.f.root, { recursive: true, force: true }); }
+  const bare = await closedLocalBundleFixture({ finalRecord: false });
+  try {
+    const done = oneShotClose(bare.f.resumed, { runCommand: bare.f.runner });
+    assert.equal(done.status, "closed-local"); assert.equal(done.followUp.status, "nothing-to-carry"); assert.equal(done.followUp.commit, undefined);
+    assert.equal(existsSync(join(bare.bundleRoot, "proofs")), false, "no final record, no follow-up");
+  } finally { rmSync(bare.f.root, { recursive: true, force: true }); }
 });

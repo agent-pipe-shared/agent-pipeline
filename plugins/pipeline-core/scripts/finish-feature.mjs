@@ -21,7 +21,8 @@ import { acceptanceQuestion, acceptanceTarget, acceptanceYesAnswersText, accepta
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
-import { closeSecurityScope, closeSecurityCoverage, describeCloseSecurityScope, CLOSE_FOLLOWUP_SENTENCE as FOLLOWUP_SENTENCE } from "../lib/security-close-status.mjs";
+import { closeSecurityScope, closeSecurityCoverage, describeCloseSecurityScope, closeFollowUpSentence } from "../lib/security-close-status.mjs";
+import { prepareCloseAuditFollowUp } from "../lib/audit-proof-collection.mjs";
 import { declaredRepositoryMode } from "./repository-freshness.mjs";
 import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
 import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
@@ -834,21 +835,30 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const step = (name, fn) => { stages.push(name); try { return { value: fn() }; } catch (error) { return { stop: stopResult(name, error.refusalCode ?? error.code, error.message, repairFor(error, id), { resumeLifecycleId: id, next: rerun(id) }) }; } };
   let observed = step("inspect", inspect); if (observed.stop) return observed.stop;
   const closedFeatureId = featureId ?? observed.value.identity?.featureId;
-  const commitFacts = () => {
-    // not rawGit: its trim() would eat the leading space of the first " M" status entry
-    // C22: the calibrated handover is part of the one close commit when the close rewrote it (CGF-12).
-    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : []),
-      // C29 (C2): an ignore line added on the close's postimage stop travels in the same one close commit, so the freeze and the final scan see it.
-      ...(existsSync(resolve(root, ".gitleaksignore")) ? [".gitleaksignore"] : [])]);
+  // The uncommitted paths under `pathspecs`, and the one commit that publishes them (armed for the protected ones). Not rawGit: its trim() would eat the leading space of the first " M" status entry.
+  const commitOf = (pathspecs, message) => {
+    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ...pathspecs]);
     const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
     const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
     paths.sort();
-    const message = `chore(close): close feature ${closedFeatureId}`;
     let armed = null;
     if (paths.length > 0) {
       try { armed = armWriterCommitCapability({ rootDir: root, writer: "finish-feature.mjs --one-shot", rerun: rerun(id), files: paths.filter((path) => existsSync(resolve(root, path))).map((path) => ({ path, sha256: sha256Hex(readFileSync(resolve(root, path))) })) }); } catch { armed = null; }
     }
     return { paths, excluded: armed?.excluded ?? [], capability: armed?.id ?? null, message, steps: paths.length > 0 ? writerCommitSteps(paths, message) : [] };
+  };
+  // C22: the calibrated handover is part of the one close commit when the close rewrote it (CGF-12).
+  const commitFacts = () => commitOf([statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : []),
+    // C29 (C2): an ignore line added on the close's postimage stop travels in the same one close commit, so the freeze and the final scan see it.
+    ...(existsSync(resolve(root, ".gitleaksignore")) ? [".gitleaksignore"] : [])], `chore(close): close feature ${closedFeatureId}`);
+  // C31-B4 (lane L6 stage 1): at closed-local the final Verify and the security verdict the close just recorded go into the bundle as the typed evidence follow-up. Files only; the commit stays the caller's
+  // step, derived from what git reports uncommitted under the bundle's proofs/, so a rerun before the commit names it again. Never blocks the close.
+  const closeFollowUp = () => {
+    let written;
+    try { written = prepareCloseAuditFollowUp({ root, featureId: closedFeatureId, approvedCommit: rawGit(["rev-parse", "HEAD"]), common: common() }); } catch (error) { return { status: "unavailable", code: String(error?.code ?? "AB-FOLLOWUP").slice(0, 60) }; }
+    if (typeof written.bundleDir !== "string") return { status: written.status };
+    const commit = commitOf([`${written.bundleDir}/proofs`], `chore(close): add the evidence follow-up of feature ${closedFeatureId}`);
+    return { status: written.status, bundleDir: written.bundleDir, ...(written.files === undefined ? {} : { files: written.files }), ...(commit.paths.length === 0 ? {} : { commit }) };
   };
   let phase = observed.value.coordinator?.phase;
   if (phase === "feature-close-prepared") {
@@ -945,8 +955,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     let declaredMode = null; try { declaredMode = declaredRepositoryMode(root)?.mode ?? null; } catch { declaredMode = null; }
     const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
     const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Correct it before the push, in this same feature, as its own commit with repository-mode-promote.mjs --root <repo> --to remote-tracked (push-init names the step; no signature): the Critic carry admits exactly that one-token change, and Verify runs again on the new HEAD." };
+    // C31-B4: only the close itself writes the follow-up; a rerun in a later phase (delivered, release-eligible, promoted) leaves it to the push's own follow-up.
+    const followUp = phase === "closed-local" ? closeFollowUp() : null;
     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)} ${securitySentence}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init. ${FOLLOWUP_SENTENCE}` });
+      ...(followUp === null ? {} : { followUp }),
+      ...(followUp?.commit === undefined ? {} : { next: "Commit followUp.commit.steps first, then run pushEvidence.command when it is present: the final Verify at HEAD (pushEvidence) runs AFTER that commit, because the commit moves HEAD; then push-init." }),
+      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)} ${securitySentence}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.${followUp === null ? "" : ` ${closeFollowUpSentence(followUp.commit === undefined ? followUp.status : "written")}`}` });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }

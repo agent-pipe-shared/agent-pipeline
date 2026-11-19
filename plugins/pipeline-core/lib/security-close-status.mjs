@@ -351,8 +351,16 @@ export function closeSecurityCoverage(scope) {
   return scope.capabilityPlan.optional > 0 ? "optional-checks-only" : "empty-plan";
 }
 
-/** C29e T4: the close is committed before its full security scan, so the bundle gets the final Verify and the security verdict only with the follow-up of the next push. */
-export const CLOSE_FOLLOWUP_SENTENCE = "The security verdict and the final Verify reach the audit bundle only with the evidence follow-up of the next push; until then this feature's audit bundle holds no security evidence.";
+/**
+ * C29e T4 / C31-B4: the close is committed before its full security scan, so the bundle gets the final Verify and the security verdict as an evidence follow-up. Since C31-B4 the close writes that
+ * follow-up itself at closed-local (`followUp` of its result) and prints its commit; the sentence says what the close really did, by the status the writer returned (never a stored status).
+ */
+export function closeFollowUpSentence(status) {
+  if (status === "written" || status === "already-followed-up") return "The close wrote the evidence follow-up of the audit bundle (followUp): the final Verify and the security verdict, as new files next to the closed bundle. Commit them with followUp.commit.steps; the final Verify at HEAD (pushEvidence) runs after that commit.";
+  if (status === "nothing-to-carry") return "Nothing is left to add to the audit bundle at this close: its evidence follow-up already carries the final Verify and the security verdict, or the close recorded none to carry. The next push's follow-up adds the approvals.";
+  if (status === "no-bundle") return "This feature has no audit bundle, so no evidence follow-up was written.";
+  return "The evidence follow-up of the audit bundle could not be written at this close (followUp.code); the next push's follow-up (audit-proof-followup.mjs) carries the security verdict and the final Verify.";
+}
 
 export function closeSecurityScopeNote(doc) {
   const scope = closeSecurityScope(doc);

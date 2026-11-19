@@ -162,6 +162,19 @@ function findBundleDir(root, featureId, approvedCommit) {
 }
 
 /**
+ * The close's step (C31-B4, lane L6 stage 1): at closed-local, `approvedCommit` is HEAD. Adds the final Verify and Security records the close just recorded to the feature's bundle as the
+ * typed evidence follow-up, with no proofs and no attributions (no approval exists yet). New files only; the bundle's manifest, README and artifacts stay byte for byte. Never blocking:
+ * no bundle is `no-bundle`, nothing recorded or already carried is `nothing-to-carry`. The commit of the written files stays the caller's step.
+ * @returns {ReturnType<typeof writeAuditProofFollowUp> | {status: "no-bundle"}}
+ */
+export function prepareCloseAuditFollowUp({ root, featureId, approvedCommit, common } = {}) {
+  if (typeof root !== "string" || !FEATURE_ID.test(featureId ?? "") || !OID.test(approvedCommit ?? "")) return { status: "no-bundle" };
+  const bundleDir = findBundleDir(root, featureId, approvedCommit);
+  if (bundleDir === null) return { status: "no-bundle" };
+  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, evidence: collectFollowUpEvidence(root, bundleDir, approvedCommit, common) });
+}
+
+/**
  * The release route's step (C20E-AP): collects what the push approval and the release approval of `approvedCommit` left (signed: the public proof objects;
  * chat or waiver: an attribution record) and adds it to the feature's bundle. Never blocking: no bundle is a typed notice (`no-bundle`).
  * @param {{root: string, featureId: string, approvedCommit: string, common: string, releaseProof: object|null, releaseApproval: {mode?: string, approvedAt?: string}|null}} input

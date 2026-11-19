@@ -587,6 +587,30 @@ test("C20E-AP the release step finds the feature's bundle (named after the packa
     assert.equal(chat.status, "already-followed-up");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+// C31-B4 (AC-112, closest accepted criterion; lane L6 stage 1): the close's own follow-up. Measured risk (a): at closed-local the approved commit IS the candidate, and merge-base --is-ancestor accepts it.
+test("C31-B4 the close step carries the recorded final Verify and Security records, also when the approved commit is the candidate itself; bad input and no bundle are typed notices", async () => {
+  const { prepareCloseAuditFollowUp } = await import("./audit-proof-collection.mjs");
+  const root = mkdtempSync(join(tmpdir(), "audit-followup-close-")); const git = (...args) => execFileSync("git", ["-C", root, "-c", "user.name=T", "-c", "user.email=t@example.invalid", ...args], { encoding: "utf8" }).trim();
+  try {
+    git("init", "-q", "-b", "main"); writeFileSync(join(root, "a.txt"), "a\n"); git("add", "a.txt"); git("commit", "-q", "-m", "candidate"); const candidate = git("rev-parse", "HEAD"); const tree = git("rev-parse", "HEAD^{tree}");
+    const common = join(root, ".git"); const input = { root, featureId: "feature-x", approvedCommit: candidate, common };
+    assert.equal(prepareCloseAuditFollowUp(input).status, "no-bundle");
+    for (const bad of [{ ...input, featureId: "X" }, { ...input, approvedCommit: "nope" }, { common }]) assert.equal(prepareCloseAuditFollowUp(bad).status, "no-bundle");
+    const dir = `audit-bundles/feature-x/${candidate}`; mkdirSync(join(root, dir), { recursive: true }); writeFileSync(join(root, dir, "manifest.json"), `${JSON.stringify({ schema: "pipeline.audit-bundle-manifest.v1", bundleId: "feature-x", candidate: { commit: candidate, tree } })}\n`);
+    assert.equal(prepareCloseAuditFollowUp(input).status, "nothing-to-carry", "a bundle and no recorded final record");
+    const verify = Buffer.from(`${JSON.stringify({ schema: "pipeline.verify-evidence.v0" })}\n`); const security = Buffer.from(`${JSON.stringify({ schema: "pipeline.security-verdict.v2" })}\n`);
+    const privateDirectory = join(common, "agent-pipeline", "publication-close", "lc-1", "evidence"); mkdirSync(privateDirectory, { recursive: true });
+    writeFileSync(join(privateDirectory, "final-verify.record.json"), verify); writeFileSync(join(privateDirectory, "final-security-verdict.record.json"), security);
+    writeFileSync(join(privateDirectory, "final-verification.json"), JSON.stringify({ schema: "pipeline.close-final-verification.v1", candidateOid: candidate, verifyStatus: "green", securityStatus: "green", verifySha256: hash(verify), securitySha256: hash(security) }));
+    const written = prepareCloseAuditFollowUp(input);
+    assert.equal(written.status, "written", JSON.stringify(written)); assert.deepEqual(written.files.map((file) => file.path), [`${dir}/proofs/001-final-verify.json`, `${dir}/proofs/002-security-verdict.json`, `${dir}/proofs/follow-up.json`]);
+    const list = JSON.parse(readFileSync(join(root, dir, "proofs", "follow-up.json"), "utf8")); assert.deepEqual([list.proofs, list.attributions, list.approvedCommit], [[], [], candidate]);
+    assert.equal(prepareCloseAuditFollowUp(input).status, "already-followed-up");
+    writeFileSync(join(root, "b.txt"), "b\n"); git("add", "-A"); git("commit", "-q", "-m", "the follow-up commit"); const later = git("rev-parse", "HEAD");
+    assert.equal(prepareCloseAuditFollowUp({ ...input, approvedCommit: later }).status, "nothing-to-carry", "a later approved commit carries no duplicate evidence");
+    assert.equal(prepareCloseAuditFollowUp({ ...input, approvedCommit: "f".repeat(40) }).status, "no-bundle", "an approved commit that is not in this history finds no bundle");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
 // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)
 // still builds and verifies, because nothing in the trust chain ever reads it.
