@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { fillCriticBriefing, renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
 import { CRITIC_BRIEFING_ROLE, renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
 import { criticRunnerFromEnv } from "../lib/critic-route-assurance.mjs";
+import { writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 
 export const DISPATCH_PREPARATION_SCHEMA = "pipeline.dispatch-preparation.v1";
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -53,6 +54,17 @@ critic-fill: the Claude route to hand a Critic its briefing as a verified pointe
   Antigravity and Codex carriers still carry the full text; a Workflow carrier refuses a pointer.
 `;
 
+const HELP_COMMAND = "node <plugin-root>/scripts/prepare-dispatch.mjs --help";
+/** C31-C1 (B3): an argument refusal shows the usage line of the failed verb and the runnable help command, never the whole help (a 3.9 KB text repeated in the context per refusal). */
+function usageRepair(verb) {
+  const lines = PREPARE_DISPATCH_HELP.split("\n");
+  const at = lines.findIndex((line) => line.startsWith(`  node <plugin-root>/scripts/prepare-dispatch.mjs ${verb} `));
+  if (at < 0) return `every verb and flag: ${HELP_COMMAND}`;
+  let end = at + 1;
+  while (lines[end]?.startsWith("       [")) end += 1;
+  return `usage: ${lines.slice(at, end).map((line) => line.trim()).join(" ")} ; every verb and flag: ${HELP_COMMAND}`;
+}
+
 const lastJson = (text) => {
   const trimmed = String(text ?? "").trim();
   if (trimmed === "") return null;
@@ -88,7 +100,7 @@ function healCommand(warning) { return /\bnode\s+\S*routine-repair\.mjs\b.*$/u.e
 
 export function prepareGoldfishDispatch({ root, packagePath, out = null, noGoldfishRunning = false }, deps = {}) {
   const verb = "goldfish";
-  if (typeof packagePath !== "string" || packagePath === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--package is required", repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
+  if (typeof packagePath !== "string" || packagePath === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--package is required", repair: usageRepair("goldfish") }, "PREP-ARGUMENT");
   const run = deps.runCommand ?? defaultRunner(root);
   const step = stepOf(run);
   const probeArgv = ["probe", "--package", packagePath, "--root", root];
@@ -138,15 +150,31 @@ function setAsideFilledRequest(target, deps) {
   return aside;
 }
 
+const shellWord = (word) => (/^[\w./@+=:\\-]+$/u.test(word) ? word : JSON.stringify(word));
+const sameSet = (left, right) => left.length === right.length && [...left].sort().join("\0") === [...right].sort().join("\0");
+
+/**
+ * C31-C1 (L14): the ONE commit step of `commit-required`, derived and never run here. The owned commit route (commit-pipeline-owned.mjs) commits a feature manifest
+ * together with the untracked evidence it lists; its own read-only dry-run says which paths it would commit. Only when that is exactly commitPaths is it named;
+ * every other answer (a refusal, other paths, nothing, no usable output) falls back to the printed steps for exactly commitPaths. This preparation still never commits.
+ */
+function commitStepFor({ root, commitPaths, step }) {
+  const dry = step("commit-pipeline-owned.mjs", ["--root", root, "--agent", "--dry-run"]);
+  const wouldCommit = dry.value?.status === "dry-run" ? [...(Array.isArray(dry.value.owned) ? dry.value.owned : []), ...(Array.isArray(dry.value.carried) ? dry.value.carried : [])] : null;
+  if (wouldCommit !== null && sameSet(wouldCommit, commitPaths)) return { route: "owned-commit", executable: process.execPath, argv: [scriptPath("commit-pipeline-owned.mjs"), "--root", root, "--agent"] };
+  const why = dry.value?.code ?? (dry.value?.status === "dry-run" ? "covers-other-paths" : dry.value?.status ?? "no-answer");
+  return { route: "explicit-steps", ownedRoute: why, steps: writerCommitSteps(commitPaths, "chore(pipeline): commit the Critic diagnostic evidence") };
+}
+
 export function prepareCriticDispatch(input, deps = {}) {
   const verb = "critic";
   const { root, spec, base, candidate, guardrails = [], evidence = [], taskId = null, priorCritic = null, deltaRequest = null, correctionInputBindings = null, registrationCommit = null, successorOf = null, label = null, command = [] } = input;
   for (const [flag, value] of [["--spec", spec], ["--base", base], ["--candidate", candidate]]) {
-    if (typeof value !== "string" || value === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: `${flag} is required`, repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
+    if (typeof value !== "string" || value === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: `${flag} is required`, repair: usageRepair(verb) }, "PREP-ARGUMENT");
   }
   if (!COMMIT.test(candidate)) return stopped(verb, "arguments", { code: "PREP-CANDIDATE-NOT-COMMIT", reason: `--candidate must be the full commit id, got ${candidate}`, repair: "pass the output of a rev-parse of the reviewed commit: the evidence commit moves HEAD, so a symbolic name would point at the wrong commit on the rerun" }, "PREP-CANDIDATE-NOT-COMMIT");
-  if ((label === null) !== (command.length === 0)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label and the check command after -- come together", repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
-  if (label !== null && !LABEL.test(label)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label takes letters, digits, dot, underscore and hyphen", repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
+  if ((label === null) !== (command.length === 0)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label and the check command after -- come together", repair: usageRepair(verb) }, "PREP-ARGUMENT");
+  if (label !== null && !LABEL.test(label)) return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: "--label takes letters, digits, dot, underscore and hyphen", repair: usageRepair(verb) }, "PREP-ARGUMENT");
   const run = deps.runCommand ?? defaultRunner(root);
   const step = stepOf(run);
   const exists = deps.exists ?? existsSync;
@@ -165,8 +193,9 @@ export function prepareCriticDispatch(input, deps = {}) {
       const registered = step("register-feature-package.mjs", ["--root", root, "--add-diagnostic-evidence", out]);
       if (registered.exit !== 0 || registered.value?.status === "refused") return stopped(verb, "register", asReason(registered), "PREP-REGISTER-FAILED");
       const commitPaths = [...new Set([out, log, ...(registered.value?.commitPaths ?? [])])];
-      return outcome(verb, "commit-required", { commitPaths, rerun: { executable: process.execPath, argv: [SELF, ...criticArgv(input)] },
-        next: "Commit exactly commitPaths in one evidence-only commit under this project's commit rules, then run the identical command again. Change nothing else first." });
+      const commit = commitStepFor({ root, commitPaths, step });
+      return outcome(verb, "commit-required", { commitPaths, commit, rerun: { executable: process.execPath, argv: [SELF, ...criticArgv(input)] },
+        next: `${commit.route === "owned-commit" ? `Run this one command, it commits exactly commitPaths (the manifest together with the evidence it lists): ${commit.argv.map(shellWord).join(" ")}` : "Run the steps of commit in order, they stage and commit exactly commitPaths in one evidence-only commit"}; then run the identical command again (rerun). Change nothing else first.` });
     }
     evidencePaths.push(out);
   }
@@ -213,7 +242,7 @@ const CRITIC_DRAFT_PATH = /^scratch\/critic-briefing\/([A-Za-z0-9][A-Za-z0-9._-]
 
 export function prepareCriticFill({ root, briefing, fills = [] }, deps = {}) {
   const verb = "critic-fill";
-  const refuse = (code, reason, repair = PREPARE_DISPATCH_HELP) => stopped(verb, code.startsWith("PREP-") ? "arguments" : "fill", { code, reason, repair }, code);
+  const refuse = (code, reason, repair = usageRepair(verb)) => stopped(verb, code.startsWith("PREP-") ? "arguments" : "fill", { code, reason, repair }, code);
   const match = typeof briefing === "string" ? CRITIC_DRAFT_PATH.exec(briefing.replace(/\\/gu, "/")) : null;
   if (match === null) return refuse("PREP-FILL-PATH", "--briefing must be a generated draft: scratch/critic-briefing/<folder>/critic[-<part>].briefing.md, the file `prepare-dispatch.mjs critic` wrote", "pass the path printed in next.briefings of the critic verb");
   const values = new Map();
@@ -319,7 +348,7 @@ export function parsePrepareDispatchArgv(argv) {
 
 export function runPrepareDispatch(argv, deps = {}) {
   const parsed = parsePrepareDispatchArgv(argv);
-  if (parsed.error !== undefined) return stopped(["critic", "critic-fill"].includes(argv[0]) ? argv[0] : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: "run prepare-dispatch.mjs --help for every verb and flag" }, "PREP-ARGUMENT");
+  if (parsed.error !== undefined) return stopped(["critic", "critic-fill"].includes(argv[0]) ? argv[0] : "goldfish", "arguments", { code: "PREP-ARGUMENT", reason: parsed.error, repair: usageRepair(argv[0]) }, "PREP-ARGUMENT");
   if (parsed.options.verb === "critic-fill") return prepareCriticFill(parsed.options, deps);
   return parsed.options.verb === "goldfish" ? prepareGoldfishDispatch(parsed.options, deps) : prepareCriticDispatch(parsed.options, deps);
 }

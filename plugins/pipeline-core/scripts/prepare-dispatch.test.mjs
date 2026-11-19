@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PREPARE_DISPATCH_HELP, parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
+import { PREPARE_DISPATCH_HELP, parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch, runPrepareDispatch } from "./prepare-dispatch.mjs";
 import * as prepareFill from "./prepare-dispatch.mjs";
 import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
@@ -126,7 +126,9 @@ const SAME_CANDIDATE = JSON.stringify({ candidate: { commit: CANDIDATE } });
 
 test("the first Critic call produces and registers evidence, stops once with the exact paths and commits nothing", () => {
   const steps = stub({ "git log": { status: 0, stdout: "\n", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({ path: "x" }),
-    "register-feature-package.mjs": ok({ status: "registered", commitPaths: ["specs/f/manifest.json"] }) });
+    "register-feature-package.mjs": ok({ status: "registered", commitPaths: ["specs/f/manifest.json"] }),
+    // C31-C1 (QG-04, restated stub): commit-required now asks the read-only dry-run of the owned commit route for its one commit step.
+    "commit-pipeline-owned.mjs": no({ status: "refused", code: "CPO-FOREIGN-CHANGES" }) });
   const result = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: steps.runCommand });
   assert.equal(result.status, "commit-required");
   assert.deepEqual(result.commitPaths, ["specs/f/evidence/suite.json", "specs/f/evidence/suite.log", "specs/f/manifest.json"]);
@@ -136,10 +138,11 @@ test("the first Critic call produces and registers evidence, stops once with the
 });
 
 test("a registered evidence that is still uncommitted is registered again and asks for the same commit, without producing it twice", () => {
-  const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }) });
+  const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }), "commit-pipeline-owned.mjs": no({ status: "refused", code: "CPO-FOREIGN-CHANGES" }) });
   const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
   assert.equal(result.status, "commit-required");
-  assert.deepEqual(steps.keys(), ["git log", "register-feature-package.mjs"]);
+  // C31-C1 (QG-04, restated list): the read-only dry-run of the owned commit route is the only step added; evidence is still not produced twice.
+  assert.deepEqual(steps.keys(), ["git log", "register-feature-package.mjs", "commit-pipeline-owned.mjs"]);
 });
 
 test("a label that recorded another candidate is refused before anything runs", () => {
@@ -227,7 +230,7 @@ test("C30F-G4B --successor-of passes through to the preflight and into the rerun
   assert.equal(parsed.options.successorOf, "feature-a");
   assert.match(parsePrepareDispatchArgv(["critic", "--root", ROOT, "--successor-of", "a", "--successor-of", "b"]).error, /twice/u);
   assert.match(parsePrepareDispatchArgv(["goldfish", "--root", ROOT, "--successor-of", "a"]).error, /unknown flag/u);
-  const commit = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({}), "register-feature-package.mjs": ok({ commitPaths: [] }) });
+  const commit = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({}), "register-feature-package.mjs": ok({ commitPaths: [] }), "commit-pipeline-owned.mjs": no({ status: "refused", code: "CPO-FOREIGN-CHANGES" }) });
   const stopped = prepareCriticDispatch({ ...CRITIC, successorOf: "feature-a" }, { ...noFiles, runCommand: commit.runCommand });
   assert.ok(stopped.rerun.argv.includes("--successor-of") && stopped.rerun.argv[stopped.rerun.argv.indexOf("--successor-of") + 1] === "feature-a", "the identical rerun keeps the flag");
 });
@@ -572,4 +575,94 @@ test("--help works in an empty directory and names both verbs", () => {
       assert.match(run.stdout, /dispatch-briefing\.mjs --help/u);
     }
   } finally { rmSync(empty, { recursive: true, force: true }); }
+});
+
+// --- C31-C1 (L14, AC-112): `commit-required` names the ONE commit step; the preparation still never commits. ---
+
+const EVIDENCE = ["specs/f/evidence/suite.json", "specs/f/evidence/suite.log"], MANIFEST = "specs/f/manifest.json";
+const FIRST_CALL = (extra = {}) => ({ "git log": { status: 0, stdout: "\n", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({ path: "x" }),
+  "register-feature-package.mjs": ok({ status: "registered", commitPaths: [MANIFEST, ...EVIDENCE] }), ...extra });
+const gitWrites = (steps) => steps.keys().filter((key) => /^git (add|commit)/u.test(key));
+
+test("C31-C1 L14: when the owned commit route covers exactly commitPaths, commit-required names that one command, derived from its own dry-run, and the identical rerun", () => {
+  const steps = stub(FIRST_CALL({ "commit-pipeline-owned.mjs": ok({ schema: "pipeline.commit-pipeline-owned.v1", status: "dry-run", owned: [MANIFEST], carried: EVIDENCE }) }));
+  const result = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: steps.runCommand });
+  assert.equal(result.status, "commit-required");
+  assert.equal(result.commit.route, "owned-commit");
+  assert.equal(basename(result.commit.argv[0]), "commit-pipeline-owned.mjs");
+  assert.deepEqual(result.commit.argv.slice(1), ["--root", ROOT, "--agent"], "the printed command is the dry-run without --dry-run");
+  assert.equal(result.commit.executable, process.execPath);
+  const dry = steps.calls.find((call) => call.key === "commit-pipeline-owned.mjs").argv;
+  assert.deepEqual(dry.slice(1), ["--root", ROOT, "--agent", "--dry-run"], "the preparation only asks the read-only dry-run");
+  assert.match(result.next, /commit-pipeline-owned\.mjs/u);
+  assert.match(result.next, /identical command again/u);
+  assert.deepEqual(gitWrites(steps), [], "the preparation never stages or commits");
+  assert.deepEqual(result.rerun.argv.slice(1, 3), ["critic", "--root"], "the identical rerun stays");
+});
+
+test("C31-C1 L14: when the owned route refuses, covers other paths, or answers nothing usable, commit-required prints the explicit steps for exactly commitPaths", () => {
+  const list = [...EVIDENCE, MANIFEST].join(" ");
+  const answers = [
+    no({ schema: "pipeline.commit-pipeline-owned.v1", status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted" }),
+    ok({ status: "dry-run", owned: [MANIFEST, "specs/f/slice-queue.json"], carried: EVIDENCE }),
+    ok({ status: "dry-run", owned: [MANIFEST], carried: [EVIDENCE[0]] }),
+    ok({ status: "nothing-to-commit", owned: [] }),
+    { status: 1, stdout: "not json", stderr: "" },
+  ];
+  for (const answer of answers) {
+    const steps = stub(FIRST_CALL({ "commit-pipeline-owned.mjs": answer }));
+    const result = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: steps.runCommand });
+    assert.equal(result.status, "commit-required", JSON.stringify(answer));
+    assert.equal(result.commit.route, "explicit-steps", JSON.stringify(answer));
+    assert.equal(result.commit.steps[0], `git add -- ${list}`, "git add of exactly the listed paths");
+    assert.equal(result.commit.steps.at(-1), `git commit -F scratch/commit-msg/writer-output.txt -- ${list}`, "the one commit command, scoped to the same paths");
+    assert.ok(result.commit.steps.some((line) => line.includes("AI-Assisted: true") && line.includes("Dispatch: stage-0 (elephant)")), "the message file carries the trailers");
+    assert.match(result.next, /identical command again/u);
+    assert.deepEqual(gitWrites(steps), [], "the preparation never stages or commits");
+  }
+  const refused = prepareCriticDispatch(CRITIC, { ...noFiles, runCommand: stub(FIRST_CALL({ "commit-pipeline-owned.mjs": answers[0] })).runCommand });
+  assert.equal(refused.commit.ownedRoute, "CPO-FOREIGN-CHANGES", "the reason the owned route was not offered is named");
+});
+
+test("C31-C1 L14: the second round of the same evidence (registered, still uncommitted) names the same step", () => {
+  const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }),
+    "commit-pipeline-owned.mjs": ok({ status: "dry-run", owned: [], carried: [] }) });
+  const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
+  assert.equal(result.status, "commit-required");
+  assert.equal(result.commit.route, "explicit-steps", "an empty dry-run covers no listed path");
+  assert.equal(result.commit.steps[0], `git add -- ${EVIDENCE.join(" ")}`);
+});
+
+// --- C31-C1 B3 (R4): an argument refusal names the usage line of the failed verb, not the whole help. ---
+
+const REPAIR_LIMIT = 600;
+const bytes = (text) => Buffer.byteLength(String(text), "utf8");
+const usageLineOf = (verb) => PREPARE_DISPATCH_HELP.split("\n").filter((line) => line.startsWith(`  node <plugin-root>/scripts/prepare-dispatch.mjs ${verb} `))[0];
+
+test("C31-C1 B3: every argument refusal repairs with the usage line of the failed verb plus --help, under 600 bytes, never the whole help", () => {
+  const refusals = [
+    ["goldfish", prepareGoldfishDispatch({ root: ROOT }, {})],
+    ["critic", prepareCriticDispatch({ root: ROOT }, {})],
+    ["critic", prepareCriticDispatch({ ...CRITIC, command: [] }, {})],
+    ["critic", prepareCriticDispatch({ ...CRITIC, label: "bad label" }, {})],
+    ["critic-fill", prepareFill.prepareCriticFill({ root: ROOT, briefing: DRAFT_PATH, fills: ["MODEL_ID"] }, { readFile: () => "" })],
+    ["goldfish", runPrepareDispatch(["goldfish"], {})],
+    ["critic", runPrepareDispatch(["critic", "--root", ROOT, "--bogus", "x"], {})],
+    ["critic-fill", runPrepareDispatch(["critic-fill", "--root"], {})],
+  ];
+  for (const [verb, result] of refusals) {
+    assert.equal(result.status, "stopped", verb);
+    const repair = result.stop.repair;
+    assert.ok(bytes(repair) < REPAIR_LIMIT, `${verb}: the repair is ${bytes(repair)} bytes`);
+    assert.ok(repair.includes(usageLineOf(verb).trim().split("\n")[0]), `${verb}: the repair holds the verb's usage line`);
+    assert.match(repair, /prepare-dispatch\.mjs --help/u, `${verb}: the runnable help command stays`);
+    assert.notEqual(repair, PREPARE_DISPATCH_HELP);
+  }
+});
+
+test("C31-C1 B3: an unknown verb has no usage line to show and still names the runnable help command", () => {
+  const result = runPrepareDispatch(["bogus", "--root", ROOT], {});
+  assert.equal(result.stop.code, "PREP-ARGUMENT");
+  assert.ok(bytes(result.stop.repair) < REPAIR_LIMIT);
+  assert.match(result.stop.repair, /node <plugin-root>\/scripts\/prepare-dispatch\.mjs --help/u);
 });

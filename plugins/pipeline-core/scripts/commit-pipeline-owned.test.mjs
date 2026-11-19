@@ -103,6 +103,32 @@ test("Codex report: an owned manifest is committed together with the untracked e
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// C31-C1 (L14, AC-112): the Critic preparation names this command as the one commit step of a diagnostic registration. The registration lists the diagnostic JSON and its member
+// (the targeted log) as candidate-evidence entries of the manifest, all left uncommitted; whether this route then carries BOTH was inferred, here it is measured with real Git.
+test("C31-C1: a manifest that lists a diagnostic JSON and its log as candidate evidence is committed with both, and the dry-run names exactly those paths without writing", () => {
+  const { root, run, put, evidencePath } = featureRepo("diagnostic");
+  try {
+    const sha = (text) => createHash("sha256").update(text).digest("hex");
+    const diagnostic = "specs/feat-1/evidence/suite.json", log = "specs/feat-1/evidence/suite.log";
+    const logText = "ok 1 - suite\n", diagnosticText = `${JSON.stringify({ schema: "pipeline.critic-diagnostic.v1", targeted: { log: { path: log } } })}\n`;
+    put(log, logText); put(diagnostic, diagnosticText);
+    const entry = (path, text) => ({ class: "candidate-evidence", path, sha256: sha(text), authority: false, mutability: "immutable", retention: "retain" });
+    const manifest = JSON.parse(readFileSync(join(root, "specs/feat-1/lifecycle.json"), "utf8"));
+    put("specs/feat-1/lifecycle.json", `${JSON.stringify({ ...manifest, artifacts: [entry(diagnostic, diagnosticText), entry(log, logText)] }, null, 2)}\n`);
+    rmSync(join(root, evidencePath)); // the fixture's own single evidence file is not part of this case
+    const head = run("rev-parse", "HEAD").trim();
+    const dry = commitPipelineOwned(["--root", root, "--agent", "--dry-run"]);
+    assert.equal(dry.status, "dry-run", JSON.stringify(dry));
+    assert.deepEqual([...dry.owned, ...dry.carried].sort(), ["specs/feat-1/lifecycle.json", diagnostic, log].sort());
+    assert.equal(run("rev-parse", "HEAD").trim(), head, "the dry-run commits nothing");
+    assert.match(run("status", "--porcelain"), /\?\? specs\/feat-1\/evidence\//u, "and stages nothing");
+    const done = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(done.status, "committed", JSON.stringify(done));
+    assert.deepEqual(run("show", "--name-only", "--format=", "HEAD").trim().split("\n").sort(), [diagnostic, log, "specs/feat-1/lifecycle.json"].sort());
+    assert.equal(run("status", "--porcelain").trim(), "");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("Codex report: the manifest committed alone is the gap the course reader cannot pass (control for the test above)", () => {
   const { root, run } = featureRepo("control");
   try {
