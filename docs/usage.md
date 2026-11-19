@@ -35,6 +35,97 @@ A refusal, recovery result, or restart boundary is also an action contract.
 Use its named public recovery step; do not edit generated state or guard files
 by hand to move past it.
 
+## From an idea to the implementation phase
+
+This is the path of one `feature` or `epic` in a new project, in the order it
+runs, and who does each step. The agent runs every preparation step; you decide
+at four points. Each command the agent runs is named in the plugin's
+[happy-path guide](../plugins/pipeline-core/skills/pipeline-start/references/happy-path.md),
+and every refusal carries its own repair, so you never need to compose a command
+yourself.
+
+| Step | The agent | You |
+| --- | --- | --- |
+| 1. Describe the feature | drafts the PRD and the Spec from what you say | answer the questions, correct the draft |
+| 2. Review the design | has an independent read-only reviewer read both, resolves the findings | nothing, unless a finding needs your call |
+| 3. Present the design | presents it with its digest and, in `signature` mode, prints the exact signing command | **decision 1: sign the design once** (or confirm it in the session in `chat` mode) |
+| 4. Enter implementation | registers the feature package, builds the architecture map, sets the phase | nothing |
+| 5. Build, review, close | dispatches the work per module, runs the boundary check, the Critic review and the Verify | **decision 2: answer the acceptance question** after the Verify has passed |
+| 6. Push and release | prepares the push and, for a consumer project, the release notes and the tag | **decisions 3 and 4: the push approval and, for a release, the release approval** |
+
+**1. The PRD and the Spec.** The Spec's acceptance criteria are a table with one
+row per criterion, for example `| AC-1 | WHEN <trigger>, THE system <behaviour> |
+<test file> |`. A criterion a user sees names its **journeys** (the ways in and
+the interruptions, such as entering by link and by form, reloading in the middle
+of a save, a second submit after an error) and what the test **asserts**; a
+criterion no user sees is tagged `[not user-facing: <reason>]`. The PRD carries
+the architecture design: the modules, the paths each module owns, written as
+exact files or directories (a wildcard is refused), and for every design decision
+the path of its ADR. A decision you accept together with the design starts as an
+ADR proposal that the agent creates before the review; the one design signature
+publishes it, so there is no separate approval for it. A file that still carries
+the generated draft framing (a `DRAFT TEMPLATE` comment, a table cell that reads
+`REPLACE`) is not a design yet, and the bootstrap names which marker is left.
+
+**2. The design review.** One full review round, then at most two delta rounds
+that read only the findings still open and what the correction changed. There is
+no fourth round: after the third, the findings that are still open are shown to
+you when you sign. Each round leaves a review receipt that the agent creates with
+the plugin's `design-review-receipt.mjs`; a receipt written by hand is not
+admissible. A round whose sources were corrected before its receipt existed is
+bound with `create --sources-at <commit>`. When the design changes the
+architecture rules of code that already exists, the agent previews what the
+boundary check will say before you sign, with `architecture-boundary-check.mjs
+--root <root> --preview-prd <PRD path>`; the preview needs no signature, writes
+nothing and is not an approval.
+
+**3. The signature.** In `signature` mode (the default) you sign in your own
+terminal with a key that lives outside the repository; in `chat` mode you
+confirm in the session, and the record is an attribution, not a proof
+([the approval strength](#choose-the-human-approval-strength-deliberately)).
+Either way the approval is bound to the exact design and to the commit it was
+presented at. **Do not commit between the presentation and the signature.** If a
+commit has happened, the next presentation is refused with the reason: the
+scratch copy of the request (`scratch/design-approval-request-<digest>.json`)
+binds the commit it was presented at and is stale. Delete that one file and
+present again.
+
+**4. The implementation phase.** After the signature the agent registers the
+feature package, commits it, and in a new project materializes the architecture
+map from the approved design. Source files stay out of the draft commit until the
+agent sets the phase to implementation.
+
+**5. Build, review, close.** The work is cut along the modules of the design, one
+fresh Goldfish per module with that module's paths as its write scope. After the
+last module the agent runs the architecture fitness and boundary checks; a
+violation is fixed before the Critic reads the candidate. The close is one command,
+`finish-feature.mjs --one-shot`, run by the agent: it collects the Verify, the
+registration and the audit request, and prints a quality readback next to the
+result (the acceptance criteria with their journeys, the risk trace, the scanner
+results). After a passing Verify it asks you one acceptance question in the
+project's language. A plain yes (for example `yes, I accept`) records the
+acceptance; anything else (a bug, a change request) is recorded as declined,
+never as an acceptance, and the close names the correction steps in order.
+
+**6. Push and release.** A push needs an approval bound to the exact candidate
+commit, in the strength you configured. A consumer project's release is one
+annotated version tag on the pushed, closed feature, with one release approval.
+The flow, layer by layer, is in [push and release flow](push-release-flow.md).
+
+**Restarting a session.** If you gave material input (scope, constraints, open
+questions) since the last durable update of the PRD or the Spec, the agent
+captures it into a bounded resume hint before a restart, and reads it back at the
+start of the next session. `resume-hint.mjs consume` and `query` take a
+`--session-id`: any non-empty id of the current session, chosen once and used for
+both verbs (the runner's own session id where it shows one); it is the caller's
+own identity, not a value to look up. The hint is never a readiness gate.
+
+**What each runner changes.** The path is the same on Claude Code, Codex and
+Antigravity; the differences are the dispatch carrier, the review observation and
+the escalation prompts, and are tabulated in
+[runner support](runner-support.md#what-differs-along-the-feature-path). The
+known limits you can meet on the way are in [known issues](known-issues.md).
+
 ## Verify a consumer project
 
 Use the installed plugin's `scripts/verify-evidence-producer.mjs` as the

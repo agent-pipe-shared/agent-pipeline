@@ -92,6 +92,8 @@ guides, release records, architecture decision records, and state archives.
 - [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
   review, evidence, and human authority.
 - [`design-decisions.md`](design-decisions.md) — the "why" behind the method.
+- [`whats-new-0.7.0.md`](whats-new-0.7.0.md) — what the `0.7.0` release
+  candidate adds, what its greenfield runs changed, and what stays open.
 - [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
   release: product scope, release boundary, and non-claims at that time.
 - [`whats-new-0.5.0.md`](whats-new-0.5.0.md) — what was new in the `0.5.0`

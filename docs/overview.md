@@ -36,7 +36,10 @@ the runner that actually executes it. This overview claims neither a released
 nor a fully accepted `0.7.0`.
 
 The documented Greenfield route (empty directory to first implementation step)
-is covered for Claude, Codex, and Antigravity; see [Usage](usage.md). Runner
+is covered for Claude, Codex, and Antigravity; see [Usage](usage.md), in
+particular [from an idea to the implementation phase](usage.md#from-an-idea-to-the-implementation-phase),
+and [what's new in 0.7.0](whats-new-0.7.0.md) for what the release candidate
+adds and what stays open. Runner
 integrations are described by their evidence: a common methodology does not
 mean that every host has identical native hooks, sandbox isolation, model
 identity, or platform coverage. Missing, stale, or malformed evidence, and

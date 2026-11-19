@@ -23,6 +23,27 @@ Runner evidence and platform evidence are independent. In particular, the
 synthetic macOS contract suite does not claim native macOS support for any
 runner.
 
+## What differs along the feature path
+
+The path in [usage](usage.md#from-an-idea-to-the-implementation-phase) is the
+same on every runner. Only these rows differ, each taken from the plugin's
+[happy-path guide](../plugins/pipeline-core/skills/pipeline-start/references/happy-path.md#what-differs-per-runner-only-rows-with-a-source),
+which is the source and lists the rest:
+
+| Topic | Claude Code | Codex | Antigravity |
+| --- | --- | --- | --- |
+| Starting a dispatched worker | the `Agent` tool with the role's agent type | `spawn_agent` after a preparation step (Codex runs no pre-tool hook for it) | `invoke_subagent` after a preparation step for read-only roles |
+| Design review observation | the hooks record the reviewing model, and a receipt without that observation is refused at the presentation | the receipt says `unobserved` and is presented | the receipt says `unobserved` and is presented |
+| Escalation prompts | no source in the guide | Codex mounts `.git` read-only, so every lifecycle write is escalated; your recorded onboarding consent covers the agent steps up to presenting the design, and the design approval, the push, the release and any guard override are never covered | no source in the guide |
+| Close entry | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` |
+| Push second gate | the host's classifier (a settings entry) | the runner's own prompt, not measured | the runner's own prompt, not measured |
+
+A row that is missing here has no source; ask instead of assuming. The
+Codex sandbox may not be able to start a `node` installed under a version
+manager; the start preflight reports `NODE-SANDBOX-UNREACHABLE` with its one-time
+remedy, and the onboarding Driver runs its own interpreter for the actions it
+spawns.
+
 ## Antigravity managed plugin directory and global install contract
 
 Agy keeps a managed copy of an imported plugin in its config directory and
