@@ -124,5 +124,30 @@ test("reading .git/agent-pipeline and writing elsewhere are not this refusal", (
     "sed -n 1,5p .git/agent-pipeline/x.json",
     "cp scratch/forged.json scratch/agent-pipeline-copy.json",
     "mkdir -p scratch/agent-pipeline",
+    // C32 (Codex greenfield report): a copy OUT of the control plane is a read.
+    "cp .git/agent-pipeline/x.json scratch/copy.json",
+    "cp -p .git/agent-pipeline/x.json scratch/copy.json",
+    "cp -r .git/agent-pipeline/design-review-observations scratch/obs",
+    "cp -- .git/agent-pipeline/x.json scratch/copy.json",
   ]) assert.equal(writeRefused(run(command)), false, command);
+});
+
+test("a copy that could write the control plane or aim a later write at it is still refused", () => {
+  mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
+  put("scratch/forged.json", "{}\n");
+  for (const command of [
+    "cp .git/agent-pipeline/x.json .git/agent-pipeline/y.json",
+    "cp scratch/forged.json .git/agent-pipeline/",
+    "cp -t .git/agent-pipeline scratch/forged.json",
+    "cp -rt .git/agent-pipeline scratch/forged.json",
+    "cp --target-directory=.git/agent-pipeline scratch/forged.json",
+    "cp -l .git/agent-pipeline/x.json scratch/linked.json",
+    "cp -s .git/agent-pipeline/x.json scratch/linked.json",
+    "cp --symbolic-link .git/agent-pipeline/x.json scratch/linked.json",
+    "cp -S .bak .git/agent-pipeline/x.json scratch/copy.json",
+    "cp .git/agent-pipeline/x.json",
+    "cp .git/agent-pipeline/x.json scratch/copy.json > .git/agent-pipeline/z",
+    "cp -- scratch/forged.json .git/agent-pipeline/x.json",
+    "mv .git/agent-pipeline/x.json scratch/moved.json",
+  ]) assert.ok(writeRefused(run(command)), command);
 });

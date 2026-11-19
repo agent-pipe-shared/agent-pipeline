@@ -103,6 +103,19 @@ function namesControlPlane(word, root) {
   } catch { return false; }
 }
 
+// C32 (Codex greenfield report): `cp <control-plane file> scratch/x` only reads the control plane and was refused as a write. A copy reads it when the
+// destination (the last operand) is not in it. Options that can write there or aim a later write at it keep the refusal: a target directory, a
+// backup suffix, and hard or symbolic links (a link in scratch/ would let a later write change the control-plane file itself).
+const COPY_WRITING_OPTION = /^-[A-Za-z]*[tSls]|^--(?:target-directory|link|symbolic-link|suffix)(?:=|$)/u;
+function copyOnlyReadsControlPlane(parts, root) {
+  const rest = parts.slice(1);
+  const end = rest.indexOf("--");
+  const before = end === -1 ? rest : rest.slice(0, end);
+  if (before.some((word) => word.startsWith("-") && COPY_WRITING_OPTION.test(word))) return false;
+  const operands = [...before.filter((word) => !word.startsWith("-")), ...(end === -1 ? [] : rest.slice(end + 1))];
+  return operands.length >= 2 && !namesControlPlane(operands.at(-1), root);
+}
+
 /** Returns { segment } for the first shell segment that would write the control-plane directory, else null. */
 export function controlPlaneShellWriteHit(command, root) {
   if (typeof command !== "string") return null;
@@ -112,7 +125,8 @@ export function controlPlaneShellWriteHit(command, root) {
     const executable = basename(String(parts[0]).replaceAll("\\", "/"));
     const sedInPlace = executable === "sed" && parts.some((word) => /^-[a-zA-Z]*i/u.test(word) || word.startsWith("--in-place"));
     const findMutates = executable === "find" && parts.some((word) => ["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf", "-fls"].includes(word));
-    const readOnly = (READ_ONLY_COMMANDS.has(executable) || (executable === "sed" && !sedInPlace) || (executable === "find" && !findMutates))
+    const readOnly = (READ_ONLY_COMMANDS.has(executable) || (executable === "sed" && !sedInPlace) || (executable === "find" && !findMutates)
+      || (executable === "cp" && copyOnlyReadsControlPlane(parts, root)))
       && !REDIRECT.test(segment.replace(DISCARD_REDIRECT, ""));
     if (!readOnly) return { segment: segment.trim().slice(0, 200) };
   }
