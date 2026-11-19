@@ -104,7 +104,7 @@ The acceptance question of the one-shot close is asked after the candidate Verif
    "Agent finished" task-notification starts no turn. So when the hand-back arrives, run the exact `wait-host-commit.mjs` command from the launch notice in that same turn,
    run it once more on `still-waiting`, and dispatch the next ready slice from its answer (after a compaction, `--help` names what to pass instead of the launch time). While ready
    slices remain, never end a turn with a status report or to wait for the pipeline to commit; a turn that ends there waits for the PO.
-5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate.
+5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate. The two tools differ in reach: `architecture-boundary-check.mjs` reads the whole tracked tree (ownership, line bound, imports, HTML script sources), while `architecture-fitness.mjs` judges the property classes of the model for one mode (`--mode candidate|pre-close|push|ci`, default `candidate`) and, with `--diff <path> [<path>...]`, only the paths of the change; a model run that must be bound to the candidate commit is `architecture-fitness.mjs --root <root> --qualify --commit <full candidate commit>`.
 
 ## 3. Critic
 
