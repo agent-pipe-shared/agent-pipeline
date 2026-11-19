@@ -224,9 +224,9 @@ export const READ_SCOPE_DENIAL_REMEDY = [
   "A read needs no human override and none is offered. Admitted instead: shell reads of files inside the project root and of the Pipeline plugin's own files, and the native Read tool for one exact file elsewhere.",
 ];
 
-// NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the SAME
-// grammar-denial class (code) within one scope -- per resolved dispatched subagent, or per
-// session_id absent one, NVA-B-TRIMKEY -- (blocked()'s `firstOccurrenceThisSession`
+// NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the grammar-denial
+// class (any of the four codes that print the listing share one class, candidate 31 B1) within one scope -- per resolved dispatched subagent, or per
+// session_id or Antigravity conversation id absent one, NVA-B-TRIMKEY -- (blocked()'s `firstOccurrenceThisSession`
 // parameter, backed by isFirstDenialThisScope() below). Deliberately still two full,
 // actionable lines -- never a bare marker -- per AC-3: a denial that becomes unactionable is
 // a regression, not a trim. Everything else the full form prints (the leading `${code}: ...`
@@ -235,5 +235,5 @@ export const READ_SCOPE_DENIAL_REMEDY = [
 // listing shrinks to 2 lines.
 export const GRAMMAR_DENIAL_REMEDY_SHORT = [
   "Use one simple shell command per tool call; no ;, pipelines, redirects, or line continuation outside the admitted grammar.",
-  "The complete admitted grammar with exact spellings was already printed on the earlier denial of this kind this session; reuse one of the shapes shown there.",
+  "The complete admitted grammar with exact spellings was already printed on an earlier grammar refusal in this context window; reuse one of the shapes shown there, for example \"rg -n needle probe.txt\".",
 ];

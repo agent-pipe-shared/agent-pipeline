@@ -9,6 +9,7 @@ import { readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
 import { resolveGitCommonDir } from "../../hooks/guard-dispatch-budget.mjs";
 import { ensureAgentPipelineRoot, ensureHardenedPrivateDirectory } from "../hardened-private-directory.mjs";
 import { REPAIR_MAP_SCRIPT } from "./constants.mjs";
+import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE } from "./grammar-denials.mjs";
 import { verdict } from "./verdict.mjs";
 import { lifecycleSubagentIdentity } from "./bootstrap-receipt.mjs";
 import { observedOnboardingCommandMatch } from "./command-catalogue.mjs";
@@ -84,14 +85,30 @@ function denialClassesScopeKey(input, dependencies) {
   if (identity.kind === "subagent" && typeof identity.agentId === "string" && identity.agentId !== "") {
     return `agent-${identity.agentId}`;
   }
-  return typeof input?.session_id === "string" && input.session_id !== "" ? input.session_id : null;
+  if (typeof input?.session_id === "string" && input.session_id !== "") return input.session_id;
+  // Candidate 31 (B1): the Antigravity adapter payload carries the host's conversation id and no session_id, so without this
+  // fallback the trim never fired there. The id passes the same check as resetDenialClassesForSession(). A governed native
+  // child may share its parent's conversation id (NOT established), so it keeps no key: full text every time, never a wrong trim.
+  const conversation = input?.antigravity_conversation_id;
+  if (typeof input?.native_child_cwd === "string" || !isPlainScopeId(conversation)) return null;
+  return conversation;
 }
+
+function isPlainScopeId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9._-]{1,128}$/u.test(value) && !value.startsWith("agent-");
+}
+
+// Candidate 31 (B1): the four codes that print the complete grammar listing share ONE class. Once any of them printed it in a
+// scope, the others render the short form. The stored value stays the raw code (no new key shape); READ_SCOPE and credential
+// refusals are not in this set and keep their own behaviour.
+const GRAMMAR_LISTING_CODES = [READ_COMMAND_UNSUPPORTED_CODE, ...Object.keys(GRAMMAR_DENIAL_GUIDANCE)];
 
 /**
  * NVA-B-DENIALTRIM / NVA-B-TRIMKEY: true on the first denial of `classKey` (a grammar-denial
  * `code`) within one scope (see denialClassesScopeKey() above -- per resolved subagent, or
- * per session_id when no subagent identity resolves); false once that same class has already
- * been recorded seen for that same scope. Consulted ONLY on an actual denial (never on an
+ * per session_id, or per Antigravity conversation id, when no subagent identity resolves); false once that same class has already
+ * been recorded seen for that same scope. Candidate 31 (B1): the four codes that print the complete grammar listing
+ * (GRAMMAR_LISTING_CODES) are ONE class for this answer -- false once any of them was recorded in the scope. Consulted ONLY on an actual denial (never on an
  * admitted/lifted command) by the two grammar-denial call sites in
  * evaluateLifecycleReadyGuard() below, and only within their `if (!route.admitted)` branch.
  *
@@ -121,6 +138,9 @@ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
       const parsed = JSON.parse(readFileSyncFn(statePath, "utf8"));
       if (Array.isArray(parsed?.seenClasses)) seenClasses = parsed.seenClasses;
     }
+    const listingSeen = GRAMMAR_LISTING_CODES.includes(classKey)
+      ? seenClasses.some((seen) => GRAMMAR_LISTING_CODES.includes(seen))
+      : seenClasses.includes(classKey);
     if (seenClasses.includes(classKey)) return false;
     ensureGuardDenialClassesDir(commonDir, mkdirSyncFn);
     const updated = {
@@ -128,7 +148,7 @@ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
       seenClasses: [...seenClasses, classKey],
     };
     writeFileSyncFn(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf8");
-    return true;
+    return !listingSeen;
   } catch {
     return true; // never let a state-store failure trim an actionable denial -- fail open
   }
@@ -143,7 +163,7 @@ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
  * Never throws: a missing file, an unusable session id or an unresolvable common dir is a no-op.
  */
 export function resetDenialClassesForSession(sessionId, root, dependencies = {}) {
-  if (typeof sessionId !== "string" || !/^[A-Za-z0-9._-]{1,128}$/u.test(sessionId) || sessionId.startsWith("agent-")) return "skipped";
+  if (!isPlainScopeId(sessionId)) return "skipped";
   try {
     const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
     if (commonDir === null) return "skipped";
