@@ -33,8 +33,8 @@ guides, release records, architecture decision records, and state archives.
 - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
   — read-only status and proposal before an existing project adopts the
   architecture controls.
-- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
-  Nova product strands.
+- [`overview.md`](overview.md) — what the product is for, what you get, and the
+  `0.7.0` release status.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
   preview-first migration and the Codex lifecycle V4.
 - [`migration.md`](migration.md) — pointer to the current onboarding and V3
