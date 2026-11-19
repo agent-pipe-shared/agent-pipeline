@@ -1,0 +1,428 @@
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 4da451ba987fa0cbea372a97c48f33a0845dd9d3..54eeabb1f94eff7e764dce660ca94ea039e21429 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -72,6 +72,14 @@ Questions:
+ Write `- none` under a heading with no item. Keep every id on the line that
+ starts its item.
+ 
++In a delta round the status of an earlier round's items goes under a label line
++of its own, at least three words and ending in a colon, for example
++`Earlier-round items, status against the current text:`, never under
++`Blocking findings:`. Under `Blocking findings:` stand only the findings that are
++open now, and a finding or question raised now takes a new id: never reuse an id
++of an earlier round for a different point. The host reads the open findings of
++the receipt from `Blocking findings:` alone (`DRC-FINDINGS-SPLIT`).
++
+ ## What to check
+ 
+ Never state a proposed architecture scope or disposition as a fact: you cannot
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.test.mjs b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+index f685697685c77703497e9776c5b94b146b216dfb..2e896b53a6e88b003e8c993d39b5691c7af0906f 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+@@ -19,7 +19,7 @@ import {
+   parseDesignReviewReceipt,
+   summarizeDesignReviewReceipt,
+ } from "./design-review-receipt.mjs";
+-import { checkOpenFindingsAgainstReport, designReviewReportSections } from "./design-review-report-sections.mjs";
++import { checkOpenFindingsAgainstReport, designReviewReportLines, designReviewReportSections } from "./design-review-report-sections.mjs";
+ import { designReviewRoundFinding } from "./dispatch-policy.mjs";
+ import { consumeDesignReviewObservation, listUnreceiptedDesignReviewRounds, recordDesignReviewObservation } from "./design-review-observation.mjs";
+ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+@@ -698,6 +698,35 @@ test("C30-6: a report whose questions are all that is left reads as ready (no op
+   assert.deepStrictEqual(designReviewReportSections("**Blocking findings:**\n- DESIGN-REVIEW-4 a cycle\n**Questions:**\n- DESIGN-QUESTION-1 x").blocking, ["DESIGN-REVIEW-4"]);
+ });
+ 
++test("C31a: a label line ends the section, an id-anchored resolved status drops an item, and neither loses a genuine finding", () => {
++  const label = "Round 1 questions, status against the current text:";
++  const report = [
++    "Blocking findings:",
++    "- DESIGN-REVIEW-1 the snapshot has two locations; the data shape must be fixed before build.",
++    "Repair:",
++    "state one location.",
++    "- DESIGN-REVIEW-2 a second finding after a short label and a prose line",
++    "",
++    label,
++    "- DESIGN-QUESTION-1 (scope): resolved.",
++    "- DESIGN-QUESTION-2: withdrawn",
++    "",
++    "Questions:",
++    "- DESIGN-QUESTION-1 a new point reusing the id",
++  ].join("\n");
++  // The one-word "Repair:" label and the prose line do not end the section: the second finding is kept.
++  assert.deepStrictEqual(designReviewReportSections(report), { structured: true, blocking: ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"], questions: ["DESIGN-QUESTION-1"] });
++  assert.deepStrictEqual(designReviewReportLines(report), { blocking: { "DESIGN-REVIEW-1": 2, "DESIGN-REVIEW-2": 5 }, questions: { "DESIGN-QUESTION-1": 12 } });
++  // Without the label line the earlier items are read, but the id-anchored status still drops the resolved ones; "fixed before build" does not.
++  const noLabel = report.replace(`${label}\n`, "");
++  assert.deepStrictEqual(designReviewReportSections(noLabel).blocking, ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"]);
++  // A status that is not directly after the id does not count: the item stays open (fail open towards the hold).
++  const hidden = "Blocking findings:\n- DESIGN-REVIEW-3 the import is refused; an earlier version of this was resolved elsewhere\n";
++  assert.deepStrictEqual(designReviewReportSections(hidden).blocking, ["DESIGN-REVIEW-3"]);
++  // A markdown heading still ends the section as before.
++  assert.deepStrictEqual(designReviewReportSections("Blocking findings:\n- DESIGN-REVIEW-4 x\n## Notes\n- DESIGN-REVIEW-5 y").blocking, ["DESIGN-REVIEW-4"]);
++});
++
+ test("C30-6: a legacy report without a Blocking findings section is not split and is not checked", () => {
+   const legacy = "NOT READY\nDESIGN-REVIEW-1 something\nDESIGN-REVIEW-2 something else";
+   assert.deepStrictEqual(designReviewReportSections(legacy), { structured: false });
+diff --git a/plugins/pipeline-core/lib/design-review-report-sections.mjs b/plugins/pipeline-core/lib/design-review-report-sections.mjs
+index 25801e0a74115e21c7a876fe81008c5d14236620..2606f9d3390c6646aea9152f8f17cb2576a967fd 100644
+--- a/plugins/pipeline-core/lib/design-review-report-sections.mjs
++++ b/plugins/pipeline-core/lib/design-review-report-sections.mjs
+@@ -10,35 +10,67 @@
+  *
+  * A report without a `Blocking findings:` line is a legacy report: nothing is inferred from it and the caller keeps the old
+  * rule (every id the Elephant passes is an open finding). Pure: no filesystem, no git, no clock.
++ *
++ * C31a (greenfield 2026-11-19): a delta report lists the earlier round's items under a label of its own ("Round 1 questions,
++ * status against the current text:"). That line matched no heading, so the blocking section ran on through it and nine
++ * `resolved` questions became open findings the receipt could not carry (`DRC-FINDINGS-SPLIT`), which stopped the next
++ * review dispatch. A section now also ends at a label line (an unindented line that is no item and ends in a colon), and an
++ * item whose id is followed directly by `resolved`, `withdrawn` or `closed` is not open. The second rule is anchored on the id
++ * on purpose: a genuine finding that says "must be fixed before build" later in its line stays open.
+  */
+ 
+ const BLOCKING_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*blocking(?:\s+findings?)?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(?:\(.*\))?\s*$/iu;
+ const QUESTIONS_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(?:open\s+)?questions?(?:\s+to\s+the\s+elephant)?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(?:\(.*\))?\s*$/iu;
+ const OTHER_HEADING = /^\s*#{1,6}\s+\S/u;
+ const ITEM_ID = /^\s*(?:[-*+]|\d+[.)])?\s*(?:\*\*|__)?\[?([A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7})\]?(?:\*\*|__)?(?=[\s:.)\-—–]|$)/u;
++// An unindented, non-bullet line of at least three words that ends in a colon. A one- or two-word "Repair:" inside an item does not end the section.
++const LABEL_LINE = /^(?![-*+]\s|\d+[.)]\s)\S+(?:[ \t]+\S+){2,}[ \t]*(?:\*\*|__)?[ \t]*$/u;
++const ENDS_WITH_COLON = /:\s*(?:\*\*|__)?\s*$/u;
++const RESOLVED_STATUS = /^\s*(?:\([^)]*\))?\s*[:\-—–]?\s*(?:\*\*|__)?(?:resolved|withdrawn|closed)\b/iu;
+ 
+-/**
+- * @param {string} text the report text
+- * @returns {{ structured: false } | { structured: true, blocking: string[], questions: string[] }}
+- */
+-export function designReviewReportSections(text) {
+-  if (typeof text !== "string") return { structured: false };
++/** The report scanned once: each item with the 1-based line it was read from. */
++function scan(text) {
+   const lines = text.split(/\r?\n/u);
+-  if (!lines.some((line) => BLOCKING_HEADING.test(line))) return { structured: false };
++  if (!lines.some((line) => BLOCKING_HEADING.test(line))) return null;
+   const blocking = [];
+   const questions = [];
+   let section = null;
+-  for (const line of lines) {
+-    if (BLOCKING_HEADING.test(line)) { section = "blocking"; continue; }
+-    if (QUESTIONS_HEADING.test(line)) { section = "questions"; continue; }
+-    if (OTHER_HEADING.test(line)) { section = null; continue; }
+-    if (section === null) continue;
++  lines.forEach((line, index) => {
++    if (BLOCKING_HEADING.test(line)) { section = "blocking"; return; }
++    if (QUESTIONS_HEADING.test(line)) { section = "questions"; return; }
++    if (OTHER_HEADING.test(line)) { section = null; return; }
++    if (section === null) return;
+     const match = ITEM_ID.exec(line);
+-    if (match === null) continue;
++    if (match === null) {
++      if (line.length <= 160 && ENDS_WITH_COLON.test(line) && LABEL_LINE.test(line)) section = null;
++      return;
++    }
++    if (section === "blocking" && RESOLVED_STATUS.test(line.slice(match[0].length))) return;
+     const bucket = section === "blocking" ? blocking : questions;
+-    if (!bucket.includes(match[1])) bucket.push(match[1]);
+-  }
+-  return { structured: true, blocking: blocking.sort(), questions: questions.sort() };
++    if (!bucket.some((entry) => entry.id === match[1])) bucket.push({ id: match[1], line: index + 1 });
++  });
++  return { blocking, questions };
++}
++
++/**
++ * @param {string} text the report text
++ * @returns {{ structured: false } | { structured: true, blocking: string[], questions: string[] }}
++ */
++export function designReviewReportSections(text) {
++  if (typeof text !== "string") return { structured: false };
++  const scanned = scan(text);
++  if (scanned === null) return { structured: false };
++  return { structured: true, blocking: scanned.blocking.map((entry) => entry.id).sort(), questions: scanned.questions.map((entry) => entry.id).sort() };
++}
++
++/**
++ * Where each id of the blocking and the question section was read, for a refusal that has to be diagnosable.
++ * @returns {{ blocking: Record<string, number>, questions: Record<string, number> }}
++ */
++export function designReviewReportLines(text) {
++  const scanned = typeof text === "string" ? scan(text) : null;
++  const toMap = (entries) => Object.fromEntries(entries.map((entry) => [entry.id, entry.line]));
++  return scanned === null ? { blocking: {}, questions: {} } : { blocking: toMap(scanned.blocking), questions: toMap(scanned.questions) };
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/dispatch-policy.mjs b/plugins/pipeline-core/lib/dispatch-policy.mjs
+index 6d49f4e698db9a6f965e7f007314b0476087c96d..2c505da53ff0cb4ff61c9c5cb5c8639648b90d66 100644
+--- a/plugins/pipeline-core/lib/dispatch-policy.mjs
++++ b/plugins/pipeline-core/lib/dispatch-policy.mjs
+@@ -257,7 +257,7 @@ export function designReviewRoundFinding({ subagentType, unreceiptedRounds } = {
+   return {
+     code: "DISPATCH-DESIGN-REVIEW-NO-RECEIPT",
+     why: `${count === 1 ? "an earlier readiness review round has" : `${count} earlier readiness review rounds have`} no receipt yet; the design review is one full round and at most two delta rounds (C30-6), so a next round is a delta of a receipted one. `
+-      + "Repair, before correcting anything: write the report with `node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <report path>`, create the receipt over the unchanged sources with `design-review-receipt.mjs create` (one `--open-finding` per id under the report's \"Blocking findings:\"; a question is no finding), commit it, then correct the sources and dispatch the delta round (`create --previous <that receipt>`). A round older than 48 hours is treated as abandoned.",
++      + "Repair, before correcting anything: write the report with `node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <report path>`, create the receipt over the unchanged sources with `design-review-receipt.mjs create` (one `--open-finding` per id under the report's \"Blocking findings:\"; a question is no finding), commit it, then correct the sources and dispatch the delta round (`create --previous <that receipt>`). If the sources were already corrected and committed after the review read them, do not restore them in the tree: pass `--sources-at <the commit the reviewer read>` to `create`, which reads the PRD, Spec and companion bytes of that commit from git (it must be an ancestor of HEAD). A round older than 48 hours is treated as abandoned.",
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index efcef388cfb046b09741b0f298e4218a3137e006..0faa9e6b7a101bad3fc95121022b9d64b0d4233e 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -300,6 +300,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
+       optionalValue: {
+         "--previous": input,
+         "--original-report": input,
++        "--sources-at": (value) => /^[0-9a-f]{7,40}$/u.test(value),
+         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
+         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
+         "--fallback-reason-code": (value) => FALLBACK_REASON_CODE.test(value),
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 251698b90edfa039e8496f1d094f72e472292c32..8847bbc5c2caf71ab38f7fd69e9387f04b469c65 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -340,6 +340,9 @@ async function walkSteps(f, { actualGuard }) {
+   writeFileSync(join(f.root, 'evidence/design-review-original-1.md'), 'original report\n');
+   check('design-review receipt (original under evidence/)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+     '--original-report', 'evidence/design-review-original-1.md', '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-4.json`));
++  // C31a: the receipt over the bytes of the commit the reviewer read (the sources were corrected after the review) is admitted in the same state.
++  check('design-review receipt (sources at a commit)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
++    '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--sources-at', 'abc1234', '--out', `specs/${f.featureId}/review/design-review-receipt-5.json`));
+   check('design-review receipt (delta)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+     '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--previous', receiptPath, '--open-finding', 'F-1', '--out', `specs/${f.featureId}/review/design-review-receipt-3.json`));
+   // 4. present-plan, then the approval transport in the spelling inspect renders after a presentation, then the phase switch
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index c9b6606b5385c725332d8262f6d776335411db56..74d591472cd41676ee23dc0d240a4bc43f35dbe8 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -30,20 +30,21 @@
+  * was written by hand instead.
+  */
+ 
++import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { dirname, join, sep } from "node:path";
+ 
+ import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
+ import { consumeDesignReviewObservation, listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
+-import { checkOpenFindingsAgainstReport } from "../lib/design-review-report-sections.mjs";
++import { checkOpenFindingsAgainstReport, designReviewReportLines } from "../lib/design-review-report-sections.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ 
+ export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
+ 
+ const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
+-  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
++  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--sources-at <commit>] [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
+   + "       design-review-receipt.mjs export-report --repo <repo-root> --out <report> [--observation <sha256>]\n"
+   + "Every path is repo-relative. The review time, runner, reviewer model and all digests are derived, never supplied. On Claude the "
+   + "reviewer model is read from the host's record of the readiness-reviewer dispatch, found by the report's digest (export-report "
+@@ -60,7 +61,7 @@ const SINGLE_FLAGS = new Map([
+   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
+   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
+   ["original-report", "originalReportPath"], ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
+-  ["fallback-reason-code", "fallbackReasonCode"],
++  ["fallback-reason-code", "fallbackReasonCode"], ["sources-at", "sourcesAt"],
+ ]);
+ // K128: the one fallback route name, as the canonical fallback result and the recovery state spell it.
+ const FALLBACK_ROUTE = "fallback-self-dispatch";
+@@ -118,6 +119,33 @@ function readBound(repoReal, path, role) {
+   }
+ }
+ 
++const SOURCES_AT_PATTERN = /^[0-9a-f]{7,40}$/u;
++
++/**
++ * C31a: the commit whose PRD, Spec and companion bytes the reviewer read. A receipt binds the bytes a review read; when the sources were
++ * corrected after the review and before the receipt existed (the correction is committed, the next dispatch is blocked until the round has
++ * a receipt), the working tree no longer holds them. `--sources-at <commit>` reads those bytes from git objects instead of restoring them
++ * in the tree. The commit must be an ancestor of HEAD, so it names history of this branch, never an unrelated object.
++ */
++function resolveSourcesAt(repoReal, ref) {
++  if (!SOURCES_AT_PATTERN.test(ref)) return refuse("DRC-SOURCES-AT-INVALID", "--sources-at takes a commit id of 7 to 40 lowercase hex digits (git log shows it)");
++  const git = (args) => execFileSync("git", args, { cwd: repoReal, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 20 }).trim();
++  let commit;
++  try { commit = git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]); } catch { return refuse("DRC-SOURCES-AT-INVALID", `--sources-at ${ref} is not a commit of this repository`); }
++  try { git(["merge-base", "--is-ancestor", commit, "HEAD"]); } catch { return refuse("DRC-SOURCES-AT-INVALID", `--sources-at ${ref} is not an ancestor of HEAD; name the commit the reviewer read, from this branch's history`); }
++  return { ok: true, commit };
++}
++
++/** The bytes of a file at a commit (a blob, never a link), or a refusal. */
++function readBoundAt(repoReal, commit, path, role) {
++  const git = (args) => execFileSync("git", args, { cwd: repoReal, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 << 20 });
++  let entry;
++  try { entry = execFileSync("git", ["ls-tree", commit, "--", path], { cwd: repoReal, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { entry = ""; }
++  if (entry === "") return refuse("DRC-SOURCES-AT-MISSING", `${role} file ${path} does not exist at commit ${commit.slice(0, 12)}`);
++  if (!/^100(?:644|755) blob /u.test(entry)) return refuse("DRC-FILE-UNSAFE", `${role} at commit ${commit.slice(0, 12)} must be a regular file, not a link or directory: ${path}`);
++  try { return { ok: true, bytes: git(["show", `${commit}:${path}`]) }; } catch { return refuse("DRC-SOURCES-AT-MISSING", `${role} file ${path} cannot be read at commit ${commit.slice(0, 12)}`); }
++}
++
+ /** Resolve the output location: a new file in an existing directory inside the repository. */
+ function resolveOutput(repoReal, outPath) {
+   const absolute = join(repoReal, ...outPath.split("/"));
+@@ -181,6 +209,8 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const openFindingIds = request.openFindingIds ?? [];
+   const previousPath = request.previousPath ?? null;
+   const originalReportPath = request.originalReportPath ?? null;
++  const sourcesAtRef = request.sourcesAt ?? null;
++  if (sourcesAtRef !== null && typeof sourcesAtRef !== "string") return refuse("DRC-USAGE", "the request is malformed");
+   const requestedRoute = request.requestedRoute ?? null;
+   const observedIdentity = request.observedIdentity ?? null;
+   const isStrings = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+@@ -229,17 +259,25 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const output = resolveOutput(repoReal, request.outPath);
+   if (!output.ok) return output;
+ 
++  // C31a: the PRD, Spec and companion bytes come from the working tree, or from the named commit when --sources-at is given.
++  let readSource = (path, role) => readBound(repoReal, path, role);
++  if (sourcesAtRef !== null) {
++    const resolved = resolveSourcesAt(repoReal, sourcesAtRef);
++    if (!resolved.ok) return resolved;
++    readSource = (path, role) => readBoundAt(repoReal, resolved.commit, path, role);
++  }
++
+   const sources = {};
+   let specBytes = null;
+   for (const [key, role, path] of [["prd", "PRD", request.prdPath], ["spec", "Spec", request.specPath]]) {
+-    const read = readBound(repoReal, path, role);
++    const read = readSource(path, role);
+     if (!read.ok) return read;
+     sources[key] = { path, sha256: sha256Of(read.bytes) };
+     if (key === "spec") specBytes = read.bytes;
+   }
+   sources.companions = [];
+   for (const path of companionPaths) {
+-    const read = readBound(repoReal, path, "companion");
++    const read = readSource(path, "companion");
+     if (!read.ok) return read;
+     sources.companions.push({ path, sha256: sha256Of(read.bytes) });
+   }
+@@ -262,7 +300,10 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const split = splitText === null ? { ok: true } : checkOpenFindingsAgainstReport(splitText, openFindingIds);
+   if (!split.ok) {
+     const parts = [];
+-    if (split.missing.length > 0) parts.push(`the report lists blocking finding(s) not passed as --open-finding: ${split.missing.join(", ")}`);
++    // C31a: name the report line each id was read from, so a misread section is visible instead of retried unchanged.
++    const readAt = designReviewReportLines(splitText).blocking;
++    const withLine = (id) => (readAt[id] === undefined ? id : `${id} (report line ${readAt[id]})`);
++    if (split.missing.length > 0) parts.push(`the report lists blocking finding(s) not passed as --open-finding: ${split.missing.map(withLine).join(", ")}; if one of them is an earlier-round item the reviewer marks resolved, the report keeps it under "Blocking findings:" without a label line of its own ending in a colon: pass it as --open-finding as well (a delta round withdraws it) and have the next briefing ask for earlier-round status under such a label line`);
+     if (split.questionsAsFindings.length > 0) parts.push(`a question is not an open finding and is never passed as one: ${split.questionsAsFindings.join(", ")}`);
+     const other = split.extra.filter((id) => !split.questionsAsFindings.includes(id));
+     if (other.length > 0) parts.push(`--open-finding id(s) the report does not list under "Blocking findings": ${other.join(", ")}`);
+@@ -457,7 +498,7 @@ function parseArgv(argv) {
+   }
+   const missing = REQUIRED.find((name) => !single.has(name));
+   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
+-  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
++  const request = { ...repeated, previousPath: null, originalReportPath: null, sourcesAt: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
+   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
+   return { ok: true, command: "create", request };
+ }
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index 1a2a235fc7261a946791e1339a1aec69e3fcfdac..b9ddf8a02734de2c7106a398a22ca9c8d1b90d6a 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -140,13 +140,98 @@ test("C30-6: the receipt's open findings must equal the report's blocking findin
+   assert.match(asQuestion.message, /a question is not an open finding.*DESIGN-QUESTION-1/u);
+   const dropped = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });
+   assert.equal(dropped.code, "DRC-FINDINGS-SPLIT");
+-  assert.match(dropped.message, /not passed as --open-finding: DESIGN-REVIEW-1/u);
++  assert.match(dropped.message, /not passed as --open-finding: DESIGN-REVIEW-1 \(report line 4\)/u);
+   assert.equal(readdirSync(join(repo, "specs/feat-x/review")).some((name) => name.endsWith(".receipt.json")), false, "nothing is written on a refusal");
+   const exact = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
+   assert.equal(exact.ok, true, JSON.stringify(exact));
+   assert.deepEqual(exact.receipt.openFindingIds, ["DESIGN-REVIEW-1"]);
+ }));
+ 
++// C31a (greenfield 2026-11-19, synthetic copy of the shape): a delta report lists the earlier round's questions as resolved under a label line of its own.
++// Before the fix those nine lines were read as blocking findings, the receipt was refused (DRC-FINDINGS-SPLIT) and the next review dispatch stayed blocked.
++const DELTA_REPORT = [
++  "Verdict: NOT READY",
++  "",
++  "Round 2, delta review. One blocking finding is open; the round 1 questions are resolved, as listed below.",
++  "",
++  "Blocking findings:",
++  "- DESIGN-REVIEW-1 The Spec places the snapshot in two locations. The data shape must be fixed before build. Repair: state one location.",
++  "",
++  "Round 1 questions, status against the current text:",
++  "- DESIGN-QUESTION-1 (scope): resolved. The scope now lists the checklist.",
++  "- DESIGN-QUESTION-2 (PIN): resolved in substance.",
++  "- DESIGN-QUESTION-3 (asserts): withdrawn.",
++  "",
++  "Questions:",
++  "- DESIGN-QUESTION-4 (a new point of this round): which slice runs first?",
++  "",
++].join("\n");
++
++test("C31a: the earlier round's resolved items under their own label line are no open findings, and the genuine finding stays one", withRepo((repo) => {
++  writeFileSync(join(repo, REPORT1), DELTA_REPORT);
++  const exact = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
++  assert.equal(exact.ok, true, JSON.stringify(exact));
++  assert.deepEqual(exact.receipt.openFindingIds, ["DESIGN-REVIEW-1"]);
++}));
++
++test("C31a: a refusal names the report line each missing id was read from, and the way out for a misread earlier-round item", withRepo((repo) => {
++  // The same shape without the label line: the earlier items stand directly under Blocking findings and are open.
++  const flat = DELTA_REPORT.replace("Round 1 questions, status against the current text:\n", "").replace(": resolved.", ": ok.").replace(": resolved in substance.", ": ok.").replace(": withdrawn.", ": ok.");
++  writeFileSync(join(repo, REPORT1), flat);
++  const refused = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
++  assert.equal(refused.code, "DRC-FINDINGS-SPLIT");
++  assert.match(refused.message, /DESIGN-QUESTION-1 \(report line 8\)/u);
++  assert.match(refused.message, /pass it as --open-finding as well/u);
++  const all = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-QUESTION-1", "DESIGN-QUESTION-2", "DESIGN-QUESTION-3"] }), { env: CLAUDE, now });
++  assert.equal(all.ok, true, JSON.stringify(all));
++}));
++
++// C31a: the live blockade of 2026-11-19: the round had no receipt, the Spec was corrected and committed, and the next review dispatch stayed blocked.
++function gitIn(repo, ...args) {
++  const run = spawnSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.autocrlf=false", ...args], { cwd: repo, encoding: "utf8" });
++  assert.equal(run.status, 0, `${args.join(" ")}: ${run.stderr}`);
++  return run.stdout.trim();
++}
++
++test("C31a: --sources-at binds the PRD, Spec and companion bytes of the named commit, not the corrected working tree", withRepo((repo) => {
++  gitIn(repo, "init", "-q");
++  gitIn(repo, "add", ".");
++  gitIn(repo, "commit", "-q", "-m", "review read these bytes");
++  const reviewed = gitIn(repo, "rev-parse", "HEAD");
++  const reviewedSpec = readFileSync(join(repo, SPEC));
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text corrected after the review\n");
++  gitIn(repo, "commit", "-q", "-am", "correct the spec");
++  const made = createReceiptFromDisk(request(repo, { sourcesAt: reviewed.slice(0, 12), companionPaths: [DESIGN] }), { env: CLAUDE, now });
++  assert.equal(made.ok, true, JSON.stringify(made));
++  assert.equal(made.receipt.sources.spec.sha256, sha(reviewedSpec), "the Spec digest is the reviewed bytes");
++  assert.notEqual(made.receipt.sources.spec.sha256, sha(readFileSync(join(repo, SPEC))));
++  // The receipt no longer matches the corrected tree, so the next round is a delta, exactly as after any later edit.
++  const without = createReceiptFromDisk(request(repo, { reportPath: REPORT2, outPath: RECEIPT2, previousPath: RECEIPT1, companionPaths: [DESIGN] }), { env: CLAUDE, now });
++  assert.equal(without.ok, true, JSON.stringify(without));
++  assert.equal(without.receipt.kind, "delta");
++}));
++
++test("C31a: --sources-at refuses a malformed ref, a non-commit, a commit outside the history of HEAD and a file the commit does not hold", withRepo((repo) => {
++  gitIn(repo, "init", "-q");
++  gitIn(repo, "add", ".");
++  gitIn(repo, "commit", "-q", "-m", "base");
++  const base = gitIn(repo, "rev-parse", "HEAD");
++  gitIn(repo, "checkout", "-q", "-b", "side");
++  writeFileSync(join(repo, "specs/feat-x/other.md"), "side only\n");
++  gitIn(repo, "add", ".");
++  gitIn(repo, "commit", "-q", "-m", "side");
++  const side = gitIn(repo, "rev-parse", "HEAD");
++  gitIn(repo, "checkout", "-q", "-");
++  const code = (over) => createReceiptFromDisk(request(repo, over), { env: CLAUDE, now }).code;
++  assert.equal(code({ sourcesAt: "HEAD~1" }), "DRC-SOURCES-AT-INVALID");
++  assert.equal(code({ sourcesAt: "deadbee" }), "DRC-SOURCES-AT-INVALID");
++  assert.equal(code({ sourcesAt: side }), "DRC-SOURCES-AT-INVALID", "a commit of another branch is not history of HEAD");
++  assert.equal(code({ sourcesAt: base, prdPath: "specs/feat-x/missing.md" }), "DRC-SOURCES-AT-MISSING");
++  assert.equal(readdirSync(join(repo, "specs/feat-x/review")).some((name) => name.endsWith(".receipt.json")), false, "nothing is written on a refusal");
++  assert.match(runMain(baseArgv(repo, { "sources-at": "zz" })).json.message, /commit id of 7 to 40 lowercase hex digits/u);
++  assert.equal(runMain(baseArgv(repo, { "sources-at": base })).json.status, "created");
++}));
++
+ test("C30-6: a report with only questions makes a passing receipt", withRepo((repo) => {
+   writeFileSync(join(repo, REPORT1), SPLIT([], ["DESIGN-QUESTION-1"]).replace("Verdict: NOT READY", "Verdict: READY").replace("Blocking findings:\n", "Blocking findings:\n- none\n"));
+   const result = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });

@@ -1,0 +1,34 @@
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs
+index a6f8845be8fdf06f75d4fd1c19441c3a9e715cec..a449590aafc7b599cc302e437a7e45cb02ffdb75 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs
+@@ -88,6 +88,12 @@ test("one final gate: one review receipt builds the single approval request; a t
+   assert.deepEqual([third.ok, third.receipt?.round], [true, 3]);
+ });
+ 
++// C31a (greenfield 2026-11-19): a correction committed before the round had a receipt blocked the next review dispatch; the reference names the way out.
++test("C31a the design course names --sources-at for a round whose sources were corrected before its receipt existed", () => {
++  const text = course().replace(/\s+/gu, " ");
++  assert.match(text, /do not restore the old bytes in the tree: create the receipt with `--sources-at <the commit the reviewer read>` \(an ancestor of HEAD\)/u);
++});
++
+ test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 and decisions D25/D121 (outside 0.7.0, no new schema before the test candidate); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {
+   const audit = readFileSync(here("../runner-own-session-audit.mjs"), "utf8");
+   const onboarding = readFileSync(here("../project-onboarding-v3.mjs"), "utf8");
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index c5dfe48ec7f91a070badd942eed3b20272e6b300..1ea907bb2ee6beba99a8797e07c8e0f960977924 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -116,7 +116,11 @@ was needed; capability evidence is not an Advisor answer.
+    delta. A fresh full review after round 1 is never the route: the dispatch of
+    the next `readiness-reviewer` is refused while an observed round has no receipt
+    (`DISPATCH-DESIGN-REVIEW-NO-RECEIPT`, Claude's host observation; a round
+-   older than 48 hours counts as abandoned). The reviewer separates
++   older than 48 hours counts as abandoned). If a correction was already committed
++   before the round had its receipt, do not restore the old bytes in the tree:
++   create the receipt with `--sources-at <the commit the reviewer read>` (an
++   ancestor of HEAD); the PRD, Spec and companion bytes then come from that commit
++   and the next round is a delta over the corrected tree. The reviewer separates
+    **blocking findings** from **questions** (`agents/readiness-reviewer.md`); the
+    receipt's `--open-finding` ids are exactly the report's `Blocking findings:`
+    ids, checked against the bound report text (`DRC-FINDINGS-SPLIT`), and a
