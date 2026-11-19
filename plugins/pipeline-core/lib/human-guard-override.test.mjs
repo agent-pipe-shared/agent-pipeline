@@ -7659,7 +7659,68 @@ test("L16-5: every attempt of the planning is capped by what is left of the dead
     };
     const planned = plan(spawn);
     assert.equal(planned.status, "planned");
-    assert.deepEqual(timeouts.slice(0, 3), [5000, 4000, 500],
-      "first attempt at the full 5 s, the retry at what is left, the next call at the positive floor instead of a fresh 5 s");
+    // The mocked clock is added to the REAL one, so the retry's "what is left" is 4000 minus the few real milliseconds the run itself took (C32: an exact 4000 flaked by 1 ms).
+    const [first, retry, next] = timeouts;
+    assert.equal(first, 5000, "first attempt at the full 5 s");
+    assert.ok(retry <= 4000 && retry >= 3900, `the retry at what is left of the budget, got ${retry}`);
+    assert.equal(next, 500, "the next call at the positive floor instead of a fresh 5 s");
   });
+});
+
+// C32 (second half of the cloud review finding on candidate 31): the observation that follows the topology in the same planning shares its deadline.
+test("L16-6: the repository observation of a planning is capped by the budget the topology left, every one of its git calls", () => {
+  l16Setup(({ clock, plan }) => {
+    const timeouts = [];
+    let toplevel = 0, topologyAt = -1;
+    const spawn = (command, args, options) => {
+      if (command === "git") timeouts.push({ verb: args[0], timeout: options.timeout });
+      if (command === "git" && args[0] === "rev-parse" && args[1] === "--show-toplevel") {
+        toplevel += 1;
+        topologyAt = timeouts.length;
+        clock.offsetMs += 8900; // the topology succeeds, slowly, and leaves 100 ms of the 9 s
+      }
+      return spawnSync(command, args, { ...options, timeout: 30_000 });
+    };
+    assert.equal(plan(spawn).status, "planned");
+    const afterTopology = timeouts.slice(topologyAt);
+    assert.ok(afterTopology.length >= 4, "the observation runs at least git-common-dir, symbolic-ref, status and rev-parse");
+    assert.deepEqual(afterTopology.filter((call) => call.timeout !== 500), [],
+      "no call after a spent budget may run with a fresh 5 s (the floor of 500 ms), neither a git() call nor the unborn-branch probe");
+    assert.equal(toplevel, 1);
+  });
+});
+
+test("L16-8: an unborn probe that timed out is a typed HGO-GIT refusal, never an unborn repository; a probe that ran and exited non-zero still means unborn", () => {
+  const root = fixtureHumanApproval({ humanApproval: "chat" });
+  try {
+    const physical = realpathSync(root);
+    const verifyAs = (reply) => (command, args, options) => {
+      if (command === "git" && args[0] === "rev-parse" && args[1] === "--verify") return reply;
+      return spawnSync(command, args, { ...options, timeout: 30_000 });
+    };
+    assert.throws(
+      () => humanGuardOverrideInternals.repositoryObservation(physical, verifyAs({ status: null, error: Object.assign(new Error("spawnSync git ETIMEDOUT"), { code: "ETIMEDOUT" }) })),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-GIT"
+        && error.message === "repository identity is unavailable (operation=rev-parse---verify--q-HEAD, outcome=ETIMEDOUT)");
+    const unborn = humanGuardOverrideInternals.repositoryObservation(physical, verifyAs({ status: 1, stdout: "", stderr: "" }));
+    assert.equal(unborn.head, null, "a git that ran and found no HEAD commit is the unborn case, unchanged");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("L16-7: without a deadline the observation is exactly as before: every git call at the full 5 s", () => {
+  const root = fixtureHumanApproval({ humanApproval: "chat" });
+  try {
+    const timeouts = [];
+    const spawn = (command, args, options) => {
+      if (command === "git") timeouts.push(options.timeout);
+      return spawnSync(command, args, { ...options, timeout: 30_000 });
+    };
+    humanGuardOverrideInternals.repositoryObservation(realpathSync(root), spawn);
+    assert.ok(timeouts.length >= 4);
+    assert.deepEqual(timeouts.filter((timeout) => timeout !== 5000), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

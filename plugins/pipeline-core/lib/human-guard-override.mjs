@@ -220,10 +220,16 @@ function planningDeadline(budgetMs = PLANNING_DEADLINE_MS) {
 // `deadline` is optional: a caller that carries none keeps the single, unretried attempt at the full timeout.
 // With a deadline EVERY attempt (the first of each call as well as the retry) is capped by what is left of it (C31c, cloud review of candidate 31),
 // so a retry that used the budget cannot be followed by a next call that runs another full 5 s past the hook limit.
+// The timeout of one attempt: the full per-call timeout without a deadline, else what is left of it (never below the floor).
+function attemptTimeout(deadline) {
+  if (!deadline) return GIT_TIMEOUT_MS;
+  return Math.min(GIT_TIMEOUT_MS, Math.max(deadline.budgetMs - (Date.now() - deadline.startMs), GIT_MIN_ATTEMPT_MS));
+}
+
 function git(root, args, spawn = spawnSync, deadline = null) {
   const run = (timeout) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout });
   const remaining = () => deadline.budgetMs - (Date.now() - deadline.startMs);
-  let result = run(deadline ? Math.min(GIT_TIMEOUT_MS, Math.max(remaining(), GIT_MIN_ATTEMPT_MS)) : GIT_TIMEOUT_MS);
+  let result = run(attemptTimeout(deadline));
   if (deadline && result?.error?.code === "ETIMEDOUT") {
     // ETIMEDOUT only (never a non-zero exit or another error); the calls it serves are read-only
     // or idempotent, so the identical call may run once more.
@@ -257,7 +263,11 @@ function topology(root, spawn = spawnSync, deadlineMs = PLANNING_DEADLINE_MS) {
   const common = realpathSync(isAbsolute(rawCommon) ? rawCommon : resolve(physical, rawCommon));
   const info = lstatSync(common);
   if (!info.isDirectory() || info.isSymbolicLink()) fail("HGO-COMMON-DIR", "Git common directory is unsafe");
-  return { root: physical, common };
+  // C32 (cloud review of candidate 31, second half): the planning's deadline travels with the topology so the observation that follows in the same hook is bounded by the SAME budget.
+  // Non-enumerable on purpose: the result is compared, spread and serialised elsewhere, and none of that may see it.
+  const result = { root: physical, common };
+  Object.defineProperty(result, "planningDeadline", { value: deadline, enumerable: false });
+  return result;
 }
 
 /**
@@ -989,11 +999,17 @@ const UNBORN_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 // stderr content). A detached HEAD, or a genuinely missing/corrupt HEAD, both fail
 // `symbolic-ref -q HEAD` too and so still fall through to the original crash path
 // below, unchanged.
-function isUnbornBranch(root, spawn) {
-  const symbolic = spawn("git", ["symbolic-ref", "-q", "HEAD"], { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+function isUnbornBranch(root, spawn, deadline = null) {
+  const symbolic = spawn("git", ["symbolic-ref", "-q", "HEAD"], { cwd: root, encoding: "utf8", shell: false, timeout: attemptTimeout(deadline) });
   if (symbolic?.status !== 0 || symbolic?.error) return false;
-  const verify = spawn("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
-  return verify?.status !== 0 || Boolean(verify?.error);
+  const verify = spawn("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: root, encoding: "utf8", shell: false, timeout: attemptTimeout(deadline) });
+  // C32: a probe that did not RUN (timed out at the planning floor, or could not start) says nothing about the branch; reading it as "unborn" would bind head null and the empty tree of a repository that has commits.
+  // It is the same typed refusal every other git call of the observation gives; only a git that ran and exited non-zero means unborn.
+  if (verify?.error) {
+    const outcome = verify.error.code ?? verify.error.name ?? "error";
+    fail("HGO-GIT", `repository identity is unavailable (operation=rev-parse---verify--q-HEAD, outcome=${outcome})`);
+  }
+  return verify?.status !== 0;
 }
 
 // PHX merge: governance/events/** writes must not count as working-tree drift for the
@@ -1012,15 +1028,16 @@ function filterGovernanceEventsStatus(statusOutput) {
     .join("\n");
 }
 
-function repositoryObservation(root, spawn = spawnSync) {
-  const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn);
+// `deadline` (optional, from topology().planningDeadline) bounds every git call of the observation by the budget of the planning that already ran; without it the observation is exactly as before.
+function repositoryObservation(root, spawn = spawnSync, deadline = null) {
+  const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn, deadline);
   const physicalCommon = realpathSync(isAbsolute(common) ? common : resolve(root, common));
-  const unborn = isUnbornBranch(root, spawn);
-  const rawStatus = git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn);
+  const unborn = isUnbornBranch(root, spawn, deadline);
+  const rawStatus = git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn, deadline);
   return {
     fingerprintSha256: sha({ physicalRoot: realpathSync(root), physicalCommon }),
-    head: unborn ? null : git(root, ["rev-parse", "HEAD"], spawn),
-    tree: unborn ? UNBORN_TREE_OID : git(root, ["rev-parse", "HEAD^{tree}"], spawn),
+    head: unborn ? null : git(root, ["rev-parse", "HEAD"], spawn, deadline),
+    tree: unborn ? UNBORN_TREE_OID : git(root, ["rev-parse", "HEAD^{tree}"], spawn, deadline),
     statusSha256: sha(filterGovernanceEventsStatus(rawStatus)),
     state: stateObservation(root),
   };
@@ -4002,7 +4019,7 @@ export function recordHumanGuardDenial({
     : topology(crossRepositoryRoot ?? physicalRootDir, spawn);
   const repository = isLocalPluginInstall
     ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
-    : repositoryObservation(repo.root, spawn);
+    : repositoryObservation(repo.root, spawn, repo.planningDeadline);
   hgoProgress("hgo-observed");
   if (denials.some(({ guard }) => String(guard) === "guard-push.mjs")) {
     return recoveryRoute("HGO-PUBLICATION-REQUIRED", toolName, toolInput, [], {
@@ -4244,7 +4261,7 @@ export function planHumanGuardOverride({
   const plugin = pluginIdentity(pluginRoot, boundPluginProvider(request.plugin));
   const repository = isLocalPluginInstall
     ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
-    : repositoryObservation(repo.root, spawn);
+    : repositoryObservation(repo.root, spawn, repo.planningDeadline);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
   assertNoRequestDrift(repository, policy, request, { isLocalPluginInstall });
   if (canonical(plugin) !== canonical(request.plugin)) {
@@ -5214,7 +5231,7 @@ function consumeHumanGuardOverrideCore({
     }
     const repository = isLocalPluginInstall
       ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
-      : repositoryObservation(repo.root, spawn);
+      : repositoryObservation(repo.root, spawn, repo.planningDeadline);
     const expired = new Date(capability.expiresAt).getTime() <= nowMs;
     let nativeTargetDrift = false;
     if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
