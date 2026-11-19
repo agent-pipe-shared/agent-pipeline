@@ -33,6 +33,7 @@ import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 import { fixtureGit } from "./architecture-adoption-test-fixture.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
 import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { PROOF_WAIT_MAX_WINDOWS } from "../lib/signed-proof-wait.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
@@ -672,9 +673,13 @@ test("drivePushInit: a proof that can be watched is handed over with its wait ac
     const watched = drive(true);
     assert.equal(watched.outcome, "signature-required", JSON.stringify(watched));
     assert.deepEqual(watched.awaitSignature.waitAction, waitAction);
-    assert.match(watched.humanGate, /run awaitSignature\.waitAction exactly once/u);
+    // QG-04 restatement (candidate 32, Codex greenfield report): the driver no longer says "exactly once" while the wait text says "again, silently";
+    // both name one rule, a bounded number of silent windows and then one line.
+    assert.match(watched.humanGate, /run awaitSignature\.waitAction as awaitSignature\.afterSigning says/u);
     assert.match(watched.humanGate, /human reports nothing back/u);
-    assert.match(watched.humanGate, /end the turn/u, "a wait that ended without a proof still stops");
+    assert.match(watched.humanGate, new RegExp(`at most ${PROOF_WAIT_MAX_WINDOWS} windows in all`, "u"));
+    assert.match(watched.humanGate, /end the turn with one line/u, "a wait that ended without a proof still stops");
+    assert.doesNotMatch(watched.humanGate, /exactly once/u);
     const unwatched = drive(false);
     assert.equal(Object.hasOwn(unwatched, "awaitSignature"), false);
     assert.doesNotMatch(unwatched.humanGate, /waitAction/u);

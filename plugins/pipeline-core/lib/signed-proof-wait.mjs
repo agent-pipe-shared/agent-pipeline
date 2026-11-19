@@ -23,6 +23,10 @@ export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
 // Greenfields 2026-11-08: 120 s ended every wait before a human had signed (8 and 39 minutes measured). Below the 600 s cap of a foreground shell call.
 export const PROOF_WAIT_DEFAULT_SECONDS = 570;
 export const PROOF_WAIT_MAX_SECONDS = 600;
+/** C32 (Codex greenfield report, six 570 s polls in a row while the PO asked what the signature was for): one rule for every gate. The agent waits silently for at most this many windows (about 38 minutes), then ends its turn with one line. */
+export const PROOF_WAIT_MAX_WINDOWS = 4;
+/** The one sentence every wait instruction ends in, so the push driver, the acknowledgement route and the timeout repair cannot disagree. */
+export const PROOF_WAIT_GIVE_UP = `Wait for at most ${PROOF_WAIT_MAX_WINDOWS} windows in all; if no proof is there after the last one, end the turn with one line saying the step still waits for the PO's signature and the PO tells you once it is signed, then continue from the same inspect readback.`;
 /** C29 (C9): the label every wait result carries; the time waited for a human signature is PO wait, never active agent time. */
 export const PROOF_WAIT_CLASS = "po-wait";
 export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
@@ -162,7 +166,7 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
     },
-    afterSigning: `Hand the PO the poNow sentence once, verbatim, as the last thing before the wait. Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
+    afterSigning: `Hand the PO the poNow sentence once, verbatim, as the last thing before the wait. Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. ${PROOF_WAIT_GIVE_UP} The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
   };
 }
@@ -206,7 +210,7 @@ export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DE
     // message on every timeout is the toil the run showed (570 s of active waiting with repeated messages).
     const handed = isCriticalMirrorProof(proof) ? CRITICAL_SIGNING_STEP : (sign === null ? "the signing step" : text(sign));
     return { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, ...waited(), reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s; signing is a human step and the time waited is PO wait`,
-      repair: `the PO already has the one signing command (${handed}); do not repeat it and post no status message; wait silently again: ${again}` };
+      repair: `the PO already has the one signing command (${handed}); do not repeat it and post no status message; wait silently again: ${again} ${PROOF_WAIT_GIVE_UP}` };
   }
   if (last.state === "stale") {
     return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, ...waited(), reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,

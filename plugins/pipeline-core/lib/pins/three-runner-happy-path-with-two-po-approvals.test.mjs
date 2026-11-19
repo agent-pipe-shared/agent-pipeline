@@ -35,7 +35,7 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
 import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
-import { awaitSignatureFields, commandText, poNowSentence, PROOF_WAIT_CLASS, waitForSignedProof } from "../signed-proof-wait.mjs";
+import { awaitSignatureFields, commandText, poNowSentence, PROOF_WAIT_CLASS, PROOF_WAIT_GIVE_UP, PROOF_WAIT_MAX_WINDOWS, waitForSignedProof } from "../signed-proof-wait.mjs";
 import { boundedCopySafeCommand } from "../copy-safe-command.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
@@ -901,6 +901,12 @@ test("C29-C9: the signature wait is silent and its time is PO wait: a timeout do
   const fields = awaitSignatureFields({ root: "/p", proofPath: proof });
   assert.match(fields.afterSigning, /silently: no status message and no repeated signing command between waits/u);
   assert.match(fields.afterSigning, /is PO wait, never active agent time/u);
+  // C32 (Codex greenfield report): one bounded rule for every gate. The silent repeat has a number of windows and then one line; the instruction,
+  // the timeout repair and the push driver's humanGate all carry the same sentence, so they cannot disagree.
+  assert.ok(PROOF_WAIT_MAX_WINDOWS >= 2 && PROOF_WAIT_MAX_WINDOWS <= 6);
+  assert.ok(fields.afterSigning.includes(PROOF_WAIT_GIVE_UP), "the instruction names the window limit");
+  assert.ok(timeout.repair.includes(PROOF_WAIT_GIVE_UP), "the timeout repair names the same limit");
+  assert.match(PROOF_WAIT_GIVE_UP, new RegExp(`at most ${PROOF_WAIT_MAX_WINDOWS} windows in all.*end the turn with one line`, "u"));
 });
 
 test("C29-P2-6: every signing step carries one fixed 'Now from you' sentence naming its one command, handed over once before the wait", () => {

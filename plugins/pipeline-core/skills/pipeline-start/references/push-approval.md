@@ -7,7 +7,10 @@ step's `poNow` sentence verbatim, once: it names the one command and says the
 PO reports nothing back. Waiting means the step's own
 bounded `waitAction` (`proof-wait.mjs`), run silently: no status message and no
 repeated request between waits, never a re-run of the driver; after a
-`PROOF-WAIT-TIMEOUT` run the same wait again. The waited time is labelled PO
+`PROOF-WAIT-TIMEOUT` run the same wait again, for at most four windows in all
+(about 38 minutes). If no proof is there after the last window, end the turn
+with one line saying the step still waits for the signature; the PO tells you
+once it is signed and you continue from the same readback. The waited time is labelled PO
 wait (`waitClass: "po-wait"`), never active agent time. A new commit voids the
 prepared approval.
 
