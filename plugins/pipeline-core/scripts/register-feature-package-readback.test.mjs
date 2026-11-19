@@ -824,16 +824,18 @@ test("C31-M2-3: a changed path with no registered invariant is a typed refusal t
   deltaInputWithout(f.root, {});
   const none = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
   assert.equal(none.code, "FPR-DELTA-INVARIANT-UNKNOWN", JSON.stringify(none));
-  assert.deepEqual(none.missingPaths, changed);
-  for (const path of changed) assert.ok(none.reason.includes(path), `${path}: ${none.reason}`);
+  // C31-M12 (QG-04, restated): the registered pipeline evidence of the range (manifest, lineage, the base round's diagnostic and log) needs no id, so only the source path is missing.
+  assert.deepEqual(none.missingPaths, ["src/fix2.mjs"]);
+  assert.ok(none.reason.includes("src/fix2.mjs"), none.reason);
   assert.match(none.reason, /pathInvariantMap/u);
   assert.match(none.reason, /register-feature-package\.mjs --root <root> --add-delta-request scratch\/delta-input\.json/u);
   assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "a refusal writes nothing");
   deltaInputWithout(f.root, { pathInvariantMap: { "src/fix2.mjs": ["inv-fix"] } });
+  // C31-M12 (QG-04, restated): a map for the source path alone is now complete (it used to name the evidence paths as missing); "a covered path is not named as missing" stays pinned
+  // by C31-M12-2 below with two source paths.
   const partial = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
-  assert.equal(partial.code, "FPR-DELTA-INVARIANT-UNKNOWN", JSON.stringify(partial));
-  assert.deepEqual(partial.missingPaths, changed.filter((path) => path !== "src/fix2.mjs"));
-  assert.ok(!partial.reason.includes("src/fix2.mjs"), "a covered path is not named as missing");
+  assert.equal(partial.status, "delta-request-added", JSON.stringify(partial));
+  assert.deepEqual(Object.keys(registeredRequest(f.root, partial).pathInvariantMap), ["src/fix2.mjs"]);
 });
 
 test("C31-M2-5: the real preflight refuses a delta request with an invalid supplied claim list naming the field, the expected form and the command (reason and repair on the printed line)", () => {
@@ -864,4 +866,84 @@ test("C31-M2-4: the help documents the optional fields with one complete copy-pa
   assert.equal(parsed.coordinatorImpactConfirmed, true);
   assert.equal(parsed.impactAmbiguous, false);
   assert.ok(Object.values(parsed.pathInvariantMap).every((ids) => Array.isArray(ids) && ids.length > 0));
+});
+
+// C31-M12 (L10a verb part; AC-112 is the closest accepted criterion): the registered pipeline evidence of the range (the lineage file, a registered Verify evidence file, the manifest, the
+// base round's diagnostic) needs no pathInvariantMap key in the verb either; a changed source path, and a path that only looks like evidence, still does.
+const M12_VERIFY = `specs/${SUCCESSOR}/evidence/verify-suite-r2.json`;
+/** Round 2 of the consumed course: the lineage of round 1 committed, a registered Verify evidence file, optional unregistered lookalike files, then the correction (one or two source files) and its diagnostic. */
+function m12Round({ lookalike = null, sources = ["src/fix2.mjs"] } = {}) {
+  const f = consumedRound();
+  commitPaths(f.root, f.finalized.lineage.commitPaths, "register lineage of round 1");
+  const manifestPath = `specs/${SUCCESSOR}/lifecycle.json`;
+  put(f.root, M12_VERIFY, JSON.stringify({ schema: "pipeline.verify-evidence.v0", exitCode: 0 }));
+  const manifest = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8"));
+  manifest.artifacts.push({ class: "candidate-evidence", path: M12_VERIFY, sha256: sha(readFileSync(join(f.root, M12_VERIFY))), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(f.root, manifestPath), JSON.stringify(manifest));
+  commitPaths(f.root, [manifestPath, M12_VERIFY], "register the Verify evidence of round 2");
+  if (lookalike !== null) { put(f.root, lookalike, "{}\n"); commitPaths(f.root, [lookalike], "a file that only looks like evidence"); }
+  for (const source of sources) put(f.root, source, `export const value = ${JSON.stringify(source)};\n`);
+  const candidate = commitPaths(f.root, sources, "fix: round 2 correction");
+  registerDiagnosticFor(f.root, candidate, "r2");
+  return { ...f, candidate2: candidate, manifestPath };
+}
+const m12Input = (root, map) => put(root, "scratch/delta-input.json", JSON.stringify({ coordinatorImpactConfirmed: true, impactAmbiguous: false, ...(map === undefined ? {} : { pathInvariantMap: map }) }));
+const m12Add = (root) => addCriticDeltaRequest({ root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+
+test("C31-M12-1: a delta over a range that also changes the lineage file and a registered Verify evidence file registers through the verb with no key for them and reaches packet-ready", () => {
+  const f = m12Round();
+  m12Input(f.root, { "src/fix2.mjs": ["inv-fix"] });
+  const added = m12Add(f.root);
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  const request = registeredRequest(f.root, added);
+  assert.deepEqual(Object.keys(request.pathInvariantMap), ["src/fix2.mjs"], "no key and no stand-in id is written for an evidence path");
+  assert.ok(request.changedPaths.includes(M12_VERIFY) && request.changedPaths.includes(f.manifestPath) && request.changedPaths.some((path) => path.includes("/critic-lineage-")), `the Critic still sees every changed path: ${request.changedPaths.join(", ")}`);
+  const registration = commitPaths(f.root, added.commitPaths, "register the delta request");
+  const argv = ["--root", f.root, "--base", added.preflight.baseCommit, "--candidate", f.candidate2, "--spec", CRITIC_SPEC(SUCCESSOR), "--evidence", `specs/${SUCCESSOR}/evidence/diagnostic-r2.json`, "--registration-commit", registration, "--delta-request", added.deltaRequestPath];
+  const run = spawnSync(process.execPath, [join(SCRIPTS_DIR, "critic-dispatch-preflight.mjs"), ...argv], { encoding: "utf8", shell: false, env: GIT_ENV, cwd: f.root });
+  assert.equal(JSON.parse(run.stdout.split("\n")[0]).status, "packet-ready", `${run.stdout}${run.stderr}`);
+});
+
+test("C31-M12-2: a changed source path without a key is still refused FPR-DELTA-INVARIANT-UNKNOWN naming exactly that path (never an evidence path), with the example and the command; nothing is written", () => {
+  const f = m12Round({ sources: ["src/fix2.mjs", "src/other2.mjs"] });
+  m12Input(f.root, { "src/fix2.mjs": ["inv-fix"] });
+  const refused = m12Add(f.root);
+  assert.equal(refused.code, "FPR-DELTA-INVARIANT-UNKNOWN", JSON.stringify(refused));
+  assert.deepEqual(refused.missingPaths, ["src/other2.mjs"]);
+  assert.ok(!refused.reason.includes(M12_VERIFY) && !refused.reason.includes("critic-lineage-"), "an evidence path is not named as missing");
+  assert.match(refused.reason, /"src\/other2\.mjs":\["<invariant-id>"\]/u);
+  assert.match(refused.reason, /register-feature-package\.mjs --root <root> --add-delta-request scratch\/delta-input\.json/u);
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "a refusal writes nothing");
+  m12Input(f.root, {});
+  assert.deepEqual(m12Add(f.root).missingPaths, ["src/fix2.mjs", "src/other2.mjs"], "with no key at all both source paths are named and no evidence path");
+});
+
+test("C31-M12-3: a path that only looks like evidence (a file under the feature's evidence directory that the manifest never registered, committed on its own) is not registered evidence: it still needs its key", () => {
+  const lookalike = `specs/${SUCCESSOR}/evidence/verify-suite-forged.json`;
+  const f = m12Round({ lookalike });
+  m12Input(f.root, { "src/fix2.mjs": ["inv-fix"] });
+  const refused = m12Add(f.root);
+  assert.equal(refused.code, "FPR-DELTA-INVARIANT-UNKNOWN", JSON.stringify(refused));
+  assert.deepEqual(refused.missingPaths, [lookalike]);
+  m12Input(f.root, { "src/fix2.mjs": ["inv-fix"], [lookalike]: ["inv-fix"] });
+  assert.equal(m12Add(f.root).status, "delta-request-added", "keyed, the same path registers");
+});
+
+test("C31-M12-5: the path skeleton of an absent input file says the registered evidence paths need no entry, and the skeleton completed for the source path alone registers", () => {
+  const f = m12Round();
+  const skeletonRefusal = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(skeletonRefusal.code, "FPR-DELTA-INPUT-PATH", JSON.stringify(skeletonRefusal));
+  assert.match(skeletonRefusal.reason, /\d+ of the paths are registered pipeline evidence[^)]*need no entry/u);
+  const skeleton = JSON.parse(readFileSync(join(f.root, "scratch/delta-input.json"), "utf8"));
+  assert.ok(Object.hasOwn(skeleton.pathInvariantMap, M12_VERIFY) && skeleton.pathInvariantMap["src/fix2.mjs"].length === 0, "the skeleton still lists every changed path");
+  put(f.root, "scratch/delta-input.json", JSON.stringify({ coordinatorImpactConfirmed: true, impactAmbiguous: false, pathInvariantMap: { ...skeleton.pathInvariantMap, "src/fix2.mjs": ["inv-fix"] } }));
+  const added = m12Add(f.root);
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  assert.deepEqual(Object.keys(registeredRequest(f.root, added).pathInvariantMap), ["src/fix2.mjs"], "the empty evidence lists of the skeleton are no keys");
+});
+
+test("C31-M12-4: the help no longer says the map must hold exactly the changed paths; it says every behaviour path needs an entry and registered evidence paths need none", () => {
+  assert.doesNotMatch(REGISTER_FEATURE_PACKAGE_HELP, /exactly the changed paths/iu);
+  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /every behaviou?r path/iu);
+  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /registered evidence paths? (?:need|needs) no entry/iu);
 });

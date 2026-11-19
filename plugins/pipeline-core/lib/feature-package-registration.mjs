@@ -41,7 +41,7 @@ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArt
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, featurePackageDigestRoute, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
-import { COURSE_EVIDENCE_GAP_CODES, FEATURE_ID, courseEvidenceGapText, deriveSealedSuccessorOf, discardedFeatureIdsOfState, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+import { COURSE_EVIDENCE_GAP_CODES, FEATURE_ID, courseEvidenceGapText, deriveSealedSuccessorOf, discardedFeatureIdsOfState, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity, splitCriticDeltaChangedPaths } from "./critic-course-admission.mjs";
 import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
 import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
 import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
@@ -1040,17 +1040,18 @@ const LEGACY_DELTA_INPUT_KEY = "trustBoundaryChanged";
 // The three fields (and the invariant lists) below are the Coordinator's judgment: no tool fills, defaults or infers them (PO decision D223).
 const DELTA_JUDGMENT_FIELDS = ["coordinatorImpactConfirmed", "impactAmbiguous"];
 /** Writes the path skeleton ({"pathInvariantMap": {"<changed path>": [registered ids, or empty]}}) at the missing input path and refuses; wx: never overwrites. */
-function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate, known }) {
+function writeDeltaInputSkeleton({ root, featureId, inputPath, baseCommit, candidate, known }) {
   const names = gitOut(root, ["diff", "--name-only", "-z", baseCommit, candidate, "--"]);
   if (names === null) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the changed paths of ${baseCommit}..${candidate} could not be read`, { inputPath });
   const changedPaths = names.split("\0").filter(Boolean).sort();
+  const evidenceCount = splitCriticDeltaChangedPaths({ repoRoot: root, featureId, baseCommit, candidateCommit: candidate, changedPaths }).evidencePaths.length;
   const target = join(root, inputPath);
   try {
     mkdirSync(dirname(target), { recursive: true });
     if (realpathSync(dirname(target)) !== join(realpathSync(root), dirname(inputPath))) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath });
     writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, known.get(path) ?? []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
   } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
-  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}; a path whose invariant ids this course registered already carries them, the others an empty list). The Coordinator completes it: give every empty path its invariant ids (changedBehaviorClaims is derived from them and need not be written), and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Complete input example: ${DELTA_INPUT_SHAPE}. Mind the cost: impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
+  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}; a path whose invariant ids this course registered already carries them, the others an empty list). The Coordinator completes it: give every empty behaviour path its invariant ids${evidenceCount > 0 ? ` (${evidenceCount} of the paths are registered pipeline evidence, for example the lineage or the manifest: they need no entry, leave their lists empty)` : ""} (changedBehaviorClaims is derived from them and need not be written), and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Complete input example: ${DELTA_INPUT_SHAPE}. Mind the cost: impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
 }
 /** The manifest core of a commit: the manifest minus its candidate-evidence artifacts (the transport check's own definition), as a canonical digest; null when unreadable. */
 function manifestCoreSha256(root, commit, manifestPath) {
@@ -1154,14 +1155,17 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   }
   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
   const known = registeredCourseInvariants(root, manifest);
-  if (absent) return writeDeltaInputSkeleton({ root, inputPath, baseCommit: tail.commit, candidate, known });
+  if (absent) return writeDeltaInputSkeleton({ root, featureId, inputPath, baseCommit: tail.commit, candidate, known });
   // C31-M2: the effective map is the supplied entries (an empty list counts as not given) completed by the ids this course registered for the same paths. A tool never invents an id.
   const rangeNames = gitOut(root, ["diff", "--name-only", "-z", tail.commit, candidate, "--"]);
   if (rangeNames === null) return refused("FPR-DELTA-COMPILE", `the changed paths of ${tail.commit}..${candidate} could not be read`, { manifestPath });
   const rangePaths = rangeNames.split("\0").filter(Boolean).sort();
   const effectiveMap = Object.fromEntries(Object.entries(input.pathInvariantMap ?? {}).filter(([, ids]) => ids.length > 0));
   for (const path of rangePaths) if (!Object.hasOwn(effectiveMap, path) && known.has(path)) effectiveMap[path] = known.get(path);
-  const unknownPaths = rangePaths.filter((path) => !Object.hasOwn(effectiveMap, path));
+  // C31-M12 (L10a verb part): a registered pipeline evidence path of the range (lineage, registered diagnostic or Verify evidence, manifest) needs no key and gets no stand-in id; the reader derives the
+  // same split (splitCriticDeltaChangedPaths), so what the verb leaves unkeyed the admission accepts. A source path, or a path that only looks like evidence, still needs its key.
+  const evidenceExempt = new Set(splitCriticDeltaChangedPaths({ repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, changedPaths: rangePaths }).evidencePaths);
+  const unknownPaths = rangePaths.filter((path) => !Object.hasOwn(effectiveMap, path) && !evidenceExempt.has(path));
   // The other refusals of the compile (budget, transport, missing diagnostic) come first; a path without an id is compiled with a stand-in that is never registered.
   const compileMap = { ...effectiveMap, ...Object.fromEntries(unknownPaths.map((path) => [path, ["pending-invariant"]])) };
   const claimsOf = (map) => [...new Set(Object.values(map).flat())].sort();
@@ -1188,7 +1192,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   if (unknownPaths.length > 0) {
     const shown = unknownPaths.slice(0, 40).join(", ") + (unknownPaths.length > 40 ? `, and ${unknownPaths.length - 40} more (all of them are in missingPaths)` : "");
     const example = JSON.stringify({ pathInvariantMap: Object.fromEntries(unknownPaths.slice(0, 3).map((path) => [path, ["<invariant-id>"]])) });
-    return refused("FPR-DELTA-INVARIANT-UNKNOWN", `no invariant id is registered in this course for the changed path(s) ${shown}, and a tool never invents one. Fix: add them to the field pathInvariantMap of ${inputPath}, each as "<path>": ["<invariant-id>"] (a non-empty list of ids made of letters, digits, dot, underscore and hyphen, for example ${example}); the paths that carry ids from an earlier round need no entry, and changedBehaviorClaims is derived from the ids. Then run: ${rerun}`, { missingPaths: unknownPaths, changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath, field: "pathInvariantMap" });
+    return refused("FPR-DELTA-INVARIANT-UNKNOWN", `no invariant id is registered in this course for the changed path(s) ${shown}, and a tool never invents one. Fix: add them to the field pathInvariantMap of ${inputPath}, each as "<path>": ["<invariant-id>"] (a non-empty list of ids made of letters, digits, dot, underscore and hyphen, for example ${example}); the paths that carry ids from an earlier round and the registered pipeline evidence paths of the range (the lineage, registered diagnostic or Verify evidence files, the manifest) need no entry, and changedBehaviorClaims is derived from the ids. Then run: ${rerun}`, { missingPaths: unknownPaths, changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath, field: "pathInvariantMap" });
   }
   const preflight = { candidateCommit: candidate, baseCommit: tail.commit, deltaRequestPath: artifact.path, registrationCommit: "<the commit that contains commitPaths>", arguments: ["--root", "<root>", "--spec", manifest.artifacts.find((entry) => entry.class === "spec" && entry.authority === true)?.path ?? "<the feature spec path>", "--evidence", "<the registered diagnostic evidence path of the candidate>", "--base", tail.commit, "--candidate", candidate, "--registration-commit", "<the commit that contains commitPaths>", "--delta-request", artifact.path] };
   if (manifest.artifacts.some((entry) => entry.path === artifact.path && entry.sha256 === artifact.sha256)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, deltaRequestPath: artifact.path, preflight };
