@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run, statePath } from "../../scripts/pipeline-state.mjs";
+import { designApprovalRequestIsSuperseded, run, statePath } from "../../scripts/pipeline-state.mjs";
 import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
 import { recordOnboardingConsent } from "../../scripts/onboarding-consent-mark.mjs";
 import { initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
@@ -356,6 +356,20 @@ test("C28 ADR gate: an unbound draft refuses submit-plan before the PO signs, na
   // C32 F15: the carrier is explained where it is named, so nobody has to learn it from the bind's own refusal.
   assert.match(refused.err, /the carrier is a Markdown file of this design package that must already exist: write specs\/pin-adr-unbound\/design\.md with a title line first, the bind adds the decision block to it/u);
   assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
+});
+
+// C32 F18: the scratch copy of the design approval request is named by the binding digest and its content binds the commit; a commit between two present-plan runs leaves the same name with other bytes.
+test("C32 F18 a stale copy of the request is told apart from an unrelated file by the same binding and another intent, never by anything unparsable", () => {
+  const request = { schema: "pipeline.design-approval-request.v1", bindingSha256: "a".repeat(64), approvalIntent: { value: { candidate: "new" }, sha256: "b".repeat(64) } };
+  const earlier = (patch) => Buffer.from(`${JSON.stringify({ ...request, ...patch })}\n`, "utf8");
+  assert.equal(designApprovalRequestIsSuperseded(earlier({ approvalIntent: { value: { candidate: "old" }, sha256: "c".repeat(64) } }), request), true, "same binding, another commit");
+  assert.equal(designApprovalRequestIsSuperseded(earlier({}), request), false, "identical intent is no stale copy");
+  assert.equal(designApprovalRequestIsSuperseded(earlier({ bindingSha256: "d".repeat(64), approvalIntent: { sha256: "c".repeat(64) } }), request), false, "another binding");
+  assert.equal(designApprovalRequestIsSuperseded(earlier({ schema: "pipeline.other.v1", approvalIntent: { sha256: "c".repeat(64) } }), request), false, "another schema");
+  assert.equal(designApprovalRequestIsSuperseded(earlier({ approvalIntent: {} }), request), false, "no earlier intent to compare");
+  assert.equal(designApprovalRequestIsSuperseded(Buffer.from("not json"), request), false, "unparsable fails closed");
+  assert.equal(designApprovalRequestIsSuperseded(Buffer.alloc(0), request), false);
+  assert.equal(designApprovalRequestIsSuperseded(earlier({}), undefined), false, "a missing request fails closed");
 });
 
 test("C28 ADR gate: every unbound draft is listed once, in one refusal, with one --draft each", () => {

@@ -11080,6 +11080,19 @@ function inspectSubmissionSources(dir, authority, deps) {
   return { ok: true, candidate, sources: [{ path: authority.planPath, sha256: prd.sha256 }, { path: authority.specPath, sha256: spec.sha256 }] };
 }
 
+/**
+ * C32 F18 (Codex greenfield 2026-11-19): the scratch copy is named by the binding digest, but its content also binds the commit the request was presented at, so a commit between two
+ * present-plan runs of the same design leaves a copy with the same name and other bytes. True when `earlierBytes` is exactly that: a request of the same schema and binding whose intent
+ * differs. Read-only and fail-closed (anything unparsable is false); it only chooses the wording of the refusal, never whether the file is overwritten.
+ */
+export function designApprovalRequestIsSuperseded(earlierBytes, request) {
+  try {
+    const earlier = JSON.parse(Buffer.from(earlierBytes).toString("utf8"));
+    return earlier?.schema === request?.schema && earlier.bindingSha256 === request.bindingSha256
+      && typeof earlier.approvalIntent?.sha256 === "string" && earlier.approvalIntent.sha256 !== request.approvalIntent?.sha256;
+  } catch { return false; }
+}
+
 function writeDesignWorkflowApprovalRequest(dir, request) {
   const root = realpathSync(resolve(dir));
   const scratch = join(root, "scratch");
@@ -11096,7 +11109,12 @@ function writeDesignWorkflowApprovalRequest(dir, request) {
     if (existsSync(target)) {
       const stat = lstatSync(target);
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(target) !== target
-        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT", path: `scratch/${name}`, message: `scratch/${name} already exists with different content or is not a plain single-link file; it is bound to this request digest and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again.` };
+        || !readFileSync(target).equals(bytes)) {
+        const superseded = stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1 && designApprovalRequestIsSuperseded(readFileSync(target), request);
+        return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT", path: `scratch/${name}`, message: superseded
+          ? `scratch/${name} is the request of an earlier present-plan for this same design at another commit: the request binds the commit it was presented at, and a commit since then changed it, so that copy is stale and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again, and make no further commit between that present-plan and the signature.`
+          : `scratch/${name} already exists with different content or is not a plain single-link file; it is bound to this request digest and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again.` };
+      }
       return { ok: true, path: `scratch/${name}`, replay: true };
     }
     let fd;
