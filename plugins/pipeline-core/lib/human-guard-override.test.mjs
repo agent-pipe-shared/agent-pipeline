@@ -7654,7 +7654,8 @@ test("L16-5: every attempt of the planning is capped by what is left of the dead
         clock.offsetMs += toplevel === 1 ? 5000 : 3900;
         if (toplevel === 1) return { status: null, error: Object.assign(new Error("spawnSync git ETIMEDOUT"), { code: "ETIMEDOUT" }) };
       }
-      return spawnSync(command, args, options);
+      // The requested timeout is recorded above; git itself runs with a generous one, so a loaded machine cannot turn the 500 ms floor of the third call into a real timeout.
+      return spawnSync(command, args, { ...options, timeout: 30_000 });
     };
     const planned = plan(spawn);
     assert.equal(planned.status, "planned");
