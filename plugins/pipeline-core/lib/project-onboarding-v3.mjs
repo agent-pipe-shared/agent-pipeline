@@ -13,7 +13,7 @@ import { CONSUMER_VERSION_INITIAL } from "./consumer-release.mjs";
 import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets, initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
-import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
+import { stagingDesignAuthoringMarkers, stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
 // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
 // real function with the module's existing `fs.inspectArchitectureDesign` injection, not by reading source text.
 export { designToImplementationHandoverAction };
@@ -4142,11 +4142,12 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
         }
       }
       let draftIncomplete;
+      let draftMarkerLabels = [];
       try {
-        draftIncomplete = stagingDesignNeedsAuthoring(
-          readFileSync(join(root, acknowledgement.prd.path), "utf8"),
-          readFileSync(join(root, acknowledgement.spec.path), "utf8"),
-        );
+        const prdText = readFileSync(join(root, acknowledgement.prd.path), "utf8");
+        const specText = readFileSync(join(root, acknowledgement.spec.path), "utf8");
+        draftIncomplete = stagingDesignNeedsAuthoring(prdText, specText);
+        draftMarkerLabels = stagingDesignAuthoringMarkers(prdText, specText);
       } catch {
         return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
           repository, runtime, continuity, appServer, nextAction: null,
@@ -4162,7 +4163,8 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
             prdPath: acknowledgement.prd.path, specPath: acknowledgement.spec.path,
             guidance: "Author and review the generated PRD and Spec, then inspect again before bootstrap binding." },
           diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_authoring_required",
-            "the generated PRD and Spec still contain draft framing",
+            // C32 F10: name what is still present, so nobody searches the plugin source for the marker that keeps the bind blocked.
+            `the generated PRD and Spec still contain draft framing${draftMarkerLabels.length === 0 ? "" : ` (${draftMarkerLabels.join("; ")})`}`,
             "author both documents before bootstrap-bind-plan")],
         });
       }

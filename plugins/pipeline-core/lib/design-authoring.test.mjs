@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import { parseArchitectureDesign } from "./architecture-design.mjs";
-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, stagingDesignNeedsAuthoring, compactActionReadback } from "./design-authoring.mjs";
+import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, stagingDesignAuthoringMarkers, stagingDesignNeedsAuthoring, compactActionReadback } from "./design-authoring.mjs";
 import { createHash } from "node:crypto";
 import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
 import { devNull } from "node:os";
@@ -108,7 +108,23 @@ test("staging authoring distinguishes generated placeholders from reviewed sourc
   assert.equal(stagingDesignNeedsAuthoring("# Product brief\nReviewed goals.\n", "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n"), false);
 });
 
-if (completionCases.length !== 5) throw new Error("case completion count drift: expected 5, got " + completionCases.length);
+// C32 F10 (Claude and Codex greenfield 2026-11-19): both searched the plugin source for the marker that keeps the bind blocked. The labels are derived from the bytes and agree with the signal.
+test("the staging markers name what is still draft, per document, and agree with the needs-authoring signal", () => {
+  const draftPrd = renderArchitectureDesignSkeleton();
+  const draftSpec = renderDesignTraceabilitySkeleton();
+  const labels = stagingDesignAuthoringMarkers(draftPrd, draftSpec);
+  assert.ok(labels.some(label => label.startsWith("PRD: the `<!-- DRAFT TEMPLATE: replace every REPLACE value")), labels.join("\n"));
+  assert.ok(labels.some(label => label.startsWith("PRD: an architecture block value")), labels.join("\n"));
+  assert.ok(labels.some(label => label.startsWith("Spec: a table row that still says `REPLACE:")), labels.join("\n"));
+  assert.ok(labels.some(label => label.startsWith("Spec: the generated placeholder criterion")), labels.join("\n"));
+  const authoredSpec = "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n";
+  assert.deepEqual(stagingDesignAuthoringMarkers("# Product brief\nReviewed goals.\n", authoredSpec), [], "an authored pair lists nothing");
+  for (const [prd, spec] of [[draftPrd, draftSpec], [draftPrd, authoredSpec], ["# Product brief\n", draftSpec], ["# Product brief\n", authoredSpec], [undefined, null]]) {
+    assert.equal(stagingDesignNeedsAuthoring(prd, spec), stagingDesignAuthoringMarkers(prd, spec).length > 0, "the signal and the labels never disagree");
+  }
+});
+
+if (completionCases.length !== 6) throw new Error("case completion count drift: expected 6, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

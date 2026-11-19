@@ -36,15 +36,28 @@ export function hasGeneratedCriterionPlaceholder(text) {
   return matches(text.replace(legacy, `- **AC-1:** ${placeholder}`));
 }
 
+/**
+ * The draft markers one generated document still holds, as short labels (C32 F10: two runners searched the plugin source to learn which marker keeps the bind blocked).
+ * Derived from the file bytes on every call, nothing stored. `stagingDesignNeedsAuthoring` is exactly "some marker is left", so the labels cannot drift from the signal.
+ */
+function draftMarkers(text) {
+  if (typeof text !== "string") return [];
+  const markers = [];
+  if (text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")) markers.push("the `<!-- DRAFT TEMPLATE: replace every REPLACE value ... -->` comment");
+  if (/^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)) markers.push("a table row that still says `REPLACE: input reference`, `REPLACE: requirement` or `REPLACE: test path and case`");
+  if (/"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)) markers.push("an architecture block value (responsibility, rationale or profileId) that still starts with `REPLACE: `");
+  if (hasGeneratedCriterionPlaceholder(text)) markers.push("the generated placeholder criterion `AC-1: WHEN <trigger>, the system SHALL <observable result>.`");
+  return markers;
+}
+
+/** The labels of the draft markers still present in the generated PRD and Spec, per document; `[]` when both are authored. */
+export function stagingDesignAuthoringMarkers(prdText, specText) {
+  return [["PRD", draftMarkers(prdText)], ["Spec", draftMarkers(specText)]].flatMap(([label, markers]) => markers.map(marker => `${label}: ${marker}`));
+}
+
 /** Read-only draft signal for the coordinator; binding still validates the exact source bytes. */
 export function stagingDesignNeedsAuthoring(prdText, specText) {
-  const unfinished = text => typeof text === "string" && (
-    text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
-    || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
-    || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
-    || hasGeneratedCriterionPlaceholder(text)
-  );
-  return unfinished(prdText) || unfinished(specText);
+  return draftMarkers(prdText).length > 0 || draftMarkers(specText).length > 0;
 }
 
 /** Keep full evidence on disk; avoid repeating document payloads in the action readback. */

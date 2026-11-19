@@ -213,7 +213,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["darwin-requester-integration-tests","plugins/pipeline-core/lib/darwin-requester-integration.test.mjs","top-level-assertions",13],
     ["design-approval-command-admission-tests","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs","top-level-assertions",5],
     ["design-approval-route-tests","plugins/pipeline-core/lib/design-approval-route.test.mjs","top-level-assertions",66],
-    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",45],
+    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",51],
     ["design-course-command-admission-tests","plugins/pipeline-core/hooks/design-course-command-admission.test.mjs","top-level-assertions",44],
     ["design-course-coordinator-tests","plugins/pipeline-core/scripts/design-course-coordinator.test.mjs","top-level-assertions",6],
     ["design-course-session-tests","plugins/pipeline-core/scripts/design-course-session.test.mjs","top-level-assertions",66],
