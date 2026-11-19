@@ -4963,6 +4963,24 @@
       "file": "plugins/pipeline-core/lib/pins/shipped-modules-stay-under-the-authority-source-bound.test.mjs",
       "invariantPinned": "Every shipped plugin module (.mjs/.cjs/.js, tests excluded) stays at least 4 KiB below the session authority's 1 MiB source-entry bound, so an installed participant source is never refused WIN-AUTH-SIZE or source-entry-bound for its size",
       "nonOverlapNote": "Unique size pin over the whole plugin tree; session-authority-registry-fewer-checks.test.mjs exercises the reads that refuse an oversize source"
+    },
+    {
+      "name": "browser-smoke-check-tests",
+      "file": "plugins/pipeline-core/scripts/browser-smoke-check.test.mjs",
+      "invariantPinned": "The browser smoke Verify step (stage 1) runs the one declared command behind the browser-evidence preflight and is never red when no smoke command is declared; a declared command that fails is the only red",
+      "nonOverlapNote": "Unique script suite for browser-smoke-check.mjs; browser-evidence-preflight-tests pins the preflight it sits behind"
+    },
+    {
+      "name": "critic-briefing-build-tests",
+      "file": "plugins/pipeline-core/lib/critic-briefing-build.test.mjs",
+      "invariantPinned": "The Critic briefing builder fills one derived whole-line hint listing the Spec risks without behaviour (reader-untraced rows only) and removes the line, byte-identically, when there is no table, no untraced row or an unreadable Spec; the line trips no dispatch contamination check",
+      "nonOverlapNote": "Unique unit suite for critic-briefing-build.mjs; spec-risk-trace-tests pins the reader it calls"
+    },
+    {
+      "name": "denial-telemetry-tests",
+      "file": "plugins/pipeline-core/lib/guard/denial-telemetry.test.mjs",
+      "invariantPinned": "The repeated grammar refusal is trimmed per scope: the Antigravity conversation id is a valid scope key, the four listing codes share one class, the first refusal in a scope stays full, the short text keeps the retry actions, the rejected element and the override guidance, and every store failure fails open to the full text",
+      "nonOverlapNote": "Unique unit suite for denial-telemetry.mjs; grammar-listing-once-per-context-window-tests pins the rendered refusal through the hook"
     }
   ]
 }
