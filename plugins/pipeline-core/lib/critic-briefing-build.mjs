@@ -13,8 +13,10 @@
  * - Values only the dispatcher knows stay `<FILL NAME: hint>` and are listed, the same way the admit request lists its placeholders.
  * - Antigravity gets the template's paths-only envelope with absolute paths (PO tile 2026-11-10), never the body.
  */
-import { posix } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, posix, relative, resolve } from "node:path";
 import { criticToolBudget } from "./critic-split.mjs";
+import { inspectSpecRiskTrace } from "./spec-risk-trace.mjs";
 import { stampCriticBriefing, verifyCriticBriefing } from "./briefing-file-reference.mjs";
 
 export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
@@ -90,7 +92,7 @@ export function renderCriticBriefings({ preflight, templateText, commits, bindin
     if (facts.candidate !== commits[commits.length - 1]) refuse("CBB-COMMITS", "the enumerated commits do not end at the reviewed candidate");
     const rendered = runner === "antigravity"
       ? renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry })
-      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths });
+      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths, root });
     // C28-CRITIC-TOIL: a range whose preflight bound correction input bindings (retained results, state or history files are in it) never gets a briefing that says "not applicable":
     // that Critic stops on missing bindings and a fresh one is spent. The caller derives them (prepare-dispatch.mjs does) or the briefing is refused here, after the template checks.
     if (bindingsPath === null && preflight.correctionInputBindings !== undefined && preflight.correctionInputBindings !== null) {
@@ -101,7 +103,24 @@ export function renderCriticBriefings({ preflight, templateText, commits, bindin
   return { schema: CRITIC_BRIEFING_SCHEMA, briefings };
 }
 
-function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths }) {
+/**
+ * C31-M9 (lane L3, AC-112 binding): the ids of the Spec's risk rows the reader finds untraced, read from the Spec under the project root.
+ * Derived on read, never stored, never a gate: anything unreadable (no root, a path leaving the root, no file, a throwing read) yields no ids,
+ * because the reader never claims what it cannot read. Only ids come back (the reader admits no other shape for an id), never Spec prose.
+ */
+function untracedRiskIds(root, specPath) {
+  if (typeof root !== "string" || root === "" || typeof specPath !== "string" || specPath === "") return [];
+  try {
+    const base = resolve(root);
+    const inside = (target) => { const rel = relative(base, target); return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel); };
+    const spec = resolve(base, specPath);
+    if (!inside(spec)) return [];
+    const exists = (rel) => { const target = resolve(base, rel); return inside(target) && existsSync(target); };
+    return inspectSpecRiskTrace(readFileSync(spec, "utf8"), { exists }).rows.filter((row) => row.status === "untraced").map((row) => row.id);
+  } catch { return []; }
+}
+
+function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths, root }) {
   const placeholders = [];
   const open = (name, hint) => { placeholders.push(name); return fill(name, hint); };
   const scope = entry?.batchScopeLine ?? promptLines?.[0] ?? `Batch scope (MP-07): the reviewed range ${facts.base.slice(0, 12)}..${facts.candidate.slice(0, 12)}, one batch.`;
@@ -142,12 +161,15 @@ function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promp
   let text = criticTemplateBody(templateText);
   // Whole-line placeholders: the re-critic pair for a correction round, nothing for a full review; the Advisor line only on demand.
   const lineOf = (name) => new RegExp(`^- \\{\\{${name}:[^}]*\\}\\}\\n`, "mu");
-  for (const name of ["RECRITIC_LINE", "REVIEW_ORDINAL_LINE", "ADVISOR_DEMAND_LINE"]) {
+  for (const name of ["RECRITIC_LINE", "REVIEW_ORDINAL_LINE", "ADVISOR_DEMAND_LINE", "RISKS_WITHOUT_BEHAVIOUR_LINE"]) {
     if (!lineOf(name).test(text)) refuse("CBB-TEMPLATE-MARKER", `the template has no ${name} line`);
   }
   text = text.replace(lineOf("RECRITIC_LINE"), ordinal === null ? "" : `- Re-critic (MP-07): ${facts.base}..${facts.candidate}\n`);
   text = text.replace(lineOf("REVIEW_ORDINAL_LINE"), ordinal === null ? "" : `- Review ordinal: ${ordinal}\n`);
   text = text.replace(lineOf("ADVISOR_DEMAND_LINE"), "");
+  // C31-M9: one derived inspection hint (ids and a fixed sentence only), empty when the Spec has no table, no untraced row or cannot be read.
+  const riskIds = untracedRiskIds(root, facts.spec);
+  text = text.replace(lineOf("RISKS_WITHOUT_BEHAVIOUR_LINE"), riskIds.length === 0 ? "" : `- risks without behaviour: ${riskIds.join(", ")}; inspect whether the delivered behaviour or a stated residual covers each\n`);
   text = text.replace(PLACEHOLDER, (whole, name) => {
     if (!Object.hasOwn(values, name)) refuse("CBB-TEMPLATE-PLACEHOLDER", `the template holds a placeholder this builder does not know: ${name}`);
     return values[name];
