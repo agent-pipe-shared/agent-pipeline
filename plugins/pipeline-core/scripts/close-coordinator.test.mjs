@@ -1134,6 +1134,38 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
   assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
 });
 
+// AC-112 (candidate 31 lane L4, stage 1): the close injects the draft-state reader, so the adr-decision row of a real drive shows the state of a draft
+// for a slug the design promised, matches an accepted record of the same slug by slug, and writes nothing.
+test("process: AC-112 the adr-decision row shows the draft state of a promised slug and matches an accepted record by slug, report-only", () => {
+  const seen = {};
+  const status = (root) => spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).stdout;
+  processFixture("adrdraft", {
+    afterPrepared({ root }) {
+      const run = () => invoke(["drive", "--dry-run", "--root", root, "--lifecycle", "close-adrdraft", "--actor", "PO"]).qualityReadback.find((r) => r.id === "adr-decision");
+      mkdirSync(join(root, "architecture", "map"), { recursive: true });
+      writeFileSync(join(root, "architecture", "map", "index.md"), "# Map\n");
+      writeFileSync(join(root, "architecture", "map", "storage.md"), ["---", "type: Governed Module", "id: storage", "responsibility: Keeps the data.", "nonResponsibilities: []", "ownedPaths:", "  - src/storage/**", "publicContracts:", "  - src/storage/index.mjs", "allowedDependencies: []", "authorityEffects: []", "verificationEntryPoints:", "  - tests/storage.test.mjs", "adrReferences:", "  - docs/adr/0003-storage.md", "---", "", "# Module: storage", ""].join("\n"));
+      seen.noDraft = run();
+      const created = spawnSync(process.execPath, [fileURLToPath(new URL("./create-adr.mjs", import.meta.url)), "--root", root, "--slug", "storage", "--title", "Storage"], { encoding: "utf8", env: childEnv() });
+      assert.equal(created.status, 0, created.stderr || created.stdout);
+      seen.beforeDraftStatus = status(root);
+      seen.draft = run();
+      seen.afterDraftStatus = status(root);
+      writeFileSync(join(root, "docs", "adr", "0001-storage.md"), "# Storage\n");
+      writeFileSync(join(root, "docs", "adr", "0001-storage.json"), `${JSON.stringify({ id: "0001-storage", status: "accepted" })}\n`);
+      seen.accepted = run();
+    },
+  });
+  assert.equal(seen.noDraft.status, "missing", JSON.stringify(seen.noDraft));
+  assert.match(seen.noDraft.remedy, /create-adr\.mjs --root <root> --slug storage --title "Storage"/u);
+  assert.equal(seen.draft.status, "missing");
+  assert.match(seen.draft.evidence, /drafts: docs\/adr\/draft-storage\.md: unbound/u);
+  assert.doesNotMatch(seen.draft.remedy, /--slug storage --title/u);
+  assert.equal(seen.afterDraftStatus, seen.beforeDraftStatus, "the readback writes no file");
+  assert.equal(seen.accepted.status, "present", JSON.stringify(seen.accepted));
+  assert.match(seen.accepted.evidence, /docs\/adr\/0003-storage\.md: exists as docs\/adr\/0001-storage\.md/u);
+});
+
 test("process: authorization, failed publication, exact readback and cleanup stay distinct", () => {
   const fixture = processFixture("delivery");
   const authorizationPath = join(fixture.evidenceDirectory, "publication-authorization.json");

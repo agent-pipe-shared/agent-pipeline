@@ -175,6 +175,60 @@ test("AC-239 adr-decision: the evidence lists every named ADR path with whether 
   assert.equal(rows(full({ promisedAdrPaths: () => promised, exists: () => false }))["security-scan"].status, "missing");
 });
 
+// AC-112 (candidate 31 lane L4, stage 1), QG-04 restatement of the two AC-239 cases above: the exact-path rule stays (a promised path that exists is
+// present) and the old remedy text stays (it still names the architecture-decision skill), but a promised path is now ALSO matched by slug, because the
+// design names a number that bind-adr-proposals assigns later, and each absent slug gets a runnable create-adr command (the old remedy named none).
+const adrLayout = (files) => ({ exists: (p) => p === "docs/adr/0001-storage.md" && files.includes("0001-storage.md"), listDir: (p) => (p === "docs/adr" ? files : []) });
+const adrPromise = (paths, files, over = {}) => rows(full({ architectureImpact: () => "no-architecture-impact", promisedAdrPaths: () => paths, ...adrLayout(files), ...over }))["adr-decision"];
+test("AC-112 adr-decision: a promised path counts present when an accepted record with the same slug and another number exists", () => {
+  const present = adrPromise(["docs/adr/0003-storage.md"], ["0001-storage.md", "0001-storage.json"]);
+  assert.equal(present.status, "present");
+  assert.match(String(present.evidence), /docs\/adr\/0003-storage\.md: exists as docs\/adr\/0001-storage\.md/u);
+  assert.equal(present.remedy, null);
+  // A draft (draft-<slug>) is not an accepted record; another slug is not a match either.
+  assert.equal(adrPromise(["docs/adr/0003-storage.md"], ["draft-storage.md", "draft-storage.json"]).status, "missing");
+  assert.equal(adrPromise(["docs/adr/0003-storage.md"], ["0001-storage-layer.md"]).status, "missing");
+  assert.equal(adrPromise(["docs/adr/0003-storage.md"], ["0001-storage.json"]).status, "missing");
+});
+
+test("AC-112 adr-decision: per absent slug the remedy names the runnable create-adr command with a title derived from the slug", () => {
+  const gap = adrPromise(["docs/adr/0003-storage.md", "docs/adr/0004-event-bus-choice.md", "docs/adr/0005-other.md"], ["0001-other.md"]);
+  assert.equal(gap.status, "missing");
+  assert.match(gap.remedy, /create-adr\.mjs --root <root> --slug storage --title "Storage"/u);
+  assert.match(gap.remedy, /create-adr\.mjs --root <root> --slug event-bus-choice --title "Event bus choice"/u);
+  assert.doesNotMatch(gap.remedy, /--slug other/u, "a slug that exists as an accepted record gets no command");
+  assert.match(gap.remedy, /architecture-decision/u, "the old remedy text stays");
+  // A promised path that has no <number>-<slug>.md shape still reads by exact path and gets no create-adr command.
+  const odd = adrPromise(["docs/adr/notes.md"], []);
+  assert.equal(odd.status, "missing");
+  assert.doesNotMatch(odd.remedy, /create-adr\.mjs/u);
+});
+
+test("AC-112 adr-decision: an injected adrDraftStates reader appends the draft states to the evidence and steers the remedy away from a second create-adr", () => {
+  const drafts = [{ slug: "storage", path: "docs/adr/draft-storage.md", state: "unbound", acceptedId: null }, { slug: "bus", path: "docs/adr/draft-bus.md", state: "bound", acceptedId: "0002-bus" }];
+  const gap = adrPromise(["docs/adr/0003-storage.md", "docs/adr/0004-cache.md"], [], { adrDraftStates: () => drafts });
+  assert.equal(gap.status, "missing");
+  assert.match(gap.evidence, /drafts: docs\/adr\/draft-storage\.md: unbound; docs\/adr\/draft-bus\.md: bound/u);
+  assert.doesNotMatch(gap.remedy, /--slug storage --title/u, "create-adr would refuse a slug that already has a draft");
+  assert.match(gap.remedy, /docs\/adr\/draft-storage\.md exists \(unbound\)/u);
+  assert.match(gap.remedy, /bind-adr-proposals\.mjs/u);
+  assert.match(gap.remedy, /create-adr\.mjs --root <root> --slug cache --title "Cache"/u);
+  // A materialized draft of the promised slug counts present even when the listing cannot show it.
+  assert.equal(adrPromise(["docs/adr/0003-storage.md"], [], { adrDraftStates: () => [{ slug: "storage", path: "docs/adr/draft-storage.md", state: "materialized", acceptedId: "0001-storage" }] }).status, "present");
+  // Without a reader, with a throwing one or with garbage the row is exactly the reader-less row (never a refusal, never a throw).
+  const bare = adrPromise(["docs/adr/0003-storage.md"], []);
+  for (const reader of [undefined, () => { throw new Error("x"); }, () => null, () => [], () => [{ nope: 1 }]]) {
+    const same = adrPromise(["docs/adr/0003-storage.md"], [], { adrDraftStates: reader });
+    assert.deepEqual(same, bare);
+  }
+  // The draft states also ride on the impact-derived rows; the row shape stays closed and a not-applicable row stays bare.
+  const decided = rows(full({ adrDraftStates: () => drafts }))["adr-decision"];
+  assert.equal(decided.status, "present");
+  assert.match(decided.evidence, /drafts: docs\/adr\/draft-storage\.md: unbound/u);
+  assert.deepEqual(Object.keys(decided).sort(), ["evidence", "id", "remedy", "status"]);
+  assert.equal(rows(full({ architectureImpact: () => "no-architecture-impact", adrDraftStates: () => drafts }))["adr-decision"].evidence, null);
+});
+
 test("AC-239 architecture-fitness: present from a recorded run for this feature, missing with the command, unknown without history", () => {
   assert.equal(rows(full())["architecture-fitness"].status, "present");
   const missing = rows(full({ rigorHistory: () => [{ body: { featureId: "other", fitnessProjection: {} } }] }))["architecture-fitness"];

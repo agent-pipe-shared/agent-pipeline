@@ -74,17 +74,59 @@ function securityRow(readers) {
   return row(id, "present", SECURITY_ENVELOPE_PATH);
 }
 
+// AC-112 (candidate 31 lane L4, stage 1): the design names `docs/adr/<NNNN>-<slug>.md` before bind-adr-proposals assigns the final number, so a promised
+// path is matched by its slug too (an accepted record with the same slug and another number counts present); per absent slug the remedy names the
+// runnable create-adr command with a title derived from the slug; an optionally injected reader (adrDraftStates) shows what became of each draft.
+const PROMISED_ADR_SLUG = /^docs\/adr\/\d{4}-([a-z0-9][a-z0-9-]{0,63})\.md$/u;
+const ADR_DRAFT_STATE_LABELS = new Set(["unbound", "bound", "discarded", "materialized"]);
+const titleOfSlug = (slug) => { const words = slug.replace(/-+/gu, " ").trim(); return words.charAt(0).toUpperCase() + words.slice(1); };
+function adrDraftStates(readers) {
+  const read = call(readers.adrDraftStates);
+  if (!read.ok || !Array.isArray(read.value)) return [];
+  return read.value.filter((entry) => typeof entry?.slug === "string" && typeof entry.path === "string" && ADR_DRAFT_STATE_LABELS.has(entry.state));
+}
+const withDraftStates = (entries, text) => (entries.length === 0 ? text : `${text === null ? "" : `${text}; `}drafts: ${entries.map((entry) => `${entry.path}: ${entry.state}`).join("; ")}`);
+// The next step for a slug whose draft already exists: create-adr refuses an existing draft, so the remedy names the draft and what to do with its state.
+const DRAFT_NEXT_STEP = {
+  unbound: "finish it and bind it with node <plugin-root>/scripts/bind-adr-proposals.mjs (architecture-decision skill), or discard it with node <plugin-root>/scripts/create-adr.mjs --root <root> --slug <slug> --discard --reason \"<why>\"",
+  bound: "it is bound to the design and becomes accepted through the design approval (materialize-architecture)",
+  discarded: "it was discarded: remove the path from the module's adrReferences or promise a new slug",
+};
+function adrRemedy(absent, drafts) {
+  const steps = [];
+  for (const path of absent) {
+    const slug = PROMISED_ADR_SLUG.exec(path)?.[1];
+    const draft = slug === undefined ? undefined : drafts.find((entry) => entry.slug === slug && entry.state !== "materialized");
+    if (slug === undefined) continue;
+    steps.push(draft === undefined
+      ? `node <plugin-root>/scripts/create-adr.mjs --root <root> --slug ${slug} --title "${titleOfSlug(slug)}"`
+      : `${draft.path} exists (${draft.state}): ${DRAFT_NEXT_STEP[draft.state].replaceAll("<slug>", slug)}`);
+  }
+  return `The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill${steps.length === 0 ? "." : `; one step per slug: ${steps.join("; ")}.`}`;
+}
+
 function adrRow(readers) {
   const id = "adr-decision";
+  const drafts = adrDraftStates(readers);
   const promised = call(readers.promisedAdrPaths);
   if (promised.ok && Array.isArray(promised.value) && promised.value.length > 0) {
     const checks = promised.value.map((path) => ({ path, found: call(readers.exists, path) }));
     if (checks.every((c) => c.found.ok)) {
-      const absent = checks.filter((c) => c.found.value !== true).map((c) => c.path);
-      const listing = checks.map((c) => `${c.path}: ${c.found.value === true ? "exists" : "missing"}`).join(", ");
+      const accepted = call(readers.listDir, ADR_DIR);
+      const sameSlug = (path) => {
+        const slug = PROMISED_ADR_SLUG.exec(path)?.[1];
+        if (slug === undefined) return null;
+        const record = accepted.ok && Array.isArray(accepted.value) ? accepted.value.find((name) => new RegExp(`^\\d{4}-${slug}\\.md$`, "u").test(name)) : undefined;
+        if (record !== undefined) return `${ADR_DIR}/${record}`;
+        const materialized = drafts.find((entry) => entry.slug === slug && entry.state === "materialized");
+        return materialized === undefined ? null : `${ADR_DIR}/${materialized.acceptedId ?? slug}.md`;
+      };
+      for (const c of checks) if (c.found.value !== true) c.match = sameSlug(c.path);
+      const absent = checks.filter((c) => c.found.value !== true && !c.match).map((c) => c.path);
+      const listing = checks.map((c) => `${c.path}: ${c.found.value === true ? "exists" : c.match ? `exists as ${c.match}` : "missing"}`).join(", ");
       return absent.length === 0
-        ? row(id, "present", listing)
-        : row(id, "missing", listing,`The design names ADRs that do not exist: ${absent.join(", ")}. Write them with the architecture-decision skill.`);
+        ? row(id, "present", withDraftStates(drafts, listing))
+        : row(id, "missing", withDraftStates(drafts, listing), adrRemedy(absent, drafts));
     }
   }
   const impact = call(readers.architectureImpact);
@@ -93,7 +135,7 @@ function adrRow(readers) {
   if (!DECISION_IMPACTS.has(impact.value)) return unknown(id);
   const listing = call(readers.listDir, ADR_DIR);
   if (!listing.ok || !Array.isArray(listing.value)) return unknown(id);
-  return listing.value.length > 0 ? row(id, "present", ADR_DIR) : row(id, "missing");
+  return listing.value.length > 0 ? row(id, "present", withDraftStates(drafts, ADR_DIR)) : row(id, "missing", withDraftStates(drafts, null));
 }
 
 function fitnessRow(readers, featureId) {

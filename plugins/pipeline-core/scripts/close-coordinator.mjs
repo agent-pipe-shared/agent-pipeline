@@ -48,6 +48,7 @@ import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STE
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
 import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-readback.mjs";
 import { loadMapBundle } from "./module-inventory.mjs";
+import { inspectAdrDraftBindings } from "../lib/architecture-effective-decisions.mjs";
 import { pushApprovalActive, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
 import { retireFinishedContinuityOwnerRouteDescriptors } from "../lib/onboarding-continuity.mjs";
@@ -1315,9 +1316,15 @@ function readQualityRows(root, coordinator) {
     return [...new Set(bundle.modules.flatMap((mod) => (Array.isArray(mod.adrReferences) ? mod.adrReferences : [])).filter((p) => typeof p === "string" && SAFE_RELATIVE.test(p)))].sort();
   };
   // G20-27: the journey row reads the Spec the plan was bound to (the same path the audit index records), else the conventional one.
-  let specPath;
-  try { const bound = stateSnapshot(root).state?.planSubmission?.specPath; if (typeof bound === "string" && SAFE_RELATIVE.test(bound)) specPath = bound; } catch { /* the conventional spec path applies */ }
-  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, specPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths } });
+  let specPath, planPath;
+  try {
+    const submission = stateSnapshot(root).state?.planSubmission;
+    if (typeof submission?.specPath === "string" && SAFE_RELATIVE.test(submission.specPath)) specPath = submission.specPath;
+    if (typeof submission?.planPath === "string" && SAFE_RELATIVE.test(submission.planPath)) planPath = submission.planPath;
+  } catch { /* the conventional spec path applies */ }
+  // AC-112 (candidate 31 L4 stage 1): what became of each ADR draft, read from the files alone (the same reader and feature folders submit-plan uses); report-only.
+  const adrDraftStates = () => inspectAdrDraftBindings({ rootDir: resolve(root), featureDirs: [...new Set([planPath, specPath].filter((value) => typeof value === "string").map((value) => dirname(value.replace(/\\/gu, "/"))))] });
+  return closeQualityReadback({ featureId: coordinator.featureId, handoverPath, specPath, readers: { ...readers, architectureImpact: () => impact, promisedAdrPaths, adrDraftStates } });
 }
 function auditPackageIndex(root, coordinator) {
   const { readers } = qualityReaders(root);
