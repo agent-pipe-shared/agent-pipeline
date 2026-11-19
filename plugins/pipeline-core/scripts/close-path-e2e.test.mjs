@@ -613,7 +613,12 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         // C29e T4: the private final record says what the green security result covers, one closed word.
         const finalRecord = JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "publication-close", last.result.lifecycleId, "evidence", "final-verification.json"), "utf8"));
         assert.ok(["required-checks", "optional-checks-only", "empty-plan", "unavailable"].includes(finalRecord.securityCoverage), `${identity.runner}: coverage label ${finalRecord.securityCoverage}`);
-        assert.match(last.result.message, /until then this feature's audit bundle holds no security evidence\.$/u);
+        // C31-B4/B8 (QG-04, restated in place): the old sentence said the audit bundle holds no security evidence until the next push. The close now writes the evidence follow-up of the bundle and commits exactly
+        // those files itself (PO decision 2026-11-19), so the result says so and HEAD is that commit; the push-evidence command below runs at that moved HEAD.
+        assert.equal(last.result.followUp?.status, "committed", `${identity.runner}: ${JSON.stringify(last.result.followUp).slice(0, 800)}`);
+        assert.match(last.result.message, /and committed it[^]*the final Verify at HEAD \(pushEvidence\) runs after that commit\.$/u);
+        assert.deepEqual(git(log, fx.root, ["show", "--name-only", "--format=", "HEAD"]).split("\n").filter(Boolean).sort(), [...last.result.followUp.commit.paths].sort(), `${identity.runner}: HEAD is the follow-up commit and holds exactly the written paths`);
+        assert.equal(git(log, fx.root, ["status", "--porcelain", "--untracked-files=all", "--", last.result.followUp.bundleDir]).trim(), "", `${identity.runner}: the working tree is clean for the bundle`);
         // C30G-D1 (Part D): no stage between the bootstrap and the end of the close (acceptance, Verify, package moves, audit request, Result close block, close) changed the Result the State binds.
         if (!decline && boundAtBootstrap !== null) assert.equal(fileSha(resultPath), boundAtBootstrap, `${identity.runner}: the Result file is unchanged from the bootstrap to the end of the close`);
         assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");

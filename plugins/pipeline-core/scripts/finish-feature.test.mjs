@@ -2194,43 +2194,99 @@ async function closedLocalBundleFixture({ bundle = true, finalRecord = true } = 
   return { f, dir, bundleRoot, readBundle, commitFollowUp };
 }
 
-test("C31-B4: the close writes the typed evidence follow-up at closed-local as new files, verifies, leaves manifest, README and artifacts byte for byte, and prints the commit", async () => {
-  const { f, dir, bundleRoot, readBundle, commitFollowUp } = await closedLocalBundleFixture();
+// C31-B8 (AC-112, closest accepted criterion; PO decision 2026-11-19, restated in place under QG-04): the close commits the written follow-up itself, exactly the written paths, through the
+// writer commit route (the same paths, subject, trailers and capability arming as the steps the close used to print). A refusal never blocks: written-uncommitted with the typed reason and the steps.
+test("C31-B4/B8: the close writes the typed evidence follow-up at closed-local, verifies, leaves manifest, README and artifacts byte for byte, and commits exactly the written paths itself", async () => {
+  const { f, dir, bundleRoot, readBundle } = await closedLocalBundleFixture();
   try {
     const before = readBundle();
+    const headBefore = headOf(f);
     assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified");
     assert.equal(existsSync(join(bundleRoot, "proofs/follow-up.json")), false, "the closed bundle holds no follow-up before the close ends");
     const done = oneShotClose(f.resumed, { runCommand: f.runner });
     assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
-    assert.equal(done.followUp.status, "written", JSON.stringify(done.followUp));
+    assert.equal(done.followUp.status, "committed", JSON.stringify(done.followUp));
     const list = JSON.parse(readFileSync(join(bundleRoot, "proofs/follow-up.json"), "utf8"));
     assert.deepEqual(list.proofs, []); assert.deepEqual(list.attributions, []);
-    assert.equal(list.approvedCommit, headOf(f));
+    assert.equal(list.approvedCommit, headBefore, "the list names the candidate the final Verify ran on");
     assert.deepEqual(list.evidence.map((entry) => [entry.kind, entry.sha256]), [["final-verify", sha256Of(FINAL_VERIFY)], ["security-verdict", sha256Of(FINAL_SECURITY)]], "the two evidence entries match the private copies of the close");
     for (const entry of list.evidence) assert.equal(sha256Of(readFileSync(join(bundleRoot, entry.path))), entry.sha256);
     assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified", JSON.stringify(verifyAuditBundleSync({ bundleRoot })));
     assert.deepEqual(readBundle(), before, "manifest.json, README.md and every artifact are unchanged");
-    // the files, and the commit that stays the caller's step
-    assert.deepEqual(done.followUp.files.map((file) => file.path).sort(), [`${dir}/proofs/001-final-verify.json`, `${dir}/proofs/002-security-verdict.json`, `${dir}/proofs/follow-up.json`]);
-    assert.deepEqual([...done.followUp.commit.paths].sort(), done.followUp.files.map((file) => file.path).sort());
-    assert.equal(done.followUp.commit.steps[0], `git add -- ${done.followUp.commit.paths.join(" ")}`);
-    assert.match(done.followUp.commit.steps.join("\n"), /git commit -F scratch\/commit-msg\/writer-output\.txt -- /u);
-    assert.equal(f.git("status", "--porcelain", "--untracked-files=all", "--", dir).split("\n").filter(Boolean).length, done.followUp.files.length, "written, not committed");
-    assert.match(done.next, /commit/u); assert.match(done.next, /pushEvidence/u); assert.match(done.next, /runs AFTER that commit/u);
-    assert.match(done.message, /The close wrote the evidence follow-up of the audit bundle \(followUp\)[^]*Commit them with followUp\.commit\.steps; the final Verify at HEAD \(pushEvidence\) runs after that commit\.$/u);
+    // the files, and the one commit that holds exactly them
+    const written = [`${dir}/proofs/001-final-verify.json`, `${dir}/proofs/002-security-verdict.json`, `${dir}/proofs/follow-up.json`];
+    assert.deepEqual(done.followUp.files.map((file) => file.path).sort(), written);
+    assert.deepEqual([...done.followUp.commit.paths].sort(), written);
+    assert.equal(done.followUp.commit.steps, undefined, "nothing is left for the caller to run");
+    const headAfter = headOf(f);
+    assert.equal(f.git("rev-parse", "HEAD~1").trim(), headBefore, "exactly one commit was made");
+    assert.deepEqual(f.git("show", "--name-only", "--format=", "HEAD").split("\n").filter(Boolean).sort(), written, "the commit holds exactly the written paths");
+    assert.equal(f.git("status", "--porcelain", "--untracked-files=all", "--", dir).trim(), "", "the working tree is clean for the bundle");
+    const body = f.git("log", "-1", "--format=%B", "HEAD").trim().split("\n");
+    assert.equal(body[0], "chore(close): add the evidence follow-up of feature feature-abc");
+    assert.deepEqual(body.slice(-3), ["", "AI-Assisted: true", "Dispatch: stage-0 (elephant)"], "the standard trailers, after a blank line");
+    assert.match(done.next, /pushEvidence/u); assert.match(done.next, /runs AFTER this commit/u); assert.doesNotMatch(done.next, /followUp\.commit\.steps/u);
+    assert.match(done.message, /The close wrote the evidence follow-up of the audit bundle \(followUp\)[^]*and committed it[^]*the final Verify at HEAD \(pushEvidence\) runs after that commit\.$/u);
     assert.match(before["README.md"].toString("utf8"), /the close adds the final Verify and Security records at its end, and a push or release approval adds its proofs/u, "the README of a new bundle no longer says only a push adds them");
     assert.deepEqual(forbidden(f.calls), []);
-    // a rerun before the commit writes nothing new and still names the commit
+    // a second call at the new HEAD: nothing to carry, no second commit, no later duplicate
     const again = oneShotClose(f.resumed, { runCommand: f.runner });
-    assert.equal(again.followUp.status, "already-followed-up"); assert.deepEqual(again.followUp.commit.paths, done.followUp.commit.paths);
-    // after the caller's commit: nothing is carried twice, by the close or by the later push follow-up
-    commitFollowUp(done.followUp.commit.paths);
-    const third = oneShotClose(f.resumed, { runCommand: f.runner });
-    assert.equal(third.followUp.status, "nothing-to-carry", JSON.stringify(third.followUp)); assert.equal(third.followUp.commit, undefined); assert.equal(third.next, undefined);
-    assert.match(third.message, /Nothing is left to add to the audit bundle at this close[^]*\.$/u);
+    assert.equal(again.followUp.status, "nothing-to-carry", JSON.stringify(again.followUp)); assert.equal(again.followUp.commit, undefined); assert.equal(again.next, undefined);
+    assert.equal(headOf(f), headAfter, "no second commit");
+    assert.match(again.message, /Nothing is left to add to the audit bundle at this close[^]*\.$/u);
+    assert.equal(again.commits.total, done.commits.total, "the first close's commit split already counted the follow-up commit (it is made before the split is read)");
     const later = prepareAuditProofFollowUp({ root: f.root, featureId: "feature-abc", approvedCommit: headOf(f), common: join(f.root, ".git"), releaseProof: null, releaseApproval: null });
     assert.equal(later.status, "nothing-to-carry", "a later push follow-up carries no duplicate evidence");
     assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified"); assert.deepEqual(readBundle(), before);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C31-B8: a commit the repository refuses leaves a successful close with written-uncommitted, the typed reason and the steps; a rerun commits, with nothing lost", async () => {
+  const { f, dir, bundleRoot } = await closedLocalBundleFixture();
+  try {
+    const headBefore = headOf(f);
+    const hook = join(f.root, ".git/hooks/pre-commit");
+    mkdirSync(dirname(hook), { recursive: true }); writeFileSync(hook, "#!/bin/sh\necho 'the fixture hook refuses this commit' >&2\nexit 1\n", { mode: 0o755 });
+    const done = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(done.status, "closed-local", "a refused commit never fails the close");
+    assert.equal(done.followUp.status, "written-uncommitted", JSON.stringify(done.followUp));
+    assert.equal(done.followUp.code, "AB-FOLLOWUP-COMMIT-REFUSED");
+    assert.match(done.followUp.reason, /the fixture hook refuses this commit/u);
+    assert.match(done.followUp.reason, /followUp\.commit\.steps/u, "the refusal names what to run");
+    const written = [`${dir}/proofs/001-final-verify.json`, `${dir}/proofs/002-security-verdict.json`, `${dir}/proofs/follow-up.json`];
+    assert.deepEqual([...done.followUp.commit.paths].sort(), written);
+    assert.equal(done.followUp.commit.steps[0], `git add -- ${done.followUp.commit.paths.join(" ")}`);
+    assert.match(done.followUp.commit.steps.join("\n"), /git commit -F scratch\/commit-msg\/writer-output\.txt -- /u);
+    assert.equal(headOf(f), headBefore, "no commit was made");
+    assert.equal(f.git("status", "--porcelain", "--untracked-files=all", "--", dir).split("\n").filter(Boolean).length, written.length, "the files are all still there, uncommitted");
+    assert.equal(f.git("diff", "--cached", "--name-only").trim(), "", "a refused commit leaves nothing staged");
+    assert.equal(verifyAuditBundleSync({ bundleRoot }).status, "verified");
+    assert.match(done.next, /followUp\.commit\.steps/u); assert.match(done.next, /runs AFTER that commit/u);
+    assert.match(done.message, /could not commit it[^]*followUp\.commit\.steps[^]*runs after that commit\.$/u);
+    // the repair is run: a rerun at the same HEAD finds the list already written and commits exactly those files
+    rmSync(hook);
+    const again = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(again.followUp.status, "committed", JSON.stringify(again.followUp));
+    assert.deepEqual([...again.followUp.commit.paths].sort(), written);
+    assert.equal(f.git("rev-parse", "HEAD~1").trim(), headBefore);
+    assert.deepEqual(f.git("show", "--name-only", "--format=", "HEAD").split("\n").filter(Boolean).sort(), written);
+    assert.equal(f.git("status", "--porcelain", "--untracked-files=all", "--", dir).trim(), "");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C31-B8: only the written paths are committed; a foreign staged file and a foreign file in the same directory stay where they were", async () => {
+  const { f, dir } = await closedLocalBundleFixture();
+  try {
+    const headBefore = headOf(f);
+    writeFileSync(join(f.root, "notes.txt"), "mine\n"); f.git("add", "--", "notes.txt");
+    mkdirSync(join(f.root, dir, "proofs"), { recursive: true }); writeFileSync(join(f.root, dir, "proofs/foreign-notes.txt"), "not the close's\n");
+    const done = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(done.followUp.status, "committed", JSON.stringify(done.followUp));
+    const written = [`${dir}/proofs/001-final-verify.json`, `${dir}/proofs/002-security-verdict.json`, `${dir}/proofs/follow-up.json`];
+    assert.deepEqual(f.git("show", "--name-only", "--format=", "HEAD").split("\n").filter(Boolean).sort(), written);
+    assert.equal(f.git("rev-parse", "HEAD~1").trim(), headBefore);
+    assert.equal(f.git("diff", "--cached", "--name-only").trim(), "notes.txt", "the foreign staged file is still staged and was not committed");
+    assert.match(f.git("status", "--porcelain", "--untracked-files=all", "--", `${dir}/proofs`), /^\?\? .*foreign-notes\.txt$/mu, "the foreign file is untouched");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

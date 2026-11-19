@@ -836,10 +836,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   let observed = step("inspect", inspect); if (observed.stop) return observed.stop;
   const closedFeatureId = featureId ?? observed.value.identity?.featureId;
   // The uncommitted paths under `pathspecs`, and the one commit that publishes them (armed for the protected ones). Not rawGit: its trim() would eat the leading space of the first " M" status entry.
-  const commitOf = (pathspecs, message) => {
+  const commitOf = (pathspecs, message, only = () => true) => {
     const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ...pathspecs]);
     const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
-    const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
+    const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); if (only(tokens[index].slice(3))) paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
     paths.sort();
     let armed = null;
     if (paths.length > 0) {
@@ -851,14 +851,24 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const commitFacts = () => commitOf([statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : []),
     // C29 (C2): an ignore line added on the close's postimage stop travels in the same one close commit, so the freeze and the final scan see it.
     ...(existsSync(resolve(root, ".gitleaksignore")) ? [".gitleaksignore"] : [])], `chore(close): close feature ${closedFeatureId}`);
-  // C31-B4 (lane L6 stage 1): at closed-local the final Verify and the security verdict the close just recorded go into the bundle as the typed evidence follow-up. Files only; the commit stays the caller's
-  // step, derived from what git reports uncommitted under the bundle's proofs/, so a rerun before the commit names it again. Never blocks the close.
+  // C31-B4 (lane L6 stage 1): at closed-local the final Verify and the security verdict the close just recorded go into the bundle as the typed evidence follow-up.
+  // C31-B8 (PO decision 2026-11-19): the close commits exactly those files itself, with the writer's own commit facts (commitOf: paths, subject, capability armed for a protected path) and the standard
+  // trailers. The paths are the ones the writer just wrote; a rerun at the same HEAD (the list exists, the commit does not) derives them from git, limited to the names the writer gives its files.
+  // Never blocks, nothing stored: a refused commit is `written-uncommitted` with the typed reason and the printed steps, and the next call derives it again from git.
+  const FOLLOWUP_FILE = /\/proofs\/(?:follow-up(?:-[0-9]{3})?|[0-9]{3}-[a-z0-9-]+)\.json$/u;
   const closeFollowUp = () => {
     let written;
     try { written = prepareCloseAuditFollowUp({ root, featureId: closedFeatureId, approvedCommit: rawGit(["rev-parse", "HEAD"]), common: common() }); } catch (error) { return { status: "unavailable", code: String(error?.code ?? "AB-FOLLOWUP").slice(0, 60) }; }
     if (typeof written.bundleDir !== "string") return { status: written.status };
-    const commit = commitOf([`${written.bundleDir}/proofs`], `chore(close): add the evidence follow-up of feature ${closedFeatureId}`);
-    return { status: written.status, bundleDir: written.bundleDir, ...(written.files === undefined ? {} : { files: written.files }), ...(commit.paths.length === 0 ? {} : { commit }) };
+    const exact = written.status === "written" ? new Set(written.files.map((file) => file.path)) : null;
+    const commit = commitOf(exact === null ? [`${written.bundleDir}/proofs`] : [...exact], `chore(close): add the evidence follow-up of feature ${closedFeatureId}`, (path) => (exact === null ? FOLLOWUP_FILE.test(path) : exact.has(path)));
+    const facts = { bundleDir: written.bundleDir, ...(written.files === undefined ? {} : { files: written.files }) };
+    if (commit.paths.length === 0) return { status: written.status, ...facts };
+    const added = runner("git", ["add", "--", ...commit.paths]);
+    const made = added?.status === 0 ? runner("git", ["commit", "-q", "-m", commit.message, "--trailer", "AI-Assisted: true", "--trailer", "Dispatch: stage-0 (elephant)", "--", ...commit.paths]) : added;
+    if (made?.status === 0) { const { steps, ...committed } = commit; return { status: "committed", ...facts, commit: committed }; }
+    runner("git", ["reset", "-q", "--", ...commit.paths]);
+    return { status: "written-uncommitted", ...facts, code: "AB-FOLLOWUP-COMMIT-REFUSED", reason: `git refused the follow-up commit (${failedText(made).slice(0, 300)}); the files are written and kept: run followUp.commit.steps, then pushEvidence.`, commit };
   };
   let phase = observed.value.coordinator?.phase;
   if (phase === "feature-close-prepared") {
@@ -940,6 +950,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   if (phase === "closed-local" || phase === "delivered" || phase === "release-eligible" || phase === "promoted") {
     // C22B (CGR-13, CGF-12): the commits of the feature range counted by kind (the commits themselves stay as they are), and the three statuses read from what exists: the coordinator's phase, the acceptance
     // record and the fact that this close never pushes. Neither can block the close: a count that cannot be read is typed unavailable.
+    // C31-B4/B8: only the close itself writes and commits the follow-up (a rerun in a later phase leaves it to the push's own follow-up); done BEFORE the commit split is read, so the split counts that commit.
+    const followUp = phase === "closed-local" ? closeFollowUp() : null;
     let commits; try { commits = featureRangeCommitSplit({ rootDir: root, featureId: closedFeatureId, runGit: (args) => runner("git", args) }); } catch { commits = { schema: CLOSE_COMMIT_SPLIT_SCHEMA, status: "unavailable", reason: "the range could not be read" }; }
     let acceptance = null; try { acceptance = readAcceptanceRecord(root, closedFeatureId); } catch { acceptance = null; }
     const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
@@ -955,12 +967,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     let declaredMode = null; try { declaredMode = declaredRepositoryMode(root)?.mode ?? null; } catch { declaredMode = null; }
     const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
     const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Correct it before the push, in this same feature, as its own commit with repository-mode-promote.mjs --root <repo> --to remote-tracked (push-init names the step; no signature): the Critic carry admits exactly that one-token change, and Verify runs again on the new HEAD." };
-    // C31-B4: only the close itself writes the follow-up; a rerun in a later phase (delivered, release-eligible, promoted) leaves it to the push's own follow-up.
-    const followUp = phase === "closed-local" ? closeFollowUp() : null;
     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
       ...(followUp === null ? {} : { followUp }),
-      ...(followUp?.commit === undefined ? {} : { next: "Commit followUp.commit.steps first, then run pushEvidence.command when it is present: the final Verify at HEAD (pushEvidence) runs AFTER that commit, because the commit moves HEAD; then push-init." }),
-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)} ${securitySentence}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.${followUp === null ? "" : ` ${closeFollowUpSentence(followUp.commit === undefined ? followUp.status : "written")}`}` });
+      ...(followUp?.status === "committed" ? { next: "The evidence follow-up is committed. Run pushEvidence.command when it is present: the final Verify at HEAD (pushEvidence) runs AFTER this commit, because the commit moved HEAD; then push-init." }
+        : followUp?.status === "written-uncommitted" ? { next: "Commit followUp.commit.steps first, then run pushEvidence.command when it is present: the final Verify at HEAD (pushEvidence) runs AFTER that commit, because the commit moves HEAD; then push-init." } : {}),
+      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)} ${securitySentence}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.${followUp === null ? "" : ` ${closeFollowUpSentence(followUp.status)}`}` });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }
