@@ -78,6 +78,9 @@ was needed; capability evidence is not an Advisor answer.
    (`PLAN-DESIGN-REVIEW-UNOBSERVED`): dispatch the review again and start a new
    initial receipt. On Codex and Antigravity there is no observation route yet;
    their receipts say `unobserved` visibly and are presented.
+   **Before `create`:** run `export-report` (above) so the report exists on disk
+   and its observation is bound; a `create` without the exported report has
+   nothing to bind. Order per round: review returns, `export-report`, `create`, commit.
    Dispatching the design review: the `critic-review` skill is for implementation
    batches (diff range, batch preflight) and does not fit uncommitted design
    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.

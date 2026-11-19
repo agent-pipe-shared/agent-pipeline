@@ -57,6 +57,22 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" admit --root
 node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" finalize --root "$PWD" --request scratch/session-critic-finalization-request.json
 ```
 
+The verdict JSON the Critic returns has this shape (every key required; `severity` is `blocker|major|minor` on every finding; `pass` only when the dispatch asked for pass/fail):
+
+```json
+{
+  "findings": [{ "gap": "what deviates", "risk": "consequence", "severity": "major",
+                 "evidence": "path/file.mjs:12 - quoted line", "spec_ref": "AC-1" }],
+  "deliberately_not_flagged": ["aspect examined and found in order"],
+  "trajectory_verdict": "consistent",
+  "trajectory_evidence": "claims and evidence agree",
+  "briefing_violations": [],
+  "pass": true
+}
+```
+
+**Authorship evidence from a consumer project.** Hand the Critic never the raw `evidence/dispatch-record-<TASK_ID>.json`. Produce the prose-free projection per record with `node <plugin-root>/scripts/dispatch-record-strip-for-critic.mjs --record <raw-record-path> --out <stripped-path>` and hand over only the stripped path (`templates/prompts/critic-review.md`, dispatch-record citation rule). To check commit authorship in a consumer project run `node <plugin-root>/scripts/dispatch-authorship-verify.mjs --root <project> --range <a>..<b>`; without `--root` it uses the git top level of the working directory, never the plugin's install path.
+
 **Reference:** the closed request-file shape of `admit`/`finalize` moved to `references/coordinator-course.md` section C; Coordinator, load it before writing the request.
 
 The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook (Claude, Codex) reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. On Antigravity the Critic child ends by calling `send_message` to its parent conversation with that JSON as the `Message`; the PreToolUse hook issues the same record from it (the child is recognised from the host's own subagent descriptor, never from the message), so the acknowledgement below is not the normal route there either. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a stop or message that issued none, no schema-shaped verdict in it, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.

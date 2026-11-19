@@ -958,9 +958,31 @@ export function formatLine(entry) {
 function main(argv) {
   const strict = argv.includes("--strict");
   const json = argv.includes("--json");
-  const deps = gitDeps();
+  // The project to check: --root <project>, else the git top level of the working directory.
+  // Never the plugin's own install path (REPO_ROOT), which is only where the plugin reads its own files.
+  let root = null;
+  const rootAt = argv.indexOf("--root");
+  if (rootAt !== -1) {
+    root = argv[rootAt + 1];
+    if (!root || root.startsWith("--")) {
+      process.stderr.write("--root needs a project directory, e.g. --root <project>\n");
+      return 3;
+    }
+  } else {
+    try {
+      root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    } catch {
+      process.stderr.write("not inside a git repository: run from the project or pass --root <project>\n");
+      return 3;
+    }
+  }
+  const deps = gitDeps({ repoRoot: root });
   const revisions = [];
   for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--root") {
+      i += 1;
+      continue;
+    }
     if (argv[i] === "--range") {
       const range = argv[i + 1];
       i += 1;
@@ -968,7 +990,7 @@ function main(argv) {
         process.stderr.write("--range needs a revision range\n");
         return 3;
       }
-      const listed = execFileSync("git", ["rev-list", range], { cwd: REPO_ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
+      const listed = execFileSync("git", ["rev-list", range], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
       revisions.push(...listed);
       continue;
     }
@@ -976,7 +998,7 @@ function main(argv) {
     revisions.push(argv[i]);
   }
   if (revisions.length === 0) {
-    process.stderr.write("usage: dispatch-authorship-verify.mjs [--strict] [--json] <sha>... | --range <a>..<b>\n");
+    process.stderr.write("usage: dispatch-authorship-verify.mjs [--strict] [--json] [--root <project>] <sha>... | --range <a>..<b>\n");
     return 3;
   }
   const results = revisions.map((sha) => verifyCommit(sha, deps));

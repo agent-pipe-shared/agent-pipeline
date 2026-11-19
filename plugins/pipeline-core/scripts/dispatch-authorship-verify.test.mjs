@@ -1228,3 +1228,65 @@ test("D52-5 (vii) the existing stage-0, design and administrative bindings are u
   const undeclared = verifyCommit("f".repeat(40), commit({ message: "docs(x): y\n", paths: ["docs/state.md"] }));
   assert.equal(undeclared.classification, "elephant-direct-undeclared");
 });
+
+test("C31-M6 --root checks a fixture repository outside the plugin tree; the default is the working directory's git top level", () => {
+  const fixture = mkdtempSync(join(SCRATCH, "consumer-root-"));
+  const g = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: fixture, encoding: "utf8" });
+  g("init", "-q");
+  writeFileSync(join(fixture, "a.txt"), "one\n");
+  g("add", "--", "a.txt");
+  g("commit", "-q", "-m", "docs: one");
+  writeFileSync(join(fixture, "a.txt"), "two\n");
+  g("add", "--", "a.txt");
+  g("commit", "-q", "-m", "docs: two");
+  const head = g("rev-parse", "HEAD").trim();
+  const script = join(dirname(fileURLToPath(import.meta.url)), "dispatch-authorship-verify.mjs");
+  const run = (args, cwd) => {
+    try { return { status: 0, out: execFileSync("node", [script, ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+    catch (e) { return { status: e.status, out: String(e.stdout), err: String(e.stderr) }; }
+  };
+  const viaRoot = run(["--root", fixture, "--json", "--range", "HEAD~1..HEAD"], tmpdir());
+  assert.notEqual(viaRoot.status, 3, viaRoot.err);
+  assert.equal(JSON.parse(viaRoot.out).results[0].sha, head);
+  const viaCwd = run(["--json", head], fixture);
+  assert.equal(JSON.parse(viaCwd.out).results[0].sha, head);
+  const noValue = run(["--root"], fixture);
+  assert.equal(noValue.status, 3);
+  assert.match(noValue.err, /--root needs/);
+});
+
+const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+const readPlugin = (rel) => readFileSync(join(PLUGIN_DIR, rel), "utf8");
+
+test("C31-M6 documentation contract: the consumer route to the prose-free dispatch projection names the command and --root", () => {
+  const skill = readPlugin("skills/critic-review/SKILL.md");
+  assert.match(skill, /dispatch-record-strip-for-critic\.mjs --record <raw-record-path> --out <stripped-path>/);
+  assert.match(skill, /dispatch-authorship-verify\.mjs[^\n]*--root <project>/);
+  assert.match(skill, /never the raw `evidence\/dispatch-record-/);
+});
+
+test("C31-M6 documentation contract: the Antigravity reference carries Model in the prepare example and the package field names as a copy-paste block", () => {
+  const ref = readPlugin("skills/pipeline-start/references/antigravity-native-dispatch.md");
+  assert.match(ref, /"Model": "(?:flash|inherit)"/);
+  const block = /```json\n([^`]*"paths"[^`]*)```/u.exec(ref);
+  assert.ok(block, "a json block with the package field names");
+  const pkg = JSON.parse(block[1]);
+  for (const key of ["id", "item", "agentType", "modelId", "check", "title", "ac", "goal", "paths", "context", "targeted"]) assert.ok(key in pkg, key);
+  assert.ok(!("ownedPaths" in pkg));
+});
+
+test("C31-M6 documentation contract: the design course orders the report export before the receipt and the barrier notice follows onboarding", () => {
+  const course = readPlugin("skills/pipeline-start/references/design-course.md");
+  assert.match(course, /\*\*Before `create`:\*\* run `export-report`/);
+  const recovery = readPlugin("skills/pipeline-start/references/onboarding-recovery.md");
+  assert.match(recovery, /next shell call is blocked until the `pipeline-start`\s+skill has been read/i);
+});
+
+test("C31-M6 documentation contract: a Critic verdict JSON example carries every required field and severity per finding", () => {
+  const skill = readPlugin("skills/critic-review/SKILL.md");
+  const block = /```json\n(\{\s*"findings"[^`]*)```/u.exec(skill);
+  assert.ok(block, "a verdict json block");
+  const verdict = JSON.parse(block[1]);
+  for (const key of ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"]) assert.ok(key in verdict, key);
+  for (const f of verdict.findings) for (const key of ["gap", "risk", "severity", "evidence", "spec_ref"]) assert.ok(key in f, key);
+});

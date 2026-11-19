@@ -52,6 +52,10 @@ the bounded effects once, then execute each returned digest-bound action and
 readback without re-asking per digest. `requiresConfirmation` describes the
 action's safety shape, not a second PO chat gate.
 
+After `onboarding-init` the next shell call is blocked until the `pipeline-start`
+skill has been read in this session (the restart-barrier token notice). That block
+is expected, not a fault: read the skill, then repeat the same call unchanged.
+
 A local Git init result carrying a `collect-input` action for the repository's
 commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
 neither `user.name` nor `user.email` resolves locally or globally) is a

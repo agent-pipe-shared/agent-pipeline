@@ -113,6 +113,23 @@ Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `
   "requiredPathSha256": { "input.txt": "<sha256>" }, "resultDestination": { "kind": "return" } }
 ```
 
+The closed request file of one child (flat host arguments around the packet; `Model` is one of `inherit|flash_lite|flash|pro` and is optional: a read-only role inherits, so `"inherit"` or no `Model` at all, never an explicit alias on a Critic):
+
+```json
+{ "packets": [ { "schema": "pipeline.role-dispatch-request.v1", "dispatchId": "review-1", "transport": "antigravity",
+                 "role": "pipeline-core:readiness-reviewer", "prompt": "<briefing>" } ],
+  "TypeName": "pipeline-core:readiness-reviewer", "Role": "pipeline-core:readiness-reviewer", "Prompt": "<briefing>",
+  "Workspace": "inherit", "Model": "inherit" }
+```
+
+The Goldfish briefing package for `prepare-dispatch.mjs goldfish --package` / `dispatch-briefing.mjs build|probe` uses exactly these field names (copy and fill; the write scope is `paths`, never `ownedPaths`; unknown keys are refused):
+
+```json
+{ "schema": "pipeline.dispatch-briefing-package.v1", "id": "<dispatch id>", "item": "<item slug>", "agentType": "goldfish-implementor",
+  "modelId": "flash", "check": "<node test path>", "title": "<title>", "ac": "AC-1", "goal": "<goal>",
+  "paths": ["<repo-relative write path>"], "context": ["<file the dispatch reads>"], "targeted": ["<exact check command>"] }
+```
+
 Resolve the already loaded plugin root first. The required entrypoint is
 `scripts/antigravity-native-dispatch-prepare.mjs` below that root. The host tool
 takes FLAT arguments, so build one closed JSON request file per child with exactly
