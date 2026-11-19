@@ -484,7 +484,7 @@ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicabili
 import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
 import { adrDraftHintText, inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { adrDraftReferenceSlug } from "./module-inventory.mjs";
-import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+import { architectureDraftRepairGuidance, inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
 import { profileSourceChangedKeys } from "../lib/plan-approval-device-rebind.mjs";
 import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
@@ -4433,9 +4433,12 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
           kind: designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? "architecture-design-required" : "repair-required",
           ...(designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? { prdPath: designDraft.prdPath } : {}),
           code: designDraft.code,
+          // C32 (Claude and Codex greenfields 2026-11-19): the validator already knows the field, the rule and the rejected value; the repair action
+          // dropped them, so both agents read the validator source to learn which path rule they had broken.
+          ...(typeof designDraft.field === "string" ? { field: designDraft.field, expected: designDraft.expected, rejectedValue: designDraft.rejectedValue } : {}),
           guidance: designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED"
             ? "Author and validate the architecture design in this exact draft PRD before submit-plan. No PO signature request exists until the completed design and Advisor/readiness package are presented together once."
-            : "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.",
+            : architectureDraftRepairGuidance(designDraft),
         };
       }
     }

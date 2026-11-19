@@ -4,7 +4,7 @@ import test from "node:test";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseArchitectureDesign, architectureDesignTargets, materializeArchitectureDesign, publishArchitectureDesignTargets } from "./architecture-design.mjs";
+import { parseArchitectureDesign, architectureDesignTargets, architectureDraftRepairGuidance, materializeArchitectureDesign, publishArchitectureDesignTargets } from "./architecture-design.mjs";
 import { makeAggregateFixture as actualAuthorityFixture } from "./architecture-prospective-materialization.fixture.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { generateAdoptionProposal } from "../scripts/architecture-adoption.mjs";
@@ -107,6 +107,19 @@ test("field-local diagnostics identify the single invalid architecture input", (
   assert.throws(() => parseArchitectureDesign(prd(input)), error =>
     error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH"
       && error.field === "fitnessModel.modules[0].ownedPaths");
+});
+// C32 (Claude and Codex greenfields 2026-11-19): the inspect next action said only "repair its exact physical source", although the validator knew the field and the rule.
+test("C32 the draft repair guidance carries the field, the rejected value and the path rule of the first refusal", () => {
+  const input = design(); input.modules[0].ownedPaths[0] = "app/js/features/shopping*.js";
+  let refusal = null;
+  try { parseArchitectureDesign(prd(input)); } catch (error) { refusal = error; }
+  assert.equal(refusal?.message, "ARCHITECTURE-DESIGN-PATH-INVALID");
+  const guidance = architectureDraftRepairGuidance({ ok: false, code: refusal.message, field: refusal.field, expected: refusal.expected, rejectedValue: refusal.rejectedValue });
+  assert.match(guidance, /^The draft PRD could not be safely read and bound to current authority/u);
+  assert.match(guidance, /First refusal: modules\[0\]\.ownedPaths\[0\] \(app\/js\/features\/shopping\*\.js\) must be /u);
+  assert.match(guidance, /no `\*`, `\?`/u, "the rule names the wildcard characters");
+  assert.match(guidance, /owned prefix ending in \/\*\*/u, "the rule names the accepted prefix form");
+  assert.equal(architectureDraftRepairGuidance({ ok: false, code: "ARCHITECTURE-DESIGN-PRD-UNAVAILABLE" }), "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.");
 });
 test("fitness model sizeBudgets accepts positive integers, refuses others and is passed through unchanged (AC-108)", () => {
   const accepted = design();

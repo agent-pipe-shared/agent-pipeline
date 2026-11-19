@@ -182,7 +182,7 @@ export function parseArchitectureDesign(prd) {
     module.ownedPaths.forEach((path, pathIndex) => requireField(
       typeof path === "string" && bounded(path.replace(/\/\*\*?$/u, "")),
       "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
-      "bounded repository-relative path or owned prefix ending in /**", path,
+      "a repository-relative path with no `*`, `?`, `\\`, `:` or `..` inside it, or an owned prefix ending in /** (for example app/js/features/**)", path,
     ));
     // A documentation module may omit verification entry points only when every owned path is non-executable.
     if (module.kind === "documentation") {
@@ -278,6 +278,17 @@ export function architectureDesignTargets(input) {
 /** Read-only pre-presentation check for a fresh scaffold. It binds the bytes
  * to the submitted PRD digest and never treats the scaffold itself as design
  * approval or as a materialized architecture map. */
+/**
+ * The guidance of the `repair-required` next action for a draft PRD whose design block the validator refused. The generic sentence was all the
+ * agent got; the validator's own field, rule and rejected value (already carried by the draft inspection) now follow it.
+ */
+export function architectureDraftRepairGuidance(designDraft) {
+  const generic = "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.";
+  return typeof designDraft?.field === "string"
+    ? `${generic} First refusal: ${designDraft.field} (${designDraft.rejectedValue}) must be ${designDraft.expected}.`
+    : generic;
+}
+
 export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlanSha256 } = {}) {
   const root = resolve(rootDir);
   try {
