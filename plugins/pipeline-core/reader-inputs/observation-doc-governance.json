@@ -84,6 +84,7 @@
           "docs/github-issue-operations.md",
           "docs/governance-event-export.md",
           "docs/governance-replay.md",
+          "docs/known-issues.md",
           "docs/licensing.md",
           "docs/macos-support.md",
           "docs/migration.md",
@@ -101,6 +102,7 @@
           "docs/v3-consumer-onboarding.md",
           "docs/whats-new-0.5.0.md",
           "docs/whats-new-0.6.0.md",
+          "docs/whats-new-0.7.0.md",
           "docs/windows-authority-boundaries.md"
         ]
       },
@@ -307,6 +309,7 @@
           "docs/adr/0102-the-main-session-is-reminded-to-work-in-parallel.md",
           "docs/adr/0103-the-close-scans-infrastructure-files-with-trivy-and-blocks-only-new-findings.md",
           "docs/adr/0104-an-evidence-only-follower-commit-and-what-a-verify-result-covers.md",
+          "docs/adr/0105-a-prd-may-name-its-user-documentation-the-review-asks-and-the-close-offers-one-reader-review.md",
           "docs/adr/README.md"
         ]
       },
@@ -379,7 +382,7 @@
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",
           "docs/human-authorization-inventory.md",
-          "docs/known-issues.md",
+          "docs/maintainer-v3-transfer-record.md",
           "docs/pipeline-review-greenfield-2026-09-29.md",
           "docs/sprint-alfred-completion-report.md"
         ]

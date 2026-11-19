@@ -220,6 +220,7 @@
 | pipeline.codex-compact-sessionstart-json-rejects-measurement-fields | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.codex-dispatch-passes-no-model-or-effort-and-observes-none | open | defect | pipeline | nightwing | 2026-11-19 | — | — |
 | pipeline.codex-greenfield-report-findings | open | defect | pipeline | alfred | 2026-11-09 | — | — |
 | pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap | closed | defect | pipeline | nova-b | 2026-09-20 | — | — |
 | pipeline.codex-own-session-audit-export-missing | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | — |
@@ -957,6 +958,7 @@
 | pipeline.source-agent-definition-change-locks-that-agent-until-install | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.spec-retention-on-close | closed | defect | pipeline | — | 2026-07-20 | — | — |
+| pipeline.split-a-very-large-initial-requirement-into-sequenced-epics | open | requirement | pipeline | nightwing | 2026-11-19 | — | — |
 | pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | nightwing | 2026-08-12 | 2026-09-12 | — |
 | pipeline.stale-plan-invalidation-reopens-the-authority-edit-lock | open | defect | pipeline | alfred | 2026-10-21 | — | — |
 | pipeline.stale-worktree-directories-accumulate-with-no-sweep | closed | defect | pipeline | nova | 2026-08-27 | — | — |
@@ -997,6 +999,7 @@
 | pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-opus-critic-admission-needs-a-word-the-template-does-not-carry | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | — | 2026-08-27 | — | — |
+| pipeline.the-pipeline-does-not-meet-the-module-and-size-rules-it-imposes-on-projects | open | defect | pipeline | alfred | 2026-11-19 | — | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
@@ -1099,7 +1102,7 @@
 
 ## Counts
 
-- open: 402
+- open: 405
 - in_progress: 0
 - closed: 674
 - rejected: 3

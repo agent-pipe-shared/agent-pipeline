@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b37373a42381c302144831fff2bdc82a85b091266b4602725fefb7a5ce8b6c90"
+    "transitionHead": "5a6ae820cb1649516a201c61a66945599a7fc0975becb706c620a13814bea483"
   },
   "counts": {
-    "open": 402,
+    "open": 405,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -2665,6 +2665,16 @@
       "source": "Local Codex 0.157.1 design-readiness replay on 2026-09-27/28; scratch/codex-readiness-provisional-report.json and scratch/codex-readiness-fix.patch.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.codex-dispatch-passes-no-model-or-effort-and-observes-none",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-19",
+      "source": "Codex greenfield report of the candidate 31 run (analysis of the delivered run), checked against plugins/pipeline-core/scripts/codex-native-dispatch-prepare.mjs",
+      "deferred": false,
+      "sprint": "nightwing"
     },
     {
       "id": "pipeline.codex-greenfield-report-findings",
@@ -11838,6 +11848,16 @@
       "closureEvidence": "plugins/pipeline-core/lib/transfer-classification.test.mjs"
     },
     {
+      "id": "pipeline.split-a-very-large-initial-requirement-into-sequenced-epics",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-11-19",
+      "source": "PO ruling 2026-11-19 (candidate 32 session), raised from a greenfield run in which one very large initial requirement was cut into several epics by hand",
+      "deferred": false,
+      "sprint": "nightwing"
+    },
+    {
       "id": "pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy",
       "status": "open",
       "type": "defect",
@@ -12330,6 +12350,16 @@
       "closureRepository": "self",
       "closureCommit": "ec7d2e11705e8c90502445737859c3965259f87a",
       "closureEvidence": "docs/adr/0068-backlog-ledger-merge-semantics.md"
+    },
+    {
+      "id": "pipeline.the-pipeline-does-not-meet-the-module-and-size-rules-it-imposes-on-projects",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-19",
+      "source": "PO observation 2026-11-19 (the Pipeline's own modules probably break the boundaries it enforces), measured with architecture-boundary-check.mjs and a size and import survey of the candidate 32 tree",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate",
