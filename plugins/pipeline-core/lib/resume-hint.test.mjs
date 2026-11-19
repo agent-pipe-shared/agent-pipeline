@@ -410,6 +410,15 @@ test("resumeHintContextDetail never echoes the rejected value itself", () => {
   assert.doesNotMatch(detail, /documentation-reconciliation/u, "a diagnostic must not repeat a value flagged as secret-shaped");
 });
 
+// C32: a long German compound joined by hyphens fires the key rule; the refusal names that shape (not the value) so the repair is not a guess.
+test("RH-SCHEMA-DIAG-3 a 24+ character hyphenated word in intent is named as the shape that reads as a key, without echoing it", () => {
+  const detail = resumeHintContextDetail(withIntent("Familien-Küchen-Tablet-App mit Startseite und sechs Modulen"));
+  assert.match(detail, /^intent must be one non-empty single-line string/u);
+  assert.match(detail, /24 or more characters joined by hyphens or underscores.*write a long compound word with spaces/u);
+  assert.doesNotMatch(detail, /Familien/u, "the diagnostic must not repeat the flagged value");
+  assert.doesNotMatch(resumeHintContextDetail(withIntent("short intent with abc123DEF456ghi789JKL012mno345")), /compound word/u, "a key-shaped value without a joined word gets no compound hint");
+});
+
 // RH-SCHEMA-DIAG-2. A fully-valid `context` with an invalid `createdAt` must NOT be
 // blamed on context: resumeHintContextDetail() would find nothing wrong and fall
 // through to its generic "context is not accepted in this shape", which is false --

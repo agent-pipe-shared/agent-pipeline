@@ -202,6 +202,15 @@ function validContext(value) {
   return !Object.hasOwn(value, "progress") || validTextList(value.progress, 4);
 }
 
+// C32 (Antigravity greenfield 2026-11-19: `Familien-Küchen-Tablet-App` was read as a key by the length-24 rule of opaqueToken() and the repair was a guess).
+// The detector stays exactly as strict; only the diagnosis names the shape that can fire it, without echoing the value.
+function longJoinedWordHint(textOrList) {
+  const texts = Array.isArray(textOrList) ? textOrList : [textOrList];
+  const fires = texts.some((text) => typeof text === "string"
+    && text.split(/\s+/).some((token) => token.replace(/[^A-Za-z0-9_=-]/g, "").length >= 24 && /[_=-]/.test(token)));
+  return fires ? "; a word of 24 or more characters joined by hyphens or underscores reads as a key, so write a long compound word with spaces" : "";
+}
+
 /**
  * Which field a rejected card actually failed on, as one short clause.
  *
@@ -230,12 +239,12 @@ export function resumeHintContextDetail(value) {
       + `${unexpected.length > 0 ? `; unexpected: ${unexpected.join(", ")}` : ""}`;
   }
   if (!validText(value.intent)) {
-    return "intent must be one non-empty single-line string, free of secrets and opaque tokens";
+    return `intent must be one non-empty single-line string, free of secrets and opaque tokens${longJoinedWordHint(value.intent)}`;
   }
   for (const [key, maximum] of [["scope", 4], ["constraints", 4], ["questions", 3]]) {
     if (validTextList(value[key], maximum)) continue;
     return Array.isArray(value[key])
-      ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens`
+      ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens${longJoinedWordHint(value[key])}`
       : `${key} must be an ARRAY of at most ${maximum} short strings, not a ${typeof value[key]}`;
   }
   if (Object.hasOwn(value, "progress") && !validTextList(value.progress, 4)) {
