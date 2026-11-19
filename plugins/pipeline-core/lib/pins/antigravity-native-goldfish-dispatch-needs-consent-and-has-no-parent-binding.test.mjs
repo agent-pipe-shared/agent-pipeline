@@ -455,6 +455,16 @@ test("an agent write under the Antigravity brain or config directory is refused"
       `node ${ledger} ${cli}/brain`, `node /tmp/other.mjs --timeline ${transcript}`, `node ${ledger} --timeline ${transcript} --row`]) {
       assert.match(nativeBrainWriteRefusal({ filePath: null, command }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, command);
     }
+    // C32: the close's cost row over the same transcript only prints; the same command with any other operator, script, flag or a second path stays refused.
+    for (const command of [`node ${ledger} --row --antigravity-transcript ${transcript}`, `node ${ledger} --row "S1/B2" --antigravity-transcript ${transcript}`,
+      `node ${ledger} --row S1-B2 --antigravity-transcript ${transcript} --model gemini-4-argon-medium`]) {
+      assert.equal(nativeBrainWriteRefusal({ filePath: null, command }), null, command);
+    }
+    for (const command of [`node ${ledger} --row --antigravity-transcript ${transcript} > ${transcript}`, `node ${ledger} --row "x" --antigravity-transcript ${transcript}; rm ${transcript}`,
+      `node /tmp/other.mjs --row --antigravity-transcript ${transcript}`, `node ${ledger} --row --antigravity-transcript ${transcript} --out ${transcript}`,
+      `node ${ledger} --row --antigravity-transcript ${transcript} ${cli}/brain`, `node ${ledger} --antigravity-transcript ${transcript} --row`]) {
+      assert.match(nativeBrainWriteRefusal({ filePath: null, command }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, command);
+    }
     const res = runAdapter(fx, payload(fx, {
       conversationId: PARENT, toolCall: { name: "write_to_file", args: { TargetFile: descriptorPath, CodeContent: "{}" } },
     }));

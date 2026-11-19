@@ -281,7 +281,11 @@ export function nativeBrainWriteRefusal({ filePath, command } = {}) {
     // nothing (it prints to stdout). Exactly `node <...>/scripts/usage-ledger.mjs --timeline <file> [--json]`, no shell operator.
     const timelineRead = !/[<>|;&`$()]/u.test(command)
       && /^\s*node(?:\.exe)?\s+\S*[\\/]scripts[\\/]usage-ledger\.mjs\s+--timeline\s+\S+(?:\s+--json)?\s*$/u.test(command);
-    if (!readOnly && !timelineRead) return BRAIN_REFUSAL;
+    // C32 (second Antigravity greenfield report): the close's cost row reads the same transcript and only prints it. Exactly
+    // `node <...>/scripts/usage-ledger.mjs --row [label] --antigravity-transcript <file> [--model <name>]`, no shell operator; the refusal had left telemetry/costs.md empty.
+    const costRowRead = !/[<>|;&`$()]/u.test(command)
+      && /^\s*node(?:\.exe)?\s+\S*[\\/]scripts[\\/]usage-ledger\.mjs\s+--row(?:\s+(?:"[^"]*"|'[^']*'|[^\s"'-]\S*))?\s+--antigravity-transcript\s+\S+(?:\s+--model\s+\S+)?\s*$/u.test(command);
+    if (!readOnly && !timelineRead && !costRowRead) return BRAIN_REFUSAL;
   }
   return null;
 }
