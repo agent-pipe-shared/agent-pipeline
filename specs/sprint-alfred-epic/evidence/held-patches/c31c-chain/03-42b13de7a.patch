@@ -1,0 +1,245 @@
+diff --git a/plugins/pipeline-core/lib/guard/denial-telemetry.mjs b/plugins/pipeline-core/lib/guard/denial-telemetry.mjs
+index fe6e0caf33455fe72095ad81f3dd054a1710cdb1..1bb1f71bae57025cde4a83b3a6dba0ee81cc65fc 100644
+--- a/plugins/pipeline-core/lib/guard/denial-telemetry.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-telemetry.mjs
+@@ -89,11 +89,21 @@ function denialClassesScopeKey(input, dependencies) {
+   // Candidate 31 (B1): the Antigravity adapter payload carries the host's conversation id and no session_id, so without this
+   // fallback the trim never fired there. The id passes the same check as resetDenialClassesForSession(). A governed native
+   // child may share its parent's conversation id (NOT established), so it keeps no key: full text every time, never a wrong trim.
++  return conversationScopeKey(input);
++}
++
++function conversationScopeKey(input) {
+   const conversation = input?.antigravity_conversation_id;
+   if (typeof input?.native_child_cwd === "string" || !isPlainScopeId(conversation)) return null;
+   return conversation;
+ }
+ 
++// C31c (cloud review of candidate 31): no Antigravity hook reports a compaction or a resume (all five were read: start hint, bootstrap lock, pretool guard, stop hook, slicing hint), so a conversation-keyed
++// scope cannot be reset when its context window is cut. A heuristic bounds it instead: the grammar listing printed to an Antigravity conversation is presumed gone from its context after this long and
++// the next listing refusal prints it in full again. The clock is the time of the last FULL listing (`listingAtMs` in the scope's state file), never the file's mtime, which moves whenever a new class
++// is recorded. It only ever adds output (fail-open); the session-keyed Claude scope is reset by its compaction hook and is untouched.
++const ANTIGRAVITY_LISTING_WINDOW_MS = 30 * 60 * 1000;
++
+ function isPlainScopeId(value) {
+   return typeof value === "string" && /^[A-Za-z0-9._-]{1,128}$/u.test(value) && !value.startsWith("agent-");
+ }
+@@ -123,34 +133,63 @@ const GRAMMAR_LISTING_CODES = [READ_COMMAND_UNSUPPORTED_CODE, ...Object.keys(GRA
+  *  - any read, parse, mkdir, or write error against the per-scope state file.
+  */
+ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
++  return denialFirstOccurrences(input, root, classKey, dependencies).listing;
++}
++
++/**
++ * The same single read-and-record as isFirstDenialThisScope(), with BOTH answers (C31c, cloud review of candidate 31): `listing` is the shared-class answer (true only while no code of the
++ * grammar-listing class has printed in this scope: it picks the full or the short grammar listing) and `own` answers the human-override text: true until that text has actually been
++ * printed once in this scope (`overrideShown` in the store, set when a call passes `overrideOffered`, i.e. the route carries override text), whatever the code. The two differ after a
++ * read-spelling refusal, which prints the listing but offers no override: the later redirect or operator refusal gets the short listing and still the FULL signing instructions. A refusal that
++ * offers no override (a typed retry action instead) does not count as having shown it either. One call, because the first call records and a second call would read it back as seen.
++ */
++export function denialFirstOccurrences(input, root, classKey, dependencies, { overrideOffered = false } = {}) {
++  const full = { listing: true, own: true };
+   const scopeKey = denialClassesScopeKey(input, dependencies);
+-  if (!scopeKey) return true;
++  if (!scopeKey) return full;
+   const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
+-  if (commonDir === null) return true; // nowhere safe to persist -- fail open, full text every time
++  if (commonDir === null) return full; // nowhere safe to persist -- fail open, full text every time
+   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+   const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
+   const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
+   const statePath = guardDenialClassesPath(commonDir, scopeKey);
+   try {
++    const nowMs = (dependencies.nowMsFn ?? Date.now)();
++    const conversationScoped = scopeKey === conversationScopeKey(input);
+     let seenClasses = [];
++    let listingAtMs = null;
++    let overrideShown = false;
+     if (existsSyncFn(statePath)) {
+       const parsed = JSON.parse(readFileSyncFn(statePath, "utf8"));
+       if (Array.isArray(parsed?.seenClasses)) seenClasses = parsed.seenClasses;
++      if (Number.isFinite(parsed?.listingAtMs)) listingAtMs = parsed.listingAtMs;
++      overrideShown = parsed?.overrideShown === true;
++    }
++    // A conversation-keyed scope whose last full listing is older than the window, from the future, or of unknown age (a file written before the clock existed) forgets what it has seen.
++    if (conversationScoped && seenClasses.length > 0
++      && !(listingAtMs !== null && nowMs >= listingAtMs && nowMs - listingAtMs <= ANTIGRAVITY_LISTING_WINDOW_MS)) {
++      seenClasses = [];
++      listingAtMs = null;
++      overrideShown = false;
+     }
+-    const listingSeen = GRAMMAR_LISTING_CODES.includes(classKey)
+-      ? seenClasses.some((seen) => GRAMMAR_LISTING_CODES.includes(seen))
+-      : seenClasses.includes(classKey);
+-    if (seenClasses.includes(classKey)) return false;
++    const listingClass = GRAMMAR_LISTING_CODES.includes(classKey);
++    const classIsNew = !seenClasses.includes(classKey);
++    const listing = listingClass ? !seenClasses.some((seen) => GRAMMAR_LISTING_CODES.includes(seen)) : classIsNew;
++    const own = !overrideShown;
++    const nowShown = overrideShown || (overrideOffered && own);
++    if (!classIsNew && nowShown === overrideShown) return { listing, own };
+     ensureGuardDenialClassesDir(commonDir, mkdirSyncFn);
+     const updated = {
+       schema: "pipeline.guard-denial-classes-seen.v1",
+-      seenClasses: [...seenClasses, classKey],
++      seenClasses: classIsNew ? [...seenClasses, classKey] : seenClasses,
++      ...(conversationScoped ? { listingAtMs: listing && listingClass ? nowMs : listingAtMs } : {}),
++      ...(nowShown ? { overrideShown: true } : {}),
+     };
+     writeFileSyncFn(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf8");
+-    return !listingSeen;
++    return { listing, own };
+   } catch {
+-    return true; // never let a state-store failure trim an actionable denial -- fail open
++    return full; // never let a state-store failure trim an actionable denial -- fail open
+   }
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/guard/denial-telemetry.test.mjs b/plugins/pipeline-core/lib/guard/denial-telemetry.test.mjs
+index e5c70ce93c2c45fa506824740d27069efc83c9be..3a74f92c563bcc020fa3e0c58a9440450e43548d 100644
+--- a/plugins/pipeline-core/lib/guard/denial-telemetry.test.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-telemetry.test.mjs
+@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
+ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+-import { isFirstDenialThisScope } from "./denial-telemetry.mjs";
++import { denialFirstOccurrences, isFirstDenialThisScope } from "./denial-telemetry.mjs";
+ import { mkdtempTestScratch } from "../test-tmpdir.mjs";
+ 
+ const FULL = /The complete admitted grammar, with bounds and exact spellings:/u;
+@@ -167,6 +167,80 @@ test("C31-B1 rendered: an Antigravity-shaped input is trimmed on repeat, a new c
+   assert.equal(newConversation.stderr.length, first.stderr.length);
+ }));
+ 
++// C31c (cloud review of candidate 31): the shared listing class picks the grammar listing only; the human-override text keeps the base rule of its own code.
++test("C31c one call answers both: the listing follows the shared class, the override text follows whether it was printed", () => withFixture(({ root, commonDir, stateDir }) => {
++  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir };
++  const offered = { overrideOffered: true };
++  const input = { session_id: "two-answers-1" };
++  // A read-spelling refusal prints the listing and offers no override.
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-READ-COMMAND-UNSUPPORTED", deps), { listing: true, own: true });
++  // The redirect refusal gets the short listing and the full override text, which it then records as printed.
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-REDIRECT-UNAPPROVED", deps, offered), { listing: false, own: true });
++  // Any later refusal that offers the override gets the short form, whatever its code (the C31-B1 trim of the repeat text stays).
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-REDIRECT-UNAPPROVED", deps, offered), { listing: false, own: false });
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-OPERATOR-UNAPPROVED", deps, offered), { listing: false, own: false });
++  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), false, "the boolean wrapper is the listing answer");
++  assert.deepEqual(JSON.parse(readFileSync(join(stateDir, "two-answers-1.json"), "utf8")).seenClasses,
++    ["GUARD-READ-COMMAND-UNSUPPORTED", "GUARD-REDIRECT-UNAPPROVED", "GUARD-OPERATOR-UNAPPROVED", "GUARD-PARSE-UNSUPPORTED"]);
++  assert.deepEqual(denialFirstOccurrences({ session_id: "" }, root, "GUARD-PARSE-UNSUPPORTED", deps, offered), { listing: true, own: true }, "no scope: full, nothing stored");
++}));
++
++test("C31c a refusal that offered no override never counts as having shown it", () => withFixture(({ root, commonDir }) => {
++  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir };
++  const input = { session_id: "two-answers-2" };
++  // A typed retry action instead of an override: the class is recorded, the override text is not.
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-PARSE-UNSUPPORTED", deps, { overrideOffered: false }), { listing: true, own: true });
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-OPERATOR-UNAPPROVED", deps, { overrideOffered: true }), { listing: false, own: true }, "the full override text is still owed");
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-REDIRECT-UNAPPROVED", deps, { overrideOffered: true }), { listing: false, own: false });
++}));
++
++test("C31c rendered: a read-spelling refusal first leaves the full signing instructions to the next mutation refusal", () => withFixture(({ deps }) => {
++  const planned = { ...deps, recordHumanGuardDenialFn: () => ({ status: "planned", requestSha256: "a".repeat(64) }) };
++  const read = evaluateLifecycleReadyGuard(claude(READ_SPELLING, "rendered-4"), planned);
++  assert.match(read.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
++  assert.doesNotMatch(read.stderr, /Human override/u, "a read spelling offers no override");
++  const redirect = evaluateLifecycleReadyGuard(claude(REDIRECT, "rendered-4"), planned);
++  assert.match(redirect.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
++  assert.doesNotMatch(redirect.stderr, FULL, "the listing was printed by the read refusal");
++  assert.match(redirect.stderr, /Human override available for this exact/u, "the ceremony text was never printed in this scope, so it is full");
++  const again = evaluateLifecycleReadyGuard(claude(REDIRECT, "rendered-4"), planned);
++  assert.match(again.stderr, /Human override remains available for this exact/u, "the repeat of the same code is short, as before");
++}));
++
++test("C31c Antigravity: the listing is presumed gone after the window, counted from the last FULL listing and not from the last write", () => withFixture(({ root, commonDir, stateDir }) => {
++  const minute = 60 * 1000;
++  let nowMs = 1_000_000_000_000;
++  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir, nowMsFn: () => nowMs };
++  const input = agy("x");
++  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), true);
++  nowMs += 10 * minute;
++  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), false, "inside the window: short");
++  // A new class recorded later rewrites the state file but is not a full listing: the clock stays at the first one.
++  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-OPERATOR-UNAPPROVED", deps), { listing: false, own: true });
++  assert.equal(JSON.parse(readFileSync(join(stateDir, `${CONVERSATION}.json`), "utf8")).listingAtMs, 1_000_000_000_000);
++  nowMs += 21 * minute; // 31 minutes after the full listing, 21 after the last write
++  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), true, "past the window: full again");
++  nowMs += minute;
++  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), false, "and the new window starts there");
++}));
++
++test("C31c Antigravity: a store from before the clock existed or a clock from the future fails open to full once; a session scope never expires", () => withFixture(({ root, commonDir, stateDir }) => {
++  let nowMs = 2_000_000_000_000;
++  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir, nowMsFn: () => nowMs };
++  mkdirSync(stateDir, { recursive: true });
++  writeFileSync(join(stateDir, `${CONVERSATION}.json`), `${JSON.stringify({ schema: "pipeline.guard-denial-classes-seen.v1", seenClasses: ["GUARD-PARSE-UNSUPPORTED"] })}\n`);
++  assert.equal(isFirstDenialThisScope(agy("x"), root, "GUARD-PARSE-UNSUPPORTED", deps), true, "unknown age of the earlier listing: full once");
++  assert.equal(isFirstDenialThisScope(agy("x"), root, "GUARD-PARSE-UNSUPPORTED", deps), false, "then it is trimmed again");
++  nowMs -= 5 * 60 * 1000; // the clock went back: a listing time in the future is not trusted
++  assert.equal(isFirstDenialThisScope(agy("x"), root, "GUARD-PARSE-UNSUPPORTED", deps), true);
++  // The session-keyed scope (Claude, Codex) has its own reset at compaction and no clock.
++  nowMs = 2_000_000_000_000;
++  assert.equal(isFirstDenialThisScope({ session_id: "session-clock-1" }, root, "GUARD-PARSE-UNSUPPORTED", deps), true);
++  nowMs += 24 * 60 * 60 * 1000;
++  assert.equal(isFirstDenialThisScope({ session_id: "session-clock-1" }, root, "GUARD-PARSE-UNSUPPORTED", deps), false);
++  assert.equal("listingAtMs" in JSON.parse(readFileSync(join(stateDir, "session-clock-1.json"), "utf8")), false, "the session store keeps its shape");
++}));
++
+ test("C31-B1 rendered: a read-scope refusal first never hides the first full listing", () => withFixture(({ deps }) => {
+   const scope = evaluateLifecycleReadyGuard(claude(READ_SCOPE, "rendered-2"), deps);
+   assert.equal(scope.exitCode, 2);
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index a295e2f2a0b138d6d4db55ee10e5335e0c9c805a..af724dafa4a491d30e30d20113cff9709ab27518 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -29,7 +29,7 @@ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestP
+ import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingPluginFileShellDenialText, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
+-import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
++import { denialFirstOccurrences, isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
+ import { devPlanShellBlocked, devPlanShellFaultBlocked, devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
+ import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationControllerCandidate, acquireSourceOwnedOwningControllerCommandAdmission, releaseSourceOwnedOwningControllerCommandAdmission } from "./command-catalogue.mjs";
+ import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
+@@ -632,12 +632,13 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       if (!route.admitted) {
+         // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
+         // an admitted/lifted command -- computed here, inside this branch, not earlier.
+-        const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
++        // C31c: the grammar listing trims on the shared class (`listing`), the human-override text on whether it has been printed in this scope yet (`own`).
++        const first = denialFirstOccurrences(input, root, code, dependencies, { overrideOffered: route.overrideGuidance !== "" });
+         return withLifts(lifts, blocked(
+           code,
+           null,
+           retryActions,
+-          firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
++          first.own ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
+           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
+           // P2-2: when no typed action could be built, a `;`/newline list still gets a per-part verdict as message text.
+           grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine))
+@@ -646,7 +647,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+               : null),
+           null,
+           false,
+-          firstOccurrence,
++          first.listing,
+         ));
+       }
+       lifts.push(route.admitted);
+@@ -687,10 +688,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+         // character it scans (its per-part policy only ever recovers `;`/newline-joined
+         // segments). Measured empirically across `&&`, `|`, `>`, `2>&1`, `| tee`: [] in
+         // every case. Calling it here would be dead code, not a fix.
+-        const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
++        const first = denialFirstOccurrences(input, root, code, dependencies, { overrideOffered: route.overrideGuidance !== "" });
+         return withLifts(lifts, blocked(
+-          code, null, [], firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance), rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
+-          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)), null, false, firstOccurrence,
++          code, null, [], first.own ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance), rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
++          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)), null, false, first.listing,
+         ));
+       }
+       lifts.push(route.admitted);

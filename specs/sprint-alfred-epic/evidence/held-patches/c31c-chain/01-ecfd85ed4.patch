@@ -1,0 +1,75 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 9a6ced9839adf5f10f6942dcd3a1c96dd2dfc30b..927f87b19f17f44e26b89aa4b4901717e3df9a39 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -148,8 +148,12 @@ function testOwners(file, modules, mirrored) {
+   return modules.filter((mod) => named.has(mod.id));
+ }
+ 
+-/** All raw violations of the tree, before exceptions. */
+-function observe(root, modules, policy, listed, readFile, extensions) {
++/**
++ * All raw violations of the tree, before exceptions. `keepUnowned` is the set of paths an accepted `unowned-path` exception already covers: a test file in it keeps the reading it had
++ * when that exception was written (no module, so no import check and no ambiguity), because deriving an owner for it would turn an accepted tree into new violations no exception covers
++ * (C31c, cloud review of candidate 31). The exception stays used, so it is never reported stale; dropping it hands the file to the derivation.
++ */
++function observe(root, modules, policy, listed, readFile, extensions, keepUnowned = new Set()) {
+   const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
+   const sources = listed.filter((file) => extensions.has(path.extname(file)) && !excluded(file)).sort();
+   const violations = [];
+@@ -165,7 +169,7 @@ function observe(root, modules, policy, listed, readFile, extensions) {
+   }
+   for (const file of sources) {
+     let owners = owningModules(file, modules);
+-    const tested = owners.length === 0 && isTestFile(file) ? testOwners(file, modules, mirrored) : [];
++    const tested = owners.length === 0 && isTestFile(file) && !keepUnowned.has(file) ? testOwners(file, modules, mirrored) : [];
+     if (tested.length > 1) {
+       const ids = tested.map((owner) => owner.id).sort();
+       violations.push({ file, module: ids.join(", "), rule: "ambiguous-ownership", detail: `${file} is a test of ${ids.join(" and ")} equally (by declared entry point, name, directory or mirrored source file)` });
+@@ -245,7 +249,8 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
+   const listed = (deps.listFiles ?? trackedFiles)(root);
+   if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the check needs a Git work tree", violations: [] };
+   const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
+-  const { sources, violations: observed, usage, edges } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions));
++  const keepUnowned = new Set(policy.exceptions.filter((entry) => entry.rule === "unowned-path").map((entry) => entry.path));
++  const { sources, violations: observed, usage, edges } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions), keepUnowned);
+ 
+   const accepted = new Map(policy.exceptions.map((entry) => [exceptionKey(entry.rule, entry.path, entry.target ?? null), entry]));
+   const used = new Set();
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index 2f2761d59f74c036c5f65b991655dd9a5114934d..c21f76570c68d24daac4fa422b40805f2ebd21f9 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -341,6 +341,32 @@ test("M3-03 a derived-owned test is held to its module's allowedDependencies lik
+   assert.deepEqual(rules(refused), [["forbidden-dependency", "tests/app.test.mjs", "src/lib/x.mjs"]]);
+ });
+ 
++// C31c (cloud review of candidate 31): a policy written before the derivation accepted these tests as `unowned-path`. It must keep covering them: no new forbidden-dependency, no new
++// ambiguous-ownership, no stale exception; removing the exception hands the file to the derivation.
++const unownedPolicy = (...paths) => ({ schema: BOUNDARY_POLICY_SCHEMA, lineBound: DEFAULT_LINE_BOUND, excludedPaths: [], exceptions: paths.map((file) => ({ rule: "unowned-path", path: file, reason: "accepted when the boundary check was adopted" })) });
++
++test("M3-04 an accepted unowned-path exception keeps covering a test the derivation would now own and check", () => {
++  const files = { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n", "tests/app.test.mjs": 'import "../src/lib/x.mjs";\n' };
++  const accepted = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files, policy: unownedPolicy("tests/app.test.mjs") }) });
++  assert.equal(accepted.status, "pass", JSON.stringify(accepted.violations));
++  assert.deepEqual(accepted.staleExceptions, [], "the exception is still used, never reported stale");
++  assert.equal(accepted.counts.excepted, 1);
++  assert.deepEqual([...accepted._measured.usage].map(([id, row]) => [id, row.files]).sort(), [["app", 1], ["lib", 1]], "an accepted unowned file is not counted to a module, as before");
++  const dropped = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files, policy: unownedPolicy() }) });
++  assert.deepEqual(rules(dropped), [["forbidden-dependency", "tests/app.test.mjs", "src/lib/x.mjs"]], "without the exception the derivation applies");
++});
++
++test("M3-05 an accepted unowned-path exception also covers a test that maps to two modules, and only the paths it names", () => {
++  const files = {
++    "src/app/shared.mjs": "export {};\n", "src/lib/shared.mjs": "export {};\n", "tests/shared.test.mjs": "export {};\n",
++    "src/app/main.mjs": "export {};\n", "tests/main.test.mjs": "export {};\n",
++  };
++  const accepted = checkArchitectureBoundaries({ rootDir: fixture({ files, policy: unownedPolicy("tests/shared.test.mjs") }) });
++  assert.equal(accepted.status, "pass", JSON.stringify(accepted.violations));
++  assert.deepEqual(accepted.staleExceptions, []);
++  assert.deepEqual([...accepted._measured.usage].map(([id, row]) => [id, row.files]).sort(), [["app", 3], ["lib", 1]], "tests/main.test.mjs is not named, so it is still derived to app");
++});
++
+ // C31-M3 (L11, AC-112): the baseline policy materialize-architecture writes for the non-module path classes.
+ const design = await import("../lib/architecture-design.mjs");
+ const m3Modules = (owned) => Object.entries(owned).map(([id, ownedPaths]) => ({ id, ownedPaths }));
