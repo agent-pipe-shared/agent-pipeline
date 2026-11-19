@@ -34,7 +34,9 @@ const NOT_USER_FACING_TAG = /\[not user-facing:\s*(?!\{\{|<)\S[^\]]*\]/iu; // an
 const USER_FACING_VOCABULARY = /\b(?:users?|players?|screens?|pages?|buttons?|clicks?|taps?|presses|pressed|browsers?|dialogs?|menus?|reload|displays?|displayed|renders?|rendered|UI)\b/iu;
 const CLAUSE_MARKER = /\b(Journeys?|Asserts?):/giu;
 // Both placeholder spellings: the generated skeleton's `<...>` and the Spec template's `{{...}}`.
-const PLACEHOLDER = /<[^>]*>|\{\{|REPLACE/u;
+// C32 (second Antigravity greenfield report): `/<[^>]*>/` read `< 1800000 ms ... >= 1800000 ms` as one unfilled placeholder and refused a criterion that was complete. A skeleton placeholder is `<` directly
+// followed by a letter or underscore, not by a digit or a space, and not glued to the word before it (`a<b`), and it holds no further `<`.
+const PLACEHOLDER = /(?<![\p{L}\p{N}])<[\p{L}_][^<>]*>|\{\{|REPLACE/u;
 // An effect that only says something changed is no assertion on the actual effect.
 const WEAK_EFFECT = /^(?:the\s+)?(?:text|label|title|output|value|content|page|view|screen|message|state)?\s*(?:is\s+|was\s+|has\s+|gets\s+)?(?:changed|updated|shown|displayed|visible|present|different|correct|ok|works?|set)$/iu;
 

@@ -138,6 +138,11 @@ test("J2 journeys without an effect assertion, or an effect that is only 'text c
   assert.equal(only("Journeys: <list the journeys>. Asserts: <effect>.").status, "not-covered", "a skeleton placeholder is no journey");
   assert.equal(only("Journeys: {{every entry path; reload}}. Asserts: {{the actual effect}}.").status, "not-covered", "the Spec template's own placeholder is no journey");
   assert.equal(only("Journeys: menu import. Asserts: the stored candidate is unchanged after reload.").status, "covered");
+  // C32 (second Antigravity greenfield report): comparison operators are no placeholder, a skeleton still is one wherever it stands.
+  assert.equal(only("Journeys: timer runs idle; reload mid-game. Asserts: the remaining time is < 1800000 ms while playing and >= 1800000 ms after the reset.").status, "covered", "a comparison is no placeholder");
+  assert.equal(only("Journeys: reload; second tap. Asserts: a<b holds and c>d holds in the stored record.").status, "covered", "an operator glued to a word is no placeholder");
+  assert.equal(only("Journeys: <every entry path; reload in the middle of a transition>. Asserts: the stored record holds the new title.").status, "not-covered", "the generated skeleton's long placeholder is still one");
+  assert.equal(only("Journeys: reload; second tap. Asserts: the stored record holds <the actual effect>.").status, "not-covered", "a placeholder after prose is still one");
 });
 
 test("J3 only a reasoned 'not user-facing' tag exempts a criterion; the explicit user-facing tag forces the duty", async () => {
