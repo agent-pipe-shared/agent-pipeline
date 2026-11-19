@@ -12305,7 +12305,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
             const featureFolder = featureDirs[0] ?? "specs";
             console.error(`Error: submit-plan blocked by ADR-DRAFT-UNBOUND (${unbound.map((entry) => entry.path).join(", ")}); ${unbound.length === 1 ? "this ADR proposal was" : "these ADR proposals were"} written but never bound into the design package, `
               + `so the design approval would pass and no decision would ever become an accepted ADR. Bind ${unbound.length === 1 ? "it" : "them"}: node ${scripts("bind-adr-proposals.mjs")} --root ${dir} --feature ${base.activeFeature.id} `
-              + `--carrier ${featureFolder}/design.md --selection ${featureFolder}/po-selection.json ${unbound.map((entry) => `--draft ${entry.slug}`).join(" ")} (the selection file holds the PO's own words as JSON; skills/architecture-decision/SKILL.md shows its shape), `
+              + `--carrier ${featureFolder}/design.md --selection ${featureFolder}/po-selection.json ${unbound.map((entry) => `--draft ${entry.slug}`).join(" ")} (the selection file holds the PO's own words as JSON; skills/architecture-decision/SKILL.md shows its shape; `
+              // C32 (Claude greenfield 2026-11-19, F15): the bind refused "design.md does not exist" and the agent created the carrier by hand; the refusal here now says what it is.
+              + `the carrier is a Markdown file of this design package that must already exist: write ${featureFolder}/design.md with a title line first, the bind adds the decision block to it), `
               + `commit the written files, then run submit-plan again. A proposal that is deliberately not wanted is discarded with a reason instead, one command per draft (an audit record, no signature): `
               + `${unbound.map((entry) => `node ${scripts("create-adr.mjs")} --root ${dir} --slug ${entry.slug} --discard --reason "<why it is not wanted>"`).join(" ; ")}. No submission or signature request was recorded.`);
             return 2;

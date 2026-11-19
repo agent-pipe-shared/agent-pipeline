@@ -353,6 +353,8 @@ test("C28 ADR gate: an unbound draft refuses submit-plan before the PO signs, na
   assert.ok(refused.err.includes(`bind-adr-proposals.mjs --root ${f.root} --feature pin-adr-unbound --carrier specs/pin-adr-unbound/design.md --selection specs/pin-adr-unbound/po-selection.json --draft storage-adapter`), refused.err);
   assert.ok(refused.err.includes(`create-adr.mjs --root ${f.root} --slug storage-adapter --discard --reason "<why it is not wanted>"`), refused.err);
   assert.match(refused.err, /No submission or signature request was recorded\./u);
+  // C32 F15: the carrier is explained where it is named, so nobody has to learn it from the bind's own refusal.
+  assert.match(refused.err, /the carrier is a Markdown file of this design package that must already exist: write specs\/pin-adr-unbound\/design\.md with a title line first, the bind adds the decision block to it/u);
   assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
 });
 
