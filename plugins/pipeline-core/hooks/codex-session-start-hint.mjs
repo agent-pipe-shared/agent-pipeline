@@ -57,8 +57,24 @@ function priorTranscriptRecoveryLine(root, sessionId, runner) {
     + `${listCommand}. It lists only PRIOR Codex transcripts whose own session metadata matches this repository identity, excludes this session by its supplied identity, and returns bounded operational excerpts. Only when recovering a specific detail, read a session id returned by that list with exactly: ${readCommand}; that targeted read returns its complete JSONL and is never automatic context injection. If list or read reports unavailable, state that honestly and continue; never search $CODEX_HOME, ~/.codex, or any runner session directory directly.`;
 }
 
+// C32 (second Antigravity greenfield report, PO 2026-11-19): once the design is approved the material input lives in the sealed PRD and Spec, and repeating every original chunk in every turn
+// cost over 30 redundant reads and a 40-line reminder per turn. True when the active feature's plan is approved or a feature has been closed. Any read problem answers false, so the full lines stay (fail-safe).
+function designSealed(root) {
+  try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+    const statePath = authority.status === "ready"
+      ? authority.state
+      : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+    const state = loadStateSafe(join(root, statePath));
+    return state?.activeFeature?.planApproved === true || (Array.isArray(state?.closedFeatures) && state.closedFeatures.length > 0);
+  } catch {
+    return false;
+  }
+}
+
 // The intake checkpoint is the lossless, private authority store. Its material input is
-// independent of a resume card and is therefore surfaced on every governed SessionStart.
+// independent of a resume card and is therefore surfaced on every governed SessionStart
+// until the design is approved; after that only a one-line pointer to the sealed documents remains.
 export function intakeVerbatimContextLines(root) {
   // The private checkpoint is Git-owned state. A governed fixture or project without
   // Git cannot have one, so avoid asking its resolver to discover private storage.
@@ -83,7 +99,9 @@ export function intakeVerbatimContextLines(root) {
     if (parts.length > 0) lines.push(`Onboarding intake answered values (already answered, do not re-ask): ${parts.join("; ")}.`);
   }
   const chunks = Array.isArray(material?.chunks) ? material.chunks : [];
-  if (chunks.length > 0) {
+  if (chunks.length > 0 && designSealed(root)) {
+    lines.push(`Onboarding intake material input (${chunks.length} chunk(s)) is condensed in the approved PRD and Spec; read those, the original chunks are not repeated here.`);
+  } else if (chunks.length > 0) {
     lines.push(
       `Onboarding intake verbatim material input is private authority and MUST be read in full now, not treated as already condensed by any resume-hint summary (${chunks.length} chunk(s)):`,
     );

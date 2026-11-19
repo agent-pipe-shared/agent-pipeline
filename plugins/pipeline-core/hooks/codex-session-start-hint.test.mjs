@@ -386,6 +386,20 @@ cases.push({ id: "SSH008", name: "verbatim onboarding intake and malformed check
     assert.match(withVerbatim.context, /do not recapture an existing chunk merely to satisfy a ritual/u);
     assert.match(withVerbatim.context, /do not substitute answered onboarding settings for product requirements/u);
 
+    // C32: after the design is approved the original chunks are no longer repeated (they live in the sealed PRD and Spec); the answered values stay.
+    const stateFile = join(verbatimRoot, ".claude", "pipeline-state.json");
+    mkdirSync(join(verbatimRoot, ".claude"), { recursive: true });
+    writeFileSync(stateFile, JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f", planApproved: true } }));
+    const sealed = sessionStartDecision(verbatimRoot, undefined, "verbatim-sealed");
+    assert.match(sealed.context, /Onboarding intake answered values \(already answered, do not re-ask\)/u, "the answered values stay");
+    assert.match(sealed.context, /Onboarding intake material input \(2 chunk\(s\)\) is condensed in the approved PRD and Spec/u);
+    assert.doesNotMatch(sealed.context, /Onboarding intake material input chunk 1 of 2/u, "the original chunks are not repeated after the approval");
+    writeFileSync(stateFile, JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f", planApproved: false } }));
+    assert.match(sessionStartDecision(verbatimRoot, undefined, "verbatim-unsealed").context, /Onboarding intake material input chunk 1 of 2/u, "before the approval the chunks stay");
+    writeFileSync(stateFile, "{ not json");
+    assert.match(sessionStartDecision(verbatimRoot, undefined, "verbatim-state-unreadable").context, /Onboarding intake material input chunk 1 of 2/u, "an unreadable state keeps the full lines (fail-safe)");
+    rmSync(join(verbatimRoot, ".claude"), { recursive: true, force: true });
+
     // A read failure (malformed checkpoint bytes) must degrade to exactly the distilled-card
     // output -- never a throw, never a crash, never a partial/garbled new line.
     const { checkpoint: checkpointPath } = resolveIntakeCheckpointPaths({ rootDir: verbatimRoot });
