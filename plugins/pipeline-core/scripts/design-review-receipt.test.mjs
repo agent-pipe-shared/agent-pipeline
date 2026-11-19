@@ -352,6 +352,9 @@ test("an output whose directory does not exist is refused, never created", withR
   const result = createReceiptFromDisk(request(repo, { outPath: "specs/feat-x/other/receipt.json" }), { env: CLAUDE, now });
   assert.equal(result.code, "DRC-OUT-PARENT-MISSING");
   assert.equal(existsSync(join(repo, "specs/feat-x/other")), false);
+  // C32: the refusal names the missing DIRECTORY (not the file path) and a way out.
+  assert.match(result.message, /the output directory does not exist: specs\/feat-x\/other \(/u);
+  assert.match(result.message, /create it by writing any file into it with the Write tool, or choose an existing directory/u);
 }));
 
 test("no runner signal is refused and nothing is written", withRepo((repo) => {

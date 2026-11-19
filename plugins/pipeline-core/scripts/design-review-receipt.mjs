@@ -146,6 +146,12 @@ function readBoundAt(repoReal, commit, path, role) {
   try { return { ok: true, bytes: git(["show", `${commit}:${path}`]) }; } catch { return refuse("DRC-SOURCES-AT-MISSING", `${role} file ${path} cannot be read at commit ${commit.slice(0, 12)}`); }
 }
 
+// C32 (Claude greenfield 2026-11-19): the refusal printed the FILE path as "the output directory" and named no repair. It names the directory and the way out.
+function missingParentMessage(outPath) {
+  const directory = outPath.includes("/") ? outPath.slice(0, outPath.lastIndexOf("/")) : ".";
+  return `the output directory does not exist: ${directory} (this command never creates one; create it by writing any file into it with the Write tool, or choose an existing directory such as the feature's own specs folder, then run the command again with --out ${outPath})`;
+}
+
 /** Resolve the output location: a new file in an existing directory inside the repository. */
 function resolveOutput(repoReal, outPath) {
   const absolute = join(repoReal, ...outPath.split("/"));
@@ -158,7 +164,7 @@ function resolveOutput(repoReal, outPath) {
   try {
     if (!isInside(repoReal, realpathSync(dirname(absolute)))) return refuse("DRC-PATH-UNSAFE", `the output directory resolves outside the repository: ${outPath}`);
   } catch {
-    return refuse("DRC-OUT-PARENT-MISSING", `the output directory does not exist: ${outPath}`);
+    return refuse("DRC-OUT-PARENT-MISSING", missingParentMessage(outPath));
   }
   return { ok: true, absolute };
 }
@@ -405,7 +411,7 @@ export function createReceiptFromDisk(input, deps = {}) {
     writeFileSync(output.absolute, created.bytes, { flag: "wx" });
   } catch (error) {
     if (error?.code === "EEXIST") return refuse("DRC-OUT-EXISTS", `the output already exists and is never overwritten: ${request.outPath}; choose a new --out path (for example the same name with a -2 suffix) and run the command again`);
-    if (error?.code === "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", `the output directory does not exist: ${request.outPath}`);
+    if (error?.code === "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", missingParentMessage(request.outPath));
     return refuse("DRC-WRITE-FAILED", `the receipt could not be written: ${request.outPath}`);
   }
   return {
