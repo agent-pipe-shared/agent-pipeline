@@ -2018,6 +2018,35 @@ test("C21H (b) the namespaced critic-high-risk type is the Critic as well, and o
   } finally { cleanup(fx); }
 });
 
+// C32 (Codex greenfield report, candidate 31 run): a Critic stop that issues no Source return leaves one small diagnostic note, and the close and the split merge say why.
+test("C32 the last Critic stop is noted, also when no record is issued, and the sentence names what the hook saw", async () => {
+  const { issueCriticSourceReturn, readCriticStopNote, describeCriticStopNote } = await import("../lib/critic-source-return.mjs");
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    const commonDir = join(fx.root, ".git");
+    assert.equal(readCriticStopNote({ controlRoot: admitted.controlRoot }), null, "no stop yet");
+    assert.match(describeCriticStopNote(null), /recorded no Critic subagent stop/u);
+    // A Critic stop whose final message holds no verdict: no record, a note with the reason.
+    assert.equal(issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput("The review is finished; no machine-readable verdict was returned.", { agent_type: "critic" }) }).status, "no-verdict");
+    let note = readCriticStopNote({ controlRoot: admitted.controlRoot });
+    assert.deepEqual([note.runner, note.agentType, note.status], ["codex", "critic", "no-verdict"]);
+    assert.match(note.reason, /does not end in a fenced JSON verdict/u);
+    // A verdict under another agent type (what a `default` spawn returns): still not applicable, and the note names the type.
+    assert.equal(issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput(criticReturn(), { agent_type: "default" }) }).status, "not-applicable");
+    note = readCriticStopNote({ controlRoot: admitted.controlRoot });
+    assert.deepEqual([note.agentType, note.status], ["default", "verdict-under-other-agent-type"]);
+    assert.match(describeCriticStopNote(note), /agent type default\) ended as verdict-under-other-agent-type: a subagent of type default returned a Critic verdict, but only the agent types critic and critic-high-risk/u);
+    assert.equal(existsSync(target), false, "no record from a non-Critic type");
+    // A non-Critic stop without a verdict leaves the note as it was; an issued stop notes itself.
+    issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput("done", { agent_type: "goldfish-implementor" }) });
+    assert.equal(readCriticStopNote({ controlRoot: admitted.controlRoot }).status, "verdict-under-other-agent-type");
+    assert.equal(issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput(criticReturn(), { agent_type: "critic" }) }).status, "issued");
+    assert.equal(readCriticStopNote({ controlRoot: admitted.controlRoot }).status, "issued");
+  } finally { cleanup(fx); }
+});
+
 // G20-41 (candidate 20, AC-108): on Antigravity the Critic CHILD's final `send_message` to its parent conversation issues the same record.
 // Criterion-bound cases, written before the producer existed. The child is recognised only through runner-written facts: its own conversationId,
 // the descriptor the host wrote under the PARENT's brain directory, and the Recipient; payloads are shaped like the M4c measurement.

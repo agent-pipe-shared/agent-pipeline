@@ -98,7 +98,11 @@ function openAdmittedPackets(controlRoot, runner, nowMs) {
  */
 export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date.now(), readHandbackFn = null } = {}) {
   try {
-    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || !CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) return { status: "not-applicable" };
+    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop") return { status: "not-applicable" };
+    if (!CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) {
+      noteOtherAgentVerdict({ commonDir, runner, nowMs, input });
+      return { status: "not-applicable" };
+    }
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
     let verdict = extractCriticVerdict(input.last_assistant_message);
     // C27: the text the verdict was looked for in is the text a problem is reported about. A child that ended with a hand-back has no useful last message of its own.
@@ -110,8 +114,52 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
     const child = childDigest(input.agent_id);
     const result = issueForVerdict({ commonDir, runner, verdict, nowMs, child });
     noteReturnProblem({ commonDir, runner, nowMs, child, result, text: returned });
+    writeStopNote({ commonDir, runner, nowMs, agentType: input.agent_type, status: result.status,
+      reason: result.status === "no-verdict" ? verdictProblemText(returned) : result.status === "contradictory-verdict" ? `its verdict contradicts its own pass: true (${result.reason})` : null });
     return result;
   } catch { return { status: "unavailable" }; }
+}
+
+// C32 (Codex greenfield report, candidate 31 run: the Critic stops produced no Source return and the cause could not be told afterwards): the last Critic stop the
+// hook saw is written down as a fixed small note next to the packets, so the close can say why no record was issued. It is a diagnostic only and never fails or
+// changes a stop: `<common-dir>/agent-pipeline/critic-packets/last-critic-stop.json`, mode 0600, overwritten by the next stop, written only where the packet directory exists.
+export const CRITIC_STOP_NOTE_FILE = "last-critic-stop.json";
+const cleanAgentType = (value) => (typeof value === "string" ? value.replace(/[^A-Za-z0-9:_.-]/gu, "?").slice(0, 40) : null);
+
+function writeStopNote({ commonDir, runner, nowMs, agentType, status, reason = null }) {
+  try {
+    if (typeof commonDir !== "string" || commonDir === "") return;
+    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
+    if (!existsSync(controlRoot)) return;
+    writeFileSync(join(controlRoot, CRITIC_STOP_NOTE_FILE), canonicalJson({ runner, atMs: nowMs, agentType: cleanAgentType(agentType), status: String(status).slice(0, 40), reason: reason === null ? null : String(reason).slice(0, 400) }), { mode: 0o600 });
+  } catch { /* a diagnostic never fails the stop */ }
+}
+
+/** A subagent that is no Critic type but returned a schema-shaped Critic verdict: the usual cause of a missing Source return on a runner that spawns every role as `default`. */
+function noteOtherAgentVerdict({ commonDir, runner, nowMs, input }) {
+  try {
+    const text = input.last_assistant_message;
+    if (typeof text !== "string" || text.length > 400_000 || !text.includes("{") || extractCriticVerdict(text) === null) return;
+    writeStopNote({ commonDir, runner, nowMs, agentType: input.agent_type ?? "none", status: "verdict-under-other-agent-type",
+      reason: `a subagent of type ${cleanAgentType(input.agent_type ?? "none")} returned a Critic verdict, but only the agent types ${[...CRITIC_AGENT_TYPES].join(" and ")} issue the Source return` });
+  } catch { /* a diagnostic never fails the stop */ }
+}
+
+/** The last Critic stop note of this repository, or null. */
+export function readCriticStopNote({ controlRoot } = {}) {
+  try {
+    if (typeof controlRoot !== "string") return null;
+    const note = JSON.parse(readFileSync(join(controlRoot, CRITIC_STOP_NOTE_FILE), "utf8"));
+    return note !== null && typeof note === "object" && Number.isSafeInteger(note.atMs) && typeof note.status === "string" ? note : null;
+  } catch { return null; }
+}
+
+/** One sentence for a close or merge refusal: what the hook saw at the last Critic stop. Pure. */
+export function describeCriticStopNote(note) {
+  if (note === null || typeof note !== "object") {
+    return " The stop hook recorded no Critic subagent stop in this repository: it did not fire for the Critic, or the Critic ran under an agent type it does not recognise and returned no verdict.";
+  }
+  return ` The last Critic subagent stop the hook saw (${new Date(note.atMs).toISOString()}, ${note.runner ?? "unknown runner"}, agent type ${note.agentType ?? "none"}) ended as ${note.status}${typeof note.reason === "string" && note.reason !== "" ? `: ${note.reason}` : ""}.`;
 }
 
 /** In words, why a Critic's final message holds no verdict that can be recorded. */

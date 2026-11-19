@@ -29,6 +29,7 @@ import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
 import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
+import { describeCriticStopNote, readCriticStopNote } from "../lib/critic-source-return.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import { featurePackageDigestRoute, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
@@ -358,7 +359,7 @@ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
   // route) admits the identical close; the label stays caller-authored-fallback and travels with the acknowledgement reference.
   const acknowledgement = findCriticAcknowledgement({ gitCommonDir: common, packetId, receipt });
   if (acknowledgement !== null) return Object.freeze({ independence, acknowledgement });
-  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet, the wait for its proof and the follow-up command: hand the PO only the signing command, the PO reports nothing back, then run the wait and the follow-up yourself), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
+  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk;${describeCriticStopNote(readCriticStopNote({ controlRoot: join(common, "agent-pipeline", "critic-packets") }))} repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet, the wait for its proof and the follow-up command: hand the PO only the signing command, the PO reports nothing back, then run the wait and the follow-up yourself), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
 }
 function startPlan(values) {
   const root = physicalRoot(values.root);
