@@ -89,10 +89,20 @@ function denialClassesScopeKey(input, dependencies) {
   // Candidate 31 (B1): the Antigravity adapter payload carries the host's conversation id and no session_id, so without this
   // fallback the trim never fired there. The id passes the same check as resetDenialClassesForSession(). A governed native
   // child may share its parent's conversation id (NOT established), so it keeps no key: full text every time, never a wrong trim.
+  return conversationScopeKey(input);
+}
+
+function conversationScopeKey(input) {
   const conversation = input?.antigravity_conversation_id;
   if (typeof input?.native_child_cwd === "string" || !isPlainScopeId(conversation)) return null;
   return conversation;
 }
+
+// C31c (cloud review of candidate 31): no Antigravity hook reports a compaction or a resume (all five were read: start hint, bootstrap lock, pretool guard, stop hook, slicing hint), so a conversation-keyed
+// scope cannot be reset when its context window is cut. A heuristic bounds it instead: the grammar listing printed to an Antigravity conversation is presumed gone from its context after this long and
+// the next listing refusal prints it in full again. The clock is the time of the last FULL listing (`listingAtMs` in the scope's state file), never the file's mtime, which moves whenever a new class
+// is recorded. It only ever adds output (fail-open); the session-keyed Claude scope is reset by its compaction hook and is untouched.
+const ANTIGRAVITY_LISTING_WINDOW_MS = 30 * 60 * 1000;
 
 function isPlainScopeId(value) {
   return typeof value === "string" && /^[A-Za-z0-9._-]{1,128}$/u.test(value) && !value.startsWith("agent-");
@@ -123,34 +133,63 @@ const GRAMMAR_LISTING_CODES = [READ_COMMAND_UNSUPPORTED_CODE, ...Object.keys(GRA
  *  - any read, parse, mkdir, or write error against the per-scope state file.
  */
 export function isFirstDenialThisScope(input, root, classKey, dependencies) {
+  return denialFirstOccurrences(input, root, classKey, dependencies).listing;
+}
+
+/**
+ * The same single read-and-record as isFirstDenialThisScope(), with BOTH answers (C31c, cloud review of candidate 31): `listing` is the shared-class answer (true only while no code of the
+ * grammar-listing class has printed in this scope: it picks the full or the short grammar listing) and `own` answers the human-override text: true until that text has actually been
+ * printed once in this scope (`overrideShown` in the store, set when a call passes `overrideOffered`, i.e. the route carries override text), whatever the code. The two differ after a
+ * read-spelling refusal, which prints the listing but offers no override: the later redirect or operator refusal gets the short listing and still the FULL signing instructions. A refusal that
+ * offers no override (a typed retry action instead) does not count as having shown it either. One call, because the first call records and a second call would read it back as seen.
+ */
+export function denialFirstOccurrences(input, root, classKey, dependencies, { overrideOffered = false } = {}) {
+  const full = { listing: true, own: true };
   const scopeKey = denialClassesScopeKey(input, dependencies);
-  if (!scopeKey) return true;
+  if (!scopeKey) return full;
   const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
-  if (commonDir === null) return true; // nowhere safe to persist -- fail open, full text every time
+  if (commonDir === null) return full; // nowhere safe to persist -- fail open, full text every time
   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
   const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
   const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
   const statePath = guardDenialClassesPath(commonDir, scopeKey);
   try {
+    const nowMs = (dependencies.nowMsFn ?? Date.now)();
+    const conversationScoped = scopeKey === conversationScopeKey(input);
     let seenClasses = [];
+    let listingAtMs = null;
+    let overrideShown = false;
     if (existsSyncFn(statePath)) {
       const parsed = JSON.parse(readFileSyncFn(statePath, "utf8"));
       if (Array.isArray(parsed?.seenClasses)) seenClasses = parsed.seenClasses;
+      if (Number.isFinite(parsed?.listingAtMs)) listingAtMs = parsed.listingAtMs;
+      overrideShown = parsed?.overrideShown === true;
     }
-    const listingSeen = GRAMMAR_LISTING_CODES.includes(classKey)
-      ? seenClasses.some((seen) => GRAMMAR_LISTING_CODES.includes(seen))
-      : seenClasses.includes(classKey);
-    if (seenClasses.includes(classKey)) return false;
+    // A conversation-keyed scope whose last full listing is older than the window, from the future, or of unknown age (a file written before the clock existed) forgets what it has seen.
+    if (conversationScoped && seenClasses.length > 0
+      && !(listingAtMs !== null && nowMs >= listingAtMs && nowMs - listingAtMs <= ANTIGRAVITY_LISTING_WINDOW_MS)) {
+      seenClasses = [];
+      listingAtMs = null;
+      overrideShown = false;
+    }
+    const listingClass = GRAMMAR_LISTING_CODES.includes(classKey);
+    const classIsNew = !seenClasses.includes(classKey);
+    const listing = listingClass ? !seenClasses.some((seen) => GRAMMAR_LISTING_CODES.includes(seen)) : classIsNew;
+    const own = !overrideShown;
+    const nowShown = overrideShown || (overrideOffered && own);
+    if (!classIsNew && nowShown === overrideShown) return { listing, own };
     ensureGuardDenialClassesDir(commonDir, mkdirSyncFn);
     const updated = {
       schema: "pipeline.guard-denial-classes-seen.v1",
-      seenClasses: [...seenClasses, classKey],
+      seenClasses: classIsNew ? [...seenClasses, classKey] : seenClasses,
+      ...(conversationScoped ? { listingAtMs: listing && listingClass ? nowMs : listingAtMs } : {}),
+      ...(nowShown ? { overrideShown: true } : {}),
     };
     writeFileSyncFn(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf8");
-    return !listingSeen;
+    return { listing, own };
   } catch {
-    return true; // never let a state-store failure trim an actionable denial -- fail open
+    return full; // never let a state-store failure trim an actionable denial -- fail open
   }
 }
 

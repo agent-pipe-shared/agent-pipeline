@@ -29,7 +29,7 @@ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestP
 import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingPluginFileShellDenialText, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
 import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
-import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
+import { denialFirstOccurrences, isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
 import { devPlanShellBlocked, devPlanShellFaultBlocked, devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
 import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationControllerCandidate, acquireSourceOwnedOwningControllerCommandAdmission, releaseSourceOwnedOwningControllerCommandAdmission } from "./command-catalogue.mjs";
 import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
@@ -632,12 +632,13 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       if (!route.admitted) {
         // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
         // an admitted/lifted command -- computed here, inside this branch, not earlier.
-        const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
+        // C31c: the grammar listing trims on the shared class (`listing`), the human-override text on whether it has been printed in this scope yet (`own`).
+        const first = denialFirstOccurrences(input, root, code, dependencies, { overrideOffered: route.overrideGuidance !== "" });
         return withLifts(lifts, blocked(
           code,
           null,
           retryActions,
-          firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
+          first.own ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
           // P2-2: when no typed action could be built, a `;`/newline list still gets a per-part verdict as message text.
           grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine))
@@ -646,7 +647,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
               : null),
           null,
           false,
-          firstOccurrence,
+          first.listing,
         ));
       }
       lifts.push(route.admitted);
@@ -687,10 +688,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         // character it scans (its per-part policy only ever recovers `;`/newline-joined
         // segments). Measured empirically across `&&`, `|`, `>`, `2>&1`, `| tee`: [] in
         // every case. Calling it here would be dead code, not a fix.
-        const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
+        const first = denialFirstOccurrences(input, root, code, dependencies, { overrideOffered: route.overrideGuidance !== "" });
         return withLifts(lifts, blocked(
-          code, null, [], firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance), rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
-          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)), null, false, firstOccurrence,
+          code, null, [], first.own ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance), rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
+          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)), null, false, first.listing,
         ));
       }
       lifts.push(route.admitted);

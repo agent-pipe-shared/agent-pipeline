@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
-import { isFirstDenialThisScope } from "./denial-telemetry.mjs";
+import { denialFirstOccurrences, isFirstDenialThisScope } from "./denial-telemetry.mjs";
 import { mkdtempTestScratch } from "../test-tmpdir.mjs";
 
 const FULL = /The complete admitted grammar, with bounds and exact spellings:/u;
@@ -165,6 +165,80 @@ test("C31-B1 rendered: an Antigravity-shaped input is trimmed on repeat, a new c
   const newConversation = evaluateLifecycleReadyGuard(payload(OPERATOR, "a-new-conversation-1"), deps);
   assert.match(newConversation.stderr, FULL);
   assert.equal(newConversation.stderr.length, first.stderr.length);
+}));
+
+// C31c (cloud review of candidate 31): the shared listing class picks the grammar listing only; the human-override text keeps the base rule of its own code.
+test("C31c one call answers both: the listing follows the shared class, the override text follows whether it was printed", () => withFixture(({ root, commonDir, stateDir }) => {
+  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir };
+  const offered = { overrideOffered: true };
+  const input = { session_id: "two-answers-1" };
+  // A read-spelling refusal prints the listing and offers no override.
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-READ-COMMAND-UNSUPPORTED", deps), { listing: true, own: true });
+  // The redirect refusal gets the short listing and the full override text, which it then records as printed.
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-REDIRECT-UNAPPROVED", deps, offered), { listing: false, own: true });
+  // Any later refusal that offers the override gets the short form, whatever its code (the C31-B1 trim of the repeat text stays).
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-REDIRECT-UNAPPROVED", deps, offered), { listing: false, own: false });
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-OPERATOR-UNAPPROVED", deps, offered), { listing: false, own: false });
+  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), false, "the boolean wrapper is the listing answer");
+  assert.deepEqual(JSON.parse(readFileSync(join(stateDir, "two-answers-1.json"), "utf8")).seenClasses,
+    ["GUARD-READ-COMMAND-UNSUPPORTED", "GUARD-REDIRECT-UNAPPROVED", "GUARD-OPERATOR-UNAPPROVED", "GUARD-PARSE-UNSUPPORTED"]);
+  assert.deepEqual(denialFirstOccurrences({ session_id: "" }, root, "GUARD-PARSE-UNSUPPORTED", deps, offered), { listing: true, own: true }, "no scope: full, nothing stored");
+}));
+
+test("C31c a refusal that offered no override never counts as having shown it", () => withFixture(({ root, commonDir }) => {
+  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir };
+  const input = { session_id: "two-answers-2" };
+  // A typed retry action instead of an override: the class is recorded, the override text is not.
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-PARSE-UNSUPPORTED", deps, { overrideOffered: false }), { listing: true, own: true });
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-OPERATOR-UNAPPROVED", deps, { overrideOffered: true }), { listing: false, own: true }, "the full override text is still owed");
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-REDIRECT-UNAPPROVED", deps, { overrideOffered: true }), { listing: false, own: false });
+}));
+
+test("C31c rendered: a read-spelling refusal first leaves the full signing instructions to the next mutation refusal", () => withFixture(({ deps }) => {
+  const planned = { ...deps, recordHumanGuardDenialFn: () => ({ status: "planned", requestSha256: "a".repeat(64) }) };
+  const read = evaluateLifecycleReadyGuard(claude(READ_SPELLING, "rendered-4"), planned);
+  assert.match(read.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
+  assert.doesNotMatch(read.stderr, /Human override/u, "a read spelling offers no override");
+  const redirect = evaluateLifecycleReadyGuard(claude(REDIRECT, "rendered-4"), planned);
+  assert.match(redirect.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+  assert.doesNotMatch(redirect.stderr, FULL, "the listing was printed by the read refusal");
+  assert.match(redirect.stderr, /Human override available for this exact/u, "the ceremony text was never printed in this scope, so it is full");
+  const again = evaluateLifecycleReadyGuard(claude(REDIRECT, "rendered-4"), planned);
+  assert.match(again.stderr, /Human override remains available for this exact/u, "the repeat of the same code is short, as before");
+}));
+
+test("C31c Antigravity: the listing is presumed gone after the window, counted from the last FULL listing and not from the last write", () => withFixture(({ root, commonDir, stateDir }) => {
+  const minute = 60 * 1000;
+  let nowMs = 1_000_000_000_000;
+  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir, nowMsFn: () => nowMs };
+  const input = agy("x");
+  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), true);
+  nowMs += 10 * minute;
+  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), false, "inside the window: short");
+  // A new class recorded later rewrites the state file but is not a full listing: the clock stays at the first one.
+  assert.deepEqual(denialFirstOccurrences(input, root, "GUARD-OPERATOR-UNAPPROVED", deps), { listing: false, own: true });
+  assert.equal(JSON.parse(readFileSync(join(stateDir, `${CONVERSATION}.json`), "utf8")).listingAtMs, 1_000_000_000_000);
+  nowMs += 21 * minute; // 31 minutes after the full listing, 21 after the last write
+  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), true, "past the window: full again");
+  nowMs += minute;
+  assert.equal(isFirstDenialThisScope(input, root, "GUARD-PARSE-UNSUPPORTED", deps), false, "and the new window starts there");
+}));
+
+test("C31c Antigravity: a store from before the clock existed or a clock from the future fails open to full once; a session scope never expires", () => withFixture(({ root, commonDir, stateDir }) => {
+  let nowMs = 2_000_000_000_000;
+  const deps = { ...orchestrator, resolveGitCommonDirFn: () => commonDir, nowMsFn: () => nowMs };
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(join(stateDir, `${CONVERSATION}.json`), `${JSON.stringify({ schema: "pipeline.guard-denial-classes-seen.v1", seenClasses: ["GUARD-PARSE-UNSUPPORTED"] })}\n`);
+  assert.equal(isFirstDenialThisScope(agy("x"), root, "GUARD-PARSE-UNSUPPORTED", deps), true, "unknown age of the earlier listing: full once");
+  assert.equal(isFirstDenialThisScope(agy("x"), root, "GUARD-PARSE-UNSUPPORTED", deps), false, "then it is trimmed again");
+  nowMs -= 5 * 60 * 1000; // the clock went back: a listing time in the future is not trusted
+  assert.equal(isFirstDenialThisScope(agy("x"), root, "GUARD-PARSE-UNSUPPORTED", deps), true);
+  // The session-keyed scope (Claude, Codex) has its own reset at compaction and no clock.
+  nowMs = 2_000_000_000_000;
+  assert.equal(isFirstDenialThisScope({ session_id: "session-clock-1" }, root, "GUARD-PARSE-UNSUPPORTED", deps), true);
+  nowMs += 24 * 60 * 60 * 1000;
+  assert.equal(isFirstDenialThisScope({ session_id: "session-clock-1" }, root, "GUARD-PARSE-UNSUPPORTED", deps), false);
+  assert.equal("listingAtMs" in JSON.parse(readFileSync(join(stateDir, "session-clock-1.json"), "utf8")), false, "the session store keeps its shape");
 }));
 
 test("C31-B1 rendered: a read-scope refusal first never hides the first full listing", () => withFixture(({ deps }) => {
