@@ -1010,7 +1010,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).
     const parsed = parseOneShot(process.argv.slice(2));
     const closed = oneShotClose(parsed);
     const result = parsed.stage ? stageOneShotCommit(realpathSync(resolve(parsed.rootDir)), closed) : closed;
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(result)}\n`);
     if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
     else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);
     else if (result.status === "declined") process.stderr.write(`finish-feature --one-shot: the acceptance was declined; the feature returns to a correction round. Next, in order:\n${result.next.map((line, index) => `${index + 1}. ${line}`).join("\n")}\n`);
@@ -1018,7 +1018,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).
 } else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const result = finishFeature(parse(process.argv.slice(2)));
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(result)}\n`);
     // G20-66: the exact commit of what the close wrote, as the next step (stderr; stdout stays the one JSON object).
     if (result.writerCommit?.status === "armed") process.stderr.write(`${formatWriterCommitNextStep({ ...result.writerCommit, id: "per stage, see writerCommit.stages" }).join("\n")}\n`);
   }

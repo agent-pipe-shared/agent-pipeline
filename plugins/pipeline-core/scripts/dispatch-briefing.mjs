@@ -1714,6 +1714,6 @@ export function runDispatchBriefing(argv, deps = {}) {
 
 if (directInvocation && !cliHelp) {
   const result = runDispatchBriefing(process.argv.slice(2));
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
   if (!result.ok) process.exitCode = 2;
 }

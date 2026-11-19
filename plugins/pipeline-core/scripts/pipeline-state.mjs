@@ -14634,7 +14634,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const inspectPath = payload.phase === "implementation" || payload.status === "approved" ? "implement"
         : payload.status === "draft" || payload.status === "awaiting-approval" ? "plan" : "start";
       const inspectRefused = lifecycle.ok === false || payload.nextAction?.kind === "repair-required";
-      console.log(JSON.stringify(attachRunbookLink(payload, { pathId: inspectPath, step: "inspect", refused: inspectRefused, rootDir: dir }), null, 2));
+      console.log(JSON.stringify(attachRunbookLink(payload, { pathId: inspectPath, step: "inspect", refused: inspectRefused, rootDir: dir })));
       return 0;
     }
 

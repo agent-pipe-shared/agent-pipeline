@@ -1891,6 +1891,9 @@ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed re
     const stopped = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--by", "PO", "--architecture-impact", "no-architecture-impact"], { encoding: "utf8" });
     assert.equal(stopped.status, 2, stopped.stderr);
     assert.equal(JSON.parse(stopped.stdout).stop.code, "ONESHOT-NO-ACTIVE-FEATURE");
+    // C31-C4 (B2): stdout is exactly one line, the same value as before.
+    assert.equal(stopped.stdout.slice(0, -1).includes("\n"), false, "stdout must be a single line");
+    assert.equal(stopped.stdout, `${JSON.stringify(JSON.parse(stopped.stdout))}\n`);
     assert.match(stopped.stderr, /ONESHOT-NO-ACTIVE-FEATURE/u); assert.match(stopped.stderr, /^repair: /mu);
     const usage = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--bogus", "x"], { encoding: "utf8" });
     assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);

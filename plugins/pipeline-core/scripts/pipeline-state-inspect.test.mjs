@@ -100,6 +100,19 @@ test("inspect on a project with no active feature reports an inactive lifecycle 
   assert.equal(stateExistsAfter, false, "inspect must not create a state file as a side effect");
 });
 
+// C31-C4 (B2): the real process prints the inspect payload as exactly one line, the same value as the
+// indented text parsed to.
+test("inspect process stdout is exactly one line of JSON with the same value", () => {
+  const root = freshRoot("oneline");
+  const result = spawnSync(process.execPath, [PIPELINE_STATE_SCRIPT_PATH, "inspect"], { cwd: root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.endsWith("\n"), true);
+  assert.equal(result.stdout.slice(0, -1).includes("\n"), false, "stdout must be a single line");
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.schema, "pipeline.inspect.v1");
+  assert.equal(result.stdout, `${JSON.stringify(payload)}\n`);
+});
+
 test("inspect after set-feature surfaces phase, draft lifecycle, and the live Next-action text", () => {
   const root = freshRoot("draft");
   assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);

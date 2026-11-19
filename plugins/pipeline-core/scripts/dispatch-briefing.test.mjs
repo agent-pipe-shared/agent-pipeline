@@ -626,6 +626,9 @@ test("the command line prints a typed refusal as JSON and exits 2", () => {
   const out = JSON.parse(r.stdout);
   assert.equal(out.ok, false);
   assert.equal(out.code, "DBG-FLAG-UNKNOWN");
+  // C31-C4 (B2): stdout is exactly one line, the same value as before.
+  assert.equal(r.stdout.slice(0, -1).includes("\n"), false, "stdout must be a single line");
+  assert.equal(r.stdout, `${JSON.stringify(out)}\n`);
 });
 
 // --- `build`: the complete briefing from a closed package (PO decision D78) ---
