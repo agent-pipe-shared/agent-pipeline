@@ -101,7 +101,7 @@ provisional scope; none of these entries authorizes relocation or deletion:
 | `codex-isolated-critic-foundation.md` | `maintainer` / `review-candidate` evidence snapshot | Consider archive or relocation. |
 | `critic-isolation-threat-model.md` | `maintainer` / `maintained` public security contract, not a user front door | Keep; optionally group under a future `docs/security/` structure. |
 | `design-decisions.md` | `public-user` / `review-candidate`; duplicates ADR/Operating Model material and needs V3 terminology review | Review merge only after inbound-link and authority checks. |
-| `known-issues.md` | `maintainer` / `review-candidate`; currently branch/rollback handover material, not canonical known-error authority | Review split or relocation; GitHub Issues remain canonical. |
+| `known-issues.md` | `public-user` / `maintained`; the limits a user can meet on the feature path, not canonical known-error authority (the maintainer transfer and rollback record moved to `maintainer-v3-transfer-record.md`, `maintainer` / `review-candidate`) | Keep; GitHub Issues remain canonical. |
 | `marketplace-supply-chain-threat-model.md` | `maintainer` / `maintained`; linked from ADR-0001 | Keep. |
 | `product-capability-inventory.json` | `machine` / `maintained` governance evidence | Keep machine-readable; its tooling-owned path may remain. |
 | `runtime-boundary.md` | `public-user` / `maintained` | Keep and refresh its Codex and legacy-redirect descriptions. |

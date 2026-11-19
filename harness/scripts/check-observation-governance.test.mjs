@@ -44,7 +44,9 @@ test("provisional Observation 13 scope keeps audience and lifecycle independent"
     ["docs/contributor-gate-security.md", { audience: "maintainer", lifecycle: "maintained" }],
     ["docs/critic-isolation-threat-model.md", { audience: "maintainer", lifecycle: "maintained" }],
     ["docs/design-decisions.md", { audience: "public-user", lifecycle: "review-candidate" }],
-    ["docs/known-issues.md", { audience: "maintainer", lifecycle: "review-candidate" }],
+    // QG-04 restatement (candidate 32): the page now holds only the user-facing limits; the transfer and rollback record is its own maintainer file.
+    ["docs/known-issues.md", { audience: "public-user", lifecycle: "maintained" }],
+    ["docs/maintainer-v3-transfer-record.md", { audience: "maintainer", lifecycle: "review-candidate" }],
     ["docs/marketplace-supply-chain-threat-model.md", { audience: "maintainer", lifecycle: "maintained" }],
     ["docs/product-capability-inventory.json", { audience: "machine", lifecycle: "maintained" }],
     ["docs/runtime-boundary.md", { audience: "public-user", lifecycle: "maintained" }],
