@@ -107,8 +107,13 @@ function validTimestamp(value) { return typeof value === "string" && Number.isFi
 // lower case or one leading capital, at least three letters), a short all-capital abbreviation (at most six letters) or a one- or
 // two-digit number. A key or token is random mixed case or longer digit runs and never has that shape in every segment.
 const WORD_JOINED = /^(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2})(?:-(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2}))+$/;
+// C32 (second Antigravity greenfield report, PO 2026-11-19): `Familien-Küchen-Tablet-App` was refused as a key. A German compound written with hyphens is capitalised words, short capital abbreviations
+// and one- or two-digit numbers joined by hyphens, with umlauts and ß as letters; a random key is not capitalised word by word. Lower-case hyphenated words keep their earlier treatment (they are still read as a key at 24 characters).
+const CAPITALISED_WORD = String.raw`(?:\p{Lu}\p{Ll}{2,}|\p{Lu}{2,6}|\d{1,2})`;
+const CAPITALISED_COMPOUND = new RegExp(`^${CAPITALISED_WORD}(?:-${CAPITALISED_WORD})+$`, "u");
 function opaqueToken(value) {
   return value.split(/\s+/).some((token) => {
+    if (CAPITALISED_COMPOUND.test(token.replace(/[^\p{L}\p{N}_=-]/gu, ""))) return false;
     const compact = token.replace(/[^A-Za-z0-9_=-]/g, "");
     if (compact.length < 16) return false;
     const hasLower = /[a-z]/.test(compact); const hasUpper = /[A-Z]/.test(compact); const hasDigit = /\d/.test(compact);
@@ -203,11 +208,12 @@ function validContext(value) {
 }
 
 // C32 (Antigravity greenfield 2026-11-19: `Familien-Küchen-Tablet-App` was read as a key by the length-24 rule of opaqueToken() and the repair was a guess).
-// The detector stays exactly as strict; only the diagnosis names the shape that can fire it, without echoing the value.
+// The diagnosis names the shape that can fire the length-24 rule, without echoing the value (a capitalised compound no longer fires it, see CAPITALISED_COMPOUND).
 function longJoinedWordHint(textOrList) {
   const texts = Array.isArray(textOrList) ? textOrList : [textOrList];
   const fires = texts.some((text) => typeof text === "string"
-    && text.split(/\s+/).some((token) => token.replace(/[^A-Za-z0-9_=-]/g, "").length >= 24 && /[_=-]/.test(token)));
+    && text.split(/\s+/).some((token) => token.replace(/[^A-Za-z0-9_=-]/g, "").length >= 24 && /[_=-]/.test(token)
+      && !CAPITALISED_COMPOUND.test(token.replace(/[^\p{L}\p{N}_=-]/gu, ""))));
   return fires ? "; a word of 24 or more characters joined by hyphens or underscores reads as a key, so write a long compound word with spaces" : "";
 }
 

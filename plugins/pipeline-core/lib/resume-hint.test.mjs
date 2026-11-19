@@ -182,6 +182,21 @@ test("C30E-RH1: words and short numbers joined by hyphens are admitted, random m
   ]) rejects(text);
 });
 
+// C32-RH2 (second Antigravity greenfield report, PO 2026-11-19): a capitalised German compound with umlauts is plain prose, however long.
+test("C32-RH2: capitalised German compounds with umlauts are admitted, keys and lower-case hyphenated words are still not", () => {
+  for (const text of [
+    "Familien-Küchen-Tablet-App mit Startseite und sechs Modulen",
+    "Die Haushalts-Kassen-Abrechnung für die Wochen-Ausgaben-Übersicht",
+    "Eltern-PIN-Schutz und Zutaten-Fänger-Spiel",
+  ]) accepts(text);
+  for (const text of [
+    "tablet notes Familien-Küchen-Tablet-App-4f9a2c71b83d05e6",
+    "tablet notes Xk9-Zq2-Wv7-Rt4-Yb8-Hn3",
+    "tablet notes documentation-reconciliation-status",
+    "tablet notes Küchen-aB3dE5fG7hJ9kL1mN3pQ",
+  ]) rejects(text);
+});
+
 test("pins the residual the shape filter cannot close without a word list", () => {
   for (const text of ADMITTED_RESIDUAL) accepts(text);
 });
@@ -410,12 +425,14 @@ test("resumeHintContextDetail never echoes the rejected value itself", () => {
   assert.doesNotMatch(detail, /documentation-reconciliation/u, "a diagnostic must not repeat a value flagged as secret-shaped");
 });
 
-// C32: a long German compound joined by hyphens fires the key rule; the refusal names that shape (not the value) so the repair is not a guess.
+// C32: a long lower-case hyphenated word fires the key rule; the refusal names that shape (not the value) so the repair is not a guess.
+// (Restated, not reverted: this case used `Familien-Küchen-Tablet-App`, which the PO decided on 2026-11-19 is ordinary German and must be admitted, see C32-RH2.)
 test("RH-SCHEMA-DIAG-3 a 24+ character hyphenated word in intent is named as the shape that reads as a key, without echoing it", () => {
-  const detail = resumeHintContextDetail(withIntent("Familien-Küchen-Tablet-App mit Startseite und sechs Modulen"));
+  const detail = resumeHintContextDetail(withIntent("documentation-reconciliation-status mit Startseite und sechs Modulen"));
   assert.match(detail, /^intent must be one non-empty single-line string/u);
   assert.match(detail, /24 or more characters joined by hyphens or underscores.*write a long compound word with spaces/u);
-  assert.doesNotMatch(detail, /Familien/u, "the diagnostic must not repeat the flagged value");
+  assert.doesNotMatch(detail, /reconciliation/u, "the diagnostic must not repeat the flagged value");
+  assert.doesNotMatch(resumeHintContextDetail(withIntent("Familien-Küchen-Tablet-App mit Startseite und sechs Modulen")), /compound word/u, "a capitalised German compound is admitted, so it needs no hint");
   assert.doesNotMatch(resumeHintContextDetail(withIntent("short intent with abc123DEF456ghi789JKL012mno345")), /compound word/u, "a key-shaped value without a joined word gets no compound hint");
 });
 
