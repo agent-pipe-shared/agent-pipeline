@@ -47,6 +47,27 @@ test("AC-239: the observation-boundary row exists per runner and claims no conta
   assert.ok(guide.includes(`| ${row.topic} | ${row.claude} | ${row.codex} | ${row.antigravity} |`), "the guide carries the same row");
 });
 
+test("AC-112: the telemetry row names the token-only Antigravity and Codex routes in the data, the guide and the close reference", () => {
+  const row = readRunnerCapabilities().rows.find((candidate) => candidate.topic === "Telemetry row at close");
+  assert.ok(row, "the Telemetry row at close exists");
+  assert.match(row.claude, /usage-ledger\.mjs/u);
+  assert.match(row.antigravity, /--antigravity-transcript/u);
+  assert.match(row.codex, /--codex-rollout/u);
+  for (const runner of ["codex", "antigravity"]) {
+    assert.match(row[runner], /token/iu, `${runner} cell says token`);
+    assert.doesNotMatch(row[runner], /not available|\$\s?\d/u, `${runner} cell neither says not available nor claims a dollar figure`);
+  }
+  const guide = readFileSync(GUIDE, "utf8");
+  const step = guide.split("\n").find((line) => line.startsWith("4. Telemetry row"));
+  assert.ok(step, "the close step 4 telemetry line exists");
+  assert.match(step, /--antigravity-transcript/u);
+  assert.match(step, /--codex-rollout/u);
+  assert.doesNotMatch(step, /skip it/u);
+  const close = readFileSync(join(PLUGIN, "skills", "close-block", "references", "close-light-and-extensions.md"), "utf8");
+  assert.match(close, /--antigravity-transcript/u);
+  assert.match(close, /--codex-rollout/u);
+});
+
 test("an owner that names a file in this plugin names one that ships", () => {
   for (const row of readRunnerCapabilities().rows) {
     for (const owner of row.owner.split(";").map((part) => part.trim())) {
