@@ -24,7 +24,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import test from "node:test";
+import test, { mock } from "node:test";
 
 import {
   authorizeHumanGuardOverride,
@@ -7562,4 +7562,82 @@ test("PF-53 (Critic F2): the repair an inventory-bound refusal names works at th
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------------
+// C31-C2 / L16 (AC-112 fresh bounded attempt): a git ETIMEDOUT during override planning
+// is retried ONCE, only inside a per-planning deadline. Fact: under parallel load a hook's
+// `git rev-parse --show-toplevel` ended ETIMEDOUT (HGO-GIT), the timeout became an
+// external-operator hand-over, and the identical call succeeded at once. Hooks carry a 10 s
+// limit and one planning makes several git calls, so the retry is bounded by one deadline
+// started at the planning's first git call (default 9 s), not per call.
+// ---------------------------------------------------------------------------------
+
+function l16Setup(fn) {
+  const root = fixtureHumanApproval({ humanApproval: "chat" });
+  const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+  const clock = { offsetMs: 0 };
+  const realNow = Date.now.bind(Date);
+  mock.method(Date, "now", () => realNow() + clock.offsetMs);
+  try {
+    const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT,
+      toolName: "Write", toolInput: { file_path: "note.md", content: "bounded\n" },
+      denials: denial, nowMs: 1_000 });
+    const calls = { toplevel: 0 };
+    // The first `rev-parse --show-toplevel` times out; `afterTimeoutMs` is how much of the
+    // deadline that first attempt consumed. `timeouts` bounds how many toplevel calls time out.
+    const makeSpawn = ({ timeouts, afterTimeoutMs = 5000, failure = null }) => (command, args, options) => {
+      if (command === "git" && args[0] === "rev-parse" && args[1] === "--show-toplevel") {
+        calls.toplevel += 1;
+        if (calls.toplevel <= timeouts) {
+          clock.offsetMs += afterTimeoutMs;
+          return { status: null, error: failure ?? Object.assign(new Error("spawnSync git ETIMEDOUT"), { code: "ETIMEDOUT" }) };
+        }
+      }
+      return spawnSync(command, args, options);
+    };
+    const plan = (spawn) => planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256, nowMs: 2_000, scriptPath, spawn });
+    return fn({ calls, makeSpawn, plan });
+  } finally {
+    mock.restoreAll();
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("L16-1: a first git ETIMEDOUT followed by a success inside the deadline: the planning succeeds", () => {
+  l16Setup(({ calls, makeSpawn, plan }) => {
+    const planned = plan(makeSpawn({ timeouts: 1 }));
+    assert.equal(planned.status, "planned");
+    assert.equal(calls.toplevel, 2, "exactly one retry of the timed-out call");
+  });
+});
+
+test("L16-2: two ETIMEDOUTs give the same HGO-GIT card as without a retry", () => {
+  l16Setup(({ calls, makeSpawn, plan }) => {
+    assert.throws(() => plan(makeSpawn({ timeouts: 2 })),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-GIT"
+        && error.message === "repository identity is unavailable (operation=rev-parse---show-toplevel, outcome=ETIMEDOUT)");
+    assert.equal(calls.toplevel, 2, "one retry only, never a third attempt");
+  });
+});
+
+test("L16-3: a non-timeout git error is not retried", () => {
+  l16Setup(({ calls, makeSpawn, plan }) => {
+    const eperm = Object.assign(new Error("blocked"), { code: "EPERM" });
+    assert.throws(() => plan(makeSpawn({ timeouts: 1, failure: eperm })),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-GIT" && error.message.includes("outcome=EPERM"));
+    assert.equal(calls.toplevel, 1, "EPERM is final on the first attempt");
+  });
+});
+
+test("L16-4: no retry when the planning deadline is already spent", () => {
+  l16Setup(({ calls, makeSpawn, plan }) => {
+    assert.throws(() => plan(makeSpawn({ timeouts: 1, afterTimeoutMs: 8_500 })),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-GIT" && error.message.includes("outcome=ETIMEDOUT"));
+    assert.equal(calls.toplevel, 1, "the retry must not run past the hook limit");
+  });
 });

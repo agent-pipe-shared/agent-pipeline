@@ -201,8 +201,28 @@ function exactKeys(value, keys) {
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
-function git(root, args, spawn = spawnSync) {
-  const result = spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+// L16: one planning makes several git calls inside a hook that carries a 10 s limit, so a
+// timeout retry is bounded by ONE deadline per planning (started at the planning's first git
+// call), never per call. The default stays below the hook limit; a retry runs only while at
+// least GIT_RETRY_MIN_MS of the budget is left and is capped to what is left.
+const GIT_TIMEOUT_MS = 5000;
+const PLANNING_DEADLINE_MS = 9000;
+const GIT_RETRY_MIN_MS = 2000;
+
+function planningDeadline(budgetMs = PLANNING_DEADLINE_MS) {
+  return { startMs: Date.now(), budgetMs };
+}
+
+// `deadline` is optional: a caller that carries none keeps the single, unretried attempt.
+function git(root, args, spawn = spawnSync, deadline = null) {
+  const run = (timeout) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout });
+  let result = run(GIT_TIMEOUT_MS);
+  if (deadline && result?.error?.code === "ETIMEDOUT") {
+    // ETIMEDOUT only (never a non-zero exit or another error); the calls it serves are read-only
+    // or idempotent, so the identical call may run once more.
+    const remainingMs = deadline.budgetMs - (Date.now() - deadline.startMs);
+    if (remainingMs >= GIT_RETRY_MIN_MS) result = run(Math.min(GIT_TIMEOUT_MS, remainingMs));
+  }
   if (result?.status !== 0 || result?.error) {
     // The operation label is deliberately argv-only: it is enough to repair a
     // broken adapter/spawn boundary without disclosing repository data.
@@ -221,11 +241,12 @@ function physicalRoot(root) {
   return physical;
 }
 
-function topology(root, spawn = spawnSync) {
+function topology(root, spawn = spawnSync, deadlineMs = PLANNING_DEADLINE_MS) {
   const physical = physicalRoot(root);
-  const top = realpathSync(git(physical, ["rev-parse", "--show-toplevel"], spawn));
+  const deadline = planningDeadline(deadlineMs);
+  const top = realpathSync(git(physical, ["rev-parse", "--show-toplevel"], spawn, deadline));
   if (top !== physical) fail("HGO-ROOT", "override root must be the physical repository top");
-  const rawCommon = git(physical, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn);
+  const rawCommon = git(physical, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn, deadline);
   const common = realpathSync(isAbsolute(rawCommon) ? rawCommon : resolve(physical, rawCommon));
   const info = lstatSync(common);
   if (!info.isDirectory() || info.isSymbolicLink()) fail("HGO-COMMON-DIR", "Git common directory is unsafe");
