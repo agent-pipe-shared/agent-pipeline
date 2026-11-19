@@ -726,3 +726,65 @@ test("G20-65: the document suffix set of the check validator equals the one of t
   const { DOCUMENT_CHECK_FILE } = await import("./native-goldfish-host-return.mjs");
   assert.equal(DOCUMENT_CHECK_FILE.source, mod.DOCUMENT_OWNED_FILE.source, "the two copies of the document suffix set must not drift");
 });
+
+// C31-M3 (L11, AC-112): materialize-architecture writes the baseline boundary policy of the non-module path classes in the same step, so the tree does not change later.
+const M3_POLICY = "architecture/boundary-policy.json";
+const m3Lock = (root) => {
+  const lockPath = join(root, "project", "pipeline-state.json.lock");
+  writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: "token-1", ownerNonce: "nonce-1" }));
+  return { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" };
+};
+function m3Design(ownedPaths) {
+  const input = hf9Design();
+  input.modules[0].ownedPaths = ownedPaths;
+  input.fitnessModel.modules[0].ownedPaths = ownedPaths;
+  return input;
+}
+
+test("M3-06 a fresh materialization writes the baseline policy with the map, as part of the same publication, and the boundary check then passes", async () => {
+  const { stage, mod } = await hf9Load();
+  const { checkArchitectureBoundaries } = await import("../scripts/architecture-boundary-check.mjs");
+  const fixture = hf9Fixture(stage, { block: true, scaffold: "exact" });
+  const inventory = mod.inspectArchitectureMaterializationTargets(fixture.root, {});
+  assert.equal(inventory.ok, true, inventory.code);
+  assert.ok(inventory.targets.some((target) => target.path === M3_POLICY), "the policy is a publication target of the step");
+  assert.ok(inventory.sealedTargets.some((target) => target.path === M3_POLICY), "and is declared with the sealed targets of the companion route");
+  assert.equal(inventory.inspected.receipt.targets.some((target) => target.path === M3_POLICY), false, "the receipt digests the design, not the policy: a later policy edit is never artifact drift");
+  const published = mod.materializeArchitectureDesign(fixture.root, { lock: m3Lock(fixture.root) });
+  assert.equal(published.status, "materialized", published.code);
+  const policy = JSON.parse(readFileSync(join(fixture.root, M3_POLICY), "utf8"));
+  assert.equal(policy.schema, "pipeline.architecture-boundary-policy.v1");
+  assert.deepEqual(policy.excludedPaths.map((entry) => entry.pattern), ["docs/**", "public/**", "static/**", "assets/**"], "an owned document file (docs/contract.md) does not hide the docs class");
+  for (const [file, text] of Object.entries({ "src/application.mjs": "export {};\n", "tests/application.test.mjs": "export {};\n", "public/app.js": "export {};\n", "assets/logo.mjs": "export {};\n" })) hf9Put(fixture.root, file, text);
+  const files = readdirSync(fixture.root, { recursive: true }).map((entry) => String(entry).split("\\").join("/")).filter((entry) => /\.(?:mjs|js)$/u.test(entry) && /^(?:src|tests|public|assets)\//u.test(entry));
+  const checked = checkArchitectureBoundaries({ rootDir: fixture.root }, { listFiles: () => files });
+  assert.equal(checked.status, "pass", JSON.stringify(checked.violations));
+  const settled = mod.inspectArchitectureMaterializationTargets(fixture.root, {});
+  assert.deepEqual(settled.targets, [], "the step is settled, nothing is published a second time");
+  assert.equal(mod.materializeArchitectureDesign(fixture.root, { lock: m3Lock(fixture.root) }).status, "materialized");
+  assert.equal(JSON.stringify(JSON.parse(readFileSync(join(fixture.root, M3_POLICY), "utf8"))), JSON.stringify(policy), "a repeated step changes no byte");
+});
+
+test("M3-07 an existing policy is never replaced by a materialization, and a refresh over a settled map writes the missing one once", async () => {
+  const { stage, mod } = await hf9Load();
+  const own = (r, f) => ({ ...r, featureId: HF9_FEATURE, planPath: HF9_PLAN, planSha256: "a".repeat(64), specSha256: hf9Sha(HF9_SPEC_TEXT) });
+  const kept = f1Fixture(stage, { edit: own });
+  hf9Put(kept.root, M3_POLICY, '{"accepted":"by the project"}\n');
+  assert.equal(mod.inspectArchitectureMaterializationTargets(kept.root, {}).targets.some((target) => target.path === M3_POLICY), false, "an existing policy is not a target");
+  assert.equal(mod.materializeArchitectureDesign(kept.root, { lock: m3Lock(kept.root) }).status, "materialized");
+  assert.equal(readFileSync(join(kept.root, M3_POLICY), "utf8"), '{"accepted":"by the project"}\n', "not one byte of an existing policy changes");
+  const missing = f1Fixture(stage, { edit: own });
+  assert.equal(mod.materializeArchitectureDesign(missing.root, { lock: m3Lock(missing.root) }).status, "materialized");
+  assert.equal(JSON.parse(readFileSync(join(missing.root, M3_POLICY), "utf8")).schema, "pipeline.architecture-boundary-policy.v1");
+});
+
+test("M3-08 a design whose modules own every non-module class gets no policy, and a settled materialization is never given one later", async () => {
+  const { stage, mod } = await hf9Load();
+  const all = hf9Fixture(stage, { block: true, scaffold: "exact", designInput: m3Design(["src/**", "tests/**", "docs/**", "public/**", "static/**", "assets/**"]) });
+  assert.equal(mod.inspectArchitectureMaterializationTargets(all.root, {}).targets.some((target) => target.path === M3_POLICY), false);
+  assert.equal(mod.materializeArchitectureDesign(all.root, { lock: m3Lock(all.root) }).status, "materialized");
+  assert.equal(readdirSync(join(all.root, "architecture")).includes("boundary-policy.json"), false, "no empty or noise policy");
+  const settled = f1Fixture(stage, {});
+  assert.equal(mod.inspectArchitectureDesign(settled.root, null, {}).status, "materialized");
+  assert.deepEqual(mod.inspectArchitectureMaterializationTargets(settled.root, {}).targets, [], "a materialized map is not touched again, so the tree never changes later");
+});

@@ -730,6 +730,34 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
   }
 }
 
+/**
+ * C31-M3 (L11, AC-112): the baseline boundary policy of the path classes no module is meant to own. Two consumer runs went red in Verify (`unowned-path`) on source-extension files under
+ * public/ and docs/ and then wrote the policy late with `architecture-boundary-check.mjs --write-policy`, which changed the tree and cost an extra Critic round. materialize-architecture now
+ * writes it in the same step. It uses `excludedPaths` (the policy's own field for trees that hold no project source), because the files of these classes do not exist yet when the design
+ * is materialized, so per-file exceptions could not cover them. A class is left out as soon as a module's ownedPaths reach into it (a directory, a glob or a source file): excluding it would
+ * also drop that module's line bound and import checks. An owned document file (docs/contract.md) does not count. Derived from the design alone, so the companion's sealed bytes and the
+ * writer's bytes are equal. Null when nothing is left to cover: no empty policy is written.
+ */
+export const BASELINE_BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
+const BASELINE_BOUNDARY_CLASSES = Object.freeze([
+  ["docs", "documentation, decision records and contracts, not project source"],
+  ["public", "static assets served as they are, not module source"],
+  ["static", "static assets served as they are, not module source"],
+  ["assets", "static assets served as they are, not module source"],
+]);
+export function baselineBoundaryPolicy(modules) {
+  const reaches = (directory) => modules.some(module => (module.ownedPaths ?? []).some((owned) => {
+    const glob = /\/\*\*?$/u.test(owned);
+    const base = owned.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
+    if (base !== directory && !base.startsWith(`${directory}/`)) return false;
+    return glob || base === directory || !DOCUMENT_OWNED_FILE.test(base);
+  }));
+  const excludedPaths = BASELINE_BOUNDARY_CLASSES.filter(([directory]) => !reaches(directory))
+    .map(([directory, reason]) => ({ pattern: `${directory}/**`, reason: `${reason}; written by materialize-architecture` }));
+  return excludedPaths.length === 0 ? null
+    : { schema: "pipeline.architecture-boundary-policy.v1", lineBound: 1000, excludedPaths, exceptions: [] };
+}
+
 /** Fixed target writer; caller must hold the sanctioned lifecycle writer's selected State lock. */
 /** Read-only exact inventory shared by the Source companion and the locked writer. */
 export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
@@ -743,13 +771,17 @@ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
   if (!prospective.ok) return { ok: false, status: "blocked", code: prospective.code };
   const receiptTarget = inspected.receipt ? { path: "architecture/design-materialization.json", bytes: json(inspected.receipt),
     ...(inspected.receiptPreimageSha256 ? { preimageSha256: inspected.receiptPreimageSha256 } : {}) } : null;
+  // C31-M3: create-only, never part of the receipt (a later policy edit is no artifact drift), and only while the policy is absent, so a settled or hand-adopted map is never touched again.
+  const policy = inspected.receipt && inspected.status === "materialization-required" && !existsSync(join(root, BASELINE_BOUNDARY_POLICY_PATH))
+    ? baselineBoundaryPolicy(inspected.input.modules) : null;
+  const policyTargets = policy === null ? [] : [{ path: BASELINE_BOUNDARY_POLICY_PATH, bytes: json(policy) }];
   const mapTargets = inspected.receipt && inspected.status === "materialization-required"
-    ? [...inspected.targets, receiptTarget] : [];
+    ? [...inspected.targets, ...policyTargets, receiptTarget] : [];
   // The retained authority is the final publication of the single transaction.
   const targets = [...prospective.targets.filter(target => target.path !== prospective.referencePath),
     ...mapTargets, ...prospective.targets.filter(target => target.path === prospective.referencePath)];
   requireValue(new Set(targets.map(target => target.path)).size === targets.length, "ARCHITECTURE-DESIGN-DUPLICATE-TARGET");
-  const mapInventory = inspected.receipt ? [...inspected.targets, receiptTarget] : [];
+  const mapInventory = inspected.receipt ? [...inspected.targets, ...policyTargets, receiptTarget] : [];
   const prospectiveInventory = prospective.inventoryTargets ?? [];
   const sealedTargets = [...prospectiveInventory.filter(target => target.path !== prospective.referencePath),
     ...mapInventory, ...prospectiveInventory.filter(target => target.path === prospective.referencePath)];

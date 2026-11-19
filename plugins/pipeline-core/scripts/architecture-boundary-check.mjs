@@ -9,7 +9,7 @@
  * and applies three rules to every tracked source file:
  *   - `unowned-path` / `ambiguous-ownership`: the file belongs to exactly one module's `ownedPaths`
  *     (the longest matching pattern wins, as in `resolveModuleForPath`; a tie between two modules is
- *     ambiguous);
+ *     ambiguous); a test file in no module's `ownedPaths` counts to the module it tests (derived on read, see `testOwners`);
  *   - `forbidden-dependency`: a relative import (`./`, `../`) stays inside its module or reaches a
  *     module listed in `allowedDependencies`; package and `node:` imports are not the map's concern;
  *   - `over-line-bound`: the file has at most `lineBound` lines.
@@ -130,6 +130,24 @@ function lineCount(text) {
 const exceptionKey = (rule, file, target = null) => JSON.stringify([rule, file, target]);
 const order = (a, b) => a.file.localeCompare(b.file) || a.rule.localeCompare(b.rule) || String(a.target ?? "").localeCompare(String(b.target ?? ""));
 
+// C31-M3 (L2, AC-112): a test file counts to the module it tests. Derived on read from what the checker sees, never stored and never an exception: a file in no module's ownedPaths that is
+// a test (a .test/.spec infix, a _test suffix, a test_ prefix, or a test/tests/__tests__/spec directory) is owned by the module that (1) declares it in verificationEntryPoints; else by
+// the module(s) (2) it is named after (its stem or one of its directories is the module id) or whose owned source file it mirrors (same stem). Two modules stay ambiguous-ownership.
+const TEST_DIRECTORIES = new Set(["test", "tests", "__tests__", "spec"]);
+const isTestFile = (file) => /\.(?:test|spec)\.[^./]+$/u.test(file) || /_test\.[^./]+$/u.test(file) || /(?:^|\/)test_[^/]+$/u.test(file)
+  || file.split("/").slice(0, -1).some((segment) => TEST_DIRECTORIES.has(segment));
+const testStem = (file) => path.posix.basename(file).replace(/\.[^./]+$/u, "").replace(/\.(?:test|spec)$/u, "").replace(/_test$/u, "").replace(/^test_/u, "");
+
+function testOwners(file, modules, mirrored) {
+  const declared = modules.filter((mod) => (mod.verificationEntryPoints ?? []).includes(file));
+  if (declared.length > 0) return declared;
+  const stem = testStem(file);
+  const directories = file.split("/").slice(0, -1);
+  const named = new Set(modules.filter((mod) => mod.id === stem || directories.includes(mod.id)).map((mod) => mod.id));
+  for (const id of mirrored.get(stem) ?? []) named.add(id);
+  return modules.filter((mod) => named.has(mod.id));
+}
+
 /** All raw violations of the tree, before exceptions. */
 function observe(root, modules, policy, listed, readFile, extensions) {
   const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
@@ -137,9 +155,24 @@ function observe(root, modules, policy, listed, readFile, extensions) {
   const violations = [];
   const usage = new Map(); // module id -> { files, lines } of its source files
   const edges = new Map(); // module id -> Set of module ids its source files really import (allowed or not)
+  const mirrored = new Map(); // stem -> Set of module ids owning a non-test source file of that stem
   for (const file of sources) {
+    if (isTestFile(file)) continue;
     const owners = owningModules(file, modules);
-    if (owners.length === 0) {
+    if (owners.length !== 1) continue;
+    const stem = testStem(file);
+    mirrored.set(stem, (mirrored.get(stem) ?? new Set()).add(owners[0].id));
+  }
+  for (const file of sources) {
+    let owners = owningModules(file, modules);
+    const tested = owners.length === 0 && isTestFile(file) ? testOwners(file, modules, mirrored) : [];
+    if (tested.length > 1) {
+      const ids = tested.map((owner) => owner.id).sort();
+      violations.push({ file, module: ids.join(", "), rule: "ambiguous-ownership", detail: `${file} is a test of ${ids.join(" and ")} equally (by declared entry point, name, directory or mirrored source file)` });
+      owners = tested;
+    } else if (tested.length === 1) {
+      owners = tested;
+    } else if (owners.length === 0) {
       violations.push({ file, module: null, rule: "unowned-path", detail: `${file} is in no module's ownedPaths` });
     } else if (owners.length > 1) {
       const ids = owners.map((owner) => owner.id).sort();
