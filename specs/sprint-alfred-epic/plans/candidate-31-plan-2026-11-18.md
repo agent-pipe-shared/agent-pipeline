@@ -80,3 +80,10 @@ M1 L20 (unblocks consumer B), M2 L10a+L12 delta preparation (P1), M3 L2+L11 boun
 
 - The two free-text conditions of the PO (scaffold never blocked; bundle as an addendum) bind L5 and L6.
 - No consumer names or machine paths in the repository.
+
+## Status (2026-11-19)
+
+- Built: lanes L1 to L18 plus B7 to B12 (follow-up commit by the close, timeline bytes per script and refusal code, origin/HEAD notice, labelled list-price estimates, readiness ADR question). Held chain `evidence/held-patches/c31-chain/` (37 patches plus `po-apply-0.7-candidate31.sh`, committed as `a7709d1fa`), rehearsed clean.
+- Full Verify on the rehearsed final state: 1237 steps, 14 red; 7 red at base too, 7 load-flaky (green alone); no candidate regression left. Two real regressions of the first run are fixed in the chain.
+- Not built: worktree write probe (classifier-denied in the Fam App session, measure in the greenfield), B4 short form (after the M0 measurement), README backfill (PO: none).
+- Open: PO apply, stamp, install readback, then greenfield and Full Verify in parallel; Critic suspended and not run; PO acceptance open.
