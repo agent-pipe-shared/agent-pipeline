@@ -116,7 +116,11 @@ was needed; capability evidence is not an Advisor answer.
    delta. A fresh full review after round 1 is never the route: the dispatch of
    the next `readiness-reviewer` is refused while an observed round has no receipt
    (`DISPATCH-DESIGN-REVIEW-NO-RECEIPT`, Claude's host observation; a round
-   older than 48 hours counts as abandoned). The reviewer separates
+   older than 48 hours counts as abandoned). If a correction was already committed
+   before the round had its receipt, do not restore the old bytes in the tree:
+   create the receipt with `--sources-at <the commit the reviewer read>` (an
+   ancestor of HEAD); the PRD, Spec and companion bytes then come from that commit
+   and the next round is a delta over the corrected tree. The reviewer separates
    **blocking findings** from **questions** (`agents/readiness-reviewer.md`); the
    receipt's `--open-finding` ids are exactly the report's `Blocking findings:`
    ids, checked against the bound report text (`DRC-FINDINGS-SPLIT`), and a

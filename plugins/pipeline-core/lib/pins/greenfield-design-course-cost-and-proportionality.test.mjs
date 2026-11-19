@@ -88,6 +88,12 @@ test("one final gate: one review receipt builds the single approval request; a t
   assert.deepEqual([third.ok, third.receipt?.round], [true, 3]);
 });
 
+// C31a (greenfield 2026-11-19): a correction committed before the round had a receipt blocked the next review dispatch; the reference names the way out.
+test("C31a the design course names --sources-at for a round whose sources were corrected before its receipt existed", () => {
+  const text = course().replace(/\s+/gu, " ");
+  assert.match(text, /do not restore the old bytes in the tree: create the receipt with `--sources-at <the commit the reviewer read>` \(an ancestor of HEAD\)/u);
+});
+
 test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 and decisions D25/D121 (outside 0.7.0, no new schema before the test candidate); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {
   const audit = readFileSync(here("../runner-own-session-audit.mjs"), "utf8");
   const onboarding = readFileSync(here("../project-onboarding-v3.mjs"), "utf8");
