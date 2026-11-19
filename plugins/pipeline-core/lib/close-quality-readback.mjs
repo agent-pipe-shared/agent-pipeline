@@ -16,6 +16,8 @@
 //   risk-trace            (AC-112, report-only) per row of the Spec's closed risk table (lib/spec-risk-trace.mjs): present when every row is covered,
 //                         residual-stated or not-applicable; missing, with the untraced / stale / malformed ids listed, when any row is not;
 //                         not-applicable when the Spec has no such table; unknown when the Spec or a named path cannot be read.
+//   readme-filled         (C32, report-only) present when README.md exists without the onboarding skeleton sentence "Not filled yet."; missing when it still carries it;
+//                         not-applicable without a README; unknown when it cannot be read.
 // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
@@ -27,7 +29,7 @@ import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
 import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
 
 export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
-export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
+export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace", "readme-filled"]);
 export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
 export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
 
@@ -208,6 +210,21 @@ function riskTraceRow(readers, specPath) {
   return trace.open.length === 0 ? row(id, "present", listing) : row(id, "missing", listing, RISK_TRACE_REPAIR(trace.open));
 }
 
+// C32 (second Antigravity greenfield report, ADR-0105 spirit: a hint, never a gate): the README the onboarding scaffold writes says "Not filled yet." until someone states how to start and test the project.
+// The report found it still so at the close. Present when a README exists without that sentence, missing (with the remedy) when it is still there, not-applicable without a README, unknown when it cannot be read.
+const README_PATH = "README.md";
+const README_SKELETON = /\bNot filled yet\./u;
+const README_REPAIR = "fill the placeholder sections of README.md: state the exact command that starts the product and the command that runs the tests, then commit it before the freeze (a hint, never a gate)";
+function readmeRow(readers) {
+  const id = "readme-filled";
+  const found = call(readers.exists, README_PATH);
+  if (!found.ok) return unknown(id);
+  if (found.value !== true) return row(id, "not-applicable");
+  const bytes = call(readers.readBytes, README_PATH);
+  if (!bytes.ok) return unknown(id);
+  return README_SKELETON.test(Buffer.from(bytes.value).toString("utf8")) ? row(id, "missing", README_PATH, README_REPAIR) : row(id, "present", README_PATH);
+}
+
 function handoverRow(readers, handoverPath) {
   const id = "handover-freshness";
   const updated = call(readers.handoverUpdatedMs);
@@ -225,6 +242,7 @@ export function closeQualityReadback({ featureId, handoverPath = "docs/state.md"
     handoverRow(readers, handoverPath),
     journeyRow(readers, specPath),
     riskTraceRow(readers, specPath),
+    readmeRow(readers),
   ];
 }
 

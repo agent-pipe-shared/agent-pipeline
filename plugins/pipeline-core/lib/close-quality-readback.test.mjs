@@ -43,17 +43,35 @@ test("CGF-23 the architecture-fitness evidence labels the observation and lists 
 
 // QG-04 restatement (candidate 30k K16, AC-112): the six ids above keep their order and shape; the readback gained a seventh, appended,
 // report-only row "risk-trace" (cases below). `full()` carries no Spec reader, so journey-coverage and risk-trace are "unknown" here.
-test("AC-239: exactly the seven ids, in order, with the closed row shape", () => {
+// QG-04 restatement (candidate 32, second Antigravity report): the seven ids keep their order and shape; the readback gained an eighth, appended,
+// report-only row "readme-filled" (cases below).
+test("AC-239: exactly the eight ids, in order, with the closed row shape", () => {
   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
-  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
+  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace", "readme-filled"]);
   assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
   for (const row of list) {
     assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
     assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
   }
-  assert.ok(list.filter((r) => r.id !== "journey-coverage" && r.id !== "risk-trace").every((r) => r.status === "present"), JSON.stringify(list));
+  assert.ok(list.filter((r) => r.id !== "journey-coverage" && r.id !== "risk-trace" && r.id !== "readme-filled").every((r) => r.status === "present"), JSON.stringify(list));
+  assert.equal(list.find((r) => r.id === "readme-filled").status, "not-applicable", "`full()` has no README");
   assert.equal(list.find((r) => r.id === "journey-coverage").status, "unknown");
   assert.equal(list.find((r) => r.id === "risk-trace").status, "unknown");
+});
+
+// C32: the report-only readme-filled row reports the onboarding skeleton sentence, as a hint (the chain guide lists a missing row as advice, never a gate).
+test("C32 readme-filled: present without the skeleton sentence, missing with the remedy while it is there, not-applicable without a README, unknown when unreadable", () => {
+  const readme = (text, exists = true) => rows(full({ exists: (rel) => (rel === "README.md" ? exists : true), readBytes: (rel) => Buffer.from(rel === "README.md" ? text : "x") }))["readme-filled"];
+  const filled = readme("# App\n\nStart: npm start\nTest: npm test\n");
+  assert.equal(filled.status, "present");
+  assert.equal(filled.evidence, "README.md");
+  const skeleton = readme("# App\n\n## Start\nNot filled yet. State the exact command that starts the product and what to expect\n");
+  assert.equal(skeleton.status, "missing");
+  assert.match(skeleton.remedy, /state the exact command that starts the product and the command that runs the tests.*a hint, never a gate/u);
+  assert.equal(readme("", false).status, "not-applicable");
+  assert.equal(rows(full({ exists: () => true, readBytes: () => { throw new Error("boom"); } }))["readme-filled"].status, "unknown");
+  assert.equal(rows(full({ exists: undefined }))["readme-filled"].status, "unknown", "a missing reader is never 'present'");
+  assert.deepEqual(Object.keys(skeleton).sort(), ["evidence", "id", "remedy", "status"]);
 });
 
 // AC-112 (candidate 30k K16, stage S2): the report-only risk-trace row reads the Spec's closed risk table through inspectSpecRiskTrace.
