@@ -1,0 +1,46 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index c5e792e7450fe7b726aec53c3c978ea37e5bc539..3a8efcd350add1be4d65b4650c9ca3a643777715 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -510,7 +510,14 @@
+           "CCA100",
+           "CCA101",
+           "CCA102",
+-          "CCA103"
++          "CCA103",
++          "CCA104",
++          "CCA105",
++          "CCA106",
++          "CCA107",
++          "CCA108",
++          "CCA109",
++          "CCA110"
+         ],
+         "maxBytes": 65536
+       }
+@@ -644,7 +651,8 @@
+           "CDPF121",
+           "CDPF122",
+           "CDPF123",
+-          "CDPF124"
++          "CDPF124",
++          "CDPF125"
+         ],
+         "maxBytes": 65536
+       }
+@@ -2439,7 +2447,14 @@
+           "GD85",
+           "GD86",
+           "GD87",
+-          "GD88"
++          "GD88",
++          "GD89",
++          "GD90",
++          "GD91",
++          "GD92",
++          "GD93",
++          "GD94",
++          "GD95"
+         ],
+         "maxBytes": 65536
+       },

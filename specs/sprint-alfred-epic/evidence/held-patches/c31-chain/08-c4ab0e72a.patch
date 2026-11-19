@@ -1,0 +1,269 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 00e7a544eabc2f456de2b7746173d50438dcd963..2baeadf03a39d2a71f6b07508bafec9b994b80a7 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -1008,7 +1008,7 @@ if (isDirectInvocation(import.meta.url)) {
+   }
+   // D78/K146: enforce generated Goldfish briefings before queue and native pending effects.
+   for (const { dispatch } of productive) {
+-    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`, { requireGenerated: true });
++    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`, { requireGenerated: true, root: routeRoot });
+     if (finding) {
+       process.stderr.write(`BLOCKED (guard-dispatch): ${finding.code}: ${finding.message}\n`);
+       process.exit(2);
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 24f865ad7bea43150ac178efddb533db5db5d769..7b287d8763c0e1022bd405477dd6ff40d7033d84 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -1331,6 +1331,34 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
+   }
+ });
+ 
++// C31-M10 (L13): a retyped briefing that differs by one character is still refused DBG-GENERATED-DIGEST-MISMATCH (no pointer route for a non-Claude
++// carrier, no loosening), but the refusal now names the first differing line and column and orders the generated file to be copied verbatim.
++manualCheck("GD80b block  C31-M10: a one-character edit of a generated briefing names the first differing line and column and the file to copy; the unedited text is admitted", () => {
++  const governed = generatedItemFixture();
++  writeFileSync(join(governed.root, "scratch", "briefing-m10.md"), governed.text);
++  const lines = governed.text.split("\n");
++  const lineIndex = lines.findIndex((line) => line.includes("Fixture goal text."));
++  const column = lines[lineIndex].indexOf("Fixture goal text.") + "Fixture goal text".length + 1;
++  const edited = runAtOut(generatedDispatch({ root: governed.root, text: governed.text.replace("Fixture goal text.", "Fixture goal text!") }, "gd80b-edit", {}), governed.root);
++  assert.equal(edited.code, BLOCK, edited.stderr.slice(0, 400));
++  assert.ok(edited.stderr.includes("DBG-GENERATED-DIGEST-MISMATCH"), edited.stderr.slice(0, 400));
++  assert.ok(edited.stderr.includes(`first difference at line ${lineIndex + 1}, column ${column}:`), edited.stderr.slice(0, 600));
++  assert.ok(edited.stderr.includes("copy the briefing from scratch/briefing-m10.md verbatim instead of retyping it"), edited.stderr.slice(0, 600));
++  assert.equal(edited.stderr.includes(governed.root), false, "the refusal names no absolute path");
++  // A lost final newline alone stays admitted; the same text with the file present is admitted unchanged.
++  const exact = runAtOut(generatedDispatch(governed, "gd80b-exact", {}), governed.root);
++  assert.equal(exact.code, ALLOW, exact.stderr.slice(0, 400));
++});
++manualCheck("GD80c block  C31-M10: an edited generated briefing with no file under scratch/ keeps the old refusal and names the generate command to rerun", () => {
++  const governed = generatedItemFixture();
++  const edited = runAtOut(generatedDispatch({ root: governed.root, text: governed.text.replace("Fixture goal text.", "Fixture goal text!") }, "gd80c", {}), governed.root);
++  assert.equal(edited.code, BLOCK, edited.stderr.slice(0, 400));
++  assert.ok(edited.stderr.includes("DBG-GENERATED-DIGEST-MISMATCH"), edited.stderr.slice(0, 400));
++  assert.ok(edited.stderr.includes("the Goldfish briefing was changed after the generator rendered it;"), edited.stderr.slice(0, 400));
++  assert.ok(/no generated briefing file under scratch\/ carries this marker; rerun `node [^`]*dispatch-briefing\.mjs build --package <package\.json> --out scratch\/briefing-<dispatch-id>\.md`/u.test(edited.stderr), edited.stderr.slice(0, 600));
++  assert.equal(edited.stderr.includes("first difference"), false);
++});
++
+ // G20-48 (live Antigravity greenfield 2026-11-07): a briefing the generator built with --runner antigravity was refused
+ // DBG-GENERATED-BINDING-REQUIRED by every consumer, because the binding parser admitted only the claude and codex runners. No
+ // admit case existed for an Antigravity Goldfish; this one walks the whole guard with the real generator and the host's own
+@@ -1448,7 +1476,8 @@ manualCheck("GD85 block  C30D-G3: a Critic pointer carried by a Workflow script,
+ // QG-04 restatement (candidate 20b, G20-47/G20-48): the corpus grew by the Antigravity bare-name and generated-briefing cases.
+ // C23 (QG-04, restated in place): 85 -> 88, the three GD2-C23 cases for a call that carries an effort.
+ // C30D-G3 (QG-04, restated in place): 88 -> 93, the five GD81-GD85 cases for a Critic briefing handed over as a pointer.
+-assert.equal(cases.length, 93,"the complete dispatch guard corpus must register before execution");
++// C31-M10 (QG-04, restated in place): 93 -> 95, the two GD80b/GD80c cases for the digest-mismatch refusal that names the first differing line.
++assert.equal(cases.length, 95,"the complete dispatch guard corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 1f6dc010f8397bb4ac688f921b8ee03a1d120498..9d53b67553e75c265de532f0c50f2f48505199ba 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -14,7 +14,7 @@
+  * caller (scripts/dispatch-briefing.mjs) owns the binding call and any file write.
+  */
+ import { createHash } from "node:crypto";
+-import { existsSync, readFileSync } from "node:fs";
++import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
+ import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
+@@ -251,7 +251,64 @@ function splitMarker(text) {
+   if (index === -1) return null;
+   const digest = GENERATOR_MARKER_LINE.exec(lines[index])[1];
+   lines.splice(index, 1);
+-  return { digest, body: lines.join("\n") };
++  return { digest, body: lines.join("\n"), markerIndex: index };
++}
++
++// C31-M10 (L13): where a retyped briefing first differs from the generated file. The file is found by the marker digest the prompt carries
++// (the generator records no path, so nothing is stored): the generator writes under scratch/ and every such file ends in its own marker line.
++const BRIEFING_SCAN_MAX_DEPTH = 3;
++const BRIEFING_SCAN_MAX_FILES = 400;
++const BRIEFING_SCAN_MAX_BYTES = 262144;
++const BRIEFING_SCAN_SKIP = new Set(["agent-out", "clones", "node_modules", ".git"]);
++const BRIEFING_SPAN_CHARS = 60;
++const SAFE_RELATIVE_PATH = /^[A-Za-z0-9._/-]+$/u;
++
++/** `{ path, text }` of the first intact generated briefing file under `<root>/scratch/` whose marker digest is `digest`, else `null`. Read-only and bounded. */
++export function findGeneratedBriefingFile(root, digest) {
++  const marker = `${GENERATOR_MARKER_PREFIX}${digest} -->`;
++  let scanned = 0;
++  const walk = (relative, depth) => {
++    let entries;
++    try { entries = readdirSync(join(root, relative), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1)); } catch { return null; }
++    for (const entry of entries) {
++      const path = `${relative}/${entry.name}`;
++      if (entry.isDirectory()) {
++        const hit = depth < BRIEFING_SCAN_MAX_DEPTH && !BRIEFING_SCAN_SKIP.has(entry.name) ? walk(path, depth + 1) : null;
++        if (hit !== null) return hit;
++        continue;
++      }
++      if (!entry.isFile() || !entry.name.endsWith(".md") || !SAFE_RELATIVE_PATH.test(path)) continue;
++      if (++scanned > BRIEFING_SCAN_MAX_FILES) return null;
++      let text;
++      try {
++        if (lstatSync(join(root, path)).size > BRIEFING_SCAN_MAX_BYTES) continue;
++        text = readFileSync(join(root, path), "utf8");
++      } catch { continue; }
++      if (text.split("\n").includes(marker) && verifyGeneratedBriefing(text).ok) return { path, text };
++    }
++    return null;
++  };
++  return walk("scratch", 0);
++}
++
++/**
++ * `null` when the two texts are equal, else the first differing position: 1-based `line` and `column`, and the spans of at most
++ * 60 characters around it in each text. Line numbers are those of `expectedFile` (marker line included).
++ */
++function firstBriefingDifference(expectedBody, observedBody, expectedMarkerIndex) {
++  let index = 0;
++  const limit = Math.min(expectedBody.length, observedBody.length);
++  while (index < limit && expectedBody[index] === observedBody[index]) index++;
++  if (index === expectedBody.length && index === observedBody.length) return null;
++  const before = expectedBody.slice(0, index);
++  const bodyLine = before.split("\n").length;
++  const span = (text) => JSON.stringify(text.slice(Math.max(0, index - BRIEFING_SPAN_CHARS / 2), Math.max(0, index - BRIEFING_SPAN_CHARS / 2) + BRIEFING_SPAN_CHARS));
++  return {
++    line: bodyLine + (expectedMarkerIndex <= bodyLine - 1 ? 1 : 0),
++    column: index - (before.lastIndexOf("\n") + 1) + 1,
++    expected: span(expectedBody),
++    observed: span(observedBody),
++  };
+ }
+ 
+ /** Verifies the generator marker: one marker line whose digest equals sha256 over the rest of the text. */
+@@ -268,12 +325,24 @@ export function verifyGeneratedBriefing(text) {
+  * and a governed item briefing (a native binding with itemDelivery) must carry the marker. Returns null
+  * when the prompt is admitted, else `{ code, message }` whose message names the generator command.
+  */
+-export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs", { requireGenerated = false } = {}) {
++export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs", { requireGenerated = false, root } = {}) {
+   if (typeof prompt !== "string") return null;
+-  const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
++  const rerun = `\`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\``;
++  const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run ${rerun}, and dispatch that file's text unchanged`;
+   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
+     const verified = verifyGeneratedBriefing(prompt);
+-    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
++    if (!verified.ok) {
++      const changed = `the Goldfish briefing was changed after the generator rendered it; ${repair}`;
++      // C31-M10 (L13): with a repository root, a mismatch names the first differing line and column and orders the generated file to be copied; the refusal itself is unchanged.
++      if (verified.code !== "DBG-GENERATED-DIGEST-MISMATCH" || typeof root !== "string") return { code: verified.code, message: changed };
++      const observed = splitMarker(prompt);
++      const source = findGeneratedBriefingFile(root, observed.digest);
++      if (source === null) return { code: verified.code, message: `${changed}; no generated briefing file under scratch/ carries this marker; rerun ${rerun} and copy that file verbatim instead of retyping it` };
++      const expected = splitMarker(source.text);
++      const difference = firstBriefingDifference(expected.body, observed.body, expected.markerIndex);
++      if (difference === null) return { code: verified.code, message: changed };
++      return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; first difference at line ${difference.line}, column ${difference.column}: expected ${difference.expected} but the prompt has ${difference.observed}; copy the briefing from ${source.path} verbatim instead of retyping it; ${repair}` };
++    }
+     // G20-48: the D78 rule is runner-neutral, so an Antigravity binding is parsed too.
+     const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
+     if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index d3ded2da7934d7b0925dd40bb94548db6944ab75..2caab8efea2f0f9cdd2ad2c0e91f2fa3493d8e21 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1044,6 +1044,95 @@ test("the dispatch admission (D78) admits a generated briefing and refuses an ed
+   assert.equal(generatedBriefingAdmission("A plain research prompt with no binding."), null);
+ });
+ 
++// C31-M10 (L13): a retyped briefing that differs by one character used to be refused with a bare DBG-GENERATED-DIGEST-MISMATCH. The refusal
++// now names the first differing line and column and orders the exact file to be copied; the file is found by the marker digest (derived, no stored field).
++const m10Quoted = (message) => [...message.matchAll(/(?:expected|has) ("(?:[^"\\]|\\.)*")/gu)].map((match) => JSON.parse(match[1]));
++async function m10Briefing(files = ["scratch/briefing-m10.md"]) {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const { text } = runDispatchBriefing(argv, depsOf(fx));
++  mkdirSync(join(fx.root, "scratch"), { recursive: true });
++  for (const file of files) { mkdirSync(dirname(join(fx.root, file)), { recursive: true }); writeFileSync(join(fx.root, file), text, "utf8"); }
++  return { root: fx.root, text };
++}
++// The expected (1-based) line and column of the first byte that differs, computed from the two texts by hand, never from the production function.
++const m10Position = (fileText, needle) => {
++  const lines = fileText.split("\n");
++  const line = lines.findIndex((entry) => entry.includes(needle));
++  return { line: line + 1, column: lines[line].indexOf(needle) + 1 };
++};
++
++test("C31-M10: a one-character edit names the first differing line and column and orders the briefing file to be copied", async () => {
++  const { generatedBriefingAdmission } = await buildLib();
++  const { root, text } = await m10Briefing();
++  const prompt = text.replace("Fixture goal text.", "Fixture goal text!");
++  const at = m10Position(text, "Fixture goal text.");
++  const found = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root });
++  assert.equal(found.code, "DBG-GENERATED-DIGEST-MISMATCH", "a mismatch stays a refusal with the same code");
++  assert.match(found.message, new RegExp(`first difference at line ${at.line}, column ${at.column + "Fixture goal text".length}:`, "u"));
++  const [expected, observed] = m10Quoted(found.message);
++  assert.ok(expected.includes("Fixture goal text.") && observed.includes("Fixture goal text!"), found.message);
++  assert.ok(expected.length <= 80 && observed.length <= 80, "each quoted span is capped at 80 characters");
++  assert.match(found.message, /copy the briefing from scratch\/briefing-m10\.md verbatim instead of retyping it/u);
++  assert.match(found.message, /repair: .*node gen\.mjs build --package/u, "the old repair text stays");
++  assert.equal(found.message.includes(root), false, "no absolute path");
++});
++
++test("C31-M10: a changed line and a trimmed last content line each name their own line", async () => {
++  const { generatedBriefingAdmission } = await buildLib();
++  const { root, text } = await m10Briefing();
++  const changed = text.replace("### 5. Stop conditions", "### 5. Stop condition");
++  const at = m10Position(text, "### 5. Stop conditions");
++  const first = generatedBriefingAdmission(changed, "node gen.mjs", { requireGenerated: true, root });
++  assert.match(first.message, new RegExp(`first difference at line ${at.line}, column ${"### 5. Stop condition".length + 1}:`, "u"));
++  // The last content line before the marker loses its final character: the line is the last content line, the column its length.
++  const lines = text.split("\n");
++  const markerIndex = lines.findIndex((line) => line.startsWith("<!-- pipeline-briefing-generator:"));
++  const contentIndex = lines.map((line, index) => [line, index]).filter(([line, index]) => index < markerIndex && line !== "").pop()[1];
++  const trimmedLines = [...lines];
++  trimmedLines[contentIndex] = trimmedLines[contentIndex].slice(0, -1);
++  const trimmed = generatedBriefingAdmission(trimmedLines.join("\n"), "node gen.mjs", { requireGenerated: true, root });
++  assert.match(trimmed.message, new RegExp(`first difference at line ${contentIndex + 1}, column ${lines[contentIndex].length}:`, "u"));
++  // A trimmed final newline alone is still tolerated; a trimmed final newline plus an edit names the edit, not the end.
++  assert.equal(generatedBriefingAdmission(text.slice(0, -1), "node gen.mjs", { requireGenerated: true, root }), null);
++  const both = generatedBriefingAdmission(changed.slice(0, -1), "node gen.mjs", { requireGenerated: true, root });
++  assert.match(both.message, new RegExp(`first difference at line ${at.line}, column `, "u"));
++  // An ADDED newline differs at the end of the file: the line after the last one, column 1.
++  const added = generatedBriefingAdmission(`${text}\n`, "node gen.mjs", { requireGenerated: true, root });
++  assert.equal(added.code, "DBG-GENERATED-DIGEST-MISMATCH");
++  assert.match(added.message, /first difference at line \d+, column 1:/u);
++});
++
++test("C31-M10: no generated file found keeps the old text and adds one sentence naming the generate command to rerun; a matching prompt is admitted", async () => {
++  const { generatedBriefingAdmission } = await buildLib();
++  const { root, text } = await m10Briefing(["scratch/unrelated-note.txt"]);
++  const prompt = text.replace("Fixture goal text.", "Fixture goal text!");
++  const old = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true });
++  const lost = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root });
++  assert.equal(lost.code, "DBG-GENERATED-DIGEST-MISMATCH");
++  assert.ok(lost.message.startsWith("the Goldfish briefing was changed after the generator rendered it;"), lost.message);
++  assert.ok(lost.message.startsWith(old.message), "today's text is kept, the new sentence is appended");
++  assert.match(lost.message, /repair: .*node gen\.mjs build --package/u);
++  assert.match(lost.message, /no generated briefing file under scratch\/ carries this marker; rerun `node gen\.mjs build --package <package\.json> --out scratch\/briefing-<dispatch-id>\.md`/u);
++  assert.equal(lost.message.includes("first difference"), false);
++  // A file under scratch/ whose own marker digest differs is not the source of the prompt.
++  const decoy = `${text.replace("Fixture goal text.", "Another goal text.")}`.split("\n").filter((line) => !line.startsWith("<!-- pipeline-briefing-generator:")).join("\n");
++  writeFileSync(join(root, "scratch", "briefing-decoy.md"), `${decoy}\n<!-- pipeline-briefing-generator:v1 sha256=${"0".repeat(64)} -->\n`, "utf8");
++  assert.equal(generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root }).message.includes("first difference"), false);
++  assert.equal(generatedBriefingAdmission(text, "node gen.mjs", { requireGenerated: true, root }), null, "a matching prompt is admitted unchanged");
++  assert.equal(generatedBriefingAdmission(text, "node gen.mjs", { requireGenerated: true }), null);
++});
++
++test("C31-M10: the file is found two folder levels below scratch/ and a very long differing line is quoted capped", async () => {
++  const { generatedBriefingAdmission } = await buildLib();
++  const { root, text } = await m10Briefing(["scratch/briefings/c31/briefing-nested.md"]);
++  const prompt = text.replace("Fixture goal text.", `Fixture goal text${"x".repeat(300)}.`);
++  const found = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root });
++  assert.match(found.message, /copy the briefing from scratch\/briefings\/c31\/briefing-nested\.md verbatim/u);
++  const [expected, observed] = m10Quoted(found.message);
++  assert.ok(expected.length <= 80 && observed.length <= 80 && observed.length > 0);
++});
++
+ test("a fresh fix wave uses an existing accepted criterion and a missing original row names that route", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();

@@ -1,0 +1,394 @@
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.test.mjs b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+index 77090fab41efd3fa9743417c5b2ad6f08f26c726..dfea92229dcfe7ae7daec2eb6016509a3e886418 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+@@ -1043,7 +1043,7 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
+ // (AC-207). Parity only: nothing outside the policy library's scaffold lists is newly admitted.
+ {
+   const devplanPolicy = await import("../lib/guard-devplan-policy.mjs");
+-  const SCAFFOLD_WRITES = ["architecture/map/modules.json", "AGENTS.md", "pipeline.user.yaml"];
++  const SCAFFOLD_WRITES = ["architecture/map/modules.json", "AGENTS.md", "pipeline.user.yaml", "README.md" /* C31 L5 */];
+   const PRODUCTION_WRITES = ["lib/production.mjs", "src/implementation.mjs"];
+   const phases = [
+     ["draft", UNAPPROVED_STATE, false],
+@@ -1086,7 +1086,10 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
+     ["src/implementation.mjs", false],
+     ["lib/production.mjs", false],
+     ["tests/a.test.mjs", false],
+-    ["README.md", false],
++    // C31 L5 (restated pin, QG-04: it fixed the old refusal): the onboarding seeds a root README.md, exactly that one file is scaffold.
++    ["README.md", true],
++    ["sub/README.md", false],
++    ["README.md.bak", false],
+     ["architecture-notes.md", false],
+     ["sub/AGENTS.md", false],
+     ["sub/pipeline.user.yaml", false],
+diff --git a/plugins/pipeline-core/lib/architecture-map-scaffold.mjs b/plugins/pipeline-core/lib/architecture-map-scaffold.mjs
+index 131071d1e78daba626e08f7ef9b21629fe9f240f..708a89ae141497cf97b71e6a6a743fcc7e3a0b1b 100644
+--- a/plugins/pipeline-core/lib/architecture-map-scaffold.mjs
++++ b/plugins/pipeline-core/lib/architecture-map-scaffold.mjs
+@@ -14,7 +14,7 @@ export function initialGreenfieldAgentEntryTarget(classification) {
+   if (!["fresh", "fresh-host-managed"].includes(classification)) return null;
+   return {
+     path: "AGENTS.md",
+-    bytes: "# Agent-Pipeline project entry\n\nThis file is a pointer, not a second ruleset. At a real session start or runtime re-entry, invoke `pipeline-core:pipeline-start`.\n\nRead the [architecture map](architecture/map/index.md) before planning or changing owned implementation. Keep this project's architecture decisions in `docs/adr/` (see `docs/adr/README.txt`). Preserve this project-owned file when updating the plugin.\n",
++    bytes: "# Agent-Pipeline project entry\n\nThis file is a pointer, not a second ruleset. At a real session start or runtime re-entry, invoke `pipeline-core:pipeline-start`.\n\nRead the [architecture map](architecture/map/index.md) before planning or changing owned implementation. Keep this project's architecture decisions in `docs/adr/` (see `docs/adr/README.txt`). The root `README.md` says how to start and test the project and `backlog/README.md` says where open work is kept; keep both current. Preserve this project-owned file when updating the plugin.\n",
+   };
+ }
+ 
+@@ -27,6 +27,12 @@ decisions only in chat, commit messages or code comments.
+ 
+ How: use the skill \`pipeline-core:architecture-decision\`. It assesses whether a
+ decision is architecturally significant and drafts the record.
++- Create the draft with create-adr.mjs (in the scripts directory of the Pipeline
++  plugin): create-adr.mjs --root <project root> --slug <slug> --title "<title>".
++  It writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json with the digest
++  already computed. Do not write a draft by hand.
++- The design step binds the draft with bind-adr-proposals.mjs; the accepted record
++  below appears only after the PO's design approval.
+ - Markdown record: docs/adr/XXXX-<slug>.md (four-digit number, next free one).
+ - Companion sidecar: docs/adr/XXXX-<slug>.json (the skill states the schema and
+   the digest of the Markdown bytes).
+@@ -72,3 +78,66 @@ export function initialGreenfieldDecisionRecordTargets(classification) {
+     { path: "docs/adr/templates/adr-template.md", bytes: DECISION_RECORD_TEMPLATE },
+   ];
+ }
++
++const PROJECT_README_SEED = `# Project README
++
++This file is the front door of the project. It starts as a skeleton: fill in the two
++sections below when the first deliverable runs, so that anyone can start and test the
++project without asking.
++
++## How to start
++
++Not filled yet. State the exact command that starts the product and what to expect
++when it runs. Fill this in when the first deliverable runs.
++
++## How to test
++
++Not filled yet. State the exact command that runs the tests. Fill this in when the
++first deliverable runs.
++
++## Where things live
++
++- \`AGENTS.md\`: the entry for agents working on this project.
++- \`architecture/map/index.md\`: the architecture map.
++- \`docs/adr/README.txt\`: how architecture decisions are recorded.
++- \`backlog/README.md\`: where open work and ideas are kept.
++`;
++
++const PROJECT_BACKLOG_SEED = `# Backlog
++
++Open work and ideas of this project live here, one file per item. This is a plain
++list of files, not a ledger: no index or status file has to be kept in step.
++
++## How to add an item
++
++- One file per item: \`backlog/items/YYYY-MM-DD-slug.md\` (the date it was written).
++- Start the file with this frontmatter, then describe the item in plain words:
++
++\`\`\`
++---
++title: Short title
++status: open
++created: YYYY-MM-DD
++source: where the idea came from
++---
++\`\`\`
++
++## Status words
++
++- \`open\`: written down, not started.
++- \`in_progress\`: someone is working on it.
++- \`closed\`: finished or decided against; say which in the item's last lines.
++
++Never delete an item. Close it, so the reason stays readable.
++`;
++
++/** Separate create-only root documents: a README skeleton and the backlog skeleton. Like the agent
++ * entry they are outside the map's byte-bound scaffold. Static bytes: no project name, no
++ * placeholder token, no stored status. The caller skips a target whose root entry already exists. */
++export function initialGreenfieldProjectDocTargets(classification) {
++  if (!["fresh", "fresh-host-managed"].includes(classification)) return [];
++  return [
++    { path: "README.md", bytes: PROJECT_README_SEED },
++    { path: "backlog/README.md", bytes: PROJECT_BACKLOG_SEED },
++  ];
++}
+diff --git a/plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs b/plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs
+index c7a78cdadeda68c13bafc3ed7b5e93a57d9754d5..e63fd54c14868b9bc50149e60e8de133c694631a 100644
+--- a/plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs
+@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
+ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+-import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
++import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets, initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
+ import { inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
+ 
+ test("only physically classified Greenfield gets a pending scaffold", () => {
+@@ -44,6 +44,12 @@ test("only a fresh project gets the decision-record directory with a hint and a
+     assert.match(targets[0].bytes, /pipeline-core:architecture-decision/u);
+     assert.match(targets[0].bytes, /docs\/adr\/XXXX-<slug>\.md/u);
+     assert.match(targets[0].bytes, /sidecar/iu);
++    // C31 L4 stage 4 (restated pin, QG-04: the old seed described only a hand-written route): the hint names the sanctioned creator and the binder.
++    assert.match(targets[0].bytes, /create-adr\.mjs/u);
++    assert.match(targets[0].bytes, /--root/u);
++    assert.match(targets[0].bytes, /--slug/u);
++    assert.match(targets[0].bytes, /--title/u);
++    assert.match(targets[0].bytes, /bind-adr-proposals/u);
+     assert.match(targets[1].bytes, /## Context/u);
+     assert.deepEqual(initialGreenfieldDecisionRecordTargets(classification), targets);
+     assert.match(initialGreenfieldAgentEntryTarget(classification).bytes, /docs\/adr\/README\.txt/u,
+@@ -54,6 +60,33 @@ test("only a fresh project gets the decision-record directory with a hint and a
+   }
+ });
+ 
++// C31 L5: a fresh project gets a root README.md and a backlog/README.md skeleton; static bytes, nothing project-specific, no stored status.
++test("only a fresh project gets a root README and a backlog skeleton, as static bytes", () => {
++  for (const classification of ["fresh", "fresh-host-managed"]) {
++    const targets = initialGreenfieldProjectDocTargets(classification);
++    assert.deepEqual(targets.map(t => t.path), ["README.md", "backlog/README.md"]);
++    assert.deepEqual(initialGreenfieldProjectDocTargets(classification), targets, "deterministic");
++    for (const target of targets) {
++      assert.equal(typeof target.bytes, "string");
++      assert.ok(target.bytes.endsWith("\n") && target.bytes.length > 100, `${target.path} carries real text`);
++      assert.doesNotMatch(target.bytes, /\{\{|\}\}|<[A-Z_]+>/u, `${target.path} holds no placeholder token`);
++    }
++    assert.match(targets[0].bytes, /How to start/u);
++    assert.match(targets[0].bytes, /How to test/u);
++    assert.match(targets[0].bytes, /AGENTS\.md/u);
++    assert.match(targets[0].bytes, /docs\/adr\/README\.txt/u);
++    assert.match(targets[0].bytes, /backlog\/README\.md/u);
++    assert.match(targets[1].bytes, /backlog\/items\//u);
++    for (const status of ["open", "in_progress", "closed"]) assert.match(targets[1].bytes, new RegExp(status, "u"));
++    assert.match(targets[1].bytes, /never delete/iu);
++    assert.match(initialGreenfieldAgentEntryTarget(classification).bytes, /README\.md/u, "the agent entry names the two files");
++    assert.match(initialGreenfieldAgentEntryTarget(classification).bytes, /backlog\/README\.md/u);
++  }
++  for (const classification of ["existing-unmanaged", "ready", "partial", undefined]) {
++    assert.deepEqual(initialGreenfieldProjectDocTargets(classification), []);
++  }
++});
++
+ test("the decision-record scaffold satisfies the ADR source reader without raising a finding", () => {
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "adr-scaffold-")));
+   try {
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index a5e123f1297c3f459ce815e163aa0cbcc590d27a..56a4aeba69c90bc5fa77e2eb3909d9085dc312ed 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -342,7 +342,9 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
+ // C20b G20-52 (live Claude greenfield 2026-11-07): the onboarding seeds `VERSION` (consumer release = version tag, G20-42) in the same
+ // scaffold, and the staged-commit check refused it GUARD-DEVPLAN-LIFECYCLE twice (scaffold commit, architecture commit); it is
+ // release coordination, not product implementation, so it belongs here too.
+-const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml", "VERSION"]);
++// C31 L5: the onboarding also seeds a root README.md skeleton; the ONE exact root file is admitted (never a nested or suffixed README),
++// so the scaffold commit and the agent's later README edits are never refused by the lifecycle gate. `backlog/` is already an exempt prefix.
++const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml", "VERSION", "README.md"]);
+ const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+index 58f972c938da5cf8ce2e20a291d4874abb3b1e98..636dcf00fdc283cb17c4e59801fd00db8104408c 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+@@ -80,6 +80,23 @@ test("staged lifecycle policy blocks indirect implementation and package outputs
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// C31 L5: the onboarding seeds a root README.md; the scaffold commit in a draft lifecycle must never be refused for it (the G20-52 failure of VERSION).
++// Exactly the ONE root file is admitted: a nested or suffixed README stays implementation.
++test("the onboarding-seeded root README.md is committable and writable in a draft lifecycle; nothing README-like beside it is", () => {
++  const root = lifecycleFixture();
++  try {
++    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: ["README.md"] }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
++    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: ["README.md", "backlog/README.md", "docs/adr/README.txt", "VERSION"] }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
++    for (const path of ["sub/README.md", "README.md.bak", "src/README.md", "README.txt"]) {
++      const result = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: [path] });
++      assert.equal(result.code, "PIPELINE-STAGED-LIFECYCLE-BLOCKED", path);
++    }
++    assert.equal(devPlanGateVerdict({ filePath: "README.md", projectDir: root }).verdict, "allow");
++    assert.equal(devPlanGateVerdict({ filePath: "README.md", projectDir: root, stagedCommit: true }).verdict, "allow");
++    assert.equal(devPlanGateVerdict({ filePath: "src/x.mjs", projectDir: root }).verdict, "block");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("the generated Codex projection is committable in a draft lifecycle, and no other path under .codex is", () => {
+   const root = lifecycleFixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index dda2a986b5a50832a83bfb2c48f65e4ba45613e7..7e0549b9a01eeda45483534047930e18f74c78d3 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -11,7 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
+ import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
+ import { CONSUMER_VERSION_INITIAL } from "./consumer-release.mjs";
+ import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
+-import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
++import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets, initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
+ import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
+ import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
+ // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
+@@ -6191,9 +6191,14 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
+   const greenfieldFromWalk = inspected.status === "existing-unmanaged" && greenfieldScaffold.status === "planned";
+   const scaffoldClassification = greenfieldFromWalk ? "fresh" : inspected.status;
+   const agentEntry = initialGreenfieldAgentEntryTarget(scaffoldClassification);
++  // C31 L5: the README and backlog skeletons are create-only and must never fail the apply (a `wx` collision rolls the whole onboarding back).
++  // Any root README (any case, any extension) or backlog entry is the project's own, and the match is case-insensitive for case-insensitive filesystems.
++  const existingRootNames = inspected.entries ?? [];
++  const projectDocs = initialGreenfieldProjectDocTargets(scaffoldClassification).filter((target) =>
++    !existingRootNames.some((name) => (target.path === "README.md" ? /^readme(\..*)?$/iu : /^backlog$/iu).test(name)));
+   const internal = [
+     ...initialGreenfieldMapTargets(scaffoldClassification),
+-    ...(agentEntry ? [agentEntry] : []), ...initialGreenfieldDecisionRecordTargets(scaffoldClassification),
++    ...(agentEntry ? [agentEntry] : []), ...initialGreenfieldDecisionRecordTargets(scaffoldClassification), ...projectDocs,
+     ...[
+       NEUTRAL_CALIBRATION,
+       NEUTRAL_MANIFEST,
+@@ -6218,7 +6223,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
+       : (target.path === ".gitignore" || target.path === ".gitattributes" || target.path === "VERSION"
+         ? (target.path === ".gitignore" ? "project-ignore" : (target.path === "VERSION" ? "project-version" : "project-attributes"))
+         : (target.path === "AGENTS.md" ? "project-entry" : (target.path.startsWith("docs/adr/") ? "project-decision-records"
+-          : (target.path.startsWith("project/") ? "project-authority" : "runtime")))),
++          : (target.path === "README.md" ? "project-readme" : (target.path === "backlog/README.md" ? "project-backlog"
++            : (target.path.startsWith("project/") ? "project-authority" : "runtime")))))),
+     before: describe(null),
+     after: describe(target.bytes),
+     changed: true,
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index c7f1de8689b894695ae20537bf4aa367b558abe7..19ec81c7a981a8f770de7605aba3d7ac29c7bbd2 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -19,6 +19,8 @@ import { fixture as projectUninstallFixture } from "./project-uninstall.fixture.
+ import {derivePlanLifecycle,CURRENT_APPROVAL_SCHEMA,PLAN_SUBMISSION_SCHEMA,sha256CanonicalJson} from "./plan-spec-state-v2.mjs";
+ import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
++import { DEFAULT_EXEMPT_PREFIXES, isOnboardingScaffoldPath } from "./guard-devplan-policy.mjs";
++import { initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
+ 
+ import {
+   applyProjectOnboardingManifestRepairV4,
+@@ -2969,8 +2971,8 @@ test("blank real root inspect and plan are read-only", () => {
+     assert.equal(plan.status, "ready");
+     assert.deepEqual(names(path), []);
+     assert.deepEqual(plan.targets.map((target) => target.path), [
+-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+-      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
++      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "backlog/README.md" /* C31 L5 */, "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
++      "project/pipeline.json", "project/pipeline.yaml", "README.md" /* C31 L5: the create-only root README seed, restated in place */, "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+     ]);
+   } finally { dispose(path); }
+ });
+@@ -7823,8 +7825,8 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
+     assert.deepEqual(
+       plan.targets.map((target) => target.path),
+       [
+-        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+-        "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
++        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "backlog/README.md" /* C31 L5 */, "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
++        "project/pipeline.json", "project/pipeline.yaml", "README.md" /* C31 L5: the create-only root README seed, restated in place */, "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+       ],
+       "fresh onboarding seeds the canonical project authority, the ignore rules for the paths it writes into, and the docs/adr decision-record hint and template (D80); runtime targets are initialized later",
+     );
+@@ -8006,8 +8008,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
+     assert.equal(planned.git.initializesGit, false);
+     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
+     assert.deepEqual(planned.targets.map((target) => target.path), [
+-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+-      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
++      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "backlog/README.md" /* C31 L5 */, "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
++      "project/pipeline.json", "project/pipeline.yaml", "README.md" /* C31 L5: the create-only root README seed, restated in place */, "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+     ]);
+     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
+     assert.equal(applied.status, "applied");
+@@ -8094,7 +8096,15 @@ test("a recognized read-only host control layout receives portable onboarding wi
+   } finally { dispose(path); }
+ });
+ 
++// C31 L5 cases are bodies, not callbacks: the suite's closed partition (EXPECTED_CASE_COUNT = SHARD_COUNT x CHUNK_COUNT x CASES_PER_CHILD) fixes the callback count,
++// so they run inside this one existing callback, each failure named.
++const C31_L5_CASES = [];
++const c31L5Case = (name, body) => C31_L5_CASES.push({ name, body });
+ test("an existing unmanaged project receives an additive adoption plan", () => {
++  assert.equal(C31_L5_CASES.length, 3, "the three C31 L5 case bodies are registered before this callback runs");
++  for (const { name, body } of C31_L5_CASES) {
++    try { body(); } catch (error) { error.message = `[C31 L5 case: ${name}] ${error.message}`; throw error; }
++  }
+   const path = root();
+   try {
+     writeFileSync(join(path, "README.md"), "existing project\n");
+@@ -8123,6 +8133,71 @@ test("an existing unmanaged project receives an additive adoption plan", () => {
+   } finally { dispose(path); }
+ });
+ 
++// C31 L5: a fresh project gets a root README.md and a backlog/README.md skeleton, create-only. The PO condition: the scaffold must NEVER cause a write
++// refusal or roll back the onboarding, so (a) every plan target is admitted by the scaffold predicate or an exempt prefix (the structural guard that
++// would have caught the VERSION refusal of G20-52 before a live run) and (b) an existing README or backlog entry, in any letter case, gets no seed.
++c31L5Case("every onboarding target is admitted by the draft-phase write policy, and the README and backlog seeds are applied create-only with their own kinds", () => {
++  const path = root();
++  try {
++    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
++    assert.equal(plan.status, "ready");
++    for (const target of plan.targets) {
++      const folded = target.path.toLowerCase();
++      assert.ok(isOnboardingScaffoldPath(folded) || DEFAULT_EXEMPT_PREFIXES.some((prefix) => folded.startsWith(prefix)),
++        `${target.path} would be refused by guard-devplan while the first feature is in draft`);
++    }
++    const kinds = Object.fromEntries(plan.targets.map((target) => [target.path, target.kind]));
++    assert.equal(kinds["README.md"], "project-readme");
++    assert.equal(kinds["backlog/README.md"], "project-backlog");
++    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
++    assert.equal(applied.status, "applied");
++    for (const seed of initialGreenfieldProjectDocTargets("fresh")) {
++      assert.equal(readFileSync(join(path, seed.path), "utf8"), seed.bytes, seed.path);
++    }
++  } finally { dispose(path); }
++});
++
++c31L5Case("a root that already holds a README (any letter case, any extension) or a backlog entry gets no seed for it and onboarding still applies", () => {
++  for (const readmeName of ["Readme.md", "readme", "README.rst", "README"]) {
++    const path = root();
++    try {
++      writeFileSync(join(path, readmeName), "the project's own words\n");
++      const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
++      assert.equal(plan.status, "ready", readmeName);
++      assert.equal(plan.greenfieldScaffold.status, "planned", `${readmeName}: a README keeps the root greenfield-equivalent`);
++      assert.equal(plan.targets.some((target) => /^readme(\..*)?$/iu.test(target.path)), false, `${readmeName}: no README target`);
++      assert.equal(plan.targets.some((target) => target.path === "backlog/README.md"), true, `${readmeName}: the backlog seed is independent`);
++      assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied", readmeName);
++      assert.equal(readFileSync(join(path, readmeName), "utf8"), "the project's own words\n", readmeName);
++      assert.equal(readdirSync(path).filter((name) => /^readme(\..*)?$/iu.test(name)).length, 1, `${readmeName}: no second README beside it`);
++    } finally { dispose(path); }
++  }
++  for (const backlogName of ["backlog", "Backlog"]) {
++    const path = root();
++    try {
++      mkdirSync(join(path, backlogName));
++      writeFileSync(join(path, backlogName, "idea.md"), "an idea\n");
++      const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
++      assert.equal(plan.status, "ready", backlogName);
++      assert.equal(plan.targets.some((target) => target.path.toLowerCase().startsWith("backlog/")), false, `${backlogName}: no backlog target`);
++      assert.equal(plan.targets.some((target) => target.path === "README.md"), true, `${backlogName}: the README seed is independent`);
++      assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied", backlogName);
++      assert.equal(readFileSync(join(path, backlogName, "idea.md"), "utf8"), "an idea\n", backlogName);
++    } finally { dispose(path); }
++  }
++});
++
++c31L5Case("an existing project root that is not greenfield-equivalent gets neither the README nor the backlog seed", () => {
++  const path = root();
++  try {
++    writeFileSync(join(path, "package.json"), "{}\n");
++    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
++    assert.equal(plan.status, "ready");
++    assert.equal(plan.state, "existing-unmanaged");
++    assert.equal(plan.targets.some((target) => target.path === "README.md" || target.path === "backlog/README.md"), false);
++  } finally { dispose(path); }
++});
++
+ test("Git capability rejects nonzero, missing-status, and non-EPERM spawn results", () => {
+   for (const [name, versionResult] of [
+     ["nonzero", { status: 1, stdout: "git version 2.40.1\n", stderr: "refused" }],

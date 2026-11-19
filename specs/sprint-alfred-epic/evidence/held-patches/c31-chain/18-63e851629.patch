@@ -1,0 +1,92 @@
+diff --git a/plugins/pipeline-core/lib/agy-native-goldfish.mjs b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+index 5c85bd6e2c1d5546ea366cc07fc8296b6e29078a..15e94b2baf6242b3f8d619b3c98a764adad8c420 100644
+--- a/plugins/pipeline-core/lib/agy-native-goldfish.mjs
++++ b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+@@ -136,7 +136,7 @@ export function evaluateNativeChildCall(input, { routeSource } = {}) {
+   if (status !== "mismatch") return { ok: true, attributed, modelCheck };
+   return {
+     ok: true, attributed, modelCheck,
+-    notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model).`,
++    notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model). If the parent call passed inherit or no Model, re-issue it with Model: "flash" (the dispatch guard requires it for this role); if it passed flash, the host resolved the alias to the session model: nothing to repair, the observation is recorded in the verdict modelCheck.`,
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index aa89680bc6b2852bb6de4cf962ebe644f99cbf99..bc23f03c606b96ce50806669d12fd07a945eb9ad 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -762,3 +762,42 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
+     `plan --root '${root}' --branch ${branch} --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch ${branch} --allowed-path a --force`,
+   ]) assert.equal(admitted(args), false, args);
+ });
++
++// C31-B6 / L15: the notice named no repair. A real mismatch (an unknown family) now says what to do for both ways it can happen.
++test("C31-B6: the child model notice names both repairs; a tier match still earns no notice", async () => {
++  const fx = brainFixture();
++  try {
++    descriptor(fx, CHILD, "goldfish-implementor");
++    writeFileSync(join(fx.workspace, "x.txt"), "x\n");
++    const { evaluateNativeChildCall } = await loadModule();
++    const childCall = { name: "view_file", args: { AbsolutePath: join(fx.workspace, "x.txt") } };
++    const odd = evaluateNativeChildCall(payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: "gemini-4-hydrogen-tiered-high", toolCall: childCall }));
++    assert.equal(odd.modelCheck.status, "mismatch");
++    assert.ok(odd.notice.includes('Model: "flash"'), odd.notice);
++    assert.match(odd.notice, /inherit/u);
++    assert.match(odd.notice, /modelCheck/u);
++    assert.equal(odd.notice.includes("\n"), false, "one notice line");
++    const tierName = selectedModel("implement").includes("pro") ? "pro" : "flash";
++    const same = evaluateNativeChildCall(payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement").replace(/flash.*|pro.*/u, "") + `${tierName}-agent`, toolCall: childCall }));
++    assert.equal(same.modelCheck.status, "tier-match");
++    assert.equal(same.notice, undefined);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++// C31-B6: the design-review reference names, per runner, only commands that exist (design-review-receipt.mjs has `export-report` and `create`
++// and no other subcommand; `finalize` is a Goldfish Final Return step, never a design-review step).
++test("C31-B6: the design-course reference gives a per-runner table of the step before design-review-receipt create, naming only existing commands", () => {
++  const refs = join(libDir, "..", "skills", "pipeline-start", "references");
++  const course = readFileSync(join(refs, "design-course.md"), "utf8");
++  const agy = readFileSync(join(refs, "antigravity-native-dispatch.md"), "utf8");
++  const receipt = readFileSync(join(libDir, "..", "scripts", "design-review-receipt.mjs"), "utf8");
++  assert.match(receipt, /command === "export-report"/u);
++  assert.match(receipt, /command !== "create"\) return refuse\("DRC-USAGE", `expected the subcommand/u);
++  const table = course.split("\n").map((line) => line.trimStart()).filter((line) => /^\|/u.test(line) && /Claude|Codex|Antigravity/u.test(line));
++  assert.equal(table.length >= 3, true, "one table row per runner");
++  for (const runner of ["Claude", "Codex", "Antigravity"]) assert.ok(table.some((line) => line.startsWith(`| ${runner} `)), runner);
++  assert.ok(table.find((line) => line.startsWith("| Claude ")).includes("export-report"));
++  assert.ok(table.find((line) => line.startsWith("| Antigravity ")).includes("no `export-report`"));
++  for (const text of [course, agy]) assert.doesNotMatch(text, /finalize[^\n]{0,40}before[^\n]{0,40}create/iu);
++  assert.match(agy, /design-course\.md/u, "the Antigravity reference points at the table");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index 31f5012ec7a3be961cb49a614ae1a2141898c313..a1340cd89b57261d6baf22fc11b717b8609b305c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -103,6 +103,8 @@ node <loaded-plugin-root>/scripts/elephant-implementation-dispatch.mjs dispatch
+ It is documented as the Codex-to-Antigravity route, takes a signed session consent, and is not how an Antigravity-hosted Elephant
+ implements. Make at most one attempt and never retry a launched job. The child gets no stdin and is killed after its bounded timeout.
+ 
++A returned `readiness-reviewer` design review has no `export-report` or `finalize` step on Antigravity; the per-runner step before `design-review-receipt.mjs create` is the table in `design-course.md`.
++
+ Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `pipeline-core:critic`, `readiness-reviewer`, `plan-verifier`,
+ `consult-advisor`. Prepare the call first with the command below. One example packet (field list: `schema`, `dispatchId`, `transport`, `role`,
+ `prompt`, `candidate{commit,tree}`, `requiredPaths`, `requiredPathSha256`, `resultDestination`):
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index b922da58cb1818885a9dc00d29256899fc79912c..c5dfe48ec7f91a070badd942eed3b20272e6b300 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -81,6 +81,14 @@ was needed; capability evidence is not an Advisor answer.
+    **Before `create`:** run `export-report` (above) so the report exists on disk
+    and its observation is bound; a `create` without the exported report has
+    nothing to bind. Order per round: review returns, `export-report`, `create`, commit.
++   The step between the returned review and `create`, per runner (`design-review-receipt.mjs` has the
++   subcommands `create` and `export-report` only; there is no `finalize` step for a design review):
++
++   | Runner | Step before `create` |
++   |---|---|
++   | Claude | `design-review-receipt.mjs export-report --repo <root> --out <report path>` |
++   | Codex | no `export-report` (it needs a Claude observation); write the returned text to the report file as returned, then `create --report` (receipt says `unobserved`) |
++   | Antigravity | no `export-report` (it needs a Claude observation); write the returned text to the report file as returned, then `create --report` (receipt says `unobserved`) |
+    Dispatching the design review: the `critic-review` skill is for implementation
+    batches (diff range, batch preflight) and does not fit uncommitted design
+    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.

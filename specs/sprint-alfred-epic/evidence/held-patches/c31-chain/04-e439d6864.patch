@@ -1,0 +1,109 @@
+diff --git a/plugins/pipeline-core/lib/human-command-render.mjs b/plugins/pipeline-core/lib/human-command-render.mjs
+index d2d0d1f0701035ea0c13610d6473f2bbb00e92e4..c208a0105dddd328817fa1c0fee83035f2f1934e 100644
+--- a/plugins/pipeline-core/lib/human-command-render.mjs
++++ b/plugins/pipeline-core/lib/human-command-render.mjs
+@@ -37,6 +37,21 @@ export function posixPathArgv(argv) {
+   return shaped.every((value, index) => value === argv[index]) ? argv : shaped;
+ }
+ 
++const BARE_WORD = /^[\w@%+=:,./-]+$/u;
++
++/**
++ * C31-L9: the SINGLE-LINE command a prose text hands a human to copy (a rerun, a signing line). Windows-style absolute paths are shown with
++ * forward slashes (valid in bash, PowerShell and node), a word that needs quoting gets double quotes with \ " $ ` escaped, and the
++ * line never breaks. Display only: the argv a caller holds is not changed.
++ */
++export function humanCommandLine({ executable = "node", argv } = {}) {
++  const word = (value) => {
++    const text = String(value);
++    return BARE_WORD.test(text) ? text : `"${text.replace(/[\\"$`]/gu, "\\$&")}"`;
++  };
++  return [toForwardSlashes(executable), ...posixPathArgv(argv)].map(word).join(" ");
++}
++
+ /**
+  * The line-break-safe string for ONE shell: the bounded bash (`CMD=` fragments, `eval "$CMD"`) or PowerShell block.
+  * `pathStyle` "posix" shows Windows-style paths with forward slashes, "native" leaves them as built; the default is "posix" for bash
+diff --git a/plugins/pipeline-core/lib/human-command-render.test.mjs b/plugins/pipeline-core/lib/human-command-render.test.mjs
+index 9a4a277243036116213664dde2ee9e7ffe54ae9a..0de9fb63971b10841d0ea737478ac022005c2a87 100644
+--- a/plugins/pipeline-core/lib/human-command-render.test.mjs
++++ b/plugins/pipeline-core/lib/human-command-render.test.mjs
+@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
+ import { readFileSync } from "node:fs";
+ import { boundedCopySafeCommand, renderHumanCopySafeCommand } from "./copy-safe-command.mjs";
+ import { authorizeCriticalPushCommand, poHumanApprovalSetupCommand } from "../scripts/po-human-approval.mjs";
+-import { boundedCopySafeCommandForBash, posixPathArgv, renderHumanCommand, renderHumanStep } from "./human-command-render.mjs";
++import { boundedCopySafeCommandForBash, humanCommandLine, posixPathArgv, renderHumanCommand, renderHumanStep } from "./human-command-render.mjs";
+ 
+ const WIN_SCRIPT = "C:\\Users\\someone\\.claude\\plugins\\pipeline-core\\scripts\\pipeline-state.mjs";
+ const WIN_PROOF = "C:\\work\\proj\\scratch\\critical-push-request-abcdef123456.json";
+@@ -90,3 +90,14 @@ test("the bounded helper hands back the input unchanged when no path needs resha
+   assert.equal(built.argv.length, 3);
+   assert.equal(built.command, "node /opt/plugin/scripts/x.mjs --by po");
+ });
++
++// C31-L9 (AC-112, closest accepted criterion): one single-line command for prose a human copies, in the same path style as the block renderer.
++test("humanCommandLine shows Windows-style paths forward-slashed on one line and quotes only what needs it", () => {
++  const line = humanCommandLine({ executable: "node", argv: [WIN_SCRIPT, "--root", "C:\\work\\proj", "--by", "Some One", "--resume-lifecycle-id", "abc-1"] });
++  assert.equal(line, 'node C:/Users/someone/.claude/plugins/pipeline-core/scripts/pipeline-state.mjs --root C:/work/proj --by "Some One" --resume-lifecycle-id abc-1');
++});
++
++test("humanCommandLine leaves a POSIX command as a plain join would and escapes shell-live characters", () => {
++  assert.equal(humanCommandLine({ executable: "node", argv: ["/opt/p/x.mjs", "--root", "/w/p"] }), "node /opt/p/x.mjs --root /w/p");
++  assert.equal(humanCommandLine({ executable: "node", argv: ["x.mjs", "a$b`c\"d"] }), 'node x.mjs "a\\$b\\`c\\"d"');
++});
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 0312660750e8b15c52aaa64a776a38916ecc08e9..79effa70da756b8b9321ac17be1e59dd358f9afc 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync,
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
++import { humanCommandLine } from "../lib/human-command-render.mjs";
+ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+@@ -148,7 +149,7 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+   // arms the commit of exactly the bytes it wrote, so the close's own outputs are committed without a human override. A fault
+   // in arming never changes a stage's outcome: it is recorded in `stages` and the hook then keeps its old refusal.
+   const writerCommitStages = [];
+-  const rerun = `node ${fileURLToPath(import.meta.url)} --root ${root} --by ${JSON.stringify(by.trim())} --architecture-impact ${architectureImpact} --audit-request ${JSON.stringify(auditRequest)} --critic-verify-lifecycle ${criticVerifyLifecycle}${continuityCloseRequest === null ? "" : ` --continuity-close-request ${JSON.stringify(continuityCloseRequest)}`} --resume-lifecycle-id ${id}`;
++  const rerun = humanCommandLine({ argv: [fileURLToPath(import.meta.url), "--root", root, "--by", by.trim(), "--architecture-impact", String(architectureImpact), "--audit-request", String(auditRequest), "--critic-verify-lifecycle", String(criticVerifyLifecycle), ...(continuityCloseRequest === null ? [] : ["--continuity-close-request", continuityCloseRequest]), "--resume-lifecycle-id", id] });
+   const armStage = (stage, run, succeeded = () => true) => {
+     const before = captureWorktree(root);
+     const out = run();
+@@ -289,7 +290,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   const featureId = state.activeFeature?.id;
+   const statePath = statePathFor(root);
+   const evidenceDir = featureId === undefined ? null : `specs/${featureId}/evidence`;
+-  const rerunBase = `node ${fileURLToPath(import.meta.url)} --one-shot --root ${root} --by ${JSON.stringify(actor)} --architecture-impact ${architectureImpact}`;
++  const rerunBase = humanCommandLine({ argv: [fileURLToPath(import.meta.url), "--one-shot", "--root", root, "--by", actor, "--architecture-impact", String(architectureImpact)] });
+   let packetForRerun = criticPacketId;
+   // C24 (Claude greenfield): a resume dropped the packet, and with two Critic rounds on record the printed command stopped at ONESHOT-CRITIC-PACKET-MISSING.
+   const rerun = (id) => `${rerunBase}${packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
+@@ -452,7 +453,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         const request = head === null || headTree === null ? null : createSbomOverrideRequest({ featureId, blocked: sbom.blocks, candidate: { commit: head, tree: headTree } });
+         if (request === null) return stopResult("sbom", sbom.blocks[0].code, blockedText, `${helps.join(" ")} The commit (HEAD) could not be read, so a signed override cannot be prepared: repair the repository, then rerun the identical command: ${rerun(again)}`);
+         const requestPath = `scratch/sbom-override-request-${request.intentSha256.slice(0, 16)}.json`; const proofPath = requestPath.replace("request", "proof");
+-        const signText = `The PO can accept the gap by signature, in their own terminal (never the agent): node ${PO_HUMAN_APPROVAL} sign-intent --repo-root ${root} --request ${requestPath} -- it shows the findings and writes the proof to ${proofPath}. Then rerun the identical command with the proof added: ${rerun(again)} --sbom-override-proof ${proofPath}. Do not commit or change the tree in between: the signature names the current commit.`;
++        const signText = `The PO can accept the gap by signature, in their own terminal (never the agent): ${humanCommandLine({ argv: [PO_HUMAN_APPROVAL, "sign-intent", "--repo-root", root, "--request", requestPath] })} -- it shows the findings and writes the proof to ${proofPath}. Then rerun the identical command with the proof added: ${rerun(again)} --sbom-override-proof ${proofPath}. Do not commit or change the tree in between: the signature names the current commit.`;
+         if (sbomOverrideProof === null) {
+           mkdirSync(resolve(root, "scratch"), { recursive: true }); writeFileSync(resolve(root, requestPath), `${JSON.stringify(request, null, 2)}\n`);
+           return stopResult("sbom", sbom.blocks[0].code, blockedText, `${helps.join(" ")} ${signText}`);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 1d27a1cb10ac1b7e5d4a8d41ec14b1bc6ebb5566..ad9c11f7cecee0fd870c950ee5f2b9ca064a62fa 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -2152,3 +2152,11 @@ test("C30G-D2: every stop of the one-shot names a way on: a non-empty repair wit
+   assert.deepEqual(failing.filter((code) => !Object.hasOwn(CONTRACT_EXCEPTIONS, code)), [], "these stops name no runnable command and no human actor: fix their repair text");
+   assert.deepEqual([...reached].sort(), Object.keys(CONTRACT_EXCEPTIONS).sort(), "every listed exception is still a real exception");
+ });
++
++// C31-L9 (AC-112, closest accepted criterion): a command finish-feature prints for the human is built by the shared renderer, never by string concatenation.
++test("C31-L9: no printed rerun or signing command of finish-feature is a node-plus-path string template", () => {
++  const source = readFileSync(new URL("./finish-feature.mjs", import.meta.url), "utf8");
++  assert.match(source, /human-command-render\.mjs/u, "the shared renderer is imported");
++  assert.doesNotMatch(source, /`node \$\{fileURLToPath\(import\.meta\.url\)\}/u, "the rerun command is not concatenated");
++  assert.doesNotMatch(source, /node \$\{PO_HUMAN_APPROVAL\} sign-intent/u, "the PO signing command is not concatenated");
++});

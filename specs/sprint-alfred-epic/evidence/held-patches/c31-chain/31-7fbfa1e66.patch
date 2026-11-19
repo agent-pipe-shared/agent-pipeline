@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 3db56609cbd4f1d2b3eaf56101c9f1771fcf90a3..4da451ba987fa0cbea372a97c48f33a0845dd9d3 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -123,6 +123,15 @@ the design makes such a choice and no module names an ADR path for it in
+ and point to the `architecture-decision` skill. This is a question, never a
+ block; the close only reports which named ADR paths exist.
+ 
++Then ask this one fixed question, once, in the full round: is there a decision in
++the design that is expensive to reverse (a data shape, a public interface, a
++security boundary, a cross-module contract, a technology choice) and has no entry
++in any module's `adrReferences`? The answer is a question, never a blocking
++finding. Name the decision in one line and the command
++`create-adr.mjs --root <root> --slug <slug> --title "<title>"` (or `--from-design`
++after declaring the path in `adrReferences`). The reviewer says explicitly when there is none.
++Nothing is stored and the report shape does not change.
++
+ Accepted risks: when the Spec carries the closed risk table (header
+ `| id | source | statement | trace |`), read its `trace` cells. A risk row needs a
+ test reference (a test path or `command:<id>`) or an explicit residual statement
+diff --git a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+index 78402f7e6695c55d76520c7bbef3145cbc6ba856..3042c9aaf161bb159d13f6c8234e34e1515defe9 100644
+--- a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
++++ b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+@@ -175,6 +175,20 @@ test("J6 a data operation's journeys name recoverability and unintended valid in
+   has(reviewer, /not a block/u, "the question never blocks");
+ });
+ 
++// C31-B12 (AC-112, PO decision 2026-11-19): ONE fixed readiness question about an expensive decision no module declares in adrReferences.
++test("J7 the readiness reviewer asks one fixed question about an expensive decision with no adrReferences entry, as a question with the create-adr command", () => {
++  const reviewer = flat(read("plugins/pipeline-core/agents/readiness-reviewer.md"));
++  has(reviewer, /expensive to reverse/u, "the item names the decision that is expensive to reverse");
++  for (const kind of ["data shape", "public interface", "security boundary", "cross-module contract", "technology choice"]) {
++    assert.ok(reviewer.includes(kind), `the item names "${kind}"`);
++  }
++  has(reviewer, /no entry in any module's `adrReferences`/u, "the item names adrReferences");
++  has(reviewer, /DESIGN-QUESTION[^.]*never a blocking finding|question, never a blocking finding/u, "the answer is a question, never a blocking finding");
++  has(reviewer, /create-adr\.mjs --root <root> --slug <slug> --title "<title>"/u, "the item names the create-adr command");
++  has(reviewer, /--from-design/u, "the item names the --from-design form");
++  has(reviewer, /says explicitly when there is none/u, "the reviewer says when there is none");
++});
++
+ test("J5 the close readback reports journey coverage per criterion as covered / not covered, never a bare count", async () => {
+   const { closeQualityReadback, QUALITY_ROW_IDS } = await load("lib/close-quality-readback.mjs");
+   assert.ok(QUALITY_ROW_IDS.includes("journey-coverage"));

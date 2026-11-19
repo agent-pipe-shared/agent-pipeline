@@ -1,0 +1,149 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 1724da94aad2febc36b05065e80498a0362c4417..5e7d2c19d9c5fc8f4ac60ea73f7922803af8a4d4 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -2175,6 +2175,29 @@ export function observeBootstrapFacts({ rootDir = process.cwd(), status = null,
+   return facts;
+ }
+ 
++/**
++ * C31-B10 (L19): a worktree-isolated dispatch is provisioned from `refs/remotes/origin/HEAD`, not from the checkout's HEAD. When that ref
++ * exists and resolves to another commit than HEAD, one short sentence says so and names the repair. Absent ref (no origin) prints nothing,
++ * as does any git fault: this is a read-only notice that never changes a ref, a status or an exit code. Same git call and timeout rule as
++ * `observeUnseenPushToRemote`; `run` is injectable so the fault path is exercised without breaking git.
++ */
++export function observeOriginHeadNotice({
++  rootDir = process.cwd(),
++  run = (args) => {
++    const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000 });
++    return result.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : null;
++  },
++} = {}) {
++  try {
++    const origin = run(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD^{commit}"]);
++    const head = origin ? run(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"]) : null;
++    if (!origin || !head || origin === head) return null;
++    return `refs/remotes/origin/HEAD (${origin.slice(0, 7)}) differs from HEAD (${head.slice(0, 7)}) and worktree-isolated dispatches start from it, not from HEAD; to repoint it run git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/<branch> or git remote set-head origin <branch> (read-only notice, nothing was changed).`;
++  } catch {
++    return null;
++  }
++}
++
+ export const CLOSE_PUSH_CAPABILITY_SCHEMA = "pipeline.close-push-capability.v1";
+ const READY_ROW = (id) => ({ id, status: "ready", nextAction: null });
+ 
+@@ -2588,8 +2611,10 @@ export function main(options = {}) {
+   } catch { closeAndPushCapability = undefined; }
+   let bootstrapFacts;
+   try { bootstrapFacts = observeBootstrapFacts({ rootDir: process.cwd(), status: result.status, role, modelRoleBootstrap }); } catch { bootstrapFacts = undefined; }
++  const originHeadNotice = observeOriginHeadNotice({ rootDir: process.cwd() });
+   const envelope = {
+     ...result,
++    ...(originHeadNotice === null ? {} : { originHeadNotice }),
+     ...(Object.keys(bootstrapHousekeeping).length === 0 ? {} : { bootstrapHousekeeping }),
+     ...(closeAndPushCapability === undefined ? {} : { closeAndPushCapability }),
+     ...(bootstrapFacts === undefined ? {} : { bootstrapFacts }),
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index d5e42ccb61a234c90d681a0418027e76f6eb3d25..89856566cafe9c293997bb2ed84526ff7cb3cea3 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -2640,8 +2640,8 @@ function observeSubagentModelEnvOrFail() {
+   return preflightModule.observeSubagentModelEnv;
+ }
+ 
+-function runPreflightProcess(extraEnv, extraArgs = []) {
+-  const cwd = mkdtempSync(join(tmpdir(), "k139-mp04-"));
++function runPreflightProcess(extraEnv, extraArgs = [], { cwd: fixedCwd } = {}) {
++  const cwd = fixedCwd ?? mkdtempSync(join(tmpdir(), "k139-mp04-"));
+   try {
+     const env = { PATH: process.env.PATH ?? "", HOME: cwd, ...extraEnv };
+     const run = spawnSync(process.execPath, [fileURLToPath(new URL("./pipeline-start-preflight.mjs", import.meta.url)), ...extraArgs], { cwd, env, encoding: "utf8", timeout: 120000 });
+@@ -2649,7 +2649,7 @@ function runPreflightProcess(extraEnv, extraArgs = []) {
+     assert.equal(stdoutLines.length, 1, "the preflight writes exactly one compact stdout line");
+     return { stdout: run.stdout, stderr: run.stderr, line: JSON.parse(stdoutLines[0]) };
+   } finally {
+-    rmSync(cwd, { recursive: true, force: true });
++    if (fixedCwd === undefined) rmSync(cwd, { recursive: true, force: true });
+   }
+ }
+ 
+@@ -2752,3 +2752,79 @@ test("G20-45: the pipeline-governance-inactive result carries the consent questi
+   assert.equal(result.nextAction.mutation, false);
+   assert.equal(result.nextAction.requiresConfirmation, false);
+ });
++
++// C31-B10 (L19, AC-112): a worktree-isolated dispatch starts from refs/remotes/origin/HEAD, not from HEAD. The preflight says so,
++// read-only, only when that ref exists and points at another commit than HEAD. Absent ref, equal commit or any git fault: nothing.
++function buildOriginHeadFixture({ originHead }) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "c31-b10-origin-head-")));
++  const git = (args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
++  git(["init", "--quiet", "--initial-branch=main"]);
++  git(["config", "user.email", "fixture@example.invalid"]);
++  git(["config", "user.name", "fixture"]);
++  git(["commit", "--quiet", "--allow-empty", "-m", "first"]);
++  const older = git(["rev-parse", "HEAD"]);
++  git(["commit", "--quiet", "--allow-empty", "-m", "second"]);
++  const head = git(["rev-parse", "HEAD"]);
++  if (originHead !== "absent") {
++    git(["remote", "add", "origin", "https://example.invalid/fixture.git"]);
++    git(["update-ref", "refs/remotes/origin/main", originHead === "stale" ? older : head]);
++    git(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
++  }
++  return { root, git, older, head };
++}
++
++test("C31-B10: a stale refs/remotes/origin/HEAD yields one read-only notice naming the ref, the worktree start and the repair", () => {
++  const { root, git, older, head } = buildOriginHeadFixture({ originHead: "stale" });
++  try {
++    const before = git(["for-each-ref", "--format=%(refname) %(objectname)"]);
++    const notice = preflightModule.observeOriginHeadNotice({ rootDir: root });
++    assert.equal(typeof notice, "string");
++    assert.match(notice, /refs\/remotes\/origin\/HEAD/u);
++    assert.ok(notice.includes(older.slice(0, 7)) && notice.includes(head.slice(0, 7)), notice);
++    assert.match(notice, /worktree-isolated dispatches start from (?:it|that ref)/u);
++    assert.ok(notice.includes("git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/<branch>"), notice);
++    assert.ok(notice.includes("git remote set-head origin <branch>"), notice);
++    assert.ok(Buffer.byteLength(notice) <= 600, `one short sentence, ${Buffer.byteLength(notice)} bytes`);
++    assert.equal(git(["for-each-ref", "--format=%(refname) %(objectname)"]), before, "detection never changes a ref");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("C31-B10: origin/HEAD equal to HEAD, no origin at all, a non-git directory and a git fault print no notice", () => {
++  const equal = buildOriginHeadFixture({ originHead: "equal" });
++  const absent = buildOriginHeadFixture({ originHead: "absent" });
++  const plain = mkdtempSync(join(tmpdir(), "c31-b10-no-git-"));
++  try {
++    assert.equal(preflightModule.observeOriginHeadNotice({ rootDir: equal.root }), null);
++    assert.equal(preflightModule.observeOriginHeadNotice({ rootDir: absent.root }), null);
++    assert.equal(preflightModule.observeOriginHeadNotice({ rootDir: plain }), null);
++    const stale = buildOriginHeadFixture({ originHead: "stale" });
++    try {
++      assert.equal(preflightModule.observeOriginHeadNotice({ rootDir: stale.root, run: () => null }), null);
++      assert.equal(preflightModule.observeOriginHeadNotice({ rootDir: stale.root, run: () => { throw new Error("git unavailable"); } }), null);
++    } finally { rmSync(stale.root, { recursive: true, force: true }); }
++  } finally {
++    rmSync(equal.root, { recursive: true, force: true });
++    rmSync(absent.root, { recursive: true, force: true });
++    rmSync(plain, { recursive: true, force: true });
++  }
++});
++
++test("C31-B10: the printed preflight line carries the notice only for a stale origin/HEAD, within its budget, and the status never changes", () => {
++  const stale = buildOriginHeadFixture({ originHead: "stale" });
++  const equal = buildOriginHeadFixture({ originHead: "equal" });
++  const absent = buildOriginHeadFixture({ originHead: "absent" });
++  try {
++    const withNotice = runPreflightProcess({}, [], { cwd: stale.root });
++    const equalRun = runPreflightProcess({}, [], { cwd: equal.root });
++    const absentRun = runPreflightProcess({}, [], { cwd: absent.root });
++    assert.equal(typeof withNotice.line.originHeadNotice, "string");
++    assert.match(withNotice.line.originHeadNotice, /refs\/remotes\/origin\/HEAD/u);
++    assert.equal(Object.hasOwn(equalRun.line, "originHeadNotice"), false);
++    assert.equal(Object.hasOwn(absentRun.line, "originHeadNotice"), false);
++    assert.equal(withNotice.line.status, equalRun.line.status, "the notice changes no status");
++    assert.equal(withNotice.line.status, absentRun.line.status);
++    assert.equal(withNotice.line.printedPayload.withinBudget, true);
++  } finally {
++    for (const fixture of [stale, equal, absent]) rmSync(fixture.root, { recursive: true, force: true });
++  }
++});

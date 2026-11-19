@@ -1,0 +1,421 @@
+diff --git a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+index aae57cabea1a7933869bb3b9ff4810e58c322f73..fbd9d5d0e84dfe8bfb3bc8f6728457a0958356ec 100644
+--- a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
++++ b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+@@ -343,3 +343,50 @@ export function inspectAdrDraftBindings({ rootDir, featureDirs = [] } = {}) {
+   }
+   return result;
+ }
++
++// --- AC-112 (candidate 31, L4 stages 2 and 3): the ADR paths a design declares that have neither a draft nor an accepted record ---
++// The design's only marker of a decision to record is a module `adrReferences` path `docs/adr/NNNN-<slug>.md` (the number is a preview, binding assigns
++// the final one, so the slug is the identity). Derived from the declared paths and the files alone: no stored status, nothing written here.
++const DECLARED_ADR_REFERENCE = /^(?:\.\/)?docs\/adr\/\d{4}-([a-z0-9][a-z0-9-]{0,63})\.md$/u;
++const slugTitle = (slug) => { const words = slug.replace(/-+/gu, " ").trim(); return `${words.charAt(0).toUpperCase()}${words.slice(1)}`; };
++
++/**
++ * `{ pending, skipped }` for the declared references of `modules` (the design block's module list), sorted by slug and unique across modules.
++ * `pending`: `{ slug, reference, title }` with the title derived from the slug. `skipped`: `{ slug, reference, reason }`, reason `draft` (a
++ * draft-<slug> file exists in any state, the same test create-adr refuses on) or `accepted` (an accepted or superseded NNNN-<slug> record exists).
++ */
++export function classifyDeclaredAdrReferences({ rootDir, modules } = {}) {
++  const found = new Map();
++  for (const module of Array.isArray(modules) ? modules : []) {
++    for (const reference of Array.isArray(module?.adrReferences) ? module.adrReferences : []) {
++      const slug = typeof reference === "string" ? DECLARED_ADR_REFERENCE.exec(reference)?.[1] : undefined;
++      if (slug !== undefined && !found.has(slug)) found.set(slug, reference.replace(/^\.\//u, ""));
++    }
++  }
++  const dir = typeof rootDir === "string" ? join(resolve(rootDir), "docs", "adr") : null;
++  let names = [];
++  try { if (dir !== null) names = readdirSync(dir); } catch { names = []; }
++  const pending = [];
++  const skipped = [];
++  for (const slug of [...found.keys()].sort()) {
++    const reference = found.get(slug);
++    const accepted = names.some((name) => new RegExp(`^\\d{4}-${slug}\\.json$`, "u").test(name) && ["accepted", "superseded"].includes(readJsonFile(join(dir, name))?.status));
++    if (names.includes(`draft-${slug}.md`) || names.includes(`draft-${slug}.json`)) skipped.push({ slug, reference, reason: "draft" });
++    else if (accepted) skipped.push({ slug, reference, reason: "accepted" });
++    else pending.push({ slug, reference, title: slugTitle(slug) });
++  }
++  return { pending, skipped };
++}
++
++/** The non-blocking submit-plan notice for the pending declared paths (null when there is none): the exact create-adr commands and the steps after them. */
++export function adrDraftHintText({ rootDir, modules, createAdrScript } = {}) {
++  const { pending } = classifyDeclaredAdrReferences({ rootDir, modules });
++  if (pending.length === 0) return null;
++  const base = `node ${createAdrScript} --root ${rootDir}`;
++  return `Notice: the design declares ${pending.length === 1 ? "an ADR path" : `${pending.length} ADR paths`} with no draft and no accepted record (${pending.map((entry) => entry.reference).join(", ")}). `
++    + `This submission is not blocked. To record ${pending.length === 1 ? "the decision" : "the decisions"} with this design, first withdraw the recorded submission (a draft written while it stands could not be bound): `
++    + `pipeline-state.mjs cancel-submitted-plan --by <name> --submission-sha256 <the submission digest shown by submit-plan>; then create the draft${pending.length === 1 ? "" : "s"}: ${base} --from-design `
++    + `(one draft per declared path; for one entry at a time: ${pending.map((entry) => `${base} --slug ${entry.slug} --title "${entry.title}"`).join(" ; ")}), write each REPLACE: line of the new docs/adr/draft-<slug>.md, `
++    + `run ${base} --refresh, bind the drafts with bind-adr-proposals.mjs (the next submit-plan names the exact command) and submit again. `
++    + `A path that is not meant to be a decision is removed from the module's adrReferences instead.`;
++}
+diff --git a/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs b/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs
+index 2b42875114e2abacff3271dc0def949bdd41fafa..58764e1e7136410afa5327fd0fe99a97161740fe 100644
+--- a/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs
+@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
+ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, compareEffectiveArchitectureDecisions, inspectAdrDraftBindings, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
++import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, adrDraftHintText, classifyDeclaredAdrReferences, compareEffectiveArchitectureDecisions, inspectAdrDraftBindings, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
+ import { runArchitectureEffectiveCli } from "../scripts/architecture-effective-decisions.mjs";
+ 
+ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+@@ -372,3 +372,50 @@ test("C28 ADR drafts: the discard record directory raises no decision finding (a
+   writeFileSync(join(root, adrDraftDiscardPath("unwanted")), `${JSON.stringify({ schema: ADR_DRAFT_DISCARD_SCHEMA, id: "draft-unwanted", markdownSha256: digest, reason: "no longer needed", discardedAt: NOW })}\n`);
+   assert.deepEqual(inspect(root).findings, []);
+ });
++
++// --- AC-112 (candidate 31, L4 stages 2 and 3): the module adrReferences a design declares that have neither a draft nor an accepted record ---
++// Derived from the files and the declared paths alone: no stored status. submit-plan prints the notice, create-adr --from-design creates the drafts.
++const declared = (...references) => [{ id: "persistence", adrReferences: references }, { id: "ui", adrReferences: [] }];
++
++test("AC-112 declared ADR paths: a path with no draft and no accepted record is pending, with a title derived from the slug", (t) => {
++  const root = fixture(t);
++  const { pending, skipped } = classifyDeclaredAdrReferences({ rootDir: root, modules: declared("docs/adr/0002-storage.md", "./docs/adr/0003-local-cache-layer.md") });
++  assert.deepEqual(pending, [
++    { slug: "local-cache-layer", reference: "docs/adr/0003-local-cache-layer.md", title: "Local cache layer" },
++    { slug: "storage", reference: "docs/adr/0002-storage.md", title: "Storage" }]);
++  assert.deepEqual(skipped, []);
++});
++
++test("AC-112 declared ADR paths: a draft of the slug (any state) or an accepted record with another number is skipped and named, never pending", (t) => {
++  const root = fixture(t);
++  draftPair(root, "has-draft");
++  decision(root, "0001-already", { status: "accepted" });
++  decision(root, "0004-old-one", { status: "superseded" });
++  decision(root, "0005-only-proposed", { status: "proposed" });
++  const { pending, skipped } = classifyDeclaredAdrReferences({ rootDir: root, modules: declared("docs/adr/0002-has-draft.md", "docs/adr/0007-already.md", "docs/adr/0009-old-one.md", "docs/adr/0006-only-proposed.md") });
++  assert.deepEqual(pending.map((entry) => entry.slug), ["only-proposed"], "a proposed NNNN record is not an accepted record");
++  assert.deepEqual(skipped.map((entry) => [entry.slug, entry.reason]), [["already", "accepted"], ["has-draft", "draft"], ["old-one", "accepted"]]);
++});
++
++test("AC-112 declared ADR paths: other shapes, duplicates across modules and a malformed module list are ignored; nothing throws", (t) => {
++  const root = fixture(t);
++  const modules = [{ id: "a", adrReferences: ["docs/adr/0002-storage.md", "docs/adr/draft-x.md", "docs/adr/0002-Storage.md", "docs/other/0002-y.md", "docs/adr/0002-z.json", 7, null] },
++    { id: "b", adrReferences: ["docs/adr/0003-storage.md"] }, null, { id: "c" }, { id: "d", adrReferences: "docs/adr/0002-q.md" }];
++  assert.deepEqual(classifyDeclaredAdrReferences({ rootDir: root, modules }).pending.map((entry) => entry.slug), ["storage"]);
++  for (const bad of [undefined, null, "x", {}]) assert.deepEqual(classifyDeclaredAdrReferences({ rootDir: root, modules: bad }), { pending: [], skipped: [] });
++  assert.deepEqual(classifyDeclaredAdrReferences({ rootDir: join(root, "missing"), modules: declared("docs/adr/0002-storage.md") }).pending.map((entry) => entry.slug), ["storage"], "no docs/adr at all means everything is pending");
++});
++
++test("AC-112 declared ADR paths: the notice names the exact create-adr commands, the one-entry form, and is null when nothing is pending", (t) => {
++  const root = fixture(t);
++  const script = join(root, "scripts", "create-adr.mjs");
++  assert.equal(adrDraftHintText({ rootDir: root, modules: declared(), createAdrScript: script }), null);
++  const text = adrDraftHintText({ rootDir: root, modules: declared("docs/adr/0002-storage.md"), createAdrScript: script });
++  assert.ok(text.includes(`node ${script} --root ${root} --from-design`), text);
++  assert.ok(text.includes(`node ${script} --root ${root} --slug storage --title "Storage"`), text);
++  assert.ok(text.includes("docs/adr/0002-storage.md"), text);
++  assert.doesNotMatch(text, /ADR-DRAFT/u, "a notice, not one of the refusal codes the submit-plan pins match");
++  assert.ok(text.indexOf("cancel-submitted-plan") !== -1 && text.indexOf("cancel-submitted-plan") < text.indexOf("--from-design"), "the withdraw step comes first: a draft written while the submission stands could not be bound");
++  const two = adrDraftHintText({ rootDir: root, modules: declared("docs/adr/0002-storage.md", "docs/adr/0003-cache.md"), createAdrScript: script });
++  assert.ok(two.includes("--from-design") && two.includes(`--slug cache --title "Cache"`) && two.includes(`--slug storage --title "Storage"`), two);
++});
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 1d5949e5fb99b6b4ccdb478ef7eff06e7c08c2f6..efcef388cfb046b09741b0f298e4218a3137e006 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -369,6 +369,8 @@ function sanctionedCreateAdrArgs(args, root) {
+       requiredValue: { ...rooted, "--reason": (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value) },
+     });
+   }
++  // AC-112 (candidate 31, L4 stage 3): `--from-design` creates the drafts of the design's declared ADR paths; exactly --root and --from-design, no slug, title or other flag.
++  if (args.includes("--from-design")) return matchFlagSpec(args, { required: { "--from-design": true }, requiredValue: { "--root": rooted["--root"] } });
+   if (args.includes("--refresh") && !args.includes("--slug")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: { "--root": rooted["--root"] } });
+   if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
+   return matchFlagSpec(args, {
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index df73af844971743bd0bd583b653d591c55328159..f86a2957ae8db7bbcf7ddec3a5eac758af128185 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -708,6 +708,18 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
+     bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
+     bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
+     bothAdmit(make("--refresh"), f, "refresh of every draft");
++    // AC-112 (candidate 31, L4 stage 3): --from-design is its own closed shape, exactly --root and --from-design.
++    bothAdmit(make("--from-design"), f, "create the drafts of the declared design paths");
++    for (const [label, action] of [
++      ["from-design with a slug", make("--from-design", "--slug", "s")],
++      ["from-design with a title", make("--from-design", "--title", "T")],
++      ["from-design with refresh", make("--from-design", "--refresh")],
++      ["from-design with discard", make("--from-design", "--discard", "--reason", "why")],
++      ["from-design with a value", make("--from-design", "x")],
++      ["from-design of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--from-design")],
++      ["from-design without a root", scriptAction(script, "--from-design")],
++      ["from-design repeated", make("--from-design", "--from-design")],
++    ]) bothRefuse(action, f, label);
+     // C28 (plan gates): the discard shape is exactly --root, --slug, --discard and one reason line of 1 to 300 characters, in any order.
+     bothAdmit(make("--slug", "storage-adapter", "--discard", "--reason", "The PO chose a different storage design"), f, "discard with a reason");
+     bothAdmit(make("--reason", "Superseded", "--discard", "--slug", "storage-adapter"), f, "discard, flag order is free");
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index 7deee908463b92067afa65244da8100326d634c8..dc2c1cdfe833345bc2d2ee326636eaa5c732c982 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -548,6 +548,86 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       assert.equal(JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "discarded", "draft-unwanted.json"), "utf8")).reason, "first", "the first record is never rewritten");
+     });
+ 
++    // AC-112 (candidate 31, L4 stage 3): --from-design creates one proposal per module adrReferences path of the draft design that has neither a draft nor an
++    // accepted record. Derived from the design block and the files; no stored status, nothing written once the design approval is in force.
++    const designRoot = (references, state = {}, prdText = null) => {
++      const root = makeRoot();
++      fs.mkdirSync(path.join(root, "project"), { recursive: true });
++      fs.mkdirSync(path.join(root, "specs", "f"), { recursive: true });
++      fs.writeFileSync(path.join(root, "project", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f", planPath: "specs/f/prd_f.md" }, ...state })}\n`);
++      const design = { schema: "pipeline.architecture-design.v1", modules: [{ id: "persistence", adrReferences: references }, { id: "ui", adrReferences: [] }] };
++      fs.writeFileSync(path.join(root, "specs", "f", "prd_f.md"), prdText ?? `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
++      return root;
++    };
++    const adrFiles = (root) => fs.existsSync(path.join(root, "docs", "adr")) ? fs.readdirSync(path.join(root, "docs", "adr")).sort() : [];
++
++    it("7.6d create-adr --from-design creates one draft per declared path without a draft, titles from the slug, REPLACE text kept; a second call creates nothing and names the skipped", () => {
++      const root = designRoot(["docs/adr/0002-storage.md", "docs/adr/0003-local-cache-layer.md", "docs/adr/0004-already.md"]);
++      fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
++      fs.writeFileSync(path.join(root, "docs", "adr", "0001-already.md"), "# Already\n");
++      fs.writeFileSync(path.join(root, "docs", "adr", "0001-already.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001-already", title: "Already", status: "accepted", digest: sha("# Already\n"), scope: "project", date: "2026-11-18" })}\n`);
++      const first = create(root, "--from-design");
++      assert.equal(first.status, 0, first.stderr);
++      const result = JSON.parse(first.stdout);
++      assert.deepEqual(result.created.map((entry) => entry.id), ["draft-local-cache-layer", "draft-storage"]);
++      assert.deepEqual(result.skipped.map((entry) => [entry.slug, entry.reason]), [["already", "accepted"]]);
++      assert.deepEqual(adrFiles(root), ["0001-already.json", "0001-already.md", "draft-local-cache-layer.json", "draft-local-cache-layer.md", "draft-storage.json", "draft-storage.md"]);
++      const markdown = fs.readFileSync(path.join(root, "docs", "adr", "draft-local-cache-layer.md"), "utf8");
++      assert.match(markdown, /^# Local cache layer\n/u);
++      assert.match(markdown, /REPLACE: the decision, stated so/u, "bind-adr-proposals still refuses it until it is written");
++      const record = JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "draft-storage.json"), "utf8"));
++      assert.equal(record.status, "proposed");
++      assert.equal(record.title, "Storage");
++      assert.equal(record.digest, sha(fs.readFileSync(path.join(root, "docs", "adr", "draft-storage.md"))));
++      assert.equal(validate(path.join(root, "docs", "adr", "draft-storage.json")).status, 0);
++      const before = adrFiles(root).map((name) => fs.readFileSync(path.join(root, "docs", "adr", name), "utf8"));
++      const second = create(root, "--from-design");
++      assert.equal(second.status, 0, second.stderr);
++      const again = JSON.parse(second.stdout);
++      assert.deepEqual(again.created, []);
++      assert.deepEqual(again.skipped.map((entry) => [entry.slug, entry.reason]), [["already", "accepted"], ["local-cache-layer", "draft"], ["storage", "draft"]]);
++      assert.deepEqual(adrFiles(root).map((name) => fs.readFileSync(path.join(root, "docs", "adr", name), "utf8")), before, "a second call writes nothing");
++    });
++
++    it("7.6e create-adr --from-design with no declared path creates nothing and says so; every refusal writes nothing and names the step to take", () => {
++      const none = designRoot([]);
++      const out = create(none, "--from-design");
++      assert.equal(out.status, 0, out.stderr);
++      assert.deepEqual(JSON.parse(out.stdout).created, []);
++      assert.deepEqual(adrFiles(none), []);
++      const approved = designRoot(["docs/adr/0002-storage.md"], { planApproval: { poGateAuthority: { planPath: "specs/f/prd_f.md" } } });
++      const late = create(approved, "--from-design");
++      assert.notEqual(late.status, 0);
++      assert.match(late.stderr, /approval|reopen-design/u);
++      assert.match(late.stderr, /reopen-design/u, "names the step that makes a draft bindable again");
++      assert.deepEqual(adrFiles(approved), []);
++      // The shapes approve-plan and submit-plan write (state schema header of pipeline-state.mjs): a top-level planApproved flag; a recorded submission.
++      const flagged = designRoot(["docs/adr/0002-storage.md"], { planApproved: true });
++      assert.match(create(flagged, "--from-design").stderr, /reopen-design/u);
++      assert.deepEqual(adrFiles(flagged), []);
++      const submitted = designRoot(["docs/adr/0002-storage.md"], { planApproved: false, planSubmission: { planPath: "specs/f/prd_f.md", specPath: "specs/f/spec.md" } });
++      const awaiting = create(submitted, "--from-design");
++      assert.notEqual(awaiting.status, 0);
++      assert.match(awaiting.stderr, /cancel-submitted-plan/u, "names the step that withdraws the submission first");
++      assert.deepEqual(adrFiles(submitted), []);
++      const withdrawn = designRoot(["docs/adr/0002-storage.md"], { planApproved: false });
++      assert.equal(create(withdrawn, "--from-design").status, 0, "a design that was never submitted, or was withdrawn, is writable");
++      const noState = makeRoot();
++      const missing = create(noState, "--from-design");
++      assert.notEqual(missing.status, 0);
++      assert.match(missing.stderr, /submit-plan|plan|design/u);
++      assert.deepEqual(adrFiles(noState), []);
++      const noBlock = designRoot([], {}, "# PRD without a design block\n");
++      assert.notEqual(create(noBlock, "--from-design").status, 0);
++      const ok = designRoot(["docs/adr/0002-storage.md"]);
++      for (const extra of [["--slug", "storage"], ["--title", "T"], ["--refresh"], ["--discard"], ["--scope", "global"]]) {
++        const mixed = create(ok, "--from-design", ...extra);
++        assert.notEqual(mixed.status, 0, extra.join(" "));
++        assert.match(mixed.stderr, /--from-design takes only/u);
++      }
++      assert.deepEqual(adrFiles(ok), [], "a refused call writes nothing");
++    });
++
+     it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
+       const root = makeRoot();
+       makeMap(root, ["alpha", "beta"]);
+diff --git a/plugins/pipeline-core/scripts/create-adr.mjs b/plugins/pipeline-core/scripts/create-adr.mjs
+index 729925145816a9e887374d0adeb72c107b308f56..800f55c4dddd609db071ea122726a846d0b68bc9 100644
+--- a/plugins/pipeline-core/scripts/create-adr.mjs
++++ b/plugins/pipeline-core/scripts/create-adr.mjs
+@@ -8,6 +8,8 @@
+  *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
+  *   create-adr.mjs --root <root> --slug <slug> --refresh
+  *   create-adr.mjs --root <root> --refresh    (every docs/adr/draft-*.md at once)
++ *   create-adr.mjs --root <root> --from-design   (one proposal per module adrReferences path of the active feature's draft design that has
++ *                                                 no draft and no accepted record; titles from the slugs; a second call creates nothing)
+  *   create-adr.mjs --root <root> --slug <slug> --discard --reason "<why the draft is not wanted>"
+  *                                              (records the discard in docs/adr/discarded/draft-<slug>.json; the draft stays as history)
+  *
+@@ -25,12 +27,13 @@ import { createHash } from "node:crypto";
+ import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeSync } from "node:fs";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
++import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, classifyDeclaredAdrReferences, loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
++import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority-read.mjs";
+ 
+ const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+ const MODULE_ID = /^[a-z][a-z0-9-]{0,79}$/u;
+ const ADR_ID = /^[A-Za-z0-9._-]+$/u;
+-const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh", "--discard", "--reason"]);
++const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh", "--discard", "--reason", "--from-design"]);
+ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ 
+ class Refusal extends Error {}
+@@ -42,7 +45,7 @@ function parseArgs(argv) {
+     const flag = argv[index];
+     if (!FLAGS.has(flag)) refuse(`unknown argument ${JSON.stringify(flag)}; allowed: ${[...FLAGS].join(" ")}`);
+     if (values.has(flag)) refuse(`${flag} may be given only once`);
+-    if (flag === "--refresh" || flag === "--discard") { values.set(flag, true); continue; }
++    if (flag === "--refresh" || flag === "--discard" || flag === "--from-design") { values.set(flag, true); continue; }
+     const value = argv[index + 1];
+     if (typeof value !== "string" || (value.startsWith("--") && FLAGS.has(value))) refuse(`${flag} needs a value`);
+     values.set(flag, value);
+@@ -197,6 +200,49 @@ function createProposal(root, values) {
+     next: "Finish the bootstrap binding first: while readiness is bootstrap-binding-required an edit of this draft is refused (GUARD-LIFECYCLE-NOT-READY). Then replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
+ }
+ 
++/** The file at a repository-relative path inside the root, never a link; null when it is absent. */
++function readInsideRoot(root, relative) {
++  const normalized = typeof relative === "string" ? relative.replace(/\\/gu, "/") : "";
++  if (normalized === "" || isAbsolute(normalized) || /^[A-Za-z]:/u.test(normalized) || normalized.split("/").some((part) => part === ".." || part === "")) return null;
++  const target = join(root, ...normalized.split("/"));
++  try { if (!lstatSync(target).isFile()) return null; return readFileSync(target, "utf8"); } catch { return null; }
++}
++
++/**
++ * AC-112 (candidate 31, L4 stage 3): one proposal for every module adrReferences path of the active feature's draft design that has neither a
++ * draft nor an accepted record (the same list submit-plan prints as a notice). Title derived from the slug, the REPLACE: text stays so
++ * bind-adr-proposals refuses the draft until it is written, a slug that already has a draft is skipped and named. Derived from the PRD and the
++ * files: no stored status. Once the design approval is in force a draft could no longer be bound, so nothing is written then.
++ */
++function createFromDesign(root) {
++  const authority = resolveProjectAuthorityPaths({ rootDir: root });
++  const statePath = authority.status === "ready" ? authority.state : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
++  let state;
++  try { state = JSON.parse(readInsideRoot(root, statePath) ?? ""); } catch { state = null; }
++  if (state === null || typeof state !== "object" || Array.isArray(state)) refuse("--from-design needs the Pipeline State of this project (project/pipeline-state.json); run pipeline-start first");
++  if (state.planApproved === true || state.planApproval?.poGateAuthority) {
++    refuse("--from-design writes nothing while the design approval is in force: a draft written now cannot be bound into the approved package and would block the next submit-plan. Reopen the design first (pipeline-state.mjs reopen-design, the PO's reopening step), then run this command again");
++  }
++  if (state.planSubmission !== undefined && state.planSubmission !== null) {
++    refuse("--from-design writes nothing while a plan submission stands: the PRD is immutable then and a draft written now could not be bound into the design. Withdraw it first (pipeline-state.mjs cancel-submitted-plan --by <name> --submission-sha256 <the submission digest shown by submit-plan>), then run this command again");
++  }
++  const planPath = state.activeFeature?.planPath;
++  const prd = readInsideRoot(root, planPath);
++  if (prd === null) refuse("--from-design needs the active feature's PRD with its architecture design block; start the feature (pipeline-state.mjs set-feature) and author the design first");
++  const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
++  if (blocks.length !== 1) refuse(`${planPath} must hold exactly one pipeline-architecture-design block; author the design (design-authoring) first`);
++  let design;
++  try { design = JSON.parse(blocks[0][1]); } catch { refuse(`the pipeline-architecture-design block of ${planPath} is not valid JSON; correct it first`); }
++  const { pending, skipped } = classifyDeclaredAdrReferences({ rootDir: root, modules: design?.modules });
++  const created = pending.map((entry) => {
++    const proposal = createProposal(root, new Map([["--slug", entry.slug], ["--title", entry.title]]));
++    return { slug: entry.slug, id: proposal.id, title: entry.title, markdown: proposal.markdown, sidecar: proposal.sidecar, reference: entry.reference };
++  });
++  return { ok: true, created, skipped,
++    next: created.length === 0 ? "Nothing to create: every declared ADR path already has a draft or an accepted record."
++      : "Replace each REPLACE: line of the new docs/adr/draft-<slug>.md, run this script with --refresh (without --slug it updates every draft), then bind the drafts with bind-adr-proposals.mjs (SKILL.md of the architecture-decision skill) before the design review receipt. A draft that is not wanted is discarded with --discard --reason." };
++}
++
+ export function main(argv = process.argv.slice(2)) {
+   try {
+     const values = parseArgs(argv);
+@@ -209,6 +255,11 @@ export function main(argv = process.argv.slice(2)) {
+     const root = resolve(rootValue);
+     const slug = values.get("--slug");
+     const refresh = values.has("--refresh");
++    if (values.has("--from-design")) {
++      if (values.size !== 2) refuse("--from-design takes only --root and --from-design (the slugs and titles come from the design's adrReferences)");
++      console.log(JSON.stringify(createFromDesign(root), null, 2));
++      return 0;
++    }
+     if (refresh && values.size === 2) {
+       console.log(JSON.stringify(refreshAllDigests(root), null, 2));
+       return 0;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index f430d8d9e547cfe2af06a98d16a4e44c51a05eaa..497c36b11be8f1d9c6a472d173d8cd5834a136b2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -482,7 +482,7 @@ import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
+ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+ import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
+-import { inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
++import { adrDraftHintText, inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+ import { adrDraftReferenceSlug } from "./module-inventory.mjs";
+ import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+ import { rebindApproval } from "../lib/rebind-approval.mjs";
+@@ -12321,6 +12321,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+               + `Correct the architecture design block in the PRD, commit it, and run submit-plan again. No submission or signature request was recorded.`);
+             return 2;
+           }
++          // AC-112 (candidate 31, L4 stage 2): a declared ADR path with neither a draft nor an accepted record gets a NON-BLOCKING notice; exit code and every refusal stay as they are.
++          try { const adrHint = adrDraftHintText({ rootDir: dir, modules: submitDesignDraft.design?.modules, createAdrScript: scripts("create-adr.mjs") }); if (adrHint !== null) console.error(adrHint); } catch { /* a notice never changes the outcome */ }
+         }
+       }
+       // D165 D4: when no design package applies, a brownfield architecture hurdle
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 4502f8cf1144b1601316dbe81b715b97936382a9..507aa0e507c0dd9daa63aa7e1be49f1f214c134e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1534,6 +1534,36 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
+   assert.ok(!submitted.lines.some((line) => line.includes("configure-verify")), "the refused route is no longer named");
+ }
+ 
++// AC-112 (candidate 31, L4 stage 2): a design that declares docs/adr/NNNN-<slug>.md in a module's adrReferences with neither a draft nor an
++// accepted record gets a NON-BLOCKING notice from submit-plan that names the exact create-adr commands. Exit code, state and every refusal
++// stay what they were: the control run (no declared path) and the declared runs end alike.
++{
++  const adrNoticeRun = (featureId, references, prepare = () => {}) => {
++    const { root, deps } = planAuthorityFixture({ featureId, planPath: `specs/${featureId}/prd_${featureId}.md`, specPath: `specs/${featureId}/spec.md` });
++    prepare(root);
++    const design = { modules: [{ id: "persistence", adrReferences: references }, { id: "ui", adrReferences: [] }] };
++    const withDesign = { ...deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft", design }) };
++    return { root, ...capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], withDesign)) };
++  };
++  const control = adrNoticeRun("ac112-control", []);
++  assert.ok(!control.lines.some((line) => line.includes("--from-design")), "a design that declares no ADR path gets no notice");
++  const declared = adrNoticeRun("ac112-declared", ["docs/adr/0002-storage.md"]);
++  assert.equal(declared.result, control.result, `the notice never changes the exit code: ${declared.lines.join(" ")}`);
++  const notice = declared.lines.join("\n");
++  assert.ok(notice.includes(`create-adr.mjs --root ${declared.root} --from-design`), notice);
++  assert.ok(notice.includes(`--root ${declared.root} --slug storage --title "Storage"`), notice);
++  assert.ok(notice.includes("docs/adr/0002-storage.md"), notice);
++  // An accepted record of the same slug under another number (the design names the number before binding assigns it): nothing to hint.
++  const accepted = adrNoticeRun("ac112-accepted", ["docs/adr/0002-storage.md"], (root) => {
++    mkdirSync(join(root, "docs", "adr"), { recursive: true });
++    const body = "# Storage\n";
++    writeFileSync(join(root, "docs", "adr", "0001-storage.md"), body);
++    writeFileSync(join(root, "docs", "adr", "0001-storage.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001-storage",
++      title: "Storage", status: "accepted", digest: sha256Hex(body), scope: "project", date: "2026-11-18" })}\n`);
++  });
++  assert.ok(!accepted.lines.some((line) => line.includes("--from-design")), `an accepted record of the slug is not listed: ${accepted.lines.join(" ")}`);
++}
++
+ // D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE
+ // the PO signs, instead of letting set-phase implementation refuse it later.
+ {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 874b886c10c5f0df2bc998dbaf0812de54215537..950a37f9d0a7c29c7b2e222418a27b053a1107aa 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -36,6 +36,7 @@ The acceptance question of the one-shot close is asked after the candidate Verif
+    Never write a receipt or a report of the review by hand.
+    Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
+    `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
++   Before the design review, `create-adr.mjs --root <root> --from-design` creates one proposal for every module `adrReferences` path that has no draft and no accepted record yet (titles from the slugs; `submit-plan` prints the same list as a notice).
+    A decision the PO must accept with this design is a proposal first: `create-adr.mjs --root <root> --slug <slug> --title <title>` writes it (`--refresh` after an edit of the Markdown), then
+    `bind-adr-proposals.mjs --root <root> --feature <id> --carrier <design.md> --selection <po-selection.json> --draft <slug>` binds it into the carrier and prints every companion path the review receipt must carry. Run both before the receipt.
+ 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9

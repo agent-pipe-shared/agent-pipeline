@@ -1,0 +1,273 @@
+diff --git a/docs/usage.md b/docs/usage.md
+index 902fdc79337f374be6574c220d5a623b03aa59e1..c3ab55a5a6df16be2a661f7c1d88ceccd64293c3 100644
+--- a/docs/usage.md
++++ b/docs/usage.md
+@@ -115,6 +115,7 @@ Projects can add a `verifyImpact` object to their calibration (schema and
+ example: [ADR-0081](adr/0081-boundary-aware-impacted-verify.md)). Each baseline
+ or area command has a stable id; each area declares repository-relative paths.
+ The existing `verify` field remains the full project command.
++The command id `browser-smoke` is reserved: its command runs only behind the browser preflight, which supports Playwright and Chromium. Without a launchable browser the step fails with a typed code, "browser verification pending" and one human step, and the command does not run. A project that already uses this id for another command is told here and must rename it.
+ 
+ Eligible baseline results can resume on the same bound candidate; the opaque
+ project command runs freshly. A changed candidate, failed run or interrupted
+diff --git a/plugins/pipeline-core/scripts/browser-smoke-check.mjs b/plugins/pipeline-core/scripts/browser-smoke-check.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..2bf6d9b3bb71f5f74d4f856078e4e8048bcb48bf
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/browser-smoke-check.mjs
+@@ -0,0 +1,47 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++import { spawnSync } from "node:child_process";
++import { fileURLToPath } from "node:url";
++import { readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
++import { preflightBrowserEvidence } from "./browser-evidence-preflight.mjs";
++
++// C31-M7 (stage 1 of the browser smoke in Verify): the dispatcher the generated Verify adapter imports for the reserved verifyImpact id
++// `browser-smoke` (the producer passes this module's URL; no kernel file imports it, like architecture-boundary-check.mjs).
++// The declared command runs only behind the browser capability preflight, so "no browser" is never read as "the app is broken":
++//   - no entry                  -> "browser smoke: not applicable", exit 0 (the producer builds no step for it; this is a safety net)
++//   - preflight not ready       -> exit 1 WITHOUT running the command; the log carries the typed code, that no browser test ran,
++//                                  "browser verification pending" and one human step (the Pipeline never installs or downloads)
++//   - preflight ready, exit != 0 -> "browser smoke failed" and the command's own exit code
++// Stage 1 supports Playwright and Chromium only: that is what the preflight probes.
++export const BROWSER_SMOKE_ID = "browser-smoke";
++
++const PREFLIGHT_SCRIPT = fileURLToPath(new URL("./browser-evidence-preflight.mjs", import.meta.url));
++const HUMAN_STEPS = Object.freeze({
++  "BEP-PLAYWRIGHT-PACKAGE-UNAVAILABLE": "the human operator adds the project's Playwright dev dependency (for example `npm install --save-dev @playwright/test`), then reruns Verify.",
++  "BEP-CHROMIUM-UNAVAILABLE": "run `npx playwright install chromium` in the project, then rerun Verify.",
++  "BEP-BROWSER-HOST-DEPENDENCY-UNAVAILABLE": "the human operator installs the browser's system libraries (`npx playwright install-deps chromium` needs administrator rights), then reruns Verify.",
++  "BEP-CHROMIUM-LAUNCH-UNAVAILABLE": "the human operator makes the project's Chromium start on this machine (a broken download is repaired with `npx playwright install chromium`; a sandbox or display restriction needs the operator), then reruns Verify.",
++});
++const UNKNOWN_STATE_STEP = `the human operator runs \`node ${PREFLIGHT_SCRIPT} --root .\` in the project, reads its typed result and fixes the named state, then reruns Verify.`;
++
++export function runConsumerVerifyCheck(check, deps = {}) {
++  const { rootDir = process.cwd(), readConfiguration = readConsumerVerifyConfiguration, preflightDeps = {}, spawnFn = spawnSync, out = console.log, err = console.error } = deps !== null && typeof deps === "object" ? deps : {};
++  try {
++    if (check !== BROWSER_SMOKE_ID) { err(`unknown browser smoke Verify check: ${check}`); return 1; }
++    const configuration = readConfiguration(rootDir);
++    const selected = [...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)].find((entry) => entry.id === BROWSER_SMOKE_ID);
++    if (!selected) { out("browser smoke: not applicable (no browser-smoke command is declared)"); return 0; }
++    const preflight = preflightBrowserEvidence({ rootDir, requiredEvidence: "browser-e2e" }, preflightDeps);
++    if (preflight.status !== "ready") {
++      err(`browser smoke unavailable: ${preflight.code}: ${preflight.detail}`);
++      err("no browser test ran; this is not a product failure");
++      err("browser verification pending");
++      err(`human step: ${HUMAN_STEPS[preflight.code] ?? UNKNOWN_STATE_STEP}`);
++      return 1;
++    }
++    const result = spawnFn(selected.command, { cwd: rootDir, shell: true, stdio: "inherit" });
++    if (result.status === 0) return 0;
++    err(`browser smoke failed: the declared command exited with ${result.status ?? "no exit code"} although the browser was available; this is a product failure, not a missing browser`);
++    return result.status ?? 1;
++  } catch (error) { err(error.message); return 1; }
++}
+diff --git a/plugins/pipeline-core/scripts/browser-smoke-check.test.mjs b/plugins/pipeline-core/scripts/browser-smoke-check.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..81a444703609af2f3004b94fb20ee901154fac59
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/browser-smoke-check.test.mjs
+@@ -0,0 +1,98 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// C31-M7 (AC-112 binding, stage 1 of the browser smoke in Verify): unit cases of the dispatcher scripts/browser-smoke-check.mjs.
++// Marker-file commands only: no real browser is started. The preflight probe is injected through the existing `spawnFn` seam of
++// preflightBrowserEvidence. NOT YET REGISTERED in the Verify suite list (harness/verify-suites.json is protected): registration is a PO step.
++import assert from "node:assert/strict";
++import { existsSync, mkdtempSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++
++import { BROWSER_SMOKE_ID, runConsumerVerifyCheck } from "./browser-smoke-check.mjs";
++
++const MARKER_COMMAND = 'node -e "require(\'fs\').writeFileSync(\'smoke-ran\', \'yes\')"';
++const probe = (state) => ({ spawnFn: () => ({ status: 0, stdout: JSON.stringify({ state }) }) });
++const configuration = (command) => () => ({ baseline: [], areas: [{ id: "web", paths: ["web/**"], commands: command === null ? [] : [{ id: BROWSER_SMOKE_ID, command }] }] });
++
++function harness(command, state) {
++  const rootDir = mkdtempSync(join(tmpdir(), "browser-smoke-check-"));
++  const out = [];
++  const err = [];
++  let probed = 0;
++  const deps = {
++    rootDir,
++    readConfiguration: configuration(command),
++    preflightDeps: { spawnFn: (...args) => { probed += 1; return probe(state).spawnFn(...args); } },
++    out: (line) => out.push(line),
++    err: (line) => err.push(line),
++  };
++  return { rootDir, deps, text: () => [...out, ...err].join("\n"), probed: () => probed, marker: () => existsSync(join(rootDir, "smoke-ran")), done: () => rmSync(rootDir, { recursive: true, force: true }) };
++}
++
++test("a project without the reserved entry gets 'not applicable', exit 0, no probe and no command", () => {
++  const h = harness(null, "ready");
++  try {
++    assert.equal(runConsumerVerifyCheck("browser-smoke", h.deps), 0);
++    assert.match(h.text(), /browser smoke: not applicable/u);
++    assert.equal(h.probed(), 0, "no browser capability probe without a declared smoke");
++    assert.equal(h.marker(), false);
++  } finally { h.done(); }
++});
++
++test("probe ready and the command exits 0: the step passes and the command ran", () => {
++  const h = harness(MARKER_COMMAND, "ready");
++  try {
++    assert.equal(runConsumerVerifyCheck("browser-smoke", h.deps), 0);
++    assert.equal(h.probed(), 1);
++    assert.equal(h.marker(), true, "the declared command ran after a ready preflight");
++    assert.doesNotMatch(h.text(), /browser smoke failed|browser verification pending/u);
++  } finally { h.done(); }
++});
++
++test("probe ready and the command exits non-zero: 'browser smoke failed', never the unavailable text", () => {
++  const h = harness('node -e "process.exit(7)"', "ready");
++  try {
++    assert.equal(runConsumerVerifyCheck("browser-smoke", h.deps), 7, "the command's own exit code is the step result");
++    assert.match(h.text(), /browser smoke failed/u);
++    assert.doesNotMatch(h.text(), /no browser test ran|browser verification pending|BEP-/u, "a product failure is not read as a missing browser");
++  } finally { h.done(); }
++});
++
++const UNAVAILABLE_STATES = [
++  { state: "package-missing", code: "BEP-PLAYWRIGHT-PACKAGE-UNAVAILABLE", step: /Playwright dev dependency/u },
++  { state: "browser-missing", code: "BEP-CHROMIUM-UNAVAILABLE", step: /npx playwright install chromium/u },
++  { state: "host-dependency-missing", code: "BEP-BROWSER-HOST-DEPENDENCY-UNAVAILABLE", step: /npx playwright install-deps chromium/u },
++  { state: "browser-launch-failed", code: "BEP-CHROMIUM-LAUNCH-UNAVAILABLE", step: /human operator/u },
++  { state: "probe-error", code: "BEP-BROWSER-PROBE-FAILED", step: /browser-evidence-preflight\.mjs --root \./u },
++];
++
++for (const { state, code, step } of UNAVAILABLE_STATES) {
++  test(`unavailable state ${state}: non-zero, command not run, typed code, the pending words and one named human step`, () => {
++    const h = harness(MARKER_COMMAND, state);
++    try {
++      assert.equal(runConsumerVerifyCheck("browser-smoke", h.deps), 1);
++      assert.equal(h.marker(), false, "the command must not run when no browser is available");
++      const text = h.text();
++      assert.ok(text.includes(code), text);
++      assert.match(text, /no browser test ran; this is not a product failure/u);
++      assert.match(text, /browser verification pending/u);
++      assert.doesNotMatch(text, /browser smoke failed/u);
++      const humanSteps = text.split("\n").filter((line) => /^human step: \S.{15,}/u.test(line));
++      assert.equal(humanSteps.length, 1, "exactly one human step per unavailable state");
++      assert.match(humanSteps[0], step);
++    } finally { h.done(); }
++  });
++}
++
++test("an unknown check name and a configuration that cannot be read are refused with a message, never a pass", () => {
++  const h = harness(MARKER_COMMAND, "ready");
++  try {
++    assert.equal(runConsumerVerifyCheck("something-else", h.deps), 1);
++    assert.match(h.text(), /unknown browser smoke Verify check: something-else/u);
++    const broken = { ...h.deps, readConfiguration: () => { throw new Error("VEP-IMPACT-CONFIG: invalid root."); } };
++    assert.equal(runConsumerVerifyCheck("browser-smoke", broken), 1);
++    assert.equal(h.marker(), false);
++    assert.match(h.text(), /VEP-IMPACT-CONFIG/u);
++  } finally { h.done(); }
++});
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index 7a9f8f96d07cca8427edb4f1d0aa35588d76776d..6ac29ae67d757e8ed1443248fd4260abdb7f9009 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -90,6 +90,8 @@ import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISP
+ import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
+ // G20-25: the baseline-security suite's dispatcher, handed to the consumer adapter by URL (no import edge into the scanner tree).
+ const SECURITY_CLOSE_DISPATCHER = new URL("./security-close-check.mjs", import.meta.url).href;
++const BROWSER_SMOKE_DISPATCHER = new URL("./browser-smoke-check.mjs", import.meta.url).href;
++const BROWSER_SMOKE_ID = "browser-smoke";
+ import { prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
+ import {
+   GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
+@@ -532,8 +534,10 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     // Its own dispatcher (scripts/security-close-check.mjs), never a branch of the kernel file consumer-verify-check.mjs (GMWKC01).
+     { name: "baseline-security", file, args: [SECURITY_CLOSE_DISPATCHER, "security", attempt] },
+   ];
+-  const configuredBaselineSuites = configuration.baseline.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) }));
+-  const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) })));
++  // C31-M7: the reserved id `browser-smoke` runs behind the browser preflight in its own dispatcher; every other id keeps the consumer dispatcher.
++  const configuredSuite = (entry) => ({ name: `project-${entry.id}`, file, args: entry.id === BROWSER_SMOKE_ID ? [BROWSER_SMOKE_DISPATCHER, BROWSER_SMOKE_ID] : [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) });
++  const configuredBaselineSuites = configuration.baseline.map(configuredSuite);
++  const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map(configuredSuite));
+   const fullSuite = command === null ? null : { name: "configured-verify", file, args: [CONSUMER_VERIFY_DISPATCHER, "product", attempt], dependsOn: standardSuites.map((suite) => suite.name) };
+   const selectionInput = selectionInputs(root, mode, base, started.commit);
+   const baselineIds = [...standardSuites, ...configuredBaselineSuites].map((suite) => suite.name);
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 4cc058b5611616d4f6ce49040d68dae44bb97d3f..287fd2488f37f3435d6b572f51f92e53262492b6 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -674,6 +674,73 @@ test("consumer full fallback preserves the changed and unmatched paths", async (
+   });
+ });
+ 
++// C31-M7 (AC-112 binding): stage 1 of the browser smoke. The reserved verifyImpact id `browser-smoke` runs behind the browser preflight.
++// Marker-file commands only; the fixture project has no Playwright package, so the real preflight probe reports the package as missing.
++const SMOKE_MARKER_COMMAND = 'node -e "require(\'fs\').writeFileSync(\'.git/smoke-ran\', \'yes\')"';
++function commitImpact(root, impact) {
++  const calibrationPath = join(root, ".claude", "pipeline.json");
++  const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
++  calibration.verifyImpact = { schema: "pipeline.project-verify-impact.v1", ...impact };
++  writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
++  git(root, ["add", "."]);
++  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "impact policy"]);
++}
++const smokeEntry = { id: "browser-smoke", command: SMOKE_MARKER_COMMAND };
++
++test("C31-M7 a project that does not declare browser-smoke has no project-browser-smoke step and is never red from it", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    commitImpact(root, { baseline: [{ id: "common", command: 'node -e "process.exit(0)"' }], areas: [] });
++    const result = await produceVerifyEvidence({ rootDir: root });
++    assert.equal(result.status, "passed");
++    const names = result.evidence.steps.map(({ name }) => name);
++    assert.equal(names.includes("project-common"), true);
++    assert.equal(names.includes("project-browser-smoke"), false);
++  });
++});
++
++test("C31-M7 a declared browser-smoke without a browser fails that one step with the typed code, the pending words and a human step, and never runs the command", async () => {
++  await withFixture('node -e "process.exit(0)"', async (root) => {
++    commitImpact(root, { baseline: [smokeEntry], areas: [] });
++    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }),
++      (error) => error.code === "VEP-VERIFY-FAILED" && /"suite":"project-browser-smoke","exitCode":1/u.test(error.message));
++    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false, "an unavailable browser is red: no success evidence");
++    assert.equal(existsSync(join(root, ".git", "smoke-ran")), false, "the declared command must not run without a launchable browser");
++    const runs = join(root, ".git/agent-pipeline/verify/runs");
++    const log = suiteLog(root, readdirSync(runs)[0], "project-browser-smoke");
++    assert.match(log, /BEP-PLAYWRIGHT-PACKAGE-UNAVAILABLE/u);
++    assert.match(log, /no browser test ran; this is not a product failure/u);
++    assert.match(log, /browser verification pending/u);
++    assert.match(log, /^human step: .*Playwright dev dependency/mu);
++    assert.doesNotMatch(log, /browser smoke failed/u);
++  });
++});
++
++test("C31-M7 a browser-smoke entry in an area is selected by its paths only; an unrelated change omits it and its command", async () => {
++  await withFixture('node -e "process.exit(9)"', async (root) => {
++    commitImpact(root, { baseline: [], areas: [
++      { id: "web", paths: ["web/**"], commands: [smokeEntry] },
++      { id: "docs", paths: ["docs/**"], commands: [{ id: "docs", command: 'node -e "process.exit(0)"' }] },
++    ] });
++    mkdirSync(join(root, "docs"));
++    writeFileSync(join(root, "docs", "guide.md"), "# Guide\n");
++    git(root, ["add", "."]);
++    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "docs"]);
++    const omitted = await produceVerifyEvidence({ rootDir: root, mode: "critic", base: "HEAD^1" });
++    assert.equal(omitted.status, "passed");
++    assert.deepEqual(omitted.evidence.selection.matchedAreaIds, ["docs"]);
++    assert.equal(omitted.evidence.selection.omittedSuiteIds.includes("project-browser-smoke"), true);
++    assert.equal(omitted.evidence.steps.some(({ name }) => name === "project-browser-smoke"), false);
++    assert.equal(existsSync(join(root, ".git", "smoke-ran")), false);
++    mkdirSync(join(root, "web"));
++    writeFileSync(join(root, "web", "page.html"), "<p>page</p>\n");
++    git(root, ["add", "."]);
++    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "web"]);
++    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, mode: "critic", base: "HEAD^1" }),
++      (error) => error.code === "VEP-VERIFY-FAILED" && /"suite":"project-browser-smoke","exitCode":1/u.test(error.message));
++    assert.equal(existsSync(join(root, ".git", "smoke-ran")), false, "selected, but still behind the preflight");
++  });
++});
++
+ test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", async () => {
+   await withFixture('node -e "process.exit(0)"', async (root) => {
+     const result = await produceVerifyEvidence({ rootDir: root });

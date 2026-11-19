@@ -1,0 +1,32 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 428ece99d40fd1aeadab7b46a687cc6fbe5fdc7c..5cad56aff5a3fa87b36783556928f60ae1eec996 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -203,8 +203,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",455], // cand. 30k (QG-04: extension only, measured with the unchanged classifier): 353->455, outgrown since cand. 28
+-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",654], // cand. 30k (QG-04: extension only, measured with the unchanged classifier): 616->654, outgrown since cand. 28; before: cand. 28 (QG-04: extension only, measured): 563->587, the Critic part sizing and briefing cases; before: cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
++    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",482], // cand. 31 (QG-04: extension only, measured with the unchanged classifier): 455->482, the delta-round preparation and registered-invariant cases; before: cand. 30k (QG-04: extension only, measured with the unchanged classifier): 353->455, outgrown since cand. 28
++    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",656], // cand. 31 (QG-04: extension only, measured with the unchanged classifier): 654->656, the Critic preparation commit-step and usage-line cases; before: cand. 30k (QG-04: extension only, measured with the unchanged classifier): 616->654, outgrown since cand. 28; before: cand. 28 (QG-04: extension only, measured): 563->587, the Critic part sizing and briefing cases; before: cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",163], // cand. 30k (QG-04: extension only, measured with the unchanged classifier): 157->163; before: cand. 20 w252 (QG-04: extension only), measured
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+index 971b1ac0e758ace4614e55dbba529013bddd8360..7171716657cb93f612eda372c41e4d30f60fc24f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+@@ -972,7 +972,11 @@ function main(argv) {
+     try {
+       root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+     } catch {
+-      process.stderr.write("not inside a git repository: run from the project or pass --root <project>\n");
++      // Outside a repository a call with nothing to check (for example --help) still answers with the usage line, never with the repository refusal.
++      const hasRevisionInput = argv.some((arg) => !arg.startsWith("--"));
++      process.stderr.write(hasRevisionInput || argv.includes("--range")
++        ? "not inside a git repository: run from the project or pass --root <project>\n"
++        : "usage: dispatch-authorship-verify.mjs [--strict] [--json] [--root <project>] <sha>... | --range <a>..<b>\n");
+       return 3;
+     }
+   }

@@ -1,0 +1,631 @@
+diff --git a/plugins/pipeline-core/config/model-list-prices.json b/plugins/pipeline-core/config/model-list-prices.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d4470ad04d7152b0bf9c75b18a1bb70e6c089f71
+--- /dev/null
++++ b/plugins/pipeline-core/config/model-list-prices.json
+@@ -0,0 +1,15 @@
++{
++  "$comment": "List-price table for the ESTIMATED dollar half of the Antigravity and Codex token rows of plugins/pipeline-core/scripts/usage-ledger.mjs (--row ... --antigravity-transcript|--codex-rollout). US dollars per million tokens. cachedInput null = cached tokens are priced at the input price (an upper bound). A model name is matched by the longest listed name that is a prefix of the observed or configured name (tier and effort suffixes such as -medium, -high, -low, -tiered-high are dropped first). Check every value against the vendor pages before relying on it; this table is NOT the Claude price table (scripts/model-prices.json, policies/model-policy.md section 6).",
++  "asOf": "2026-11-19",
++  "source": "third-party list-price trackers, 2026-11-19; not verified against the vendor page; estimate",
++  "note": "Every value is an estimate with low confidence. Vendor pages win: when a vendor page and this table disagree, the vendor page is right and this table is to be corrected.",
++  "models": {
++    "gpt-5.3-codex": { "input": 1.75, "cachedInput": 0.175, "output": 14.0, "note": "low confidence; API dollar list price, not ChatGPT credits" },
++    "gpt-5.2-codex": { "input": 1.75, "cachedInput": 0.175, "output": 14.0, "note": "low confidence; API dollar list price, not ChatGPT credits" },
++    "gpt-5-codex": { "input": 1.25, "cachedInput": null, "output": 10.0, "note": "low confidence; no cached-input price listed, cached tokens are priced at the input price (upper bound); API dollar list price, not ChatGPT credits" },
++    "gemini-3.8-flash": { "input": 1.5, "cachedInput": 0.15, "output": 7.5, "note": "low confidence; two conflicting listings exist, the higher one is used (PO decision 2026-11-19), the introductory 0.75 / 3.75 listing is not used" },
++    "gemini-3.6-flash": { "input": 1.5, "cachedInput": 0.15, "output": 7.5, "note": "low confidence; two conflicting listings exist, the higher one is used (PO decision 2026-11-19), the introductory 0.75 / 3.75 listing is not used" },
++    "gemini-3.1-pro": { "input": 2.0, "cachedInput": 0.2, "output": 12.0, "note": "low confidence; listed for prompts up to 200K context" },
++    "gemini-3.1-flash-lite": { "input": 0.25, "cachedInput": 0.025, "output": 1.5, "note": "low confidence" }
++  }
++}
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index ee01d4a75a6735cfb1afe49eea192eb764a47072..746c0d5e86178dfeb260b568234a00454c2c3490 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -55,8 +55,8 @@
+     {
+       "topic": "Telemetry row at close",
+       "claude": "`usage-ledger.mjs`",
+-      "codex": "token-only row: `usage-ledger.mjs --row <label> --codex-rollout <file>` (price prints n/a)",
+-      "antigravity": "token-only row: `usage-ledger.mjs --row <label> --antigravity-transcript <file>` (no dollar half)",
++      "codex": "token row plus an estimated dollar half from list prices (labelled): `usage-ledger.mjs --row <label> --codex-rollout <file>`",
++      "antigravity": "token row plus an estimated dollar half from list prices (labelled): `usage-ledger.mjs --row <label> --antigravity-transcript <file> [--model <name>]`",
+       "owner": "skills/close-feature/SKILL.md"
+     },
+     {
+diff --git a/plugins/pipeline-core/scripts/runner-capabilities.test.mjs b/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
+index f3569404840151c1b72fb0908e45c61785d7e816..cb48cac3f9e6be6b12c2deb744a50d74f940d25c 100644
+--- a/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-capabilities.test.mjs
+@@ -47,7 +47,10 @@ test("AC-239: the observation-boundary row exists per runner and claims no conta
+   assert.ok(guide.includes(`| ${row.topic} | ${row.claude} | ${row.codex} | ${row.antigravity} |`), "the guide carries the same row");
+ });
+ 
+-test("AC-112: the telemetry row names the token-only Antigravity and Codex routes in the data, the guide and the close reference", () => {
++// C31-B11 restates this B7 case under QG-04 (criterion AC-112 unchanged; PO decision 2026-11-19): the Antigravity and Codex rows are no
++// longer "token-only, no dollar" but a token row plus a dollar half ESTIMATED from list prices and labelled as such. The cells must
++// say so ("estimate", "list prices") and still claim no concrete dollar figure.
++test("AC-112: the telemetry row names the Antigravity and Codex token routes with an estimated dollar half in the data, the guide and the close reference", () => {
+   const row = readRunnerCapabilities().rows.find((candidate) => candidate.topic === "Telemetry row at close");
+   assert.ok(row, "the Telemetry row at close exists");
+   assert.match(row.claude, /usage-ledger\.mjs/u);
+@@ -55,17 +58,24 @@ test("AC-112: the telemetry row names the token-only Antigravity and Codex route
+   assert.match(row.codex, /--codex-rollout/u);
+   for (const runner of ["codex", "antigravity"]) {
+     assert.match(row[runner], /token/iu, `${runner} cell says token`);
+-    assert.doesNotMatch(row[runner], /not available|\$\s?\d/u, `${runner} cell neither says not available nor claims a dollar figure`);
++    assert.match(row[runner], /estimated dollar half from list prices \(labelled\)/u, `${runner} cell says the dollar half is an estimate from list prices`);
++    assert.doesNotMatch(row[runner], /not available|no dollar|n\/a|\$\s?\d/u, `${runner} cell neither says not available nor claims a dollar figure`);
+   }
+   const guide = readFileSync(GUIDE, "utf8");
+   const step = guide.split("\n").find((line) => line.startsWith("4. Telemetry row"));
+   assert.ok(step, "the close step 4 telemetry line exists");
+   assert.match(step, /--antigravity-transcript/u);
+   assert.match(step, /--codex-rollout/u);
+-  assert.doesNotMatch(step, /skip it/u);
++  assert.match(step, /estimated dollar half from list prices \(labelled\)/u);
++  assert.doesNotMatch(step, /skip it|no dollar/u);
+   const close = readFileSync(join(PLUGIN, "skills", "close-block", "references", "close-light-and-extensions.md"), "utf8");
+   assert.match(close, /--antigravity-transcript/u);
+   assert.match(close, /--codex-rollout/u);
++  assert.match(close, /estimated dollar half from list prices \(labelled\)/u);
++  assert.doesNotMatch(close, /token-only row \(no dollar half\)/u);
++  const feature = readFileSync(join(PLUGIN, "skills", "close-feature", "SKILL.md"), "utf8");
++  assert.match(feature, /estimated dollar half from list prices \(labelled\)/u);
++  assert.doesNotMatch(feature, /token-only, no dollar|n\/a \(price unknown\)/u);
+ });
+ 
+ test("an owner that names a file in this plugin names one that ships", () => {
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.mjs b/plugins/pipeline-core/scripts/usage-ledger.mjs
+index 3267a8cc57c5ea981be44b293e010e547c9e21d2..222a29adfafee80db53bfb7ae702c308808e9ec6 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.mjs
+@@ -15,10 +15,12 @@
+  * so this script must never assume a path.
+  *
+  * Read-only: this script only opens transcript files for reading; it never writes,
+- * modifies or deletes anything under the transcripts root. The optional `--prices`
+- * file is the only other file this script reads (default: `model-prices.json` next
++ * modifies or deletes anything under the transcripts root. Besides the transcript files it
++ * reads: the optional `--prices` file (Claude path; default: `model-prices.json` next
+  * to this script, resolved from the script's own location — never the process cwd —
+- * so the default works regardless of the invoking directory).
++ * so the default works regardless of the invoking directory), and, for the
++ * Antigravity/Codex rows only, the list-price table `../config/model-list-prices.json`
++ * and (Antigravity without `--model`) `pipeline.user.yaml` in the working directory.
+  *
+  * Two output modes:
+  *   - Default (no `--row`): full markdown table to stdout, one row per
+@@ -37,11 +39,15 @@
+  *     below. Same discipline as the token half: no transcript content, no
+  *     absolute path, nothing written to disk — counts only, printed to stdout.
+  *
+- *   - `--row [label] --antigravity-transcript <file>` (exclusive, takes no root): a token-only close row for ONE Antigravity brain
+- *     transcript (input, output and cache-read tokens summed over its model steps, one synthetic model key
+- *     `antigravity-unrecorded`). The transcript records no model, so the dollar half prints "unavailable" and is never estimated.
+- *   - `--row [label] --codex-rollout <file>` (same shape): the last complete cumulative token total of ONE Codex rollout under the
+- *     model named in its `turn_context`; no Codex price exists, so the dollar half prints "n/a (price unknown)".
++ *   - `--row [label] --antigravity-transcript <file> [--model <name>]` (exclusive, takes no root): a token row for ONE Antigravity brain
++ *     transcript (input, output and cache-read tokens summed over its model steps). The transcript records no model, so the model is
++ *     `--model`, else the project's configured implement route (`pipeline.user.yaml`, read from the working directory); with neither
++ *     the row says "model not recorded; pass --model <name>" and prints no dollar figure.
++ *   - `--row [label] --codex-rollout <file>` (same shape, no `--model`): the last complete cumulative token total of ONE Codex rollout
++ *     under the model named in its `turn_context`.
++ *     For both, the dollar half is an ESTIMATE from the labelled list-price table `../config/model-list-prices.json` (third-party
++ *     list prices, never printed as exact: "approx" and the table's asOf date are always shown); a model without a listed price
++ *     leaves the dollar half unavailable with the reason "no list price for <model>".
+  *
+  *   - `--timeline <transcript-file> [--json]` (exclusive with `--row` and `--metering`; takes no root): the run
+  *     timeline of ONE session file in any of the three runner formats (Claude project JSONL, Codex rollout JSONL,
+@@ -130,6 +136,7 @@ import { createInterface } from "node:readline";
+ import { fileURLToPath } from "node:url";
+ import path from "node:path";
+ import { USAGE_ATTRIBUTION_LIMITS, UsageIngestionError, summarizeUsageAttribution } from "../lib/runner-usage-v1.mjs";
++import { readProjectRouting } from "../lib/runner-profiles-v3.mjs";
+ 
+ const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ // Composite map-key separator: project dir names and Windows paths can never
+@@ -141,11 +148,13 @@ const KEY_SEP = "::";
+ // independent of the invoking cwd).
+ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
++// The labelled list-price table of the Antigravity and Codex rows (C31-B11); the Claude path above never reads it.
++const LIST_PRICES_PATH = path.join(SCRIPT_DIR, "..", "config", "model-list-prices.json");
+ 
+ function usage(msg) {
+   if (msg) console.error(msg);
+   console.error(
+-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json] | --row [label] --antigravity-transcript|--codex-rollout <transcript-file>",
++    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json] | --row [label] --antigravity-transcript <transcript-file> [--model <name>] | --row [label] --codex-rollout <transcript-file>",
+   );
+   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
+   console.error(
+@@ -552,28 +561,101 @@ function readTranscriptRecords(file, failMessage) {
+ }
+ 
+ // C31-B5 (AC-112, lane L17): `--row [label] --antigravity-transcript <file>` and `--row [label] --codex-rollout <file>` print a
+-// token-only close row for ONE transcript of those runners. Counts only: no path, no transcript text, and no dollar figure is ever
+-// estimated. A file without a usable token record prints the same sentence as an empty `--row` and exits 0 (a missing row never fails a close).
+-//   antigravity  the step reader sums input, output and cache-read tokens per model step; the transcript names no model, so one
+-//                synthetic model key stands in and the dollar half reads "unavailable".
++// token row for ONE transcript of those runners. Counts only: no path, no transcript text. C31-B11 (PO decision 2026-11-19): the dollar
++// half is an ESTIMATE from the labelled list-price table (LIST_PRICES_PATH), always printed as "approx" with the table's asOf date and
++// never as exact; with no usable model or no listed price it stays unavailable and says why. A file without a usable token record prints
++// the same sentence as an empty `--row` and exits 0 (a missing row never fails a close).
++//   antigravity  the step reader sums input, output and cache-read tokens per model step; the transcript names no model, so the model is
++//                the `--model` argument, else the project's configured implement route; cache-read tokens are counted IN ADDITION to
++//                input (whether input already includes them is not measured, so this is an upper bound).
+ //   codex        the last complete cumulative `total_token_usage` of the rollout (the repository's own rule, runner-transcript-recovery
+-//                `codexUsage`), the model name(s) from `turn_context`; no price exists for it, so the dollar half reads the existing
+-//                "n/a (price unknown)". Whether input includes cached tokens is not measured, so the counters are printed as recorded.
++//                `codexUsage`), the model from `turn_context`; Codex defines `input_tokens` to include `cached_input_tokens`, so the
++//                uncached part is input minus cached.
+ const TRANSCRIPT_ROW_FLAGS = ["--antigravity-transcript", "--codex-rollout"];
+ const ROW_MODEL_RE = /^[A-Za-z0-9._-]{1,80}$/u;
+ const isRowCounter = (value) => Number.isSafeInteger(value) && value >= 0;
+ 
+-function antigravityRowLines(records) {
++function readListPrices() {
++  try {
++    const data = JSON.parse(readFileSync(LIST_PRICES_PATH, "utf8"));
++    return data !== null && typeof data === "object" && typeof data.asOf === "string" && data.models !== null && typeof data.models === "object" ? data : null;
++  } catch {
++    return null;
++  }
++}
++
++// The longest listed name that is a prefix of the model (after the tier/effort suffix is dropped), cut at a "-" boundary so that
++// "gemini-3.8-flashy" never prices as "gemini-3.8-flash".
++const MODEL_TIER_SUFFIX_RE = /(?:-tiered)?-(?:minimal|low|medium|high|xhigh|max)$/u;
++function listPriceFor(table, model) {
++  if (table === null) return { reason: "list-price table unreadable: plugins/pipeline-core/config/model-list-prices.json" };
++  let name = model.toLowerCase();
++  while (MODEL_TIER_SUFFIX_RE.test(name)) name = name.replace(MODEL_TIER_SUFFIX_RE, "");
++  const listed = Object.keys(table.models).filter((key) => name === key || name.startsWith(`${key}-`)).sort((a, b) => b.length - a.length)[0];
++  if (listed === undefined) return { reason: `no list price for ${model}` };
++  const rates = table.models[listed];
++  const valid = rates !== null && typeof rates === "object" && [rates.input, rates.output].every((value) => Number.isFinite(value) && value >= 0)
++    && (rates.cachedInput === null || (Number.isFinite(rates.cachedInput) && rates.cachedInput >= 0));
++  return valid ? { rates } : { reason: `list price for ${model} is malformed in plugins/pipeline-core/config/model-list-prices.json` };
++}
++
++// The dollar half of one row: an estimate from the list price, or "$ unavailable (<reason>)". `cachedInsideInput` says whether the
++// cached counter is part of the input counter (Codex) or counted in addition to it (Antigravity, upper bound).
++function listPriceHalf(model, counts, cachedInsideInput) {
++  const table = readListPrices();
++  const found = listPriceFor(table, model);
++  if (!found.rates) return { priced: false, cell: `$ unavailable (${found.reason})` };
++  const { rates } = found;
++  const cacheRate = rates.cachedInput ?? rates.input;
++  const usd = estimateUsd(
++    { input: cachedInsideInput ? Math.max(0, counts.input - counts.cached) : counts.input, output: counts.output, cacheCreate5m: 0, cacheCreateUndetermined: 0, cacheCreate1h: 0, cacheRead: counts.cached },
++    { input: rates.input, output: rates.output, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: cacheRate },
++  );
++  const rule = `${rates.cachedInput === null ? `the input price, ${rates.input} USD per 1M (no cached price listed, upper bound)` : `${rates.cachedInput} USD per 1M (listed cached-input price)`}${cachedInsideInput ? "" : ", counted in addition to input"}`;
++  return { priced: true, asOf: table.asOf, cell: `approx $${fmtUsd(usd)} (estimate from list price, ${table.asOf}; cached tokens at ${rule})`, total: `TOTAL approx $${fmtUsd(usd)} (estimate from list price, ${table.asOf})` };
++}
++
++const ESTIMATE_NOTE = (asOf) => `the dollar half is an ESTIMATE from third-party list prices (table asOf ${asOf}, not verified against the vendor page, vendor pages win), not a billed amount`;
++
++// The model of an Antigravity row: `--model`, else the project's configured implement route for Antigravity (read from
++// `pipeline.user.yaml` in the working directory through the one route reader); null when neither names a model.
++function antigravityRowModel(modelArg) {
++  if (modelArg) return { model: modelArg, source: "argument" };
++  try {
++    const read = readProjectRouting(process.cwd());
++    const value = read.source === "project" ? read.routing.duties?.implement?.antigravity?.selector?.value : undefined;
++    if (typeof value === "string" && ROW_MODEL_RE.test(value)) return { model: value, source: "configured route" };
++  } catch {
++    // an unreadable routing file is the same as none: the row then says to pass --model
++  }
++  return null;
++}
++
++function antigravityRowLines(records, modelArg) {
+   const steps = detectTimelineFormat(records) === "antigravity-steps"
+     ? antigravityStepTimelineEvents(records).filter((event) => event.kind === "response" && event.usage && [event.usage.input, event.usage.output, event.usage.cacheRead].some((value) => value !== null))
+     : [];
+   if (steps.length === 0) return null;
+   const sum = (key) => steps.reduce((total, event) => total + (event.usage[key] ?? 0), 0);
++  const counts = { input: sum("input"), output: sum("output"), cached: sum("cacheRead") };
++  const head = (key) => `- ${key}: ${fmtDe(counts.input)} in / ${fmtDe(counts.output)} out / n/a cache-write / ${fmtDe(counts.cached)} cache-read -> `;
++  const resolved = antigravityRowModel(modelArg);
++  if (resolved === null) {
++    return [
++      `${head("antigravity-unrecorded")}$ unavailable (model not recorded; pass --model <name>)`,
++      "TOTAL: n/a (no model recorded in this transcript, no dollar estimate)",
++      "",
++      `Notes: token row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; the transcript records no model and no implement route is configured for this project, so no price applies and no dollar figure is computed (pass --model <name>); cache-write is not recorded.`,
++    ];
++  }
++  const half = listPriceHalf(resolved.model, counts, false);
+   return [
+-    `- antigravity-unrecorded: ${fmtDe(sum("input"))} in / ${fmtDe(sum("output"))} out / n/a cache-write / ${fmtDe(sum("cacheRead"))} cache-read -> $ unavailable (model not recorded in this transcript)`,
+-    "TOTAL: n/a (no model recorded in this transcript, no dollar estimate)",
++    `${head(`${resolved.model} (model source: ${resolved.source})`)}${half.cell}`,
++    half.priced ? half.total : "TOTAL: n/a (no model with known price)",
+     "",
+-    `Notes: token-only row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; the transcript records no model, so no price applies and no dollar figure is computed; cache-write is not recorded.`,
++    half.priced
++      ? `Notes: token row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; ${ESTIMATE_NOTE(half.asOf)}; the transcript records no model, so the model comes from the ${resolved.source}; whether input already includes cached tokens is not measured, so they are counted in addition (upper bound); cache-write is not recorded.`
++      : `Notes: token row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; no list price applies to the model, so no dollar figure is computed; cache-write is not recorded.`,
+   ];
+ }
+ 
+@@ -588,19 +670,27 @@ function codexRowLines(records) {
+     if (isTimelineObject(usageData) && ["input_tokens", "cached_input_tokens", "output_tokens"].every((key) => isRowCounter(usageData[key]))) total = usageData; // an invalid record never replaces a valid one
+   }
+   if (total === null) return null;
+-  const model = models.size > 0 ? [...models].sort().join(", ") : "codex-unrecorded";
++  const names = [...models].sort();
++  const counts = { input: total.input_tokens, output: total.output_tokens, cached: total.cached_input_tokens };
++  const label = names.length > 0 ? `${names.join(", ")} (model source: observed)` : "codex-unrecorded";
++  const half = names.length === 1 ? listPriceHalf(names[0], counts, true)
++    : { priced: false, cell: `$ unavailable (${names.length === 0 ? "model not recorded in this rollout" : "several models in one rollout, no per-model split"})` };
+   return [
+-    `- ${model}: ${fmtDe(total.input_tokens)} in / ${fmtDe(total.output_tokens)} out / n/a cache-write / ${fmtDe(total.cached_input_tokens)} cache-read -> n/a (price unknown)`,
+-    "TOTAL: n/a (no model with known price)",
++    `- ${label}: ${fmtDe(counts.input)} in / ${fmtDe(counts.output)} out / n/a cache-write / ${fmtDe(counts.cached)} cache-read -> ${half.cell}`,
++    half.priced ? half.total : "TOTAL: n/a (no model with known price)",
+     "",
+-    "Notes: token-only row from a Codex rollout, the last cumulative total of the session; whether input includes cached tokens (and output includes reasoning tokens) is not measured, so the counters are printed as recorded and no dollar figure is computed; cache-write is not recorded.",
++    half.priced
++      ? `Notes: token row from a Codex rollout, the last cumulative total of the session; ${ESTIMATE_NOTE(half.asOf)}; Codex counts cached tokens inside the input tokens, so only input minus cached is priced at the input price; output tokens include reasoning tokens as recorded; cache-write is not recorded.`
++      : "Notes: token row from a Codex rollout, the last cumulative total of the session; no usable list price applies, so no dollar figure is computed; cache-write is not recorded.",
+   ];
+ }
+ 
+ function runTranscriptRow(args, flag) {
+-  const form = `node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<label>" ${flag} <transcript-file>`;
++  const agy = flag === "--antigravity-transcript";
++  const form = `node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<label>" ${flag} <transcript-file>${agy ? " [--model <name>]" : ""}`;
+   const refuse = (why) => usage(`${flag} is exclusive: ${why} Runnable form: ${form}`);
+   let file;
++  let modelArg;
+   let rowSeen = false;
+   let label = "";
+   for (let i = 0; i < args.length; i++) {
+@@ -611,11 +701,16 @@ function runTranscriptRow(args, flag) {
+       if (file !== undefined) refuse("name the transcript once.");
+       file = args[++i];
+       if (!file || file.startsWith("--")) refuse("a <transcript-file> value is required.");
+-    } else refuse(`it accepts only --row [label] and ${flag} <file> (no transcripts root, no other flag).`);
++    } else if (args[i] === "--model") {
++      if (!agy) refuse("--model names the model of an Antigravity row and is accepted only with --antigravity-transcript (a Codex rollout records its own model).");
++      if (modelArg !== undefined) refuse("name --model once.");
++      modelArg = args[++i];
++      if (!modelArg || modelArg.startsWith("-") || !ROW_MODEL_RE.test(modelArg)) refuse("--model needs a model name of letters, digits, dot, dash or underscore (at most 80 characters).");
++    } else refuse(`it accepts only --row [label] and ${flag} <file>${agy ? " [--model <name>]" : ""} (no transcripts root, no other flag).`);
+   }
+   if (!rowSeen) refuse("--row is required.");
+   const { records } = readTranscriptRecords(file, `usage-ledger ${flag}: ${flag.slice(2)}-unreadable. Pass an existing regular transcript file: ${form}`);
+-  const rowLines = (flag === "--codex-rollout" ? codexRowLines : antigravityRowLines)(records);
++  const rowLines = agy ? antigravityRowLines(records, modelArg) : codexRowLines(records);
+   const fragment = label ? [`Session/Block: ${label}`] : [];
+   if (rowLines === null) fragment.push("Tokens per `/usage` (collected, script): no records found for the selected session/filter.");
+   else fragment.push("Tokens per `/usage` (collected, script):", ...rowLines);
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.test.mjs b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+index 8d31e5b8a3a8a2935181622452818c6eed6cb94d..375a4f636d8302d4a3f4f8fefbc10fd547fcaca2 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.test.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+@@ -7,10 +7,11 @@
+ import assert from "node:assert/strict";
+ import { test } from "node:test";
+ import { spawnSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { readProjectRouting } from "../lib/runner-profiles-v3.mjs";
+ 
+ const CLI_PATH = fileURLToPath(new URL("./usage-ledger.mjs", import.meta.url));
+ const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+@@ -126,8 +127,8 @@ function listAllFiles(dir) {
+   return out.sort();
+ }
+ 
+-function run(args) {
+-  const result = spawnSync(process.execPath, [CLI_PATH, ...args], { encoding: "utf8" });
++function run(args, options = {}) {
++  const result = spawnSync(process.execPath, [CLI_PATH, ...args], { encoding: "utf8", ...options });
+   return result;
+ }
+ 
+@@ -554,6 +555,9 @@ test("usage-ledger --timeline is exclusive with --row and --metering and refuses
+ const agyStep = (index, at, type, extra) => ({ step_index: index, source: "MODEL", type, status: "DONE", created_at: at, ...extra });
+ const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+ 
++// C31-B11 restates this B5 case under QG-04 (the criterion AC-112 is unchanged; the PO decision of 2026-11-19 replaced "never estimated"
++// by a labelled list-price estimate). With no model argument and no project routing in the working directory (a fresh temporary
++// directory), the row still sums the steps and keeps the dollar half unavailable, now saying how to name a model.
+ test("C31-B5 usage-ledger --row --antigravity-transcript sums the model steps' tokens into one row with the dollar half unavailable", () => {
+   const { dir, file } = timelineFile([
+     { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
+@@ -562,11 +566,11 @@ test("C31-B5 usage-ledger --row --antigravity-transcript sums the model steps' t
+     agyStep(3, "2026-08-19T10:00:10Z", "PLANNER_RESPONSE", { input_tokens: 2300, cache_read_tokens: 1150, output_tokens: 9 }),
+   ]);
+   try {
+-    const result = run(["--row", "S1/B5", "--antigravity-transcript", file]);
++    const result = run(["--row", "S1/B5", "--antigravity-transcript", file], { cwd: dir });
+     assert.equal(result.status, 0, result.stderr);
+     const out = result.stdout;
+     assert.match(out, /^Session\/Block: S1\/B5$/m);
+-    assert.match(out, /^- antigravity-unrecorded: 3\.500 in \/ 16 out \/ n\/a cache-write \/ 1\.180 cache-read -> \$ unavailable \(model not recorded in this transcript\)$/m);
++    assert.match(out, /^- antigravity-unrecorded: 3\.500 in \/ 16 out \/ n\/a cache-write \/ 1\.180 cache-read -> \$ unavailable \(model not recorded; pass --model <name>\)$/m);
+     assert.match(out, /TOTAL: n\/a \(no model recorded in this transcript, no dollar estimate\)/);
+     assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for an unrecorded model");
+     for (const text of [out, result.stderr]) {
+@@ -601,6 +605,8 @@ test("C31-B5 usage-ledger --row --antigravity-transcript prints the skip sentenc
+ const codexCounters = (input, cached, output) => ({ input_tokens: input, cached_input_tokens: cached, output_tokens: output, reasoning_output_tokens: 1, total_tokens: input + output });
+ const codexTokenCount = (at, total) => ({ timestamp: at, type: "event_msg", payload: { type: "token_count", info: { total_token_usage: total } } });
+ 
++// C31-B11 restates this B5 case under QG-04: the model of this fixture (gpt-5.1-codex) has no entry in the list-price table, so the
++// dollar half stays unavailable, now with the reason "no list price for <model>" instead of "n/a (price unknown)".
+ test("C31-B5 usage-ledger --row --codex-rollout prints the last complete cumulative total under the recorded model with no dollar figure", () => {
+   const { dir, file } = timelineFile([
+     { timestamp: "2026-11-18T10:00:00Z", type: "session_meta", payload: { id: SESSION_ID, cwd: "/work/project" } },
+@@ -615,9 +621,9 @@ test("C31-B5 usage-ledger --row --codex-rollout prints the last complete cumulat
+     assert.equal(result.status, 0, result.stderr);
+     const out = result.stdout;
+     assert.match(out, /^Session\/Block: S1\/B5$/m);
+-    assert.match(out, /^- gpt-5\.1-codex: 3\.000 in \/ 120 out \/ n\/a cache-write \/ 1\.500 cache-read -> n\/a \(price unknown\)$/m);
++    assert.match(out, /^- gpt-5\.1-codex \(model source: observed\): 3\.000 in \/ 120 out \/ n\/a cache-write \/ 1\.500 cache-read -> \$ unavailable \(no list price for gpt-5\.1-codex\)$/m);
+     assert.match(out, /^TOTAL: n\/a \(no model with known price\)$/m);
+-    assert.match(out, /whether input includes cached tokens .* not measured/);
++    assert.match(out, /no dollar figure is computed/);
+     assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for a model without a price");
+     for (const text of [out, result.stderr]) assert.doesNotMatch(text, new RegExp(`${SECRET_MARKER}|/work/project|${escapeRe(dir)}|session\\.jsonl`), "no transcript text and no path");
+   } finally {
+@@ -667,6 +673,179 @@ test("C31-B5 usage-ledger --antigravity-transcript is an exclusive row mode and
+   }
+ });
+ 
++// --- C31-B11 (AC-112, lane L17; PO decision 2026-11-19): the Antigravity and Codex token rows ESTIMATE the dollar half from the
++// labelled list-price table plugins/pipeline-core/config/model-list-prices.json. The word "approx" and the asOf date are mandatory;
++// the model of an Antigravity row comes from --model, else from the project's configured implement route; Codex uses the model
++// observed in the rollout. Arithmetic below is worked by hand from the table (US dollars per million tokens).
++const PRICE_TABLE_PATH = join(dirname(CLI_PATH), "..", "config", "model-list-prices.json");
++const agyUsageSteps = (...triples) => triples.map(([input, cacheRead, output], index) => agyStep(index + 1, `2026-11-19T10:00:0${index}Z`, "PLANNER_RESPONSE", { input_tokens: input, cache_read_tokens: cacheRead, output_tokens: output }));
++const codexRollout = (model, total) => [
++  { timestamp: "2026-11-19T10:00:00Z", type: "session_meta", payload: { id: SESSION_ID, cwd: "/work/project" } },
++  { timestamp: "2026-11-19T10:00:01Z", type: "turn_context", payload: { model } },
++  codexTokenCount("2026-11-19T10:00:09Z", total),
++];
++
++test("C31-B11 the list-price table is labelled as an estimate and holds the decided entries", () => {
++  const table = JSON.parse(readFileSync(PRICE_TABLE_PATH, "utf8"));
++  assert.equal(table.asOf, "2026-11-19");
++  assert.match(table.source, /third-party list-price trackers, 2026-11-19; not verified against the vendor page; estimate/);
++  assert.match(table.note, /vendor pages win/i);
++  const expected = {
++    "gpt-5.3-codex": [1.75, 0.175, 14], "gpt-5.2-codex": [1.75, 0.175, 14], "gpt-5-codex": [1.25, null, 10],
++    "gemini-3.8-flash": [1.5, 0.15, 7.5], "gemini-3.6-flash": [1.5, 0.15, 7.5], "gemini-3.1-pro": [2, 0.2, 12], "gemini-3.1-flash-lite": [0.25, 0.025, 1.5],
++  };
++  assert.deepEqual(Object.keys(table.models).sort(), Object.keys(expected).sort());
++  for (const [name, [input, cachedInput, output]] of Object.entries(expected)) {
++    assert.deepEqual({ input: table.models[name].input, cachedInput: table.models[name].cachedInput, output: table.models[name].output }, { input, cachedInput, output }, name);
++    assert.match(table.models[name].note, /low confidence/i, `${name}: the entry says it is low confidence`);
++  }
++});
++
++test("C31-B11 usage-ledger --row --codex-rollout estimates the dollar half of a listed model from the list price, with cached tokens inside the input", () => {
++  // 4M input of which 2M cached, 1M output: 2M x 1.75 + 2M x 0.175 + 1M x 14 = 3.50 + 0.35 + 14.00 = 17.85
++  const { dir, file } = timelineFile(codexRollout("gpt-5.3-codex", codexCounters(4_000_000, 2_000_000, 1_000_000)));
++  try {
++    const result = run(["--row", "S1/B11", "--codex-rollout", file], { cwd: dir });
++    assert.equal(result.status, 0, result.stderr);
++    const out = result.stdout;
++    assert.match(out, /^- gpt-5\.3-codex \(model source: observed\): 4\.000\.000 in \/ 1\.000\.000 out \/ n\/a cache-write \/ 2\.000\.000 cache-read -> approx \$17,85 \(estimate from list price, 2026-11-19; cached tokens at 0\.175 USD per 1M \(listed cached-input price\)\)$/m);
++    assert.match(out, /^TOTAL approx \$17,85 \(estimate from list price, 2026-11-19\)$/m);
++    assert.match(out, /ESTIMATE from third-party list prices/);
++    assert.doesNotMatch(out, /unavailable|price unknown/);
++    for (const text of [out, result.stderr]) assert.doesNotMatch(text, new RegExp(`${escapeRe(dir)}|/work/project|session\\.jsonl`), "no path");
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --row --codex-rollout drops the effort suffix and prices cached tokens at the input price when no cached price is listed", () => {
++  // gpt-5-codex-high matches gpt-5-codex (1.25 / null / 10.00). 2M input of which 1M cached, 1M output: 1M x 1.25 + 1M x 1.25 + 1M x 10 = 12.50
++  const { dir, file } = timelineFile(codexRollout("gpt-5-codex-high", codexCounters(2_000_000, 1_000_000, 1_000_000)));
++  try {
++    const result = run(["--row", "S1/B11", "--codex-rollout", file], { cwd: dir });
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, /^- gpt-5-codex-high \(model source: observed\): .* -> approx \$12,50 \(estimate from list price, 2026-11-19; cached tokens at the input price, 1\.25 USD per 1M \(no cached price listed, upper bound\)\)$/m);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --row --codex-rollout keeps the dollar half unavailable, with the reason, for several models in one rollout", () => {
++  const records = [...codexRollout("gpt-5.3-codex", codexCounters(1000, 100, 10)), { timestamp: "2026-11-19T10:00:02Z", type: "turn_context", payload: { model: "gpt-5.2-codex" } }];
++  const { dir, file } = timelineFile(records);
++  try {
++    const result = run(["--row", "S1/B11", "--codex-rollout", file], { cwd: dir });
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, /-> \$ unavailable \(several models in one rollout, no per-model split\)/);
++    assert.doesNotMatch(result.stdout, /approx/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --row --antigravity-transcript --model prices the step sums with the listed model, tier suffix dropped, source 'argument'", () => {
++  // 2M input, 1M cache-read, 1M output at gemini-3.8-flash 1.50 / 0.15 / 7.50: 3.00 + 0.15 + 7.50 = 10.65
++  const { dir, file } = timelineFile(agyUsageSteps([1_500_000, 600_000, 400_000], [500_000, 400_000, 600_000]));
++  try {
++    const result = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", "gemini-3.8-flash-medium"], { cwd: dir });
++    assert.equal(result.status, 0, result.stderr);
++    const out = result.stdout;
++    assert.match(out, /^- gemini-3\.8-flash-medium \(model source: argument\): 2\.000\.000 in \/ 1\.000\.000 out \/ n\/a cache-write \/ 1\.000\.000 cache-read -> approx \$10,65 \(estimate from list price, 2026-11-19; cached tokens at 0\.15 USD per 1M \(listed cached-input price\), counted in addition to input\)$/m);
++    assert.match(out, /^TOTAL approx \$10,65 \(estimate from list price, 2026-11-19\)$/m);
++    assert.match(out, /ESTIMATE from third-party list prices/);
++    assert.doesNotMatch(out, /unavailable/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --row --antigravity-transcript picks the LONGEST listed name that prefixes the model (flash-lite is not the pro price)", () => {
++  // gemini-3.1-flash-lite-low -> 0.25 / 0.025 / 1.50: 1M x 0.25 + 4M x 0.025 + 1M x 1.50 = 0.25 + 0.10 + 1.50 = 1.85
++  const { dir, file } = timelineFile(agyUsageSteps([1_000_000, 4_000_000, 1_000_000]));
++  try {
++    const result = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", "gemini-3.1-flash-lite-low"], { cwd: dir });
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, /-> approx \$1,85 \(estimate from list price, 2026-11-19; cached tokens at 0\.025 USD per 1M/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --row --antigravity-transcript keeps the dollar half unavailable, with the reason, for a model without a list price", () => {
++  const { dir, file } = timelineFile(agyUsageSteps([1000, 100, 10]));
++  try {
++    for (const model of ["gemini-9-ultra", "gemini-3.8-flashy", "flash"]) {
++      const result = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", model], { cwd: dir });
++      assert.equal(result.status, 0, result.stderr);
++      assert.match(result.stdout, new RegExp(`^- ${model} \\(model source: argument\\): 1\\.000 in / 10 out / n/a cache-write / 100 cache-read -> \\$ unavailable \\(no list price for ${model}\\)$`, "m"));
++      assert.match(result.stdout, /^TOTAL: n\/a \(no model with known price\)$/m);
++      assert.doesNotMatch(result.stdout, /approx/);
++    }
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --row --antigravity-transcript names the configured implement route as the model source when no --model is passed", (t) => {
++  const root = join(dirname(CLI_PATH), "..", "..", "..");
++  const routing = readProjectRouting(root);
++  if (routing.source !== "project") return t.skip("this checkout has no valid pipeline.user.yaml, so there is no configured route to read");
++  const model = routing.routing.duties.implement.antigravity.selector.value;
++  const { dir, file } = timelineFile(agyUsageSteps([1_000_000, 0, 1_000_000]));
++  try {
++    const result = run(["--row", "S1/B11", "--antigravity-transcript", file], { cwd: root });
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, new RegExp(`^- ${escapeRe(model)} \\(model source: configured route\\): `, "m"));
++    assert.match(result.stdout, /-> (approx \$[0-9.,]+ \(estimate from list price, 2026-11-19;|\$ unavailable \(no list price for )/);
++    const overridden = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", "gemini-3.1-pro"], { cwd: root });
++    assert.match(overridden.stdout, /^- gemini-3\.1-pro \(model source: argument\): .* -> approx \$14,00 \(estimate/m, "the argument wins over the configured route: 1M x 2.00 + 0 + 1M x 12.00 = 14.00");
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 usage-ledger --model is refused for a Codex row and for a malformed value, naming the runnable form", () => {
++  const { dir, file } = timelineFile(agyUsageSteps([10, 1, 2]));
++  try {
++    const withCodex = run(["--row", "S1", "--codex-rollout", file, "--model", "gemini-3.8-flash"], { cwd: dir });
++    const noValue = run(["--row", "S1", "--antigravity-transcript", file, "--model"], { cwd: dir });
++    const badValue = run(["--row", "S1", "--antigravity-transcript", file, "--model", "bad name!"], { cwd: dir });
++    const twice = run(["--row", "S1", "--antigravity-transcript", file, "--model", "a", "--model", "b"], { cwd: dir });
++    for (const result of [withCodex, noValue, badValue, twice]) {
++      assert.notEqual(result.status, 0);
++      assert.match(result.stderr, /--model/);
++      assert.match(result.stderr, /Runnable form: node plugins\/pipeline-core\/scripts\/usage-ledger\.mjs --row "<label>"/);
++      assert.doesNotMatch(result.stderr, new RegExp(escapeRe(dir)));
++    }
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B11 the default Claude --row output stays byte-identical", () => {
++  const root = buildFixture();
++  try {
++    const result = run([root, "--session", SESSION_ID, "--row", "Test Row"]);
++    assert.equal(result.status, 0, result.stderr);
++    assert.equal(result.stdout, [
++      "Session/Block: Test Row",
++      "Tokens per `/usage` (collected, script):",
++      "- claude-sonnet-5: 40 in / 16 out / 0 cache-write / 0 cache-read -> $0,00 (estimated)",
++      "TOTAL ≈ $0,00 (estimated)",
++      "",
++      "Notes: $ values estimated, price table asOf 2026-07-02 (model-prices.json); cache TTL per model taken from the transcript (ephemeral_5m/1h) where present, otherwise 5m rate assumed (declared assumption).",
++      "",
++      "Turns / tool calls per `/usage` (collected, script):",
++      "- claude-sonnet-5 / main: 3 turn(s) / 3 tool call(s)",
++      "- claude-sonnet-5 / subagent:agent-abc123: 1 turn(s) / 1 tool call(s)",
++      "TOTAL: 4 turn(s) / 4 tool call(s)",
++      "",
++    ].join("\n"));
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ // --- C31-B9 (AC-112, M0 of the main-context recon): `--timeline` also prints the bytes of every tool result, grouped by the script
+ // the call ran (else the tool name) and by refusal code. Derived at read time; the unit is UTF-8 bytes of the result TEXT (not tokens,
+ // not the JSONL record). The existing lines stay as they are; the table follows the TOTAL line. Fixtures give every result a known size.
+diff --git a/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md b/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md
+index 2d0ccf386c4406721818ca5e8999e5a312470bdd..c928f7f7beca74f9475f33155eb5c376ad5601c9 100644
+--- a/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md
++++ b/plugins/pipeline-core/skills/close-block/references/close-light-and-extensions.md
+@@ -61,7 +61,7 @@ Rules: extension points not defined by this skill (e.g. a future `newBlockReview
+ 8. **Telemetry line (MP-20), auto-captured via `usage-ledger.mjs`:** `/usage` is a **user command and session-scoped** — numbers are NOT retrievable after the session ends, which is why the token half of this step now runs through `plugins/pipeline-core/scripts/usage-ledger.mjs` instead of a manual paste. New order of operations:
+ 
+    1. **Run the ledger for the CURRENT session** with `--row <block label>`: prefer `--session <own-uuid>` when the session's own UUID is derivable from the environment; otherwise `--latest` (with a sanity check that the printed self-evidence — the chosen session/file — IS the running session before trusting the row). Transcripts root is the mandatory first CLI argument (GL-03, C-4) — invoke via the env-based standard path, never a machine-specific absolute path: `"$HOME/.claude/projects"` (POSIX) resp. `"%USERPROFILE%\.claude\projects"` (Windows), e.g. `node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "<block label>"`.
+-   On Antigravity and Codex the same script gives a token-only row (no dollar half) from a transcript path you pass: `usage-ledger.mjs --row "<block label>" --antigravity-transcript <file>` resp. `--codex-rollout <file>`.
++   On Antigravity and Codex the same script gives a token row plus an estimated dollar half from list prices (labelled), printed as "approx" with the price table's date, from a transcript path you pass: `usage-ledger.mjs --row "<block label>" --antigravity-transcript <file>` resp. `--codex-rollout <file>`.
+    2. **Append the row** to the project's `telemetry/costs.md` (create the file with the header below if absent) — token half = **collected (script)**, $-half = **estimated** (marked with the `asOf` date of `plugins/pipeline-core/scripts/model-prices.json`); the advisor-model $ estimate is additionally called out on its own in "Notes" (the real-money share when a paid external model is configured). As before, **one row per session/block AND one row per goldfish dispatch** of this block.
+    3. **`/usage` paste stays OPTIONAL**, asked once as before (EL-17c) — now framed as "Limits/reconciliation" (limit standings %, credit %), no longer the data source for the token column. Decline/absence is fine; the row still exists — this replaces "not collected" as the default outcome. "not collected" remains reserved for actual script failure (5. below).
+    4. **Standing addendum rule:** a PO `/usage` paste arriving at ANY later time (any session of this repo) is worked into the NAMED session's existing row as a dated addendum — real numbers OVERRIDE the estimate, the estimate stays visible in parentheses (calibration data for the estimator, MP-21); accompanying PO comments land in "Notes".
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 84db253c3d8ac8d0ff198db59d865b2aa20f7e92..b8b5820628d7bfd9ff8bdaf8a819246245a62df1 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -48,18 +48,24 @@ node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --l
+ ```
+ 
+ (Windows: `"%USERPROFILE%\.claude\projects"`.) This reader understands the Claude Code transcript layout
+-only. On Antigravity use the token-only route instead, with the session's brain transcript file
++only. On Antigravity use the transcript route instead (a token row plus an estimated dollar half from list prices (labelled)), with the session's brain transcript file
+ (`.system_generated/logs/transcript.jsonl`) as the argument:
+ 
+ ```
+-node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<feature-id>" --antigravity-transcript <transcript-file>
++node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<feature-id>" --antigravity-transcript <transcript-file> [--model <name>]
+ ```
+ 
+-It prints the summed input, output and cache-read tokens of the model steps under the model key
+-`antigravity-unrecorded`, with the dollar half marked "unavailable (model not recorded in this
+-transcript)"; never add an estimate. On Codex use the same shape with the session's rollout file
+-(`--codex-rollout <transcript-file>`): it prints the last cumulative token total under the model the
+-rollout names, with the dollar half "n/a (price unknown)". A transcript without a usable token record
++It prints the summed input, output and cache-read tokens of the model steps. The transcript records no
++model, so the model is `--model <name>` when you pass it, else the project's configured implement route
++(`pipeline.user.yaml`); the printed row says which one named it ("model source: argument" or
++"configured route"). The dollar half is an estimate from the list-price table
++`plugins/pipeline-core/config/model-list-prices.json`: it always reads "approx $X (estimate from list
++price, <date>; cached tokens at ...)" and is never an exact or billed figure. With no model it says
++"model not recorded; pass --model <name>" and with a model that has no listed price "no list price for
++<model>"; copy that sentence into the close report as it is. On Codex use the same shape with the
++session's rollout file (`--codex-rollout <transcript-file>`): it prints the last cumulative token total
++under the model the rollout names ("model source: observed") with the same labelled estimate (API
++dollar list price, not ChatGPT credits). A transcript without a usable token record
+ prints the skip sentence and exits 0; say in the close report that the telemetry row is unavailable
+ for it. Do not point the Claude command at another runner's directory and do not invent a row.
+ With several project directories under the Claude root, name the directory
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 314dff00db7e123780d1895859f206c725d2ec2f..e731ac9296a4294fb15456de051120746beb6afd 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -146,7 +146,7 @@ The single steps below are what it runs; use them for a recovery or when a stop
+    To step through these without composing each pair by hand, `close-coordinator.mjs drive --root <root> --lifecycle <id> --actor <name>` names the phase, the missing input and the remaining chain; with `--apply` it applies exactly one step and writes the cleanup receipt itself. It stops before every human-gate phase.
+ 3. `pipeline-state.mjs close-feature --by "<name>" --architecture-impact "<value>" --coordinator-lifecycle "<id>" --coordinator-sha256 "<sha>"` plus
+    `--continuity-close-request` when the returned argv carries it.
+-4. Telemetry row: `usage-ledger.mjs` on Claude; on Antigravity `usage-ledger.mjs --row <label> --antigravity-transcript <file>` and on Codex `usage-ledger.mjs --row <label> --codex-rollout <file>` give a token-only row (the transcript or rollout path is an argument you pass; no dollar figure for either runner).
++4. Telemetry row: `usage-ledger.mjs` on Claude; on Antigravity `usage-ledger.mjs --row <label> --antigravity-transcript <file>` and on Codex `usage-ledger.mjs --row <label> --codex-rollout <file>` give a token row plus an estimated dollar half from list prices (labelled), always printed as "approx" with the price table's date (the transcript or rollout path is an argument you pass).
+ 
+ ## 5. Push
+ 
+@@ -176,7 +176,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
+ | Model exception | a PO-recorded, expiring exception admits one model outside the routing | not applicable (no tool-layer model parameter to admit) | not applicable (the native alias list is fixed) |
+ | Own session descriptor at close | derived for Claude | derived for the closing runner | derived for the closing runner |
+ | Close entry | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` |
+-| Telemetry row at close | `usage-ledger.mjs` | token-only row: `usage-ledger.mjs --row <label> --codex-rollout <file>` (price prints n/a) | token-only row: `usage-ledger.mjs --row <label> --antigravity-transcript <file>` (no dollar half) |
++| Telemetry row at close | `usage-ledger.mjs` | token row plus an estimated dollar half from list prices (labelled): `usage-ledger.mjs --row <label> --codex-rollout <file>` | token row plus an estimated dollar half from list prices (labelled): `usage-ledger.mjs --row <label> --antigravity-transcript <file> [--model <name>]` |
+ | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
+ | Signing preparation | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's |
+ | Observation boundary | tool-level only: the guard judges the runner's own tool calls, one hook serves the main session and a dispatched subagent alike, and an admitted `node` script can still read outside the repository; not covered: native read tools a runner does not route through the hook, plugin scripts reading their own inputs, and any operating-system boundary (a container, an own user or read-only mounts is the recommendation for teams that need one, not built) | tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured; not covered: native read tools the runner does not route through the hook, plugin scripts reading their own inputs, any operating-system boundary (OS encapsulation is the recommendation, not built) | tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured; not covered: native read tools the runner does not route through the hook, plugin scripts reading their own inputs, any operating-system boundary (OS encapsulation is the recommendation, not built) |

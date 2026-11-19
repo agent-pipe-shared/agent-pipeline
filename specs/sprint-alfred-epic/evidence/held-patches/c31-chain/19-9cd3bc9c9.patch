@@ -1,0 +1,315 @@
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.mjs b/plugins/pipeline-core/scripts/usage-ledger.mjs
+index 089409ad71d08bb4c5a94e35612d28475b9bff77..28023303f8f6484c3bbfecec40f1e3e2ff7bbb67 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.mjs
+@@ -37,6 +37,12 @@
+  *     below. Same discipline as the token half: no transcript content, no
+  *     absolute path, nothing written to disk — counts only, printed to stdout.
+  *
++ *   - `--row [label] --antigravity-transcript <file>` (exclusive, takes no root): a token-only close row for ONE Antigravity brain
++ *     transcript (input, output and cache-read tokens summed over its model steps, one synthetic model key
++ *     `antigravity-unrecorded`). The transcript records no model, so the dollar half prints "unavailable" and is never estimated.
++ *   - `--row [label] --codex-rollout <file>` (same shape): the last complete cumulative token total of ONE Codex rollout under the
++ *     model named in its `turn_context`; no Codex price exists, so the dollar half prints "n/a (price unknown)".
++ *
+  *   - `--timeline <transcript-file> [--json]` (exclusive with `--row` and `--metering`; takes no root): the run
+  *     timeline of ONE session file in any of the three runner formats (Claude project JSONL, Codex rollout JSONL,
+  *     Antigravity transcript, detected from the content): human turns, per-turn duration, human wait, net run time,
+@@ -136,7 +142,7 @@ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
+ function usage(msg) {
+   if (msg) console.error(msg);
+   console.error(
+-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json]",
++    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json] | --row [label] --antigravity-transcript|--codex-rollout <transcript-file>",
+   );
+   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
+   console.error(
+@@ -436,25 +442,15 @@ function renderTimeline(timeline) {
+   return lines.join("\n");
+ }
+ 
+-function runTimeline(args) {
+-  if (args.includes("--row") || args.includes("--metering")) usage("--timeline is exclusive with --row and --metering.");
+-  let file;
+-  let json = false;
+-  for (let i = 0; i < args.length; i++) {
+-    if (args[i] === "--timeline") {
+-      file = args[i + 1];
+-      if (!file || file.startsWith("--")) usage("--timeline requires a <file> value.");
+-      i++;
+-    } else if (args[i] === "--json") json = true;
+-    else usage("--timeline is exclusive: it accepts only one <file> and --json.");
+-  }
++// One transcript file read as JSONL records (a regular file, bounded size); an unreadable file prints `failMessage` (never the path) and exits 1.
++function readTranscriptRecords(file, failMessage) {
+   let text;
+   try {
+     const info = lstatSync(file);
+     if (!info.isFile() || info.size > TIMELINE_MAX_BYTES) throw new Error("not-readable");
+     text = readFileSync(file, "utf8");
+   } catch {
+-    console.error("usage-ledger --timeline: timeline-input-unreadable");
++    console.error(failMessage);
+     process.exit(1);
+   }
+   const records = [];
+@@ -467,6 +463,94 @@ function runTimeline(args) {
+       malformed++;
+     }
+   }
++  return { records, malformed };
++}
++
++// C31-B5 (AC-112, lane L17): `--row [label] --antigravity-transcript <file>` and `--row [label] --codex-rollout <file>` print a
++// token-only close row for ONE transcript of those runners. Counts only: no path, no transcript text, and no dollar figure is ever
++// estimated. A file without a usable token record prints the same sentence as an empty `--row` and exits 0 (a missing row never fails a close).
++//   antigravity  the step reader sums input, output and cache-read tokens per model step; the transcript names no model, so one
++//                synthetic model key stands in and the dollar half reads "unavailable".
++//   codex        the last complete cumulative `total_token_usage` of the rollout (the repository's own rule, runner-transcript-recovery
++//                `codexUsage`), the model name(s) from `turn_context`; no price exists for it, so the dollar half reads the existing
++//                "n/a (price unknown)". Whether input includes cached tokens is not measured, so the counters are printed as recorded.
++const TRANSCRIPT_ROW_FLAGS = ["--antigravity-transcript", "--codex-rollout"];
++const ROW_MODEL_RE = /^[A-Za-z0-9._-]{1,80}$/u;
++const isRowCounter = (value) => Number.isSafeInteger(value) && value >= 0;
++
++function antigravityRowLines(records) {
++  const steps = detectTimelineFormat(records) === "antigravity-steps"
++    ? antigravityStepTimelineEvents(records).filter((event) => event.kind === "response" && event.usage && [event.usage.input, event.usage.output, event.usage.cacheRead].some((value) => value !== null))
++    : [];
++  if (steps.length === 0) return null;
++  const sum = (key) => steps.reduce((total, event) => total + (event.usage[key] ?? 0), 0);
++  return [
++    `- antigravity-unrecorded: ${fmtDe(sum("input"))} in / ${fmtDe(sum("output"))} out / n/a cache-write / ${fmtDe(sum("cacheRead"))} cache-read -> $ unavailable (model not recorded in this transcript)`,
++    "TOTAL: n/a (no model recorded in this transcript, no dollar estimate)",
++    "",
++    `Notes: token-only row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; the transcript records no model, so no price applies and no dollar figure is computed; cache-write is not recorded.`,
++  ];
++}
++
++function codexRowLines(records) {
++  if (detectTimelineFormat(records) !== "codex") return null;
++  let total = null;
++  const models = new Set();
++  for (const record of records) {
++    if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
++    if (record.type === "turn_context" && typeof record.payload.model === "string" && ROW_MODEL_RE.test(record.payload.model)) models.add(record.payload.model);
++    const usageData = record.type === "event_msg" && record.payload.type === "token_count" ? record.payload.info?.total_token_usage : null;
++    if (isTimelineObject(usageData) && ["input_tokens", "cached_input_tokens", "output_tokens"].every((key) => isRowCounter(usageData[key]))) total = usageData; // an invalid record never replaces a valid one
++  }
++  if (total === null) return null;
++  const model = models.size > 0 ? [...models].sort().join(", ") : "codex-unrecorded";
++  return [
++    `- ${model}: ${fmtDe(total.input_tokens)} in / ${fmtDe(total.output_tokens)} out / n/a cache-write / ${fmtDe(total.cached_input_tokens)} cache-read -> n/a (price unknown)`,
++    "TOTAL: n/a (no model with known price)",
++    "",
++    "Notes: token-only row from a Codex rollout, the last cumulative total of the session; whether input includes cached tokens (and output includes reasoning tokens) is not measured, so the counters are printed as recorded and no dollar figure is computed; cache-write is not recorded.",
++  ];
++}
++
++function runTranscriptRow(args, flag) {
++  const form = `node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<label>" ${flag} <transcript-file>`;
++  const refuse = (why) => usage(`${flag} is exclusive: ${why} Runnable form: ${form}`);
++  let file;
++  let rowSeen = false;
++  let label = "";
++  for (let i = 0; i < args.length; i++) {
++    if (args[i] === "--row") {
++      rowSeen = true;
++      if (args[i + 1] && !args[i + 1].startsWith("--")) label = args[++i];
++    } else if (args[i] === flag) {
++      if (file !== undefined) refuse("name the transcript once.");
++      file = args[++i];
++      if (!file || file.startsWith("--")) refuse("a <transcript-file> value is required.");
++    } else refuse(`it accepts only --row [label] and ${flag} <file> (no transcripts root, no other flag).`);
++  }
++  if (!rowSeen) refuse("--row is required.");
++  const { records } = readTranscriptRecords(file, `usage-ledger ${flag}: ${flag.slice(2)}-unreadable. Pass an existing regular transcript file: ${form}`);
++  const rowLines = (flag === "--codex-rollout" ? codexRowLines : antigravityRowLines)(records);
++  const fragment = label ? [`Session/Block: ${label}`] : [];
++  if (rowLines === null) fragment.push("Tokens per `/usage` (collected, script): no records found for the selected session/filter.");
++  else fragment.push("Tokens per `/usage` (collected, script):", ...rowLines);
++  console.log(fragment.join("\n"));
++  process.exit(0);
++}
++
++function runTimeline(args) {
++  if (args.includes("--row") || args.includes("--metering")) usage("--timeline is exclusive with --row and --metering.");
++  let file;
++  let json = false;
++  for (let i = 0; i < args.length; i++) {
++    if (args[i] === "--timeline") {
++      file = args[i + 1];
++      if (!file || file.startsWith("--")) usage("--timeline requires a <file> value.");
++      i++;
++    } else if (args[i] === "--json") json = true;
++    else usage("--timeline is exclusive: it accepts only one <file> and --json.");
++  }
++  const { records, malformed } = readTranscriptRecords(file, "usage-ledger --timeline: timeline-input-unreadable");
+   const runner = detectTimelineFormat(records);
+   if (!runner) {
+     console.error("usage-ledger --timeline: timeline-format-unknown");
+@@ -477,6 +561,8 @@ function runTimeline(args) {
+   process.exit(0);
+ }
+ 
++const transcriptRowFlag = argv.find((arg) => TRANSCRIPT_ROW_FLAGS.includes(arg));
++if (transcriptRowFlag) runTranscriptRow(argv, transcriptRowFlag);
+ if (argv.includes("--timeline")) runTimeline(argv);
+ 
+ // Metering is intentionally an exclusive, selected-file mode. It never opens
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.test.mjs b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+index 7d6d354e6ac7fe74967416cc740984be629865e0..552666116c57f6c6e54d19c7fb6f8ba266d13c3c 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.test.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+@@ -548,3 +548,121 @@ test("usage-ledger --timeline is exclusive with --row and --metering and refuses
+     rmSync(dir, { recursive: true, force: true });
+   }
+ });
++
++// --- C31-B5 (AC-112, lane L17): `--row <label> --antigravity-transcript <file>` prints a token-only close row. ---
++// The brain transcript names no model, so the dollar half is marked unavailable and never estimated; the path and the text stay out.
++const agyStep = (index, at, type, extra) => ({ step_index: index, source: "MODEL", type, status: "DONE", created_at: at, ...extra });
++const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
++
++test("C31-B5 usage-ledger --row --antigravity-transcript sums the model steps' tokens into one row with the dollar half unavailable", () => {
++  const { dir, file } = timelineFile([
++    { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
++    agyStep(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 1200, cache_read_tokens: 30, output_tokens: 7, content: SECRET_MARKER }),
++    agyStep(2, "2026-08-19T10:00:04Z", "GENERIC", { content: `tool result ${SECRET_MARKER}` }),
++    agyStep(3, "2026-08-19T10:00:10Z", "PLANNER_RESPONSE", { input_tokens: 2300, cache_read_tokens: 1150, output_tokens: 9 }),
++  ]);
++  try {
++    const result = run(["--row", "S1/B5", "--antigravity-transcript", file]);
++    assert.equal(result.status, 0, result.stderr);
++    const out = result.stdout;
++    assert.match(out, /^Session\/Block: S1\/B5$/m);
++    assert.match(out, /^- antigravity-unrecorded: 3\.500 in \/ 16 out \/ n\/a cache-write \/ 1\.180 cache-read -> \$ unavailable \(model not recorded in this transcript\)$/m);
++    assert.match(out, /TOTAL: n\/a \(no model recorded in this transcript, no dollar estimate\)/);
++    assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for an unrecorded model");
++    for (const text of [out, result.stderr]) {
++      assert.doesNotMatch(text, new RegExp(`${SECRET_MARKER}|please do|${escapeRe(dir)}|session\\.jsonl`), "no transcript text and no path");
++    }
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B5 usage-ledger --row --antigravity-transcript prints the skip sentence and exits 0 when the file holds no model step", () => {
++  const stepsOnly = timelineFile([
++    { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
++    agyStep(1, "2026-08-19T10:00:04Z", "GENERIC", { content: "ok" }),
++  ]);
++  const claudeLayout = timelineFile(claudeTimelineRecords());
++  try {
++    for (const { file } of [stepsOnly, claudeLayout]) {
++      const result = run(["--row", "S1/B5", "--antigravity-transcript", file]);
++      assert.equal(result.status, 0, result.stderr);
++      assert.match(result.stdout, /^Session\/Block: S1\/B5$/m);
++      assert.match(result.stdout, /Tokens per `\/usage` \(collected, script\): no records found for the selected session\/filter\./);
++      assert.doesNotMatch(result.stdout, /antigravity-unrecorded/);
++    }
++  } finally {
++    rmSync(stepsOnly.dir, { recursive: true, force: true });
++    rmSync(claudeLayout.dir, { recursive: true, force: true });
++  }
++});
++
++// The same shape for a Codex rollout: the last complete cumulative `total_token_usage`, the model from `turn_context`; no Codex price exists.
++const codexCounters = (input, cached, output) => ({ input_tokens: input, cached_input_tokens: cached, output_tokens: output, reasoning_output_tokens: 1, total_tokens: input + output });
++const codexTokenCount = (at, total) => ({ timestamp: at, type: "event_msg", payload: { type: "token_count", info: { total_token_usage: total } } });
++
++test("C31-B5 usage-ledger --row --codex-rollout prints the last complete cumulative total under the recorded model with no dollar figure", () => {
++  const { dir, file } = timelineFile([
++    { timestamp: "2026-11-18T10:00:00Z", type: "session_meta", payload: { id: SESSION_ID, cwd: "/work/project" } },
++    { timestamp: "2026-11-18T10:00:01Z", type: "turn_context", payload: { model: "gpt-5.1-codex" } },
++    { timestamp: "2026-11-18T10:00:02Z", type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: SECRET_MARKER }] } },
++    codexTokenCount("2026-11-18T10:00:03Z", codexCounters(1000, 400, 50)),
++    codexTokenCount("2026-11-18T10:00:09Z", codexCounters(3000, 1500, 120)),
++    codexTokenCount("2026-11-18T10:00:10Z", { ...codexCounters(9000, 9000, 900), input_tokens: -1 }),
++  ]);
++  try {
++    const result = run(["--row", "S1/B5", "--codex-rollout", file]);
++    assert.equal(result.status, 0, result.stderr);
++    const out = result.stdout;
++    assert.match(out, /^Session\/Block: S1\/B5$/m);
++    assert.match(out, /^- gpt-5\.1-codex: 3\.000 in \/ 120 out \/ n\/a cache-write \/ 1\.500 cache-read -> n\/a \(price unknown\)$/m);
++    assert.match(out, /^TOTAL: n\/a \(no model with known price\)$/m);
++    assert.match(out, /whether input includes cached tokens .* not measured/);
++    assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for a model without a price");
++    for (const text of [out, result.stderr]) assert.doesNotMatch(text, new RegExp(`${SECRET_MARKER}|/work/project|${escapeRe(dir)}|session\\.jsonl`), "no transcript text and no path");
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B5 usage-ledger --row --codex-rollout prints the skip sentence for a rollout without a complete total and refuses a mixed or unreadable call", () => {
++  const noTotal = timelineFile([{ type: "session_meta", payload: { id: SESSION_ID } }, codexTokenCount("2026-11-18T10:00:03Z", { input_tokens: 1, output_tokens: 2 })]);
++  try {
++    const skipped = run(["--row", "S1", "--codex-rollout", noTotal.file]);
++    assert.equal(skipped.status, 0, skipped.stderr);
++    assert.match(skipped.stdout, /Tokens per `\/usage` \(collected, script\): no records found for the selected session\/filter\./);
++    const mixed = run(["--row", "S1", "--codex-rollout", noTotal.file, "--antigravity-transcript", noTotal.file]);
++    const missing = run(["--row", "S1", "--codex-rollout", join(noTotal.dir, "absent.jsonl")]);
++    for (const result of [mixed, missing]) {
++      assert.notEqual(result.status, 0);
++      assert.match(result.stderr, /--codex-rollout/);
++      assert.doesNotMatch(result.stderr, new RegExp(escapeRe(noTotal.dir)));
++    }
++    assert.match(missing.stderr, /codex-rollout-unreadable/);
++    assert.match(missing.stderr, /usage-ledger\.mjs --row "<label>" --codex-rollout <transcript-file>/);
++  } finally {
++    rmSync(noTotal.dir, { recursive: true, force: true });
++  }
++});
++
++test("C31-B5 usage-ledger --antigravity-transcript is an exclusive row mode and its refusals name the runnable form without a path", () => {
++  const { dir, file } = timelineFile([agyStep(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 5, cache_read_tokens: 1, output_tokens: 2 })]);
++  try {
++    const missing = run(["--row", "S1", "--antigravity-transcript", join(dir, "absent.jsonl")]);
++    const bare = run(["--row", "S1", "--antigravity-transcript"]);
++    const withRoot = run([dir, "--row", "S1", "--antigravity-transcript", file]);
++    const withTimeline = run(["--timeline", file, "--antigravity-transcript", file]);
++    const withSession = run(["--row", "S1", "--antigravity-transcript", file, "--session", SESSION_ID]);
++    const noRow = run(["--antigravity-transcript", file]);
++    for (const result of [missing, bare, withRoot, withTimeline, withSession, noRow]) {
++      assert.notEqual(result.status, 0);
++      assert.match(result.stderr, /--antigravity-transcript/);
++      assert.doesNotMatch(result.stderr, new RegExp(escapeRe(dir)));
++    }
++    assert.match(missing.stderr, /antigravity-transcript-unreadable/);
++    assert.match(missing.stderr, /usage-ledger\.mjs --row "<label>" --antigravity-transcript <transcript-file>/);
++    assert.match(withRoot.stderr, /exclusive/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 1ee7136de2594e240b2b8b57f9e7243b6270e0e2..84db253c3d8ac8d0ff198db59d865b2aa20f7e92 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -48,9 +48,22 @@ node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --l
+ ```
+ 
+ (Windows: `"%USERPROFILE%\.claude\projects"`.) This reader understands the Claude Code transcript layout
+-only. On Codex or Antigravity it has no source: skip the step and say in the close report that the
+-telemetry row is unavailable for this runner. Do not point the command at another runner's directory and
+-do not invent a row. Append the printed row to the project's
++only. On Antigravity use the token-only route instead, with the session's brain transcript file
++(`.system_generated/logs/transcript.jsonl`) as the argument:
++
++```
++node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<feature-id>" --antigravity-transcript <transcript-file>
++```
++
++It prints the summed input, output and cache-read tokens of the model steps under the model key
++`antigravity-unrecorded`, with the dollar half marked "unavailable (model not recorded in this
++transcript)"; never add an estimate. On Codex use the same shape with the session's rollout file
++(`--codex-rollout <transcript-file>`): it prints the last cumulative token total under the model the
++rollout names, with the dollar half "n/a (price unknown)". A transcript without a usable token record
++prints the skip sentence and exits 0; say in the close report that the telemetry row is unavailable
++for it. Do not point the Claude command at another runner's directory and do not invent a row.
++With several project directories under the Claude root, name the directory
++(`--latest <projectDirName>`), or the command refuses and lists them. Append the printed row to the project's
+ `telemetry/costs.md`. If that file does not exist yet, note that explicitly and SKIP this step --
+ do not fail the close over a missing telemetry file. This is per-SESSION cost data only; it is NOT
+ a feature-wide cost total (see "Explicitly out of scope" below).

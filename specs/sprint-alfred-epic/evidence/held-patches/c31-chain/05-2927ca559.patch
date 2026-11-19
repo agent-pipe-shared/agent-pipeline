@@ -1,0 +1,209 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+index 1c38f9da860490a341f58a2ffdd415c8f2b907a7..971b1ac0e758ace4614e55dbba529013bddd8360 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+@@ -958,9 +958,31 @@ export function formatLine(entry) {
+ function main(argv) {
+   const strict = argv.includes("--strict");
+   const json = argv.includes("--json");
+-  const deps = gitDeps();
++  // The project to check: --root <project>, else the git top level of the working directory.
++  // Never the plugin's own install path (REPO_ROOT), which is only where the plugin reads its own files.
++  let root = null;
++  const rootAt = argv.indexOf("--root");
++  if (rootAt !== -1) {
++    root = argv[rootAt + 1];
++    if (!root || root.startsWith("--")) {
++      process.stderr.write("--root needs a project directory, e.g. --root <project>\n");
++      return 3;
++    }
++  } else {
++    try {
++      root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
++    } catch {
++      process.stderr.write("not inside a git repository: run from the project or pass --root <project>\n");
++      return 3;
++    }
++  }
++  const deps = gitDeps({ repoRoot: root });
+   const revisions = [];
+   for (let i = 0; i < argv.length; i += 1) {
++    if (argv[i] === "--root") {
++      i += 1;
++      continue;
++    }
+     if (argv[i] === "--range") {
+       const range = argv[i + 1];
+       i += 1;
+@@ -968,7 +990,7 @@ function main(argv) {
+         process.stderr.write("--range needs a revision range\n");
+         return 3;
+       }
+-      const listed = execFileSync("git", ["rev-list", range], { cwd: REPO_ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
++      const listed = execFileSync("git", ["rev-list", range], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+       revisions.push(...listed);
+       continue;
+     }
+@@ -976,7 +998,7 @@ function main(argv) {
+     revisions.push(argv[i]);
+   }
+   if (revisions.length === 0) {
+-    process.stderr.write("usage: dispatch-authorship-verify.mjs [--strict] [--json] <sha>... | --range <a>..<b>\n");
++    process.stderr.write("usage: dispatch-authorship-verify.mjs [--strict] [--json] [--root <project>] <sha>... | --range <a>..<b>\n");
+     return 3;
+   }
+   const results = revisions.map((sha) => verifyCommit(sha, deps));
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+index 1d9b0e29dae98264e56e30769a326710d8bc9687..d49b6ca0715f75e8acfd3bd459e82d6a0fef063a 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+@@ -1228,3 +1228,65 @@ test("D52-5 (vii) the existing stage-0, design and administrative bindings are u
+   const undeclared = verifyCommit("f".repeat(40), commit({ message: "docs(x): y\n", paths: ["docs/state.md"] }));
+   assert.equal(undeclared.classification, "elephant-direct-undeclared");
+ });
++
++test("C31-M6 --root checks a fixture repository outside the plugin tree; the default is the working directory's git top level", () => {
++  const fixture = mkdtempSync(join(SCRATCH, "consumer-root-"));
++  const g = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: fixture, encoding: "utf8" });
++  g("init", "-q");
++  writeFileSync(join(fixture, "a.txt"), "one\n");
++  g("add", "--", "a.txt");
++  g("commit", "-q", "-m", "docs: one");
++  writeFileSync(join(fixture, "a.txt"), "two\n");
++  g("add", "--", "a.txt");
++  g("commit", "-q", "-m", "docs: two");
++  const head = g("rev-parse", "HEAD").trim();
++  const script = join(dirname(fileURLToPath(import.meta.url)), "dispatch-authorship-verify.mjs");
++  const run = (args, cwd) => {
++    try { return { status: 0, out: execFileSync("node", [script, ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
++    catch (e) { return { status: e.status, out: String(e.stdout), err: String(e.stderr) }; }
++  };
++  const viaRoot = run(["--root", fixture, "--json", "--range", "HEAD~1..HEAD"], tmpdir());
++  assert.notEqual(viaRoot.status, 3, viaRoot.err);
++  assert.equal(JSON.parse(viaRoot.out).results[0].sha, head);
++  const viaCwd = run(["--json", head], fixture);
++  assert.equal(JSON.parse(viaCwd.out).results[0].sha, head);
++  const noValue = run(["--root"], fixture);
++  assert.equal(noValue.status, 3);
++  assert.match(noValue.err, /--root needs/);
++});
++
++const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
++const readPlugin = (rel) => readFileSync(join(PLUGIN_DIR, rel), "utf8");
++
++test("C31-M6 documentation contract: the consumer route to the prose-free dispatch projection names the command and --root", () => {
++  const skill = readPlugin("skills/critic-review/SKILL.md");
++  assert.match(skill, /dispatch-record-strip-for-critic\.mjs --record <raw-record-path> --out <stripped-path>/);
++  assert.match(skill, /dispatch-authorship-verify\.mjs[^\n]*--root <project>/);
++  assert.match(skill, /never the raw `evidence\/dispatch-record-/);
++});
++
++test("C31-M6 documentation contract: the Antigravity reference carries Model in the prepare example and the package field names as a copy-paste block", () => {
++  const ref = readPlugin("skills/pipeline-start/references/antigravity-native-dispatch.md");
++  assert.match(ref, /"Model": "(?:flash|inherit)"/);
++  const block = /```json\n([^`]*"paths"[^`]*)```/u.exec(ref);
++  assert.ok(block, "a json block with the package field names");
++  const pkg = JSON.parse(block[1]);
++  for (const key of ["id", "item", "agentType", "modelId", "check", "title", "ac", "goal", "paths", "context", "targeted"]) assert.ok(key in pkg, key);
++  assert.ok(!("ownedPaths" in pkg));
++});
++
++test("C31-M6 documentation contract: the design course orders the report export before the receipt and the barrier notice follows onboarding", () => {
++  const course = readPlugin("skills/pipeline-start/references/design-course.md");
++  assert.match(course, /\*\*Before `create`:\*\* run `export-report`/);
++  const recovery = readPlugin("skills/pipeline-start/references/onboarding-recovery.md");
++  assert.match(recovery, /next shell call is blocked until the `pipeline-start`\s+skill has been read/i);
++});
++
++test("C31-M6 documentation contract: a Critic verdict JSON example carries every required field and severity per finding", () => {
++  const skill = readPlugin("skills/critic-review/SKILL.md");
++  const block = /```json\n(\{\s*"findings"[^`]*)```/u.exec(skill);
++  assert.ok(block, "a verdict json block");
++  const verdict = JSON.parse(block[1]);
++  for (const key of ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"]) assert.ok(key in verdict, key);
++  for (const f of verdict.findings) for (const key of ["gap", "risk", "severity", "evidence", "spec_ref"]) assert.ok(key in f, key);
++});
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 1b4a25bddb4e1d652e8d139899ce6b36f3f9ca7c..f454e824c93ae464aa153d0c65e7a1e506ad5a75 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -57,6 +57,22 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" admit --root
+ node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" finalize --root "$PWD" --request scratch/session-critic-finalization-request.json
+ ```
+ 
++The verdict JSON the Critic returns has this shape (every key required; `severity` is `blocker|major|minor` on every finding; `pass` only when the dispatch asked for pass/fail):
++
++```json
++{
++  "findings": [{ "gap": "what deviates", "risk": "consequence", "severity": "major",
++                 "evidence": "path/file.mjs:12 - quoted line", "spec_ref": "AC-1" }],
++  "deliberately_not_flagged": ["aspect examined and found in order"],
++  "trajectory_verdict": "consistent",
++  "trajectory_evidence": "claims and evidence agree",
++  "briefing_violations": [],
++  "pass": true
++}
++```
++
++**Authorship evidence from a consumer project.** Hand the Critic never the raw `evidence/dispatch-record-<TASK_ID>.json`. Produce the prose-free projection per record with `node <plugin-root>/scripts/dispatch-record-strip-for-critic.mjs --record <raw-record-path> --out <stripped-path>` and hand over only the stripped path (`templates/prompts/critic-review.md`, dispatch-record citation rule). To check commit authorship in a consumer project run `node <plugin-root>/scripts/dispatch-authorship-verify.mjs --root <project> --range <a>..<b>`; without `--root` it uses the git top level of the working directory, never the plugin's install path.
++
+ **Reference:** the closed request-file shape of `admit`/`finalize` moved to `references/coordinator-course.md` section C; Coordinator, load it before writing the request.
+ 
+ The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook (Claude, Codex) reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. On Antigravity the Critic child ends by calling `send_message` to its parent conversation with that JSON as the `Message`; the PreToolUse hook issues the same record from it (the child is recognised from the host's own subagent descriptor, never from the message), so the acknowledgement below is not the normal route there either. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a stop or message that issued none, no schema-shaped verdict in it, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index cb11fb9baa08b542e23d882e8d1e010678c3ef94..31f5012ec7a3be961cb49a614ae1a2141898c313 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -113,6 +113,23 @@ Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `
+   "requiredPathSha256": { "input.txt": "<sha256>" }, "resultDestination": { "kind": "return" } }
+ ```
+ 
++The closed request file of one child (flat host arguments around the packet; `Model` is one of `inherit|flash_lite|flash|pro` and is optional: a read-only role inherits, so `"inherit"` or no `Model` at all, never an explicit alias on a Critic):
++
++```json
++{ "packets": [ { "schema": "pipeline.role-dispatch-request.v1", "dispatchId": "review-1", "transport": "antigravity",
++                 "role": "pipeline-core:readiness-reviewer", "prompt": "<briefing>" } ],
++  "TypeName": "pipeline-core:readiness-reviewer", "Role": "pipeline-core:readiness-reviewer", "Prompt": "<briefing>",
++  "Workspace": "inherit", "Model": "inherit" }
++```
++
++The Goldfish briefing package for `prepare-dispatch.mjs goldfish --package` / `dispatch-briefing.mjs build|probe` uses exactly these field names (copy and fill; the write scope is `paths`, never `ownedPaths`; unknown keys are refused):
++
++```json
++{ "schema": "pipeline.dispatch-briefing-package.v1", "id": "<dispatch id>", "item": "<item slug>", "agentType": "goldfish-implementor",
++  "modelId": "flash", "check": "<node test path>", "title": "<title>", "ac": "AC-1", "goal": "<goal>",
++  "paths": ["<repo-relative write path>"], "context": ["<file the dispatch reads>"], "targeted": ["<exact check command>"] }
++```
++
+ Resolve the already loaded plugin root first. The required entrypoint is
+ `scripts/antigravity-native-dispatch-prepare.mjs` below that root. The host tool
+ takes FLAT arguments, so build one closed JSON request file per child with exactly
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index 461b7d99db3db020bbdf8defcb76b7aeff50b1f9..b922da58cb1818885a9dc00d29256899fc79912c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -78,6 +78,9 @@ was needed; capability evidence is not an Advisor answer.
+    (`PLAN-DESIGN-REVIEW-UNOBSERVED`): dispatch the review again and start a new
+    initial receipt. On Codex and Antigravity there is no observation route yet;
+    their receipts say `unobserved` visibly and are presented.
++   **Before `create`:** run `export-report` (above) so the report exists on disk
++   and its observation is bound; a `create` without the exported report has
++   nothing to bind. Order per round: review returns, `export-report`, `create`, commit.
+    Dispatching the design review: the `critic-review` skill is for implementation
+    batches (diff range, batch preflight) and does not fit uncommitted design
+    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+index 8ffce2db15856c68cef3186383502653f578012d..091233b34ed2c31f0202a542a29ae97b89f0e28a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+@@ -52,6 +52,10 @@ the bounded effects once, then execute each returned digest-bound action and
+ readback without re-asking per digest. `requiresConfirmation` describes the
+ action's safety shape, not a second PO chat gate.
+ 
++After `onboarding-init` the next shell call is blocked until the `pipeline-start`
++skill has been read in this session (the restart-barrier token notice). That block
++is expected, not a fault: read the skill, then repeat the same call unchanged.
++
+ A local Git init result carrying a `collect-input` action for the repository's
+ commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
+ neither `user.name` nor `user.email` resolves locally or globally) is a
