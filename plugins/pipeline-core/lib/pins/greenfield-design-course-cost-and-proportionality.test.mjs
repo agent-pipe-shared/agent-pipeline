@@ -94,6 +94,15 @@ test("C31a the design course names --sources-at for a round whose sources were c
   assert.match(text, /do not restore the old bytes in the tree: create the receipt with `--sources-at <the commit the reviewer read>` \(an ancestor of HEAD\)/u);
 });
 
+// C32 (three greenfield runs 2026-11-19): two runners dispatched the review without a model, one was refused the briefing script in the draft phase,
+// two edited the reviewed sources after the receipt and needed an extra delta round. The reference now says each of these where the design review is dispatched.
+test("C32 the design course names the model parameter of the dispatch, the draft-phase fallback for the Ruleset SHA and the cost of an edit after a receipt", () => {
+  const text = course().replace(/\s+/gu, " ");
+  assert.match(text, /tool-layer `model` parameter, on Antigravity the `Model` field of every native subagent entry; without it the dispatch is refused \(`DISPATCH-MODEL-MISSING`\)/u);
+  assert.match(text, /`GUARD-DEVPLAN-SHELL`, lane `opaque-script-execution`\): then use the seven-character suffix of the preflight `version` as the `Ruleset SHA:`/u);
+  assert.match(text, /an edit of the PRD, the Spec or an ADR draft after a receipt makes the next round a delta \(`present-plan` refuses `DCC-REVIEW-RECEIPT-BINDING`/u);
+});
+
 test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 and decisions D25/D121 (outside 0.7.0, no new schema before the test candidate); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {
   const audit = readFileSync(here("../runner-own-session-audit.mjs"), "utf8");
   const onboarding = readFileSync(here("../project-onboarding-v3.mjs"), "utf8");

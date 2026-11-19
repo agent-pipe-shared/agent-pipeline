@@ -99,7 +99,11 @@ was needed; capability evidence is not an Advisor answer.
    `gemini-` name on Antigravity; without one `DISPATCH-NO-MODEL`), and
    none of the contamination phrases (claims-to-verify, hunt list, expected
    verdict). Naming Opus additionally needs `Batch scope (MP-07):` and a
-   rationale line (`DISPATCH-OPUS-NO-BATCH-RATIONALE`). Then create the receipt.
+   rationale line (`DISPATCH-OPUS-NO-BATCH-RATIONALE`). The dispatch call itself
+   also names the model: on Claude the tool-layer `model` parameter, on
+   Antigravity the `Model` field of every native subagent entry; without it the
+   dispatch is refused (`DISPATCH-MODEL-MISSING`) and the refusal prints the
+   selectors the configured route admits. Then create the receipt.
    Every finding the report leaves open goes into the receipt as one
    `--open-finding <id>`: a report that says ready while it still lists findings
    is `open-findings`, not `pass`, and the PO sees that when signing.
@@ -125,6 +129,10 @@ was needed; capability evidence is not an Advisor answer.
    receipt's `--open-finding` ids are exactly the report's `Blocking findings:`
    ids, checked against the bound report text (`DRC-FINDINGS-SPLIT`), and a
    question never holds the design. A report with only questions is ready.
+   An answer to a question written to its own file next to the Spec leaves the
+   reviewed bytes unchanged; an edit of the PRD, the Spec or an ADR draft after a
+   receipt makes the next round a delta (`present-plan` refuses
+   `DCC-REVIEW-RECEIPT-BINDING` until it has one), so choose that knowingly.
    Before `submit-plan` a correction
    is an ordinary edit and commit; `reopen-design` exists only for a package
    that was already submitted. A delta over unchanged documents may only withdraw findings of the round before.
@@ -138,6 +146,10 @@ was needed; capability evidence is not an Advisor answer.
    `rulesetSha` that `node <plugin-root>/scripts/dispatch-briefing.mjs binding ...`
    prints (the preflight's loaded content identity, else the installed identity,
    else a hash of the plugin root); the dispatch guard only checks its format.
+   While the feature is still a draft the development-plan gate can refuse that
+   call (`GUARD-DEVPLAN-SHELL`, lane `opaque-script-execution`): then use the
+   seven-character suffix of the preflight `version` as the `Ruleset SHA:`; a
+   PO override is not needed for this.
 3. Use the sanctioned source-binding and document-integration routes. Update
    digests once, after the last edit: `create-adr.mjs --root <root> --refresh`
    without `--slug` recomputes every ADR draft, and the PRD's
