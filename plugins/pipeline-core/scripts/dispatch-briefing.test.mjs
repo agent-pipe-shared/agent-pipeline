@@ -1044,6 +1044,95 @@ test("the dispatch admission (D78) admits a generated briefing and refuses an ed
   assert.equal(generatedBriefingAdmission("A plain research prompt with no binding."), null);
 });
 
+// C31-M10 (L13): a retyped briefing that differs by one character used to be refused with a bare DBG-GENERATED-DIGEST-MISMATCH. The refusal
+// now names the first differing line and column and orders the exact file to be copied; the file is found by the marker digest (derived, no stored field).
+const m10Quoted = (message) => [...message.matchAll(/(?:expected|has) ("(?:[^"\\]|\\.)*")/gu)].map((match) => JSON.parse(match[1]));
+async function m10Briefing(files = ["scratch/briefing-m10.md"]) {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  mkdirSync(join(fx.root, "scratch"), { recursive: true });
+  for (const file of files) { mkdirSync(dirname(join(fx.root, file)), { recursive: true }); writeFileSync(join(fx.root, file), text, "utf8"); }
+  return { root: fx.root, text };
+}
+// The expected (1-based) line and column of the first byte that differs, computed from the two texts by hand, never from the production function.
+const m10Position = (fileText, needle) => {
+  const lines = fileText.split("\n");
+  const line = lines.findIndex((entry) => entry.includes(needle));
+  return { line: line + 1, column: lines[line].indexOf(needle) + 1 };
+};
+
+test("C31-M10: a one-character edit names the first differing line and column and orders the briefing file to be copied", async () => {
+  const { generatedBriefingAdmission } = await buildLib();
+  const { root, text } = await m10Briefing();
+  const prompt = text.replace("Fixture goal text.", "Fixture goal text!");
+  const at = m10Position(text, "Fixture goal text.");
+  const found = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root });
+  assert.equal(found.code, "DBG-GENERATED-DIGEST-MISMATCH", "a mismatch stays a refusal with the same code");
+  assert.match(found.message, new RegExp(`first difference at line ${at.line}, column ${at.column + "Fixture goal text".length}:`, "u"));
+  const [expected, observed] = m10Quoted(found.message);
+  assert.ok(expected.includes("Fixture goal text.") && observed.includes("Fixture goal text!"), found.message);
+  assert.ok(expected.length <= 80 && observed.length <= 80, "each quoted span is capped at 80 characters");
+  assert.match(found.message, /copy the briefing from scratch\/briefing-m10\.md verbatim instead of retyping it/u);
+  assert.match(found.message, /repair: .*node gen\.mjs build --package/u, "the old repair text stays");
+  assert.equal(found.message.includes(root), false, "no absolute path");
+});
+
+test("C31-M10: a changed line and a trimmed last content line each name their own line", async () => {
+  const { generatedBriefingAdmission } = await buildLib();
+  const { root, text } = await m10Briefing();
+  const changed = text.replace("### 5. Stop conditions", "### 5. Stop condition");
+  const at = m10Position(text, "### 5. Stop conditions");
+  const first = generatedBriefingAdmission(changed, "node gen.mjs", { requireGenerated: true, root });
+  assert.match(first.message, new RegExp(`first difference at line ${at.line}, column ${"### 5. Stop condition".length + 1}:`, "u"));
+  // The last content line before the marker loses its final character: the line is the last content line, the column its length.
+  const lines = text.split("\n");
+  const markerIndex = lines.findIndex((line) => line.startsWith("<!-- pipeline-briefing-generator:"));
+  const contentIndex = lines.map((line, index) => [line, index]).filter(([line, index]) => index < markerIndex && line !== "").pop()[1];
+  const trimmedLines = [...lines];
+  trimmedLines[contentIndex] = trimmedLines[contentIndex].slice(0, -1);
+  const trimmed = generatedBriefingAdmission(trimmedLines.join("\n"), "node gen.mjs", { requireGenerated: true, root });
+  assert.match(trimmed.message, new RegExp(`first difference at line ${contentIndex + 1}, column ${lines[contentIndex].length}:`, "u"));
+  // A trimmed final newline alone is still tolerated; a trimmed final newline plus an edit names the edit, not the end.
+  assert.equal(generatedBriefingAdmission(text.slice(0, -1), "node gen.mjs", { requireGenerated: true, root }), null);
+  const both = generatedBriefingAdmission(changed.slice(0, -1), "node gen.mjs", { requireGenerated: true, root });
+  assert.match(both.message, new RegExp(`first difference at line ${at.line}, column `, "u"));
+  // An ADDED newline differs at the end of the file: the line after the last one, column 1.
+  const added = generatedBriefingAdmission(`${text}\n`, "node gen.mjs", { requireGenerated: true, root });
+  assert.equal(added.code, "DBG-GENERATED-DIGEST-MISMATCH");
+  assert.match(added.message, /first difference at line \d+, column 1:/u);
+});
+
+test("C31-M10: no generated file found keeps the old text and adds one sentence naming the generate command to rerun; a matching prompt is admitted", async () => {
+  const { generatedBriefingAdmission } = await buildLib();
+  const { root, text } = await m10Briefing(["scratch/unrelated-note.txt"]);
+  const prompt = text.replace("Fixture goal text.", "Fixture goal text!");
+  const old = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true });
+  const lost = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root });
+  assert.equal(lost.code, "DBG-GENERATED-DIGEST-MISMATCH");
+  assert.ok(lost.message.startsWith("the Goldfish briefing was changed after the generator rendered it;"), lost.message);
+  assert.ok(lost.message.startsWith(old.message), "today's text is kept, the new sentence is appended");
+  assert.match(lost.message, /repair: .*node gen\.mjs build --package/u);
+  assert.match(lost.message, /no generated briefing file under scratch\/ carries this marker; rerun `node gen\.mjs build --package <package\.json> --out scratch\/briefing-<dispatch-id>\.md`/u);
+  assert.equal(lost.message.includes("first difference"), false);
+  // A file under scratch/ whose own marker digest differs is not the source of the prompt.
+  const decoy = `${text.replace("Fixture goal text.", "Another goal text.")}`.split("\n").filter((line) => !line.startsWith("<!-- pipeline-briefing-generator:")).join("\n");
+  writeFileSync(join(root, "scratch", "briefing-decoy.md"), `${decoy}\n<!-- pipeline-briefing-generator:v1 sha256=${"0".repeat(64)} -->\n`, "utf8");
+  assert.equal(generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root }).message.includes("first difference"), false);
+  assert.equal(generatedBriefingAdmission(text, "node gen.mjs", { requireGenerated: true, root }), null, "a matching prompt is admitted unchanged");
+  assert.equal(generatedBriefingAdmission(text, "node gen.mjs", { requireGenerated: true }), null);
+});
+
+test("C31-M10: the file is found two folder levels below scratch/ and a very long differing line is quoted capped", async () => {
+  const { generatedBriefingAdmission } = await buildLib();
+  const { root, text } = await m10Briefing(["scratch/briefings/c31/briefing-nested.md"]);
+  const prompt = text.replace("Fixture goal text.", `Fixture goal text${"x".repeat(300)}.`);
+  const found = generatedBriefingAdmission(prompt, "node gen.mjs", { requireGenerated: true, root });
+  assert.match(found.message, /copy the briefing from scratch\/briefings\/c31\/briefing-nested\.md verbatim/u);
+  const [expected, observed] = m10Quoted(found.message);
+  assert.ok(expected.length <= 80 && observed.length <= 80 && observed.length > 0);
+});
+
 test("a fresh fix wave uses an existing accepted criterion and a missing original row names that route", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

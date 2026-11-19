@@ -1008,7 +1008,7 @@ if (isDirectInvocation(import.meta.url)) {
   }
   // D78/K146: enforce generated Goldfish briefings before queue and native pending effects.
   for (const { dispatch } of productive) {
-    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`, { requireGenerated: true });
+    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`, { requireGenerated: true, root: routeRoot });
     if (finding) {
       process.stderr.write(`BLOCKED (guard-dispatch): ${finding.code}: ${finding.message}\n`);
       process.exit(2);

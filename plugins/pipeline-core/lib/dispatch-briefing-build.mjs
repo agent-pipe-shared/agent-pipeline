@@ -14,7 +14,7 @@
  * caller (scripts/dispatch-briefing.mjs) owns the binding call and any file write.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
 import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
@@ -251,7 +251,64 @@ function splitMarker(text) {
   if (index === -1) return null;
   const digest = GENERATOR_MARKER_LINE.exec(lines[index])[1];
   lines.splice(index, 1);
-  return { digest, body: lines.join("\n") };
+  return { digest, body: lines.join("\n"), markerIndex: index };
+}
+
+// C31-M10 (L13): where a retyped briefing first differs from the generated file. The file is found by the marker digest the prompt carries
+// (the generator records no path, so nothing is stored): the generator writes under scratch/ and every such file ends in its own marker line.
+const BRIEFING_SCAN_MAX_DEPTH = 3;
+const BRIEFING_SCAN_MAX_FILES = 400;
+const BRIEFING_SCAN_MAX_BYTES = 262144;
+const BRIEFING_SCAN_SKIP = new Set(["agent-out", "clones", "node_modules", ".git"]);
+const BRIEFING_SPAN_CHARS = 60;
+const SAFE_RELATIVE_PATH = /^[A-Za-z0-9._/-]+$/u;
+
+/** `{ path, text }` of the first intact generated briefing file under `<root>/scratch/` whose marker digest is `digest`, else `null`. Read-only and bounded. */
+export function findGeneratedBriefingFile(root, digest) {
+  const marker = `${GENERATOR_MARKER_PREFIX}${digest} -->`;
+  let scanned = 0;
+  const walk = (relative, depth) => {
+    let entries;
+    try { entries = readdirSync(join(root, relative), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1)); } catch { return null; }
+    for (const entry of entries) {
+      const path = `${relative}/${entry.name}`;
+      if (entry.isDirectory()) {
+        const hit = depth < BRIEFING_SCAN_MAX_DEPTH && !BRIEFING_SCAN_SKIP.has(entry.name) ? walk(path, depth + 1) : null;
+        if (hit !== null) return hit;
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".md") || !SAFE_RELATIVE_PATH.test(path)) continue;
+      if (++scanned > BRIEFING_SCAN_MAX_FILES) return null;
+      let text;
+      try {
+        if (lstatSync(join(root, path)).size > BRIEFING_SCAN_MAX_BYTES) continue;
+        text = readFileSync(join(root, path), "utf8");
+      } catch { continue; }
+      if (text.split("\n").includes(marker) && verifyGeneratedBriefing(text).ok) return { path, text };
+    }
+    return null;
+  };
+  return walk("scratch", 0);
+}
+
+/**
+ * `null` when the two texts are equal, else the first differing position: 1-based `line` and `column`, and the spans of at most
+ * 60 characters around it in each text. Line numbers are those of `expectedFile` (marker line included).
+ */
+function firstBriefingDifference(expectedBody, observedBody, expectedMarkerIndex) {
+  let index = 0;
+  const limit = Math.min(expectedBody.length, observedBody.length);
+  while (index < limit && expectedBody[index] === observedBody[index]) index++;
+  if (index === expectedBody.length && index === observedBody.length) return null;
+  const before = expectedBody.slice(0, index);
+  const bodyLine = before.split("\n").length;
+  const span = (text) => JSON.stringify(text.slice(Math.max(0, index - BRIEFING_SPAN_CHARS / 2), Math.max(0, index - BRIEFING_SPAN_CHARS / 2) + BRIEFING_SPAN_CHARS));
+  return {
+    line: bodyLine + (expectedMarkerIndex <= bodyLine - 1 ? 1 : 0),
+    column: index - (before.lastIndexOf("\n") + 1) + 1,
+    expected: span(expectedBody),
+    observed: span(observedBody),
+  };
 }
 
 /** Verifies the generator marker: one marker line whose digest equals sha256 over the rest of the text. */
@@ -268,12 +325,24 @@ export function verifyGeneratedBriefing(text) {
  * and a governed item briefing (a native binding with itemDelivery) must carry the marker. Returns null
  * when the prompt is admitted, else `{ code, message }` whose message names the generator command.
  */
-export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs", { requireGenerated = false } = {}) {
+export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs", { requireGenerated = false, root } = {}) {
   if (typeof prompt !== "string") return null;
-  const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
+  const rerun = `\`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\``;
+  const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run ${rerun}, and dispatch that file's text unchanged`;
   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
     const verified = verifyGeneratedBriefing(prompt);
-    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
+    if (!verified.ok) {
+      const changed = `the Goldfish briefing was changed after the generator rendered it; ${repair}`;
+      // C31-M10 (L13): with a repository root, a mismatch names the first differing line and column and orders the generated file to be copied; the refusal itself is unchanged.
+      if (verified.code !== "DBG-GENERATED-DIGEST-MISMATCH" || typeof root !== "string") return { code: verified.code, message: changed };
+      const observed = splitMarker(prompt);
+      const source = findGeneratedBriefingFile(root, observed.digest);
+      if (source === null) return { code: verified.code, message: `${changed}; no generated briefing file under scratch/ carries this marker; rerun ${rerun} and copy that file verbatim instead of retyping it` };
+      const expected = splitMarker(source.text);
+      const difference = firstBriefingDifference(expected.body, observed.body, expected.markerIndex);
+      if (difference === null) return { code: verified.code, message: changed };
+      return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; first difference at line ${difference.line}, column ${difference.column}: expected ${difference.expected} but the prompt has ${difference.observed}; copy the briefing from ${source.path} verbatim instead of retyping it; ${repair}` };
+    }
     // G20-48: the D78 rule is runner-neutral, so an Antigravity binding is parsed too.
     const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
     if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {

@@ -1331,6 +1331,34 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
   }
 });
 
+// C31-M10 (L13): a retyped briefing that differs by one character is still refused DBG-GENERATED-DIGEST-MISMATCH (no pointer route for a non-Claude
+// carrier, no loosening), but the refusal now names the first differing line and column and orders the generated file to be copied verbatim.
+manualCheck("GD80b block  C31-M10: a one-character edit of a generated briefing names the first differing line and column and the file to copy; the unedited text is admitted", () => {
+  const governed = generatedItemFixture();
+  writeFileSync(join(governed.root, "scratch", "briefing-m10.md"), governed.text);
+  const lines = governed.text.split("\n");
+  const lineIndex = lines.findIndex((line) => line.includes("Fixture goal text."));
+  const column = lines[lineIndex].indexOf("Fixture goal text.") + "Fixture goal text".length + 1;
+  const edited = runAtOut(generatedDispatch({ root: governed.root, text: governed.text.replace("Fixture goal text.", "Fixture goal text!") }, "gd80b-edit", {}), governed.root);
+  assert.equal(edited.code, BLOCK, edited.stderr.slice(0, 400));
+  assert.ok(edited.stderr.includes("DBG-GENERATED-DIGEST-MISMATCH"), edited.stderr.slice(0, 400));
+  assert.ok(edited.stderr.includes(`first difference at line ${lineIndex + 1}, column ${column}:`), edited.stderr.slice(0, 600));
+  assert.ok(edited.stderr.includes("copy the briefing from scratch/briefing-m10.md verbatim instead of retyping it"), edited.stderr.slice(0, 600));
+  assert.equal(edited.stderr.includes(governed.root), false, "the refusal names no absolute path");
+  // A lost final newline alone stays admitted; the same text with the file present is admitted unchanged.
+  const exact = runAtOut(generatedDispatch(governed, "gd80b-exact", {}), governed.root);
+  assert.equal(exact.code, ALLOW, exact.stderr.slice(0, 400));
+});
+manualCheck("GD80c block  C31-M10: an edited generated briefing with no file under scratch/ keeps the old refusal and names the generate command to rerun", () => {
+  const governed = generatedItemFixture();
+  const edited = runAtOut(generatedDispatch({ root: governed.root, text: governed.text.replace("Fixture goal text.", "Fixture goal text!") }, "gd80c", {}), governed.root);
+  assert.equal(edited.code, BLOCK, edited.stderr.slice(0, 400));
+  assert.ok(edited.stderr.includes("DBG-GENERATED-DIGEST-MISMATCH"), edited.stderr.slice(0, 400));
+  assert.ok(edited.stderr.includes("the Goldfish briefing was changed after the generator rendered it;"), edited.stderr.slice(0, 400));
+  assert.ok(/no generated briefing file under scratch\/ carries this marker; rerun `node [^`]*dispatch-briefing\.mjs build --package <package\.json> --out scratch\/briefing-<dispatch-id>\.md`/u.test(edited.stderr), edited.stderr.slice(0, 600));
+  assert.equal(edited.stderr.includes("first difference"), false);
+});
+
 // G20-48 (live Antigravity greenfield 2026-11-07): a briefing the generator built with --runner antigravity was refused
 // DBG-GENERATED-BINDING-REQUIRED by every consumer, because the binding parser admitted only the claude and codex runners. No
 // admit case existed for an Antigravity Goldfish; this one walks the whole guard with the real generator and the host's own
@@ -1448,7 +1476,8 @@ manualCheck("GD85 block  C30D-G3: a Critic pointer carried by a Workflow script,
 // QG-04 restatement (candidate 20b, G20-47/G20-48): the corpus grew by the Antigravity bare-name and generated-briefing cases.
 // C23 (QG-04, restated in place): 85 -> 88, the three GD2-C23 cases for a call that carries an effort.
 // C30D-G3 (QG-04, restated in place): 88 -> 93, the five GD81-GD85 cases for a Critic briefing handed over as a pointer.
-assert.equal(cases.length, 93,"the complete dispatch guard corpus must register before execution");
+// C31-M10 (QG-04, restated in place): 93 -> 95, the two GD80b/GD80c cases for the digest-mismatch refusal that names the first differing line.
+assert.equal(cases.length, 95,"the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
