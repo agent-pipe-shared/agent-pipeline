@@ -300,6 +300,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
       optionalValue: {
         "--previous": input,
         "--original-report": input,
+        "--sources-at": (value) => /^[0-9a-f]{7,40}$/u.test(value),
         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
         "--fallback-reason-code": (value) => FALLBACK_REASON_CODE.test(value),

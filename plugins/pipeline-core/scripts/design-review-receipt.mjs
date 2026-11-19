@@ -30,20 +30,21 @@
  * was written by hand instead.
  */
 
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
 import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal, DESIGN_REVIEW_UNOBSERVED_ASSURANCE } from "../lib/design-review-receipt.mjs";
 import { consumeDesignReviewObservation, listUnexportedDesignReviewObservations, markDesignReviewObservationExported, readDesignReviewObservation, readLastUnobservedDesignReview } from "../lib/design-review-observation.mjs";
-import { checkOpenFindingsAgainstReport } from "../lib/design-review-report-sections.mjs";
+import { checkOpenFindingsAgainstReport, designReviewReportLines } from "../lib/design-review-report-sections.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 
 export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
 
 const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
-  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
+  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--sources-at <commit>] [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
   + "       design-review-receipt.mjs export-report --repo <repo-root> --out <report> [--observation <sha256>]\n"
   + "Every path is repo-relative. The review time, runner, reviewer model and all digests are derived, never supplied. On Claude the "
   + "reviewer model is read from the host's record of the readiness-reviewer dispatch, found by the report's digest (export-report "
@@ -60,7 +61,7 @@ const SINGLE_FLAGS = new Map([
   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
   ["original-report", "originalReportPath"], ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
-  ["fallback-reason-code", "fallbackReasonCode"],
+  ["fallback-reason-code", "fallbackReasonCode"], ["sources-at", "sourcesAt"],
 ]);
 // K128: the one fallback route name, as the canonical fallback result and the recovery state spell it.
 const FALLBACK_ROUTE = "fallback-self-dispatch";
@@ -116,6 +117,33 @@ function readBound(repoReal, path, role) {
   } catch {
     return refuse("DRC-FILE-UNSAFE", `${role} file cannot be read: ${path}`);
   }
+}
+
+const SOURCES_AT_PATTERN = /^[0-9a-f]{7,40}$/u;
+
+/**
+ * C31a: the commit whose PRD, Spec and companion bytes the reviewer read. A receipt binds the bytes a review read; when the sources were
+ * corrected after the review and before the receipt existed (the correction is committed, the next dispatch is blocked until the round has
+ * a receipt), the working tree no longer holds them. `--sources-at <commit>` reads those bytes from git objects instead of restoring them
+ * in the tree. The commit must be an ancestor of HEAD, so it names history of this branch, never an unrelated object.
+ */
+function resolveSourcesAt(repoReal, ref) {
+  if (!SOURCES_AT_PATTERN.test(ref)) return refuse("DRC-SOURCES-AT-INVALID", "--sources-at takes a commit id of 7 to 40 lowercase hex digits (git log shows it)");
+  const git = (args) => execFileSync("git", args, { cwd: repoReal, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 20 }).trim();
+  let commit;
+  try { commit = git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]); } catch { return refuse("DRC-SOURCES-AT-INVALID", `--sources-at ${ref} is not a commit of this repository`); }
+  try { git(["merge-base", "--is-ancestor", commit, "HEAD"]); } catch { return refuse("DRC-SOURCES-AT-INVALID", `--sources-at ${ref} is not an ancestor of HEAD; name the commit the reviewer read, from this branch's history`); }
+  return { ok: true, commit };
+}
+
+/** The bytes of a file at a commit (a blob, never a link), or a refusal. */
+function readBoundAt(repoReal, commit, path, role) {
+  const git = (args) => execFileSync("git", args, { cwd: repoReal, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 << 20 });
+  let entry;
+  try { entry = execFileSync("git", ["ls-tree", commit, "--", path], { cwd: repoReal, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { entry = ""; }
+  if (entry === "") return refuse("DRC-SOURCES-AT-MISSING", `${role} file ${path} does not exist at commit ${commit.slice(0, 12)}`);
+  if (!/^100(?:644|755) blob /u.test(entry)) return refuse("DRC-FILE-UNSAFE", `${role} at commit ${commit.slice(0, 12)} must be a regular file, not a link or directory: ${path}`);
+  try { return { ok: true, bytes: git(["show", `${commit}:${path}`]) }; } catch { return refuse("DRC-SOURCES-AT-MISSING", `${role} file ${path} cannot be read at commit ${commit.slice(0, 12)}`); }
 }
 
 /** Resolve the output location: a new file in an existing directory inside the repository. */
@@ -181,6 +209,8 @@ export function createReceiptFromDisk(input, deps = {}) {
   const openFindingIds = request.openFindingIds ?? [];
   const previousPath = request.previousPath ?? null;
   const originalReportPath = request.originalReportPath ?? null;
+  const sourcesAtRef = request.sourcesAt ?? null;
+  if (sourcesAtRef !== null && typeof sourcesAtRef !== "string") return refuse("DRC-USAGE", "the request is malformed");
   const requestedRoute = request.requestedRoute ?? null;
   const observedIdentity = request.observedIdentity ?? null;
   const isStrings = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
@@ -229,17 +259,25 @@ export function createReceiptFromDisk(input, deps = {}) {
   const output = resolveOutput(repoReal, request.outPath);
   if (!output.ok) return output;
 
+  // C31a: the PRD, Spec and companion bytes come from the working tree, or from the named commit when --sources-at is given.
+  let readSource = (path, role) => readBound(repoReal, path, role);
+  if (sourcesAtRef !== null) {
+    const resolved = resolveSourcesAt(repoReal, sourcesAtRef);
+    if (!resolved.ok) return resolved;
+    readSource = (path, role) => readBoundAt(repoReal, resolved.commit, path, role);
+  }
+
   const sources = {};
   let specBytes = null;
   for (const [key, role, path] of [["prd", "PRD", request.prdPath], ["spec", "Spec", request.specPath]]) {
-    const read = readBound(repoReal, path, role);
+    const read = readSource(path, role);
     if (!read.ok) return read;
     sources[key] = { path, sha256: sha256Of(read.bytes) };
     if (key === "spec") specBytes = read.bytes;
   }
   sources.companions = [];
   for (const path of companionPaths) {
-    const read = readBound(repoReal, path, "companion");
+    const read = readSource(path, "companion");
     if (!read.ok) return read;
     sources.companions.push({ path, sha256: sha256Of(read.bytes) });
   }
@@ -262,7 +300,10 @@ export function createReceiptFromDisk(input, deps = {}) {
   const split = splitText === null ? { ok: true } : checkOpenFindingsAgainstReport(splitText, openFindingIds);
   if (!split.ok) {
     const parts = [];
-    if (split.missing.length > 0) parts.push(`the report lists blocking finding(s) not passed as --open-finding: ${split.missing.join(", ")}`);
+    // C31a: name the report line each id was read from, so a misread section is visible instead of retried unchanged.
+    const readAt = designReviewReportLines(splitText).blocking;
+    const withLine = (id) => (readAt[id] === undefined ? id : `${id} (report line ${readAt[id]})`);
+    if (split.missing.length > 0) parts.push(`the report lists blocking finding(s) not passed as --open-finding: ${split.missing.map(withLine).join(", ")}; if one of them is an earlier-round item the reviewer marks resolved, the report keeps it under "Blocking findings:" without a label line of its own ending in a colon: pass it as --open-finding as well (a delta round withdraws it) and have the next briefing ask for earlier-round status under such a label line`);
     if (split.questionsAsFindings.length > 0) parts.push(`a question is not an open finding and is never passed as one: ${split.questionsAsFindings.join(", ")}`);
     const other = split.extra.filter((id) => !split.questionsAsFindings.includes(id));
     if (other.length > 0) parts.push(`--open-finding id(s) the report does not list under "Blocking findings": ${other.join(", ")}`);
@@ -457,7 +498,7 @@ function parseArgv(argv) {
   }
   const missing = REQUIRED.find((name) => !single.has(name));
   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
-  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
+  const request = { ...repeated, previousPath: null, originalReportPath: null, sourcesAt: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
   return { ok: true, command: "create", request };
 }

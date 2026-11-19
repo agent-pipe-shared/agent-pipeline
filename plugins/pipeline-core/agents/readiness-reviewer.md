@@ -72,6 +72,14 @@ Questions:
 Write `- none` under a heading with no item. Keep every id on the line that
 starts its item.
 
+In a delta round the status of an earlier round's items goes under a label line
+of its own, at least three words and ending in a colon, for example
+`Earlier-round items, status against the current text:`, never under
+`Blocking findings:`. Under `Blocking findings:` stand only the findings that are
+open now, and a finding or question raised now takes a new id: never reuse an id
+of an earlier round for a different point. The host reads the open findings of
+the receipt from `Blocking findings:` alone (`DRC-FINDINGS-SPLIT`).
+
 ## What to check
 
 Never state a proposed architecture scope or disposition as a fact: you cannot

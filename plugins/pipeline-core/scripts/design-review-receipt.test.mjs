@@ -140,11 +140,96 @@ test("C30-6: the receipt's open findings must equal the report's blocking findin
   assert.match(asQuestion.message, /a question is not an open finding.*DESIGN-QUESTION-1/u);
   const dropped = createReceiptFromDisk(request(repo, { openFindingIds: [] }), { env: CLAUDE, now });
   assert.equal(dropped.code, "DRC-FINDINGS-SPLIT");
-  assert.match(dropped.message, /not passed as --open-finding: DESIGN-REVIEW-1/u);
+  assert.match(dropped.message, /not passed as --open-finding: DESIGN-REVIEW-1 \(report line 4\)/u);
   assert.equal(readdirSync(join(repo, "specs/feat-x/review")).some((name) => name.endsWith(".receipt.json")), false, "nothing is written on a refusal");
   const exact = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
   assert.equal(exact.ok, true, JSON.stringify(exact));
   assert.deepEqual(exact.receipt.openFindingIds, ["DESIGN-REVIEW-1"]);
+}));
+
+// C31a (greenfield 2026-11-19, synthetic copy of the shape): a delta report lists the earlier round's questions as resolved under a label line of its own.
+// Before the fix those nine lines were read as blocking findings, the receipt was refused (DRC-FINDINGS-SPLIT) and the next review dispatch stayed blocked.
+const DELTA_REPORT = [
+  "Verdict: NOT READY",
+  "",
+  "Round 2, delta review. One blocking finding is open; the round 1 questions are resolved, as listed below.",
+  "",
+  "Blocking findings:",
+  "- DESIGN-REVIEW-1 The Spec places the snapshot in two locations. The data shape must be fixed before build. Repair: state one location.",
+  "",
+  "Round 1 questions, status against the current text:",
+  "- DESIGN-QUESTION-1 (scope): resolved. The scope now lists the checklist.",
+  "- DESIGN-QUESTION-2 (PIN): resolved in substance.",
+  "- DESIGN-QUESTION-3 (asserts): withdrawn.",
+  "",
+  "Questions:",
+  "- DESIGN-QUESTION-4 (a new point of this round): which slice runs first?",
+  "",
+].join("\n");
+
+test("C31a: the earlier round's resolved items under their own label line are no open findings, and the genuine finding stays one", withRepo((repo) => {
+  writeFileSync(join(repo, REPORT1), DELTA_REPORT);
+  const exact = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
+  assert.equal(exact.ok, true, JSON.stringify(exact));
+  assert.deepEqual(exact.receipt.openFindingIds, ["DESIGN-REVIEW-1"]);
+}));
+
+test("C31a: a refusal names the report line each missing id was read from, and the way out for a misread earlier-round item", withRepo((repo) => {
+  // The same shape without the label line: the earlier items stand directly under Blocking findings and are open.
+  const flat = DELTA_REPORT.replace("Round 1 questions, status against the current text:\n", "").replace(": resolved.", ": ok.").replace(": resolved in substance.", ": ok.").replace(": withdrawn.", ": ok.");
+  writeFileSync(join(repo, REPORT1), flat);
+  const refused = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1"] }), { env: CLAUDE, now });
+  assert.equal(refused.code, "DRC-FINDINGS-SPLIT");
+  assert.match(refused.message, /DESIGN-QUESTION-1 \(report line 8\)/u);
+  assert.match(refused.message, /pass it as --open-finding as well/u);
+  const all = createReceiptFromDisk(request(repo, { openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-QUESTION-1", "DESIGN-QUESTION-2", "DESIGN-QUESTION-3"] }), { env: CLAUDE, now });
+  assert.equal(all.ok, true, JSON.stringify(all));
+}));
+
+// C31a: the live blockade of 2026-11-19: the round had no receipt, the Spec was corrected and committed, and the next review dispatch stayed blocked.
+function gitIn(repo, ...args) {
+  const run = spawnSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.autocrlf=false", ...args], { cwd: repo, encoding: "utf8" });
+  assert.equal(run.status, 0, `${args.join(" ")}: ${run.stderr}`);
+  return run.stdout.trim();
+}
+
+test("C31a: --sources-at binds the PRD, Spec and companion bytes of the named commit, not the corrected working tree", withRepo((repo) => {
+  gitIn(repo, "init", "-q");
+  gitIn(repo, "add", ".");
+  gitIn(repo, "commit", "-q", "-m", "review read these bytes");
+  const reviewed = gitIn(repo, "rev-parse", "HEAD");
+  const reviewedSpec = readFileSync(join(repo, SPEC));
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text corrected after the review\n");
+  gitIn(repo, "commit", "-q", "-am", "correct the spec");
+  const made = createReceiptFromDisk(request(repo, { sourcesAt: reviewed.slice(0, 12), companionPaths: [DESIGN] }), { env: CLAUDE, now });
+  assert.equal(made.ok, true, JSON.stringify(made));
+  assert.equal(made.receipt.sources.spec.sha256, sha(reviewedSpec), "the Spec digest is the reviewed bytes");
+  assert.notEqual(made.receipt.sources.spec.sha256, sha(readFileSync(join(repo, SPEC))));
+  // The receipt no longer matches the corrected tree, so the next round is a delta, exactly as after any later edit.
+  const without = createReceiptFromDisk(request(repo, { reportPath: REPORT2, outPath: RECEIPT2, previousPath: RECEIPT1, companionPaths: [DESIGN] }), { env: CLAUDE, now });
+  assert.equal(without.ok, true, JSON.stringify(without));
+  assert.equal(without.receipt.kind, "delta");
+}));
+
+test("C31a: --sources-at refuses a malformed ref, a non-commit, a commit outside the history of HEAD and a file the commit does not hold", withRepo((repo) => {
+  gitIn(repo, "init", "-q");
+  gitIn(repo, "add", ".");
+  gitIn(repo, "commit", "-q", "-m", "base");
+  const base = gitIn(repo, "rev-parse", "HEAD");
+  gitIn(repo, "checkout", "-q", "-b", "side");
+  writeFileSync(join(repo, "specs/feat-x/other.md"), "side only\n");
+  gitIn(repo, "add", ".");
+  gitIn(repo, "commit", "-q", "-m", "side");
+  const side = gitIn(repo, "rev-parse", "HEAD");
+  gitIn(repo, "checkout", "-q", "-");
+  const code = (over) => createReceiptFromDisk(request(repo, over), { env: CLAUDE, now }).code;
+  assert.equal(code({ sourcesAt: "HEAD~1" }), "DRC-SOURCES-AT-INVALID");
+  assert.equal(code({ sourcesAt: "deadbee" }), "DRC-SOURCES-AT-INVALID");
+  assert.equal(code({ sourcesAt: side }), "DRC-SOURCES-AT-INVALID", "a commit of another branch is not history of HEAD");
+  assert.equal(code({ sourcesAt: base, prdPath: "specs/feat-x/missing.md" }), "DRC-SOURCES-AT-MISSING");
+  assert.equal(readdirSync(join(repo, "specs/feat-x/review")).some((name) => name.endsWith(".receipt.json")), false, "nothing is written on a refusal");
+  assert.match(runMain(baseArgv(repo, { "sources-at": "zz" })).json.message, /commit id of 7 to 40 lowercase hex digits/u);
+  assert.equal(runMain(baseArgv(repo, { "sources-at": base })).json.status, "created");
 }));
 
 test("C30-6: a report with only questions makes a passing receipt", withRepo((repo) => {

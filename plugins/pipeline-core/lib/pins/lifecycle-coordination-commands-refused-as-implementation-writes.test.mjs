@@ -340,6 +340,9 @@ async function walkSteps(f, { actualGuard }) {
   writeFileSync(join(f.root, 'evidence/design-review-original-1.md'), 'original report\n');
   check('design-review receipt (original under evidence/)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
     '--original-report', 'evidence/design-review-original-1.md', '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-4.json`));
+  // C31a: the receipt over the bytes of the commit the reviewer read (the sources were corrected after the review) is admitted in the same state.
+  check('design-review receipt (sources at a commit)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+    '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--sources-at', 'abc1234', '--out', `specs/${f.featureId}/review/design-review-receipt-5.json`));
   check('design-review receipt (delta)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
     '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--previous', receiptPath, '--open-finding', 'F-1', '--out', `specs/${f.featureId}/review/design-review-receipt-3.json`));
   // 4. present-plan, then the approval transport in the spelling inspect renders after a presentation, then the phase switch

@@ -257,7 +257,7 @@ export function designReviewRoundFinding({ subagentType, unreceiptedRounds } = {
   return {
     code: "DISPATCH-DESIGN-REVIEW-NO-RECEIPT",
     why: `${count === 1 ? "an earlier readiness review round has" : `${count} earlier readiness review rounds have`} no receipt yet; the design review is one full round and at most two delta rounds (C30-6), so a next round is a delta of a receipted one. `
-      + "Repair, before correcting anything: write the report with `node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <report path>`, create the receipt over the unchanged sources with `design-review-receipt.mjs create` (one `--open-finding` per id under the report's \"Blocking findings:\"; a question is no finding), commit it, then correct the sources and dispatch the delta round (`create --previous <that receipt>`). A round older than 48 hours is treated as abandoned.",
+      + "Repair, before correcting anything: write the report with `node <plugin-root>/scripts/design-review-receipt.mjs export-report --repo <root> --out <report path>`, create the receipt over the unchanged sources with `design-review-receipt.mjs create` (one `--open-finding` per id under the report's \"Blocking findings:\"; a question is no finding), commit it, then correct the sources and dispatch the delta round (`create --previous <that receipt>`). If the sources were already corrected and committed after the review read them, do not restore them in the tree: pass `--sources-at <the commit the reviewer read>` to `create`, which reads the PRD, Spec and companion bytes of that commit from git (it must be an ancestor of HEAD). A round older than 48 hours is treated as abandoned.",
   };
 }
 

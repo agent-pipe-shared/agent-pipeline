@@ -19,7 +19,7 @@ import {
   parseDesignReviewReceipt,
   summarizeDesignReviewReceipt,
 } from "./design-review-receipt.mjs";
-import { checkOpenFindingsAgainstReport, designReviewReportSections } from "./design-review-report-sections.mjs";
+import { checkOpenFindingsAgainstReport, designReviewReportLines, designReviewReportSections } from "./design-review-report-sections.mjs";
 import { designReviewRoundFinding } from "./dispatch-policy.mjs";
 import { consumeDesignReviewObservation, listUnreceiptedDesignReviewRounds, recordDesignReviewObservation } from "./design-review-observation.mjs";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -696,6 +696,35 @@ test("C30-6: a report whose questions are all that is left reads as ready (no op
   assert.deepStrictEqual(designReviewReportSections(onlyQuestions), { structured: true, blocking: [], questions: ["DESIGN-QUESTION-1"] });
   assert.deepStrictEqual(checkOpenFindingsAgainstReport(onlyQuestions, []), { ok: true });
   assert.deepStrictEqual(designReviewReportSections("**Blocking findings:**\n- DESIGN-REVIEW-4 a cycle\n**Questions:**\n- DESIGN-QUESTION-1 x").blocking, ["DESIGN-REVIEW-4"]);
+});
+
+test("C31a: a label line ends the section, an id-anchored resolved status drops an item, and neither loses a genuine finding", () => {
+  const label = "Round 1 questions, status against the current text:";
+  const report = [
+    "Blocking findings:",
+    "- DESIGN-REVIEW-1 the snapshot has two locations; the data shape must be fixed before build.",
+    "Repair:",
+    "state one location.",
+    "- DESIGN-REVIEW-2 a second finding after a short label and a prose line",
+    "",
+    label,
+    "- DESIGN-QUESTION-1 (scope): resolved.",
+    "- DESIGN-QUESTION-2: withdrawn",
+    "",
+    "Questions:",
+    "- DESIGN-QUESTION-1 a new point reusing the id",
+  ].join("\n");
+  // The one-word "Repair:" label and the prose line do not end the section: the second finding is kept.
+  assert.deepStrictEqual(designReviewReportSections(report), { structured: true, blocking: ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"], questions: ["DESIGN-QUESTION-1"] });
+  assert.deepStrictEqual(designReviewReportLines(report), { blocking: { "DESIGN-REVIEW-1": 2, "DESIGN-REVIEW-2": 5 }, questions: { "DESIGN-QUESTION-1": 12 } });
+  // Without the label line the earlier items are read, but the id-anchored status still drops the resolved ones; "fixed before build" does not.
+  const noLabel = report.replace(`${label}\n`, "");
+  assert.deepStrictEqual(designReviewReportSections(noLabel).blocking, ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"]);
+  // A status that is not directly after the id does not count: the item stays open (fail open towards the hold).
+  const hidden = "Blocking findings:\n- DESIGN-REVIEW-3 the import is refused; an earlier version of this was resolved elsewhere\n";
+  assert.deepStrictEqual(designReviewReportSections(hidden).blocking, ["DESIGN-REVIEW-3"]);
+  // A markdown heading still ends the section as before.
+  assert.deepStrictEqual(designReviewReportSections("Blocking findings:\n- DESIGN-REVIEW-4 x\n## Notes\n- DESIGN-REVIEW-5 y").blocking, ["DESIGN-REVIEW-4"]);
 });
 
 test("C30-6: a legacy report without a Blocking findings section is not split and is not checked", () => {
