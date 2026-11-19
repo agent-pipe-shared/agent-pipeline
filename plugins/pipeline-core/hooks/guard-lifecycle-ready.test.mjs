@@ -10066,7 +10066,7 @@ test("NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session
     // constraint, plus where to find the full listing again).
     assert.match(second.stderr, /Rejected element: the operator "\|"\./u);
     assert.match(second.stderr, /Use one simple shell command per tool call/u);
-    assert.match(second.stderr, /already printed on the earlier denial of this kind this session/u);
+    assert.match(second.stderr, /already printed on an earlier grammar refusal in this context window/u);
     // Everything besides the grammar-shape listing stays present and unchanged: the typed
     // retryActions envelope and (in this "nothing armed" fixture) the human-override guidance.
     assert.match(second.stderr, /"schema":"pipeline\.guard-retry-actions\.v1"/u);
@@ -10078,14 +10078,15 @@ test("NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session
     assert.match(differentSession.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
     assert.equal(differentSession.stderr.length, first.stderr.length);
 
-    // A call with a DIFFERENT code under the SAME session id is still full-length (AC-3's
-    // "class" is the grammar denial code, not the whole session).
+    // A call with a DIFFERENT listing code under the SAME session id now prints the SHORT text
+    // (candidate 31: the four listing codes are one class, the listing was already printed).
     const differentCode = evaluateLifecycleReadyGuard(
       bashWithSession('git commit -m "line one\n\nline two"', sessionId), deps,
     );
     assert.equal(differentCode.exitCode, 2);
     assert.match(differentCode.stderr, /GUARD-PARSE-UNSUPPORTED/u);
-    assert.match(differentCode.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.doesNotMatch(differentCode.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(differentCode.stderr, /already printed on an earlier grammar refusal in this context window/u);
   } finally {
     rmSync(path, { recursive: true, force: true });
     rmSync(commonDir, { recursive: true, force: true });

@@ -13,7 +13,7 @@ import { resetDenialClassesForSession } from "../guard/denial-telemetry.mjs";
 import { mkdtempTestScratch } from "../test-tmpdir.mjs";
 
 const FULL = /The complete admitted grammar, with bounds and exact spellings:/u;
-const SHORT = /already printed on the earlier denial of this kind this session/u;
+const SHORT = /already printed on an earlier grammar refusal in this context window/u;
 const READ_SPELLING = "head -c 700 probe.txt";
 
 function governedRoot() {
