@@ -148,8 +148,12 @@ function testOwners(file, modules, mirrored) {
   return modules.filter((mod) => named.has(mod.id));
 }
 
-/** All raw violations of the tree, before exceptions. */
-function observe(root, modules, policy, listed, readFile, extensions) {
+/**
+ * All raw violations of the tree, before exceptions. `keepUnowned` is the set of paths an accepted `unowned-path` exception already covers: a test file in it keeps the reading it had
+ * when that exception was written (no module, so no import check and no ambiguity), because deriving an owner for it would turn an accepted tree into new violations no exception covers
+ * (C31c, cloud review of candidate 31). The exception stays used, so it is never reported stale; dropping it hands the file to the derivation.
+ */
+function observe(root, modules, policy, listed, readFile, extensions, keepUnowned = new Set()) {
   const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
   const sources = listed.filter((file) => extensions.has(path.extname(file)) && !excluded(file)).sort();
   const violations = [];
@@ -165,7 +169,7 @@ function observe(root, modules, policy, listed, readFile, extensions) {
   }
   for (const file of sources) {
     let owners = owningModules(file, modules);
-    const tested = owners.length === 0 && isTestFile(file) ? testOwners(file, modules, mirrored) : [];
+    const tested = owners.length === 0 && isTestFile(file) && !keepUnowned.has(file) ? testOwners(file, modules, mirrored) : [];
     if (tested.length > 1) {
       const ids = tested.map((owner) => owner.id).sort();
       violations.push({ file, module: ids.join(", "), rule: "ambiguous-ownership", detail: `${file} is a test of ${ids.join(" and ")} equally (by declared entry point, name, directory or mirrored source file)` });
@@ -245,7 +249,8 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
   const listed = (deps.listFiles ?? trackedFiles)(root);
   if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the check needs a Git work tree", violations: [] };
   const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
-  const { sources, violations: observed, usage, edges } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions));
+  const keepUnowned = new Set(policy.exceptions.filter((entry) => entry.rule === "unowned-path").map((entry) => entry.path));
+  const { sources, violations: observed, usage, edges } = observe(root, bundle.modules, policy, listed, readFile, new Set(sourceExtensions), keepUnowned);
 
   const accepted = new Map(policy.exceptions.map((entry) => [exceptionKey(entry.rule, entry.path, entry.target ?? null), entry]));
   const used = new Set();

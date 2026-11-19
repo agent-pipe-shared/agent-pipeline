@@ -341,6 +341,32 @@ test("M3-03 a derived-owned test is held to its module's allowedDependencies lik
   assert.deepEqual(rules(refused), [["forbidden-dependency", "tests/app.test.mjs", "src/lib/x.mjs"]]);
 });
 
+// C31c (cloud review of candidate 31): a policy written before the derivation accepted these tests as `unowned-path`. It must keep covering them: no new forbidden-dependency, no new
+// ambiguous-ownership, no stale exception; removing the exception hands the file to the derivation.
+const unownedPolicy = (...paths) => ({ schema: BOUNDARY_POLICY_SCHEMA, lineBound: DEFAULT_LINE_BOUND, excludedPaths: [], exceptions: paths.map((file) => ({ rule: "unowned-path", path: file, reason: "accepted when the boundary check was adopted" })) });
+
+test("M3-04 an accepted unowned-path exception keeps covering a test the derivation would now own and check", () => {
+  const files = { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n", "tests/app.test.mjs": 'import "../src/lib/x.mjs";\n' };
+  const accepted = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files, policy: unownedPolicy("tests/app.test.mjs") }) });
+  assert.equal(accepted.status, "pass", JSON.stringify(accepted.violations));
+  assert.deepEqual(accepted.staleExceptions, [], "the exception is still used, never reported stale");
+  assert.equal(accepted.counts.excepted, 1);
+  assert.deepEqual([...accepted._measured.usage].map(([id, row]) => [id, row.files]).sort(), [["app", 1], ["lib", 1]], "an accepted unowned file is not counted to a module, as before");
+  const dropped = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files, policy: unownedPolicy() }) });
+  assert.deepEqual(rules(dropped), [["forbidden-dependency", "tests/app.test.mjs", "src/lib/x.mjs"]], "without the exception the derivation applies");
+});
+
+test("M3-05 an accepted unowned-path exception also covers a test that maps to two modules, and only the paths it names", () => {
+  const files = {
+    "src/app/shared.mjs": "export {};\n", "src/lib/shared.mjs": "export {};\n", "tests/shared.test.mjs": "export {};\n",
+    "src/app/main.mjs": "export {};\n", "tests/main.test.mjs": "export {};\n",
+  };
+  const accepted = checkArchitectureBoundaries({ rootDir: fixture({ files, policy: unownedPolicy("tests/shared.test.mjs") }) });
+  assert.equal(accepted.status, "pass", JSON.stringify(accepted.violations));
+  assert.deepEqual(accepted.staleExceptions, []);
+  assert.deepEqual([...accepted._measured.usage].map(([id, row]) => [id, row.files]).sort(), [["app", 3], ["lib", 1]], "tests/main.test.mjs is not named, so it is still derived to app");
+});
+
 // C31-M3 (L11, AC-112): the baseline policy materialize-architecture writes for the non-module path classes.
 const design = await import("../lib/architecture-design.mjs");
 const m3Modules = (owned) => Object.entries(owned).map(([id, ownedPaths]) => ({ id, ownedPaths }));
