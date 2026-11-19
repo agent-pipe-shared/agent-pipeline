@@ -8,6 +8,8 @@
  *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
  *   create-adr.mjs --root <root> --slug <slug> --refresh
  *   create-adr.mjs --root <root> --refresh    (every docs/adr/draft-*.md at once)
+ *   create-adr.mjs --root <root> --from-design   (one proposal per module adrReferences path of the active feature's draft design that has
+ *                                                 no draft and no accepted record; titles from the slugs; a second call creates nothing)
  *   create-adr.mjs --root <root> --slug <slug> --discard --reason "<why the draft is not wanted>"
  *                                              (records the discard in docs/adr/discarded/draft-<slug>.json; the draft stays as history)
  *
@@ -25,12 +27,13 @@ import { createHash } from "node:crypto";
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
+import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, classifyDeclaredAdrReferences, loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority-read.mjs";
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const MODULE_ID = /^[a-z][a-z0-9-]{0,79}$/u;
 const ADR_ID = /^[A-Za-z0-9._-]+$/u;
-const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh", "--discard", "--reason"]);
+const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh", "--discard", "--reason", "--from-design"]);
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 class Refusal extends Error {}
@@ -42,7 +45,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (!FLAGS.has(flag)) refuse(`unknown argument ${JSON.stringify(flag)}; allowed: ${[...FLAGS].join(" ")}`);
     if (values.has(flag)) refuse(`${flag} may be given only once`);
-    if (flag === "--refresh" || flag === "--discard") { values.set(flag, true); continue; }
+    if (flag === "--refresh" || flag === "--discard" || flag === "--from-design") { values.set(flag, true); continue; }
     const value = argv[index + 1];
     if (typeof value !== "string" || (value.startsWith("--") && FLAGS.has(value))) refuse(`${flag} needs a value`);
     values.set(flag, value);
@@ -197,6 +200,49 @@ function createProposal(root, values) {
     next: "Finish the bootstrap binding first: while readiness is bootstrap-binding-required an edit of this draft is refused (GUARD-LIFECYCLE-NOT-READY). Then replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
 }
 
+/** The file at a repository-relative path inside the root, never a link; null when it is absent. */
+function readInsideRoot(root, relative) {
+  const normalized = typeof relative === "string" ? relative.replace(/\\/gu, "/") : "";
+  if (normalized === "" || isAbsolute(normalized) || /^[A-Za-z]:/u.test(normalized) || normalized.split("/").some((part) => part === ".." || part === "")) return null;
+  const target = join(root, ...normalized.split("/"));
+  try { if (!lstatSync(target).isFile()) return null; return readFileSync(target, "utf8"); } catch { return null; }
+}
+
+/**
+ * AC-112 (candidate 31, L4 stage 3): one proposal for every module adrReferences path of the active feature's draft design that has neither a
+ * draft nor an accepted record (the same list submit-plan prints as a notice). Title derived from the slug, the REPLACE: text stays so
+ * bind-adr-proposals refuses the draft until it is written, a slug that already has a draft is skipped and named. Derived from the PRD and the
+ * files: no stored status. Once the design approval is in force a draft could no longer be bound, so nothing is written then.
+ */
+function createFromDesign(root) {
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  const statePath = authority.status === "ready" ? authority.state : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  let state;
+  try { state = JSON.parse(readInsideRoot(root, statePath) ?? ""); } catch { state = null; }
+  if (state === null || typeof state !== "object" || Array.isArray(state)) refuse("--from-design needs the Pipeline State of this project (project/pipeline-state.json); run pipeline-start first");
+  if (state.planApproved === true || state.planApproval?.poGateAuthority) {
+    refuse("--from-design writes nothing while the design approval is in force: a draft written now cannot be bound into the approved package and would block the next submit-plan. Reopen the design first (pipeline-state.mjs reopen-design, the PO's reopening step), then run this command again");
+  }
+  if (state.planSubmission !== undefined && state.planSubmission !== null) {
+    refuse("--from-design writes nothing while a plan submission stands: the PRD is immutable then and a draft written now could not be bound into the design. Withdraw it first (pipeline-state.mjs cancel-submitted-plan --by <name> --submission-sha256 <the submission digest shown by submit-plan>), then run this command again");
+  }
+  const planPath = state.activeFeature?.planPath;
+  const prd = readInsideRoot(root, planPath);
+  if (prd === null) refuse("--from-design needs the active feature's PRD with its architecture design block; start the feature (pipeline-state.mjs set-feature) and author the design first");
+  const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
+  if (blocks.length !== 1) refuse(`${planPath} must hold exactly one pipeline-architecture-design block; author the design (design-authoring) first`);
+  let design;
+  try { design = JSON.parse(blocks[0][1]); } catch { refuse(`the pipeline-architecture-design block of ${planPath} is not valid JSON; correct it first`); }
+  const { pending, skipped } = classifyDeclaredAdrReferences({ rootDir: root, modules: design?.modules });
+  const created = pending.map((entry) => {
+    const proposal = createProposal(root, new Map([["--slug", entry.slug], ["--title", entry.title]]));
+    return { slug: entry.slug, id: proposal.id, title: entry.title, markdown: proposal.markdown, sidecar: proposal.sidecar, reference: entry.reference };
+  });
+  return { ok: true, created, skipped,
+    next: created.length === 0 ? "Nothing to create: every declared ADR path already has a draft or an accepted record."
+      : "Replace each REPLACE: line of the new docs/adr/draft-<slug>.md, run this script with --refresh (without --slug it updates every draft), then bind the drafts with bind-adr-proposals.mjs (SKILL.md of the architecture-decision skill) before the design review receipt. A draft that is not wanted is discarded with --discard --reason." };
+}
+
 export function main(argv = process.argv.slice(2)) {
   try {
     const values = parseArgs(argv);
@@ -209,6 +255,11 @@ export function main(argv = process.argv.slice(2)) {
     const root = resolve(rootValue);
     const slug = values.get("--slug");
     const refresh = values.has("--refresh");
+    if (values.has("--from-design")) {
+      if (values.size !== 2) refuse("--from-design takes only --root and --from-design (the slugs and titles come from the design's adrReferences)");
+      console.log(JSON.stringify(createFromDesign(root), null, 2));
+      return 0;
+    }
     if (refresh && values.size === 2) {
       console.log(JSON.stringify(refreshAllDigests(root), null, 2));
       return 0;

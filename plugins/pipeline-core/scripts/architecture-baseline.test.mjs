@@ -548,6 +548,86 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.equal(JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "discarded", "draft-unwanted.json"), "utf8")).reason, "first", "the first record is never rewritten");
     });
 
+    // AC-112 (candidate 31, L4 stage 3): --from-design creates one proposal per module adrReferences path of the draft design that has neither a draft nor an
+    // accepted record. Derived from the design block and the files; no stored status, nothing written once the design approval is in force.
+    const designRoot = (references, state = {}, prdText = null) => {
+      const root = makeRoot();
+      fs.mkdirSync(path.join(root, "project"), { recursive: true });
+      fs.mkdirSync(path.join(root, "specs", "f"), { recursive: true });
+      fs.writeFileSync(path.join(root, "project", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f", planPath: "specs/f/prd_f.md" }, ...state })}\n`);
+      const design = { schema: "pipeline.architecture-design.v1", modules: [{ id: "persistence", adrReferences: references }, { id: "ui", adrReferences: [] }] };
+      fs.writeFileSync(path.join(root, "specs", "f", "prd_f.md"), prdText ?? `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+      return root;
+    };
+    const adrFiles = (root) => fs.existsSync(path.join(root, "docs", "adr")) ? fs.readdirSync(path.join(root, "docs", "adr")).sort() : [];
+
+    it("7.6d create-adr --from-design creates one draft per declared path without a draft, titles from the slug, REPLACE text kept; a second call creates nothing and names the skipped", () => {
+      const root = designRoot(["docs/adr/0002-storage.md", "docs/adr/0003-local-cache-layer.md", "docs/adr/0004-already.md"]);
+      fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
+      fs.writeFileSync(path.join(root, "docs", "adr", "0001-already.md"), "# Already\n");
+      fs.writeFileSync(path.join(root, "docs", "adr", "0001-already.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001-already", title: "Already", status: "accepted", digest: sha("# Already\n"), scope: "project", date: "2026-11-18" })}\n`);
+      const first = create(root, "--from-design");
+      assert.equal(first.status, 0, first.stderr);
+      const result = JSON.parse(first.stdout);
+      assert.deepEqual(result.created.map((entry) => entry.id), ["draft-local-cache-layer", "draft-storage"]);
+      assert.deepEqual(result.skipped.map((entry) => [entry.slug, entry.reason]), [["already", "accepted"]]);
+      assert.deepEqual(adrFiles(root), ["0001-already.json", "0001-already.md", "draft-local-cache-layer.json", "draft-local-cache-layer.md", "draft-storage.json", "draft-storage.md"]);
+      const markdown = fs.readFileSync(path.join(root, "docs", "adr", "draft-local-cache-layer.md"), "utf8");
+      assert.match(markdown, /^# Local cache layer\n/u);
+      assert.match(markdown, /REPLACE: the decision, stated so/u, "bind-adr-proposals still refuses it until it is written");
+      const record = JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "draft-storage.json"), "utf8"));
+      assert.equal(record.status, "proposed");
+      assert.equal(record.title, "Storage");
+      assert.equal(record.digest, sha(fs.readFileSync(path.join(root, "docs", "adr", "draft-storage.md"))));
+      assert.equal(validate(path.join(root, "docs", "adr", "draft-storage.json")).status, 0);
+      const before = adrFiles(root).map((name) => fs.readFileSync(path.join(root, "docs", "adr", name), "utf8"));
+      const second = create(root, "--from-design");
+      assert.equal(second.status, 0, second.stderr);
+      const again = JSON.parse(second.stdout);
+      assert.deepEqual(again.created, []);
+      assert.deepEqual(again.skipped.map((entry) => [entry.slug, entry.reason]), [["already", "accepted"], ["local-cache-layer", "draft"], ["storage", "draft"]]);
+      assert.deepEqual(adrFiles(root).map((name) => fs.readFileSync(path.join(root, "docs", "adr", name), "utf8")), before, "a second call writes nothing");
+    });
+
+    it("7.6e create-adr --from-design with no declared path creates nothing and says so; every refusal writes nothing and names the step to take", () => {
+      const none = designRoot([]);
+      const out = create(none, "--from-design");
+      assert.equal(out.status, 0, out.stderr);
+      assert.deepEqual(JSON.parse(out.stdout).created, []);
+      assert.deepEqual(adrFiles(none), []);
+      const approved = designRoot(["docs/adr/0002-storage.md"], { planApproval: { poGateAuthority: { planPath: "specs/f/prd_f.md" } } });
+      const late = create(approved, "--from-design");
+      assert.notEqual(late.status, 0);
+      assert.match(late.stderr, /approval|reopen-design/u);
+      assert.match(late.stderr, /reopen-design/u, "names the step that makes a draft bindable again");
+      assert.deepEqual(adrFiles(approved), []);
+      // The shapes approve-plan and submit-plan write (state schema header of pipeline-state.mjs): a top-level planApproved flag; a recorded submission.
+      const flagged = designRoot(["docs/adr/0002-storage.md"], { planApproved: true });
+      assert.match(create(flagged, "--from-design").stderr, /reopen-design/u);
+      assert.deepEqual(adrFiles(flagged), []);
+      const submitted = designRoot(["docs/adr/0002-storage.md"], { planApproved: false, planSubmission: { planPath: "specs/f/prd_f.md", specPath: "specs/f/spec.md" } });
+      const awaiting = create(submitted, "--from-design");
+      assert.notEqual(awaiting.status, 0);
+      assert.match(awaiting.stderr, /cancel-submitted-plan/u, "names the step that withdraws the submission first");
+      assert.deepEqual(adrFiles(submitted), []);
+      const withdrawn = designRoot(["docs/adr/0002-storage.md"], { planApproved: false });
+      assert.equal(create(withdrawn, "--from-design").status, 0, "a design that was never submitted, or was withdrawn, is writable");
+      const noState = makeRoot();
+      const missing = create(noState, "--from-design");
+      assert.notEqual(missing.status, 0);
+      assert.match(missing.stderr, /submit-plan|plan|design/u);
+      assert.deepEqual(adrFiles(noState), []);
+      const noBlock = designRoot([], {}, "# PRD without a design block\n");
+      assert.notEqual(create(noBlock, "--from-design").status, 0);
+      const ok = designRoot(["docs/adr/0002-storage.md"]);
+      for (const extra of [["--slug", "storage"], ["--title", "T"], ["--refresh"], ["--discard"], ["--scope", "global"]]) {
+        const mixed = create(ok, "--from-design", ...extra);
+        assert.notEqual(mixed.status, 0, extra.join(" "));
+        assert.match(mixed.stderr, /--from-design takes only/u);
+      }
+      assert.deepEqual(adrFiles(ok), [], "a refused call writes nothing");
+    });
+
     it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
       const root = makeRoot();
       makeMap(root, ["alpha", "beta"]);

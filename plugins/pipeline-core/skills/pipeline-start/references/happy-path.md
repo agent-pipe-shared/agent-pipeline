@@ -36,6 +36,7 @@ The acceptance question of the one-shot close is asked after the candidate Verif
    Never write a receipt or a report of the review by hand.
    Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
    `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
+   Before the design review, `create-adr.mjs --root <root> --from-design` creates one proposal for every module `adrReferences` path that has no draft and no accepted record yet (titles from the slugs; `submit-plan` prints the same list as a notice).
    A decision the PO must accept with this design is a proposal first: `create-adr.mjs --root <root> --slug <slug> --title <title>` writes it (`--refresh` after an edit of the Markdown), then
    `bind-adr-proposals.mjs --root <root> --feature <id> --carrier <design.md> --selection <po-selection.json> --draft <slug>` binds it into the carrier and prints every companion path the review receipt must carry. Run both before the receipt.
 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9

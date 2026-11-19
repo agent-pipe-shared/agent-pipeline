@@ -708,6 +708,18 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
     bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
     bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
     bothAdmit(make("--refresh"), f, "refresh of every draft");
+    // AC-112 (candidate 31, L4 stage 3): --from-design is its own closed shape, exactly --root and --from-design.
+    bothAdmit(make("--from-design"), f, "create the drafts of the declared design paths");
+    for (const [label, action] of [
+      ["from-design with a slug", make("--from-design", "--slug", "s")],
+      ["from-design with a title", make("--from-design", "--title", "T")],
+      ["from-design with refresh", make("--from-design", "--refresh")],
+      ["from-design with discard", make("--from-design", "--discard", "--reason", "why")],
+      ["from-design with a value", make("--from-design", "x")],
+      ["from-design of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--from-design")],
+      ["from-design without a root", scriptAction(script, "--from-design")],
+      ["from-design repeated", make("--from-design", "--from-design")],
+    ]) bothRefuse(action, f, label);
     // C28 (plan gates): the discard shape is exactly --root, --slug, --discard and one reason line of 1 to 300 characters, in any order.
     bothAdmit(make("--slug", "storage-adapter", "--discard", "--reason", "The PO chose a different storage design"), f, "discard with a reason");
     bothAdmit(make("--reason", "Superseded", "--discard", "--slug", "storage-adapter"), f, "discard, flag order is free");

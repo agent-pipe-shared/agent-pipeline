@@ -369,6 +369,8 @@ function sanctionedCreateAdrArgs(args, root) {
       requiredValue: { ...rooted, "--reason": (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value) },
     });
   }
+  // AC-112 (candidate 31, L4 stage 3): `--from-design` creates the drafts of the design's declared ADR paths; exactly --root and --from-design, no slug, title or other flag.
+  if (args.includes("--from-design")) return matchFlagSpec(args, { required: { "--from-design": true }, requiredValue: { "--root": rooted["--root"] } });
   if (args.includes("--refresh") && !args.includes("--slug")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: { "--root": rooted["--root"] } });
   if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
   return matchFlagSpec(args, {

@@ -482,7 +482,7 @@ import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
 import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
-import { inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+import { adrDraftHintText, inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { adrDraftReferenceSlug } from "./module-inventory.mjs";
 import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
@@ -12321,6 +12321,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
               + `Correct the architecture design block in the PRD, commit it, and run submit-plan again. No submission or signature request was recorded.`);
             return 2;
           }
+          // AC-112 (candidate 31, L4 stage 2): a declared ADR path with neither a draft nor an accepted record gets a NON-BLOCKING notice; exit code and every refusal stay as they are.
+          try { const adrHint = adrDraftHintText({ rootDir: dir, modules: submitDesignDraft.design?.modules, createAdrScript: scripts("create-adr.mjs") }); if (adrHint !== null) console.error(adrHint); } catch { /* a notice never changes the outcome */ }
         }
       }
       // D165 D4: when no design package applies, a brownfield architecture hurdle

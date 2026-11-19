@@ -1534,6 +1534,36 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
   assert.ok(!submitted.lines.some((line) => line.includes("configure-verify")), "the refused route is no longer named");
 }
 
+// AC-112 (candidate 31, L4 stage 2): a design that declares docs/adr/NNNN-<slug>.md in a module's adrReferences with neither a draft nor an
+// accepted record gets a NON-BLOCKING notice from submit-plan that names the exact create-adr commands. Exit code, state and every refusal
+// stay what they were: the control run (no declared path) and the declared runs end alike.
+{
+  const adrNoticeRun = (featureId, references, prepare = () => {}) => {
+    const { root, deps } = planAuthorityFixture({ featureId, planPath: `specs/${featureId}/prd_${featureId}.md`, specPath: `specs/${featureId}/spec.md` });
+    prepare(root);
+    const design = { modules: [{ id: "persistence", adrReferences: references }, { id: "ui", adrReferences: [] }] };
+    const withDesign = { ...deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft", design }) };
+    return { root, ...capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], withDesign)) };
+  };
+  const control = adrNoticeRun("ac112-control", []);
+  assert.ok(!control.lines.some((line) => line.includes("--from-design")), "a design that declares no ADR path gets no notice");
+  const declared = adrNoticeRun("ac112-declared", ["docs/adr/0002-storage.md"]);
+  assert.equal(declared.result, control.result, `the notice never changes the exit code: ${declared.lines.join(" ")}`);
+  const notice = declared.lines.join("\n");
+  assert.ok(notice.includes(`create-adr.mjs --root ${declared.root} --from-design`), notice);
+  assert.ok(notice.includes(`--root ${declared.root} --slug storage --title "Storage"`), notice);
+  assert.ok(notice.includes("docs/adr/0002-storage.md"), notice);
+  // An accepted record of the same slug under another number (the design names the number before binding assigns it): nothing to hint.
+  const accepted = adrNoticeRun("ac112-accepted", ["docs/adr/0002-storage.md"], (root) => {
+    mkdirSync(join(root, "docs", "adr"), { recursive: true });
+    const body = "# Storage\n";
+    writeFileSync(join(root, "docs", "adr", "0001-storage.md"), body);
+    writeFileSync(join(root, "docs", "adr", "0001-storage.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001-storage",
+      title: "Storage", status: "accepted", digest: sha256Hex(body), scope: "project", date: "2026-11-18" })}\n`);
+  });
+  assert.ok(!accepted.lines.some((line) => line.includes("--from-design")), `an accepted record of the slug is not listed: ${accepted.lines.join(" ")}`);
+}
+
 // D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE
 // the PO signs, instead of letting set-phase implementation refuse it later.
 {

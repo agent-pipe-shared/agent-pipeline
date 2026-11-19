@@ -343,3 +343,50 @@ export function inspectAdrDraftBindings({ rootDir, featureDirs = [] } = {}) {
   }
   return result;
 }
+
+// --- AC-112 (candidate 31, L4 stages 2 and 3): the ADR paths a design declares that have neither a draft nor an accepted record ---
+// The design's only marker of a decision to record is a module `adrReferences` path `docs/adr/NNNN-<slug>.md` (the number is a preview, binding assigns
+// the final one, so the slug is the identity). Derived from the declared paths and the files alone: no stored status, nothing written here.
+const DECLARED_ADR_REFERENCE = /^(?:\.\/)?docs\/adr\/\d{4}-([a-z0-9][a-z0-9-]{0,63})\.md$/u;
+const slugTitle = (slug) => { const words = slug.replace(/-+/gu, " ").trim(); return `${words.charAt(0).toUpperCase()}${words.slice(1)}`; };
+
+/**
+ * `{ pending, skipped }` for the declared references of `modules` (the design block's module list), sorted by slug and unique across modules.
+ * `pending`: `{ slug, reference, title }` with the title derived from the slug. `skipped`: `{ slug, reference, reason }`, reason `draft` (a
+ * draft-<slug> file exists in any state, the same test create-adr refuses on) or `accepted` (an accepted or superseded NNNN-<slug> record exists).
+ */
+export function classifyDeclaredAdrReferences({ rootDir, modules } = {}) {
+  const found = new Map();
+  for (const module of Array.isArray(modules) ? modules : []) {
+    for (const reference of Array.isArray(module?.adrReferences) ? module.adrReferences : []) {
+      const slug = typeof reference === "string" ? DECLARED_ADR_REFERENCE.exec(reference)?.[1] : undefined;
+      if (slug !== undefined && !found.has(slug)) found.set(slug, reference.replace(/^\.\//u, ""));
+    }
+  }
+  const dir = typeof rootDir === "string" ? join(resolve(rootDir), "docs", "adr") : null;
+  let names = [];
+  try { if (dir !== null) names = readdirSync(dir); } catch { names = []; }
+  const pending = [];
+  const skipped = [];
+  for (const slug of [...found.keys()].sort()) {
+    const reference = found.get(slug);
+    const accepted = names.some((name) => new RegExp(`^\\d{4}-${slug}\\.json$`, "u").test(name) && ["accepted", "superseded"].includes(readJsonFile(join(dir, name))?.status));
+    if (names.includes(`draft-${slug}.md`) || names.includes(`draft-${slug}.json`)) skipped.push({ slug, reference, reason: "draft" });
+    else if (accepted) skipped.push({ slug, reference, reason: "accepted" });
+    else pending.push({ slug, reference, title: slugTitle(slug) });
+  }
+  return { pending, skipped };
+}
+
+/** The non-blocking submit-plan notice for the pending declared paths (null when there is none): the exact create-adr commands and the steps after them. */
+export function adrDraftHintText({ rootDir, modules, createAdrScript } = {}) {
+  const { pending } = classifyDeclaredAdrReferences({ rootDir, modules });
+  if (pending.length === 0) return null;
+  const base = `node ${createAdrScript} --root ${rootDir}`;
+  return `Notice: the design declares ${pending.length === 1 ? "an ADR path" : `${pending.length} ADR paths`} with no draft and no accepted record (${pending.map((entry) => entry.reference).join(", ")}). `
+    + `This submission is not blocked. To record ${pending.length === 1 ? "the decision" : "the decisions"} with this design, first withdraw the recorded submission (a draft written while it stands could not be bound): `
+    + `pipeline-state.mjs cancel-submitted-plan --by <name> --submission-sha256 <the submission digest shown by submit-plan>; then create the draft${pending.length === 1 ? "" : "s"}: ${base} --from-design `
+    + `(one draft per declared path; for one entry at a time: ${pending.map((entry) => `${base} --slug ${entry.slug} --title "${entry.title}"`).join(" ; ")}), write each REPLACE: line of the new docs/adr/draft-<slug>.md, `
+    + `run ${base} --refresh, bind the drafts with bind-adr-proposals.mjs (the next submit-plan names the exact command) and submit again. `
+    + `A path that is not meant to be a decision is removed from the module's adrReferences instead.`;
+}

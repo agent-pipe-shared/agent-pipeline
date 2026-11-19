@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, compareEffectiveArchitectureDecisions, inspectAdrDraftBindings, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
+import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, adrDraftHintText, classifyDeclaredAdrReferences, compareEffectiveArchitectureDecisions, inspectAdrDraftBindings, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
 import { runArchitectureEffectiveCli } from "../scripts/architecture-effective-decisions.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -371,4 +371,51 @@ test("C28 ADR drafts: the discard record directory raises no decision finding (a
   mkdirSync(join(root, "docs", "adr", "discarded"), { recursive: true });
   writeFileSync(join(root, adrDraftDiscardPath("unwanted")), `${JSON.stringify({ schema: ADR_DRAFT_DISCARD_SCHEMA, id: "draft-unwanted", markdownSha256: digest, reason: "no longer needed", discardedAt: NOW })}\n`);
   assert.deepEqual(inspect(root).findings, []);
+});
+
+// --- AC-112 (candidate 31, L4 stages 2 and 3): the module adrReferences a design declares that have neither a draft nor an accepted record ---
+// Derived from the files and the declared paths alone: no stored status. submit-plan prints the notice, create-adr --from-design creates the drafts.
+const declared = (...references) => [{ id: "persistence", adrReferences: references }, { id: "ui", adrReferences: [] }];
+
+test("AC-112 declared ADR paths: a path with no draft and no accepted record is pending, with a title derived from the slug", (t) => {
+  const root = fixture(t);
+  const { pending, skipped } = classifyDeclaredAdrReferences({ rootDir: root, modules: declared("docs/adr/0002-storage.md", "./docs/adr/0003-local-cache-layer.md") });
+  assert.deepEqual(pending, [
+    { slug: "local-cache-layer", reference: "docs/adr/0003-local-cache-layer.md", title: "Local cache layer" },
+    { slug: "storage", reference: "docs/adr/0002-storage.md", title: "Storage" }]);
+  assert.deepEqual(skipped, []);
+});
+
+test("AC-112 declared ADR paths: a draft of the slug (any state) or an accepted record with another number is skipped and named, never pending", (t) => {
+  const root = fixture(t);
+  draftPair(root, "has-draft");
+  decision(root, "0001-already", { status: "accepted" });
+  decision(root, "0004-old-one", { status: "superseded" });
+  decision(root, "0005-only-proposed", { status: "proposed" });
+  const { pending, skipped } = classifyDeclaredAdrReferences({ rootDir: root, modules: declared("docs/adr/0002-has-draft.md", "docs/adr/0007-already.md", "docs/adr/0009-old-one.md", "docs/adr/0006-only-proposed.md") });
+  assert.deepEqual(pending.map((entry) => entry.slug), ["only-proposed"], "a proposed NNNN record is not an accepted record");
+  assert.deepEqual(skipped.map((entry) => [entry.slug, entry.reason]), [["already", "accepted"], ["has-draft", "draft"], ["old-one", "accepted"]]);
+});
+
+test("AC-112 declared ADR paths: other shapes, duplicates across modules and a malformed module list are ignored; nothing throws", (t) => {
+  const root = fixture(t);
+  const modules = [{ id: "a", adrReferences: ["docs/adr/0002-storage.md", "docs/adr/draft-x.md", "docs/adr/0002-Storage.md", "docs/other/0002-y.md", "docs/adr/0002-z.json", 7, null] },
+    { id: "b", adrReferences: ["docs/adr/0003-storage.md"] }, null, { id: "c" }, { id: "d", adrReferences: "docs/adr/0002-q.md" }];
+  assert.deepEqual(classifyDeclaredAdrReferences({ rootDir: root, modules }).pending.map((entry) => entry.slug), ["storage"]);
+  for (const bad of [undefined, null, "x", {}]) assert.deepEqual(classifyDeclaredAdrReferences({ rootDir: root, modules: bad }), { pending: [], skipped: [] });
+  assert.deepEqual(classifyDeclaredAdrReferences({ rootDir: join(root, "missing"), modules: declared("docs/adr/0002-storage.md") }).pending.map((entry) => entry.slug), ["storage"], "no docs/adr at all means everything is pending");
+});
+
+test("AC-112 declared ADR paths: the notice names the exact create-adr commands, the one-entry form, and is null when nothing is pending", (t) => {
+  const root = fixture(t);
+  const script = join(root, "scripts", "create-adr.mjs");
+  assert.equal(adrDraftHintText({ rootDir: root, modules: declared(), createAdrScript: script }), null);
+  const text = adrDraftHintText({ rootDir: root, modules: declared("docs/adr/0002-storage.md"), createAdrScript: script });
+  assert.ok(text.includes(`node ${script} --root ${root} --from-design`), text);
+  assert.ok(text.includes(`node ${script} --root ${root} --slug storage --title "Storage"`), text);
+  assert.ok(text.includes("docs/adr/0002-storage.md"), text);
+  assert.doesNotMatch(text, /ADR-DRAFT/u, "a notice, not one of the refusal codes the submit-plan pins match");
+  assert.ok(text.indexOf("cancel-submitted-plan") !== -1 && text.indexOf("cancel-submitted-plan") < text.indexOf("--from-design"), "the withdraw step comes first: a draft written while the submission stands could not be bound");
+  const two = adrDraftHintText({ rootDir: root, modules: declared("docs/adr/0002-storage.md", "docs/adr/0003-cache.md"), createAdrScript: script });
+  assert.ok(two.includes("--from-design") && two.includes(`--slug cache --title "Cache"`) && two.includes(`--slug storage --title "Storage"`), two);
 });
