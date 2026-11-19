@@ -342,7 +342,9 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
 // C20b G20-52 (live Claude greenfield 2026-11-07): the onboarding seeds `VERSION` (consumer release = version tag, G20-42) in the same
 // scaffold, and the staged-commit check refused it GUARD-DEVPLAN-LIFECYCLE twice (scaffold commit, architecture commit); it is
 // release coordination, not product implementation, so it belongs here too.
-const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml", "VERSION"]);
+// C31 L5: the onboarding also seeds a root README.md skeleton; the ONE exact root file is admitted (never a nested or suffixed README),
+// so the scaffold commit and the agent's later README edits are never refused by the lifecycle gate. `backlog/` is already an exempt prefix.
+const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml", "VERSION", "README.md"]);
 const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
 
 /**

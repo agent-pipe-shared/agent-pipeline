@@ -19,6 +19,8 @@ import { fixture as projectUninstallFixture } from "./project-uninstall.fixture.
 import {derivePlanLifecycle,CURRENT_APPROVAL_SCHEMA,PLAN_SUBMISSION_SCHEMA,sha256CanonicalJson} from "./plan-spec-state-v2.mjs";
 import {recordConsentGiven} from "./onboarding-consent-marker.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+import { DEFAULT_EXEMPT_PREFIXES, isOnboardingScaffoldPath } from "./guard-devplan-policy.mjs";
+import { initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
 
 import {
   applyProjectOnboardingManifestRepairV4,
@@ -2969,8 +2971,8 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
-      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "backlog/README.md" /* C31 L5 */, "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "project/pipeline.json", "project/pipeline.yaml", "README.md" /* C31 L5: the create-only root README seed, restated in place */, "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
     ]);
   } finally { dispose(path); }
 });
@@ -7823,8 +7825,8 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.deepEqual(
       plan.targets.map((target) => target.path),
       [
-        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
-        "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "backlog/README.md" /* C31 L5 */, "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+        "project/pipeline.json", "project/pipeline.yaml", "README.md" /* C31 L5: the create-only root README seed, restated in place */, "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
       ],
       "fresh onboarding seeds the canonical project authority, the ignore rules for the paths it writes into, and the docs/adr decision-record hint and template (D80); runtime targets are initialized later",
     );
@@ -8006,8 +8008,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
-      "project/pipeline.json", "project/pipeline.yaml", "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "backlog/README.md" /* C31 L5 */, "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "project/pipeline.json", "project/pipeline.yaml", "README.md" /* C31 L5: the create-only root README seed, restated in place */, "VERSION" /* G20-42: the create-only consumer VERSION seed, restated in place */,
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
@@ -8094,7 +8096,15 @@ test("a recognized read-only host control layout receives portable onboarding wi
   } finally { dispose(path); }
 });
 
+// C31 L5 cases are bodies, not callbacks: the suite's closed partition (EXPECTED_CASE_COUNT = SHARD_COUNT x CHUNK_COUNT x CASES_PER_CHILD) fixes the callback count,
+// so they run inside this one existing callback, each failure named.
+const C31_L5_CASES = [];
+const c31L5Case = (name, body) => C31_L5_CASES.push({ name, body });
 test("an existing unmanaged project receives an additive adoption plan", () => {
+  assert.equal(C31_L5_CASES.length, 3, "the three C31 L5 case bodies are registered before this callback runs");
+  for (const { name, body } of C31_L5_CASES) {
+    try { body(); } catch (error) { error.message = `[C31 L5 case: ${name}] ${error.message}`; throw error; }
+  }
   const path = root();
   try {
     writeFileSync(join(path, "README.md"), "existing project\n");
@@ -8120,6 +8130,71 @@ test("an existing unmanaged project receives an additive adoption plan", () => {
     assert.equal(readFileSync(join(path, "README.md"), "utf8"), "existing project\n");
     assert.equal(existsSync(join(path, "pipeline.user.yaml")), true);
     assert.equal(existsSync(join(path, ".git")), true);
+  } finally { dispose(path); }
+});
+
+// C31 L5: a fresh project gets a root README.md and a backlog/README.md skeleton, create-only. The PO condition: the scaffold must NEVER cause a write
+// refusal or roll back the onboarding, so (a) every plan target is admitted by the scaffold predicate or an exempt prefix (the structural guard that
+// would have caught the VERSION refusal of G20-52 before a live run) and (b) an existing README or backlog entry, in any letter case, gets no seed.
+c31L5Case("every onboarding target is admitted by the draft-phase write policy, and the README and backlog seeds are applied create-only with their own kinds", () => {
+  const path = root();
+  try {
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready");
+    for (const target of plan.targets) {
+      const folded = target.path.toLowerCase();
+      assert.ok(isOnboardingScaffoldPath(folded) || DEFAULT_EXEMPT_PREFIXES.some((prefix) => folded.startsWith(prefix)),
+        `${target.path} would be refused by guard-devplan while the first feature is in draft`);
+    }
+    const kinds = Object.fromEntries(plan.targets.map((target) => [target.path, target.kind]));
+    assert.equal(kinds["README.md"], "project-readme");
+    assert.equal(kinds["backlog/README.md"], "project-backlog");
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    for (const seed of initialGreenfieldProjectDocTargets("fresh")) {
+      assert.equal(readFileSync(join(path, seed.path), "utf8"), seed.bytes, seed.path);
+    }
+  } finally { dispose(path); }
+});
+
+c31L5Case("a root that already holds a README (any letter case, any extension) or a backlog entry gets no seed for it and onboarding still applies", () => {
+  for (const readmeName of ["Readme.md", "readme", "README.rst", "README"]) {
+    const path = root();
+    try {
+      writeFileSync(join(path, readmeName), "the project's own words\n");
+      const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+      assert.equal(plan.status, "ready", readmeName);
+      assert.equal(plan.greenfieldScaffold.status, "planned", `${readmeName}: a README keeps the root greenfield-equivalent`);
+      assert.equal(plan.targets.some((target) => /^readme(\..*)?$/iu.test(target.path)), false, `${readmeName}: no README target`);
+      assert.equal(plan.targets.some((target) => target.path === "backlog/README.md"), true, `${readmeName}: the backlog seed is independent`);
+      assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied", readmeName);
+      assert.equal(readFileSync(join(path, readmeName), "utf8"), "the project's own words\n", readmeName);
+      assert.equal(readdirSync(path).filter((name) => /^readme(\..*)?$/iu.test(name)).length, 1, `${readmeName}: no second README beside it`);
+    } finally { dispose(path); }
+  }
+  for (const backlogName of ["backlog", "Backlog"]) {
+    const path = root();
+    try {
+      mkdirSync(join(path, backlogName));
+      writeFileSync(join(path, backlogName, "idea.md"), "an idea\n");
+      const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+      assert.equal(plan.status, "ready", backlogName);
+      assert.equal(plan.targets.some((target) => target.path.toLowerCase().startsWith("backlog/")), false, `${backlogName}: no backlog target`);
+      assert.equal(plan.targets.some((target) => target.path === "README.md"), true, `${backlogName}: the README seed is independent`);
+      assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied", backlogName);
+      assert.equal(readFileSync(join(path, backlogName, "idea.md"), "utf8"), "an idea\n", backlogName);
+    } finally { dispose(path); }
+  }
+});
+
+c31L5Case("an existing project root that is not greenfield-equivalent gets neither the README nor the backlog seed", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "package.json"), "{}\n");
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.state, "existing-unmanaged");
+    assert.equal(plan.targets.some((target) => target.path === "README.md" || target.path === "backlog/README.md"), false);
   } finally { dispose(path); }
 });
 

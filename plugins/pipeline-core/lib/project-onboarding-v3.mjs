@@ -11,7 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
 import { CONSUMER_VERSION_INITIAL } from "./consumer-release.mjs";
 import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
-import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets, initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
 import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
 // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
@@ -6191,9 +6191,14 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   const greenfieldFromWalk = inspected.status === "existing-unmanaged" && greenfieldScaffold.status === "planned";
   const scaffoldClassification = greenfieldFromWalk ? "fresh" : inspected.status;
   const agentEntry = initialGreenfieldAgentEntryTarget(scaffoldClassification);
+  // C31 L5: the README and backlog skeletons are create-only and must never fail the apply (a `wx` collision rolls the whole onboarding back).
+  // Any root README (any case, any extension) or backlog entry is the project's own, and the match is case-insensitive for case-insensitive filesystems.
+  const existingRootNames = inspected.entries ?? [];
+  const projectDocs = initialGreenfieldProjectDocTargets(scaffoldClassification).filter((target) =>
+    !existingRootNames.some((name) => (target.path === "README.md" ? /^readme(\..*)?$/iu : /^backlog$/iu).test(name)));
   const internal = [
     ...initialGreenfieldMapTargets(scaffoldClassification),
-    ...(agentEntry ? [agentEntry] : []), ...initialGreenfieldDecisionRecordTargets(scaffoldClassification),
+    ...(agentEntry ? [agentEntry] : []), ...initialGreenfieldDecisionRecordTargets(scaffoldClassification), ...projectDocs,
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,
@@ -6218,7 +6223,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
       : (target.path === ".gitignore" || target.path === ".gitattributes" || target.path === "VERSION"
         ? (target.path === ".gitignore" ? "project-ignore" : (target.path === "VERSION" ? "project-version" : "project-attributes"))
         : (target.path === "AGENTS.md" ? "project-entry" : (target.path.startsWith("docs/adr/") ? "project-decision-records"
-          : (target.path.startsWith("project/") ? "project-authority" : "runtime")))),
+          : (target.path === "README.md" ? "project-readme" : (target.path === "backlog/README.md" ? "project-backlog"
+            : (target.path.startsWith("project/") ? "project-authority" : "runtime")))))),
     before: describe(null),
     after: describe(target.bytes),
     changed: true,

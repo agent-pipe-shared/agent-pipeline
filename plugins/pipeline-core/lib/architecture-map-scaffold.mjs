@@ -14,7 +14,7 @@ export function initialGreenfieldAgentEntryTarget(classification) {
   if (!["fresh", "fresh-host-managed"].includes(classification)) return null;
   return {
     path: "AGENTS.md",
-    bytes: "# Agent-Pipeline project entry\n\nThis file is a pointer, not a second ruleset. At a real session start or runtime re-entry, invoke `pipeline-core:pipeline-start`.\n\nRead the [architecture map](architecture/map/index.md) before planning or changing owned implementation. Keep this project's architecture decisions in `docs/adr/` (see `docs/adr/README.txt`). Preserve this project-owned file when updating the plugin.\n",
+    bytes: "# Agent-Pipeline project entry\n\nThis file is a pointer, not a second ruleset. At a real session start or runtime re-entry, invoke `pipeline-core:pipeline-start`.\n\nRead the [architecture map](architecture/map/index.md) before planning or changing owned implementation. Keep this project's architecture decisions in `docs/adr/` (see `docs/adr/README.txt`). The root `README.md` says how to start and test the project and `backlog/README.md` says where open work is kept; keep both current. Preserve this project-owned file when updating the plugin.\n",
   };
 }
 
@@ -27,6 +27,12 @@ decisions only in chat, commit messages or code comments.
 
 How: use the skill \`pipeline-core:architecture-decision\`. It assesses whether a
 decision is architecturally significant and drafts the record.
+- Create the draft with create-adr.mjs (in the scripts directory of the Pipeline
+  plugin): create-adr.mjs --root <project root> --slug <slug> --title "<title>".
+  It writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json with the digest
+  already computed. Do not write a draft by hand.
+- The design step binds the draft with bind-adr-proposals.mjs; the accepted record
+  below appears only after the PO's design approval.
 - Markdown record: docs/adr/XXXX-<slug>.md (four-digit number, next free one).
 - Companion sidecar: docs/adr/XXXX-<slug>.json (the skill states the schema and
   the digest of the Markdown bytes).
@@ -70,5 +76,68 @@ export function initialGreenfieldDecisionRecordTargets(classification) {
   return [
     { path: "docs/adr/README.txt", bytes: DECISION_RECORD_HINT },
     { path: "docs/adr/templates/adr-template.md", bytes: DECISION_RECORD_TEMPLATE },
+  ];
+}
+
+const PROJECT_README_SEED = `# Project README
+
+This file is the front door of the project. It starts as a skeleton: fill in the two
+sections below when the first deliverable runs, so that anyone can start and test the
+project without asking.
+
+## How to start
+
+Not filled yet. State the exact command that starts the product and what to expect
+when it runs. Fill this in when the first deliverable runs.
+
+## How to test
+
+Not filled yet. State the exact command that runs the tests. Fill this in when the
+first deliverable runs.
+
+## Where things live
+
+- \`AGENTS.md\`: the entry for agents working on this project.
+- \`architecture/map/index.md\`: the architecture map.
+- \`docs/adr/README.txt\`: how architecture decisions are recorded.
+- \`backlog/README.md\`: where open work and ideas are kept.
+`;
+
+const PROJECT_BACKLOG_SEED = `# Backlog
+
+Open work and ideas of this project live here, one file per item. This is a plain
+list of files, not a ledger: no index or status file has to be kept in step.
+
+## How to add an item
+
+- One file per item: \`backlog/items/YYYY-MM-DD-slug.md\` (the date it was written).
+- Start the file with this frontmatter, then describe the item in plain words:
+
+\`\`\`
+---
+title: Short title
+status: open
+created: YYYY-MM-DD
+source: where the idea came from
+---
+\`\`\`
+
+## Status words
+
+- \`open\`: written down, not started.
+- \`in_progress\`: someone is working on it.
+- \`closed\`: finished or decided against; say which in the item's last lines.
+
+Never delete an item. Close it, so the reason stays readable.
+`;
+
+/** Separate create-only root documents: a README skeleton and the backlog skeleton. Like the agent
+ * entry they are outside the map's byte-bound scaffold. Static bytes: no project name, no
+ * placeholder token, no stored status. The caller skips a target whose root entry already exists. */
+export function initialGreenfieldProjectDocTargets(classification) {
+  if (!["fresh", "fresh-host-managed"].includes(classification)) return [];
+  return [
+    { path: "README.md", bytes: PROJECT_README_SEED },
+    { path: "backlog/README.md", bytes: PROJECT_BACKLOG_SEED },
   ];
 }

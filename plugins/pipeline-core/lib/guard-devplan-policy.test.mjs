@@ -80,6 +80,23 @@ test("staged lifecycle policy blocks indirect implementation and package outputs
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// C31 L5: the onboarding seeds a root README.md; the scaffold commit in a draft lifecycle must never be refused for it (the G20-52 failure of VERSION).
+// Exactly the ONE root file is admitted: a nested or suffixed README stays implementation.
+test("the onboarding-seeded root README.md is committable and writable in a draft lifecycle; nothing README-like beside it is", () => {
+  const root = lifecycleFixture();
+  try {
+    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: ["README.md"] }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
+    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: ["README.md", "backlog/README.md", "docs/adr/README.txt", "VERSION"] }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
+    for (const path of ["sub/README.md", "README.md.bak", "src/README.md", "README.txt"]) {
+      const result = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: [path] });
+      assert.equal(result.code, "PIPELINE-STAGED-LIFECYCLE-BLOCKED", path);
+    }
+    assert.equal(devPlanGateVerdict({ filePath: "README.md", projectDir: root }).verdict, "allow");
+    assert.equal(devPlanGateVerdict({ filePath: "README.md", projectDir: root, stagedCommit: true }).verdict, "allow");
+    assert.equal(devPlanGateVerdict({ filePath: "src/x.mjs", projectDir: root }).verdict, "block");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("the generated Codex projection is committable in a draft lifecycle, and no other path under .codex is", () => {
   const root = lifecycleFixture();
   try {

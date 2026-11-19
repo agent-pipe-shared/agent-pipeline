@@ -1043,7 +1043,7 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
 // (AC-207). Parity only: nothing outside the policy library's scaffold lists is newly admitted.
 {
   const devplanPolicy = await import("../lib/guard-devplan-policy.mjs");
-  const SCAFFOLD_WRITES = ["architecture/map/modules.json", "AGENTS.md", "pipeline.user.yaml"];
+  const SCAFFOLD_WRITES = ["architecture/map/modules.json", "AGENTS.md", "pipeline.user.yaml", "README.md" /* C31 L5 */];
   const PRODUCTION_WRITES = ["lib/production.mjs", "src/implementation.mjs"];
   const phases = [
     ["draft", UNAPPROVED_STATE, false],
@@ -1086,7 +1086,10 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
     ["src/implementation.mjs", false],
     ["lib/production.mjs", false],
     ["tests/a.test.mjs", false],
-    ["README.md", false],
+    // C31 L5 (restated pin, QG-04: it fixed the old refusal): the onboarding seeds a root README.md, exactly that one file is scaffold.
+    ["README.md", true],
+    ["sub/README.md", false],
+    ["README.md.bak", false],
     ["architecture-notes.md", false],
     ["sub/AGENTS.md", false],
     ["sub/pipeline.user.yaml", false],
