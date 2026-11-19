@@ -37,6 +37,8 @@ export function runConsumerVerifyCheck(check, deps = {}) {
       err("no browser test ran; this is not a product failure");
       err("browser verification pending");
       err(`human step: ${HUMAN_STEPS[preflight.code] ?? UNKNOWN_STATE_STEP}`);
+      // C31c (cloud review of candidate 31): a project that already used this id for a command of another tool sees a red suite that asks for Playwright; say why it was taken over.
+      err("note: the id browser-smoke is reserved for a Playwright and Chromium smoke test; a project command of another tool that uses this id must be renamed (docs/usage.md)");
       return 1;
     }
     const result = spawnFn(selected.command, { cwd: rootDir, shell: true, stdio: "inherit" });

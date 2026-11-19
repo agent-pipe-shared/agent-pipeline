@@ -81,6 +81,7 @@ for (const { state, code, step } of UNAVAILABLE_STATES) {
       const humanSteps = text.split("\n").filter((line) => /^human step: \S.{15,}/u.test(line));
       assert.equal(humanSteps.length, 1, "exactly one human step per unavailable state");
       assert.match(humanSteps[0], step);
+      assert.match(text, /note: the id browser-smoke is reserved for a Playwright and Chromium smoke test; a project command of another tool that uses this id must be renamed/u, "says why a renamed-away project command was taken over");
     } finally { h.done(); }
   });
 }
