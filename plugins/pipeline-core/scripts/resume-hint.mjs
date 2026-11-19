@@ -79,7 +79,8 @@ function main() {
   // recorded bytes, never accepted here as a flag.
   if (command === "consume" || command === "query") {
     const sessionId = value(args, "--session-id");
-    if (!sessionId) throw new Error(`${command} requires --session-id`);
+    // C32 (Antigravity greenfield 2026-11-19, F19): the refusal named the flag and not where its value comes from. The id is the caller's own opaque identity (see recordResumeHintConsumption).
+    if (!sessionId) throw new Error(`${command} requires --session-id <id>: any non-empty id of this session that you choose once and reuse, the same value for consume and query (the receipt is keyed by its hash); use the session id your runner shows when it shows one`);
     return command === "consume"
       ? recordResumeHintConsumption({ rootDir, sessionId })
       : queryResumeHintConsumption({ rootDir, sessionId });

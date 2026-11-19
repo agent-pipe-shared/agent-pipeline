@@ -249,6 +249,15 @@ test("query before any capture reports the no-card outcome", () => {
   assert.equal(queried.outcome, "no-card");
 });
 
+test("consume and query without --session-id say what the id is and that both verbs take the same value (C32 F19)", () => {
+  const root = freshRoot("no-session-id");
+  for (const verb of ["consume", "query"]) {
+    const refused = run([verb, "--root", root]);
+    assert.equal(refused.status, 2, verb);
+    assert.match(refused.stderr, new RegExp(`${verb} requires --session-id <id>: any non-empty id of this session that you choose once and reuse, the same value for consume and query`, "u"));
+  }
+});
+
 test("query after capture but before consume reports not-consumed with an absent-receipt code", () => {
   const root = freshRoot("query-not-consumed");
   const cardFile = join(root, "card.json");
