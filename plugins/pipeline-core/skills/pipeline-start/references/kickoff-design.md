@@ -104,6 +104,12 @@ prose content is translated, never the machine-oriented section headings — no
 validator anywhere reads heading text, so this is a documentary convention,
 not an enforced schema.
 
+Write the chosen language with its own characters from the first draft, never
+transliterated: German with `ä`, `ö`, `ü` and `ß`, not `ae`, `oe`, `ue` and
+`ss`. A transliterated Spec has to be rewritten by hand afterwards (a script
+that converts it is a new tool call the lifecycle may refuse before the project
+is ready), which costs a full second write of the document.
+
 Two different guard-drift refusals can hit this same PRD-authoring step in a
 row — a `PO-GATE-PRD-LANGUAGE-MISMATCH` on the marker, then a separate
 `projection-drift` refusal right after that repair — and they are DIFFERENT

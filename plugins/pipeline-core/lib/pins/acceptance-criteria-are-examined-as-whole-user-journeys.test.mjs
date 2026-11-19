@@ -92,6 +92,12 @@ test("J8 the example criterion of the kickoff reference passes the hand-off, and
   assert.equal(refused.code, "PLR-HANDOFF-NO-JOURNEY", JSON.stringify(refused));
 });
 
+// C32 F7 (Claude greenfield 2026-11-19): a German Spec written with transliterated umlauts was rewritten in full 1.5 minutes later. The kickoff reference says it once, where the language is bound.
+test("J9 the kickoff reference says to write the document language with its own characters, never transliterated", () => {
+  const reference = flat(read("plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"));
+  assert.match(reference, /Write the chosen language with its own characters from the first draft, never transliterated: German with `ä`, `ö`, `ü` and `ß`, not `ae`, `oe`, `ue` and `ss`\./u);
+});
+
 // C29 G6 (Glossover): the hand-off admitted a Spec as soon as one row was locatable, so a row the registration cannot locate passed it,
 // submit-plan's registration refused it afterwards, and the journey gaps only surfaced on the attempt after that.
 test("J1/G6 a criterion row the registration cannot locate is refused at the hand-off, together with the journey gaps, in one refusal", async () => {
