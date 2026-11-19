@@ -1878,13 +1878,35 @@ test("driveOnboardingInit: binds a returned root-less project action to the Driv
         assert.equal(options.env.CLAUDE_PROJECT_DIR, root);
         return respond({ schema: "pipeline.inspect.v1", status: "ready", nextAction: null });
       }
-      assert.equal(executable, "node");
+      // C32: the re-anchor step names `node`; it is spawned as the Driver's own interpreter (restated pin, was the bare name).
+      assert.equal(executable, process.execPath);
       assert.equal(argv.includes("--root"), true);
       return respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
     };
     const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
     assert.equal(result.outcome, "ready", JSON.stringify(result));
     assert.equal(calls, 3, "a command's own ready response requires a fresh inspect readback");
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit C32: the first inspect step and a published bare `node` action are spawned as the Driver's own interpreter", () => {
+  const root = freshRoot();
+  try {
+    const spawned = [];
+    const run = (executable, argv) => {
+      spawned.push(executable);
+      if (spawned.length === 1) {
+        return respond({ schema: "pipeline.project-onboarding.v4", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: false } });
+      }
+      return respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
+    };
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run, probeRoute: () => ({ ok: true }) });
+    assert.equal(result.outcome, "ready", JSON.stringify(result));
+    assert.ok(spawned.length >= 2);
+    for (const executable of spawned) assert.equal(executable, process.execPath, "no spawn names the bare `node` that a sandbox may not resolve (spawnSync node EPERM)");
+    assert.equal(result.steps[0].executable, "node", "the readback keeps the published name");
   } finally {
     dispose(root);
   }

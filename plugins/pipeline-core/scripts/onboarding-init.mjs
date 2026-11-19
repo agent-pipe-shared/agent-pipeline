@@ -1188,11 +1188,18 @@ function applyInitialOnboardingAnswersCore({
 // route is checked BEFORE the first mutating step and the host route is named in the answer, so nothing fails half way and nothing was changed.
 const HOST_ROUTE_CODES = new Set(["EPERM", "EACCES"]);
 
+// C32 (Codex greenfield 2026-11-19: the first inspect step failed with `spawnSync node EPERM` and needed an escalated retry). A published action names the
+// bare executable `node`, which a sandboxed child resolves through PATH to a version-manager install it may not start. The Driver is itself running on a node
+// that can start, so a bare `node` is spawned as that same interpreter (`process.execPath`); every other executable is spawned exactly as published.
+function reachableNode(executable) {
+  return executable === "node" ? process.execPath : executable;
+}
+
 /** Default route probe: can this context start the executable at all? Only a refused start (no status, EPERM/EACCES) says no; anything else is the step's own business. */
 function probeExecutionRoute(executable) {
   const base = String(executable).split(/[\\/]/u).pop().toLowerCase();
   if (executable !== process.execPath && base !== "node" && base !== "node.exe") return { ok: true };
-  const result = spawnSync(executable, ["--version"], { encoding: "utf8", shell: false, timeout: 10_000, windowsHide: true });
+  const result = spawnSync(reachableNode(executable), ["--version"], { encoding: "utf8", shell: false, timeout: 10_000, windowsHide: true });
   const code = result?.error?.code;
   return (result?.status === null || result?.status === undefined) && HOST_ROUTE_CODES.has(code) ? { ok: false, code } : { ok: true };
 }
@@ -1245,7 +1252,7 @@ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = nu
       ...(bindProjectRoot ? { CLAUDE_PROJECT_DIR: projectRoot } : {}),
     };
   }
-  const result = run(executable, argv, options);
+  const result = run(reachableNode(executable), argv, options);
   if (result?.error?.code === "ETIMEDOUT") {
     return { ok: false, faultCode: "execution-budget-exhausted", exitCode: result.status ?? null, stderr: "The child exceeded the remaining onboarding budget. Its operation may be partial; re-inspect before any retry." };
   }
