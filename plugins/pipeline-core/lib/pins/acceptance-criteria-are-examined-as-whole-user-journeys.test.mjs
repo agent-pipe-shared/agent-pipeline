@@ -77,6 +77,21 @@ test("J1 the same Spec with the journeys and the asserted effect is ready", asyn
   assert.equal(verdict.code, "PLR-HANDOFF-READY");
 });
 
+// C32 (Claude greenfield 2026-11-19): the Spec author read a plugin test file to learn the clause shape, because the reference only named it.
+// The example row of the kickoff reference is a worked criterion: with its clauses the hand-off admits it, with the clauses cut it refuses it.
+test("J8 the example criterion of the kickoff reference passes the hand-off, and the same row without its clauses does not", async () => {
+  const reference = flat(read("plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"));
+  const example = reference.match(/`(\| AC-3 \|[^`]*?\|)`/u)?.[1];
+  assert.ok(example, "the kickoff reference carries a worked criterion row (| AC-3 | ... |)");
+  assert.match(example, /Journeys:.*Asserts:/u);
+  const ready = await handoff(spec(example));
+  assert.equal(ready.ok, true, JSON.stringify(ready));
+  const bare = example.replace(/ Journeys:.*?(?= \| named suite \|$)/u, "");
+  assert.doesNotMatch(bare, /Journeys:/u);
+  const refused = await handoff(spec(bare));
+  assert.equal(refused.code, "PLR-HANDOFF-NO-JOURNEY", JSON.stringify(refused));
+});
+
 // C29 G6 (Glossover): the hand-off admitted a Spec as soon as one row was locatable, so a row the registration cannot locate passed it,
 // submit-plan's registration refused it afterwards, and the journey gaps only surfaced on the attempt after that.
 test("J1/G6 a criterion row the registration cannot locate is refused at the hand-off, together with the journey gaps, in one refusal", async () => {

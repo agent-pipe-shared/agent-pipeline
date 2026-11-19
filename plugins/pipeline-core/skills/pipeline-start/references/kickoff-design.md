@@ -258,7 +258,11 @@ interfaces/state/data, operational constraints, test/verification approach,
 and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
 names its journeys and state transitions and the actual effect asserted
 (`Journeys:` and `Asserts:` clauses); the plan
-hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The Spec's plan
+hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The two clauses sit inside the
+criterion text (a table cell or an indented continuation line), for example: `| AC-3 | WHEN the
+user reloads the page, THE SYSTEM SHALL keep every entry. Journeys: add from the start page and from the
+standalone view; reload in the middle of adding; a second add after an error. Asserts: the stored list
+still holds the entry, not only that the text shows it. | named suite |`; a criterion no user sees is tagged `[not user-facing: <reason>]`. The Spec's plan
 is sliced vertical first: one thin
 end-to-end path for the most important journey, then widened journey by journey,
 never all of one horizontal layer before the next. Favor thorough, comprehensive coverage of the
