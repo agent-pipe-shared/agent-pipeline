@@ -64,6 +64,13 @@ in the running text.>
 ## Non-goals
 <What is deliberately NOT done (boundary against scope creep).>
 
+## User documentation (optional)
+<Only when this change has readers outside the team (end users, or the operators of a
+project that uses it): name that audience and the document(s) that will tell them what
+changed and how to use it (a path or a README section), or say in one line that none
+is needed. The readiness review asks about a missing section once and never blocks on
+it; the close offers one reader review of the named documents (ADR-0105).>
+
 ## Risks & mitigation
 <The 2–4 most important risks, each with a countermeasure.>
 

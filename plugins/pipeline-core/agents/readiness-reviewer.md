@@ -140,6 +140,12 @@ finding. Name the decision in one line and the command
 after declaring the path in `adrReferences`). The reviewer says explicitly when there is none.
 Nothing is stored and the report shape does not change.
 
+User documentation (ADR-0105): when the PRD names readers outside the team (end users, or the
+operators of a project that uses the change) and carries no "User documentation" section, raise one
+question in the full round, once: which document tells those readers what changed. It is a question,
+never a blocking finding. The reviewer says explicitly when the PRD names no outside audience.
+Nothing is stored and the report shape does not change.
+
 Accepted risks: when the Spec carries the closed risk table (header
 `| id | source | statement | trace |`), read its `trace` cells. A risk row needs a
 test reference (a test path or `command:<id>`) or an explicit residual statement

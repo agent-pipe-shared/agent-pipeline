@@ -63,7 +63,13 @@ the architecture design: the modules, the paths each module owns, written as
 exact files or directories (a wildcard is refused), and for every design decision
 the path of its ADR. A decision you accept together with the design starts as an
 ADR proposal that the agent creates before the review; the one design signature
-publishes it, so there is no separate approval for it. A file that still carries
+publishes it, so there is no separate approval for it. If the change has readers outside the team (end
+users, or the operators of a project that uses it), the PRD can name them and the
+document that tells them what changed in an optional "User documentation"
+section; the design review asks about a missing one once, and the close offers
+one reader review of the named documents. Neither blocks
+([ADR-0105](adr/0105-a-prd-may-name-its-user-documentation-the-review-asks-and-the-close-offers-one-reader-review.md)).
+A file that still carries
 the generated draft framing (a `DRAFT TEMPLATE` comment, a table cell that reads
 `REPLACE`) is not a design yet, and the bootstrap names which marker is left.
 

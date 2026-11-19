@@ -135,6 +135,8 @@ Owner: `skills/close-feature/SKILL.md`. **The normal entry on every runner is on
 
 It collects the close evidence itself, in this order: candidate Verify bound to the Critic packet, its registration, the package moves to `verifying` and `completed`, the audit request, the Continuity Result bootstrap where the feature needs one, and the coordinator phases. It stops before Verify when the Critic acknowledgement is missing, asks the acceptance question after the Verify passed, prints the one commit the close needs, and every stop names its code and the rerun command. The Critic addenda of the dispatch records are its job as well: do not build them ahead (a `CRITIC-COVERAGE-PENDING` notice asks for nothing yet); the close writes them and stops once with `CLOSE-CRITIC-ADDENDA-WRITTEN` and the commit. A rerun after a commit qualifies the new HEAD again.
 
+When the PRD's optional "User documentation" section names documents (ADR-0105), run `pipeline-core:reader-review` once on them before this command, resolve its findings or name them in your report. It is no gate: the close neither waits for it nor reads its result, and a PRD without the section needs nothing.
+
 The single steps below are what it runs; use them for a recovery or when a stop names one. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
 
 1. Package side: `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/<name>.json`, then `register-feature-package.mjs --root <root> --add-verify-evidence <path>`,
