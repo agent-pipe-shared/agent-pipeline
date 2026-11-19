@@ -1,0 +1,79 @@
+# Recon L5 (candidate 31): README and backlog scaffold at onboarding, never a write refusal (2026-11-18)
+
+Lane L5 of `candidate-31-plan-2026-11-18.md` (PO tile: README and backlog file at onboarding; condition: never block on a write). Slice C31-R2, analysis only, no suite run. Line numbers are at the base commit of the candidate 31 clone chain (the real checkout after 30i, 30j and 30k plus the C31 base patch). Labels: PROVEN = read at that line; INFERRED = concluded from code read, not executed. No consumer names; "run A / run B" are the two consumer reports. The Critic is suspended by the PO and no Full Verify ran: tests only.
+
+## Verdict in four lines
+
+1. The only place that writes root-level project files transactionally is `applyProjectOnboardingV3`; the D80 decision-record seed (`docs/adr/README.txt`) and the G20-42 `VERSION` seed are the exact precedent shapes.
+2. `backlog/` is already admitted in every write lane. Only the root file `README.md` is refused today, and only while a feature is in draft, awaiting approval or approved (not yet implementing).
+3. One exact entry in the one shared scaffold predicate makes README.md admitted in all three lanes at once; no prefix, no new path class beyond that file.
+4. Premise check: the two reports show no README WRITE refusal; they show that no README existed. The admission matters for the scaffold COMMIT (a refusal there is `GUARD-DEVPLAN-LIFECYCLE`, the G20-52 failure of `VERSION`), so seed and admission must land together.
+
+## (a) Which step writes the first project files
+
+- PROVEN `plugins/pipeline-core/lib/project-onboarding-v3.mjs:6194-6212`: the plan's target list is `architecture/map/*`, `AGENTS.md`, `docs/adr/*`, the project authority files, `.gitignore`, `.gitattributes`, `VERSION`, sorted; `:6711-6721` writes each create-only (`flag: "wx"`), throws on a target that appeared (`:6713`), and the surrounding transaction rolls back every created file and directory (`:6640-6665`). Nothing README-like or backlog-like is in the list (rg README|backlog in that file hits comments only).
+- PROVEN `plugins/pipeline-core/lib/architecture-map-scaffold.mjs:13-19, 68-74`: the agent entry and the decision-record seed are pure functions of the classification (`fresh` / `fresh-host-managed` only, `[]` or `null` otherwise), kept OUT of the byte-bound map scaffold on purpose (`:11-12, 65-67`). This is the home for a README and a backlog skeleton.
+- PROVEN `intake-generate-apply` writes only under `specs/<featureId>/` (`skills/pipeline-start/references/intake-generate-design.md:102-109`); INFERRED `kickoff-design.md` writes no root file (it only orders the scaffold commit, `:24-46`). Neither is a candidate: later, not create-only at birth, no rollback.
+- PROVEN `:6187-6193`: the scaffold producers answer to `fresh` or a walk-proven code-free `existing-unmanaged` root. `classifyGreenfieldWalk` (`:1189-1209`) tolerates a README: a concept document in the folder keeps the root greenfield-equivalent. So a README may already EXIST when the seed is planned.
+- Backlog model: the repository's `backlog/README.md` (180 lines) is a ledger system (`index.json`, `STATUS.md`, `transitions.ndjson`, reconcile scripts) tied to this repository's verify. PROVEN GG-22 is a no-op until `backlog/transitions.ndjson` was ever committed (`plugins/pipeline-core/hooks/guard-git.mjs:1234-1239`), so a consumer `backlog/` without a ledger is never gated. INFERRED: the skeleton must NOT copy the ledger; it needs purpose, one file per item under `backlog/items/`, the status words `open` / `in_progress` / `closed`, never delete, and nothing more. `close-block` already treats a consumer `backlog/` as a close target (`skills/close-block/SKILL.md:71`).
+
+## (b) Which guards refuse a write to README.md or a backlog file
+
+Path classes, read in `plugins/pipeline-core/hooks/guard-devplan.mjs`, `lib/guard-devplan-policy.mjs`, `lib/guard/*`:
+
+| Moment | README.md | backlog/README.md |
+|---|---|---|
+| Consent given, onboarding not complete | refused for ALL Edit/Write, no path exemption, `CONSENT-GIVEN-ONBOARDING-INCOMPLETE` (`hooks/guard-onboarding-consent-lock.mjs:29-35, 104`); by design, the onboarding writes through Node, not the tool | same |
+| After onboarding, no active feature | allowed (`hooks/guard-devplan.mjs:478-480` fail-open) | allowed |
+| Active feature in draft, awaiting-approval or approved (`gates.dev-plan` is seeded `blocking`, `lib/project-onboarding-v3.mjs:1356, 1458`) | refused (below) | allowed: prefix `backlog/` is exempt (`lib/guard-devplan-policy.mjs:334`; hook `:327, 549-555`) |
+| Feature `implementing` with a resolvable approval | allowed (`hooks/guard-devplan.mjs:517-529`) | allowed |
+| Session not ready, PORG-INVALID-OBSERVATION | refused (record lane admits only `backlog`, `docs`, `scratch`, two or more segments, `lib/guard/write-scope.mjs:18, 47-53`, called at `lib/guard/lifecycle-gate.mjs:245-251`) | admitted by that lane |
+
+The refusal a README write gets in the draft window has three labels, one per lane, all from the same decision function (`devPlanGateVerdict`):
+- Edit/Write: `BLOCKED (guard-devplan, plugin pipeline-core): Feature "<id>" lifecycle is "<status>"` with the plan path and the reason; PROVEN there is NO `GUARD-*` code in this text (`hooks/guard-devplan.mjs:588-596`).
+- Shell write (echo, node, redirect target): `GUARD-DEVPLAN-SHELL` (`lib/guard-devplan-policy.mjs:382`).
+- Staged commit: `GUARD-DEVPLAN-LIFECYCLE`, result `PIPELINE-STAGED-LIFECYCLE-BLOCKED` (`:830-843`).
+Why: README.md is in no exempt prefix and not in the scaffold lists (`:345-346`), so it is treated as implementation before plan approval. PROVEN by the existing pin `hooks/guard-devplan.test.mjs:1089` (`["README.md", false]`), INFERRED for the live draft window (not executed here).
+
+Other guards: `guard-testpath` and `guard-gate-strength` do not name README.md or `backlog/` (TP-1..13 in `templates/prompts/agent-obligations.md` §2 do not match); a running Goldfish writes only inside its own write scope (a per-dispatch limit, not a path class). Not checked: the Antigravity and Codex lanes beyond sharing `devPlanGateVerdict`.
+
+Cross-lane L11: PROVEN `.md` is not a source extension (`scripts/architecture-boundary-check.mjs:51-53, 136`), so README.md and `backlog/README.md` can never be `unowned-path` findings under the default extension set. INFERRED unchanged by L11 (`w313` lists only `docs`, `public`, `static`, `assets`).
+
+## (c) How a path becomes admitted, and the smallest widening
+
+Three different lists, only one of them is a write admission:
+1. `ONBOARDING_SCAFFOLD_EXACT_PATHS` = `.gitignore`, `.gitattributes`, `AGENTS.md`, `pipeline.user.yaml`, `VERSION`, plus prefixes `architecture/`, `project/` (`lib/guard-devplan-policy.mjs:345-346`). The ONE predicate `isOnboardingScaffoldPath` (`:354-357`) is used by the Edit/Write hook (`hooks/guard-devplan.mjs:554`) and by `devPlanGateVerdict` (`:589`), which feeds the shell lane and the staged-commit check, so the lanes cannot disagree (D165 D5). Adding the string `README.md` to the exact list admits exactly the ROOT file (case-folded; `sub/README.md` and `README.md.bak` stay refused), in every lane, and widens nothing else. `VERSION` (G20-52) is the same change shape.
+2. `DEFAULT_EXEMPT_PREFIXES` (policy `:334`, hook `:327`, two copies; the hook copy lacks `scratch/`, handled earlier at `:420`): already contains `backlog/`. No change needed for the backlog skeleton.
+3. `lib/pipeline-owned-files.mjs:23-25` (`isPipelineOwnedPath`): dirty-tree classification for `commit-pipeline-owned.mjs`, queue and audit files only. It admits no write. Adding README there would let the pipeline-owned commit route carry a file the agent keeps editing; not recommended (open decision D2).
+Uninstall: `lib/project-pipeline-footprint.mjs:13` preserves `AGENTS.md`, `docs/`, `backlog/`; README.md is no owned runtime key, so it is untouched. INFERRED; the display list may name README.md (not required).
+
+## (d) Smallest build, failing-first proof
+
+Must reach (GF-10 list): (1) a pure seed function in `lib/architecture-map-scaffold.mjs` next to D80, e.g. `initialGreenfieldProjectDocTargets(classification)` returning `README.md` and `backlog/README.md`, `[]` unless `fresh` / `fresh-host-managed`; (2) its use in `planProjectOnboardingV3` after `:6196`, conditional like `.gitignore` (`:6182-6186`): skip when ANY root entry matches `/^readme(\..*)?$/i` and skip `backlog/README.md` when a `backlog` entry exists, case-insensitively (INFERRED: on a case-insensitive filesystem `Readme.md` makes `wx` throw `:6713` and the whole onboarding rolls back, which is the block the PO forbids); (3) a distinct `kind` per file (`:6216-6221` would label an unknown path `runtime`; the only `runtime` consumers read other plans, `:4477`, `:5721`, so cosmetic, but mislabelling is avoidable); (4) one entry `README.md` in `ONBOARDING_SCAFFOLD_EXACT_PATHS`; (5) a line in the agent entry (`AGENTS.md` seed, `:17`) naming `README.md` and `backlog/README.md`, optional.
+
+Seed text: static bytes, no project name, no `{{ }}` token, no stored status. README: what this file is, a "How to start" and "How to test" section stating they are filled when the first deliverable runs, pointers to `AGENTS.md`, `docs/adr/README.txt`, `backlog/README.md`. Backlog: purpose, one item per file under `backlog/items/YYYY-MM-DD-slug.md`, minimal frontmatter (`title`, `status`, `created`, `source`), statuses, never delete, no ledger required.
+
+Failing-first cases (RED against the base, written before the production edit):
+- `lib/guard-devplan-policy.test.mjs`: `evaluateStagedDevPlanPaths({ projectDir, stagedPaths: ["README.md"] })` in `lifecycleFixture()` (`:67-81`): RED is `PIPELINE-STAGED-LIFECYCLE-BLOCKED` with `GUARD-DEVPLAN-LIFECYCLE`; GREEN is allow. Same fixture: `sub/README.md` and `README.md.bak` stay blocked; `devPlanGateVerdict` for `README.md` allow, `src/x.mjs` block.
+- `hooks/guard-devplan.test.mjs:1074-1093`: restate `["README.md", false]` to `true` (QG-04, the pin restates the old behaviour; say so), add `["sub/README.md", false]`, `["README.md.bak", false]`; the Edit/Write phase loop `:1054-1067` adds README.md to `SCAFFOLD_WRITES`.
+- `lib/architecture-map-scaffold.test.mjs` (pattern `:38-55`): the seed returns two named paths for `fresh` / `fresh-host-managed`, `[]` otherwise, deterministic, no `{{`.
+- `lib/project-onboarding-v3.test.mjs`: restate the three pinned target lists (`:2972-2973, 7826-7827, 8009-8010`) with `README.md` and `backlog/README.md` (precedent comment `G20-42`); add: a root holding `Readme.md` gets no README target and onboarding applies; a root holding `backlog/` gets no backlog target; every plan target path passes `isOnboardingScaffoldPath` or an exempt prefix (the structural guard that prevents the next `VERSION`-style refusal; no such test exists today).
+Honest limit: the "existing README is skipped" cases pass before the build (no README target exists yet); only the admission and seed cases are RED.
+
+Neighbour suites (one at a time, private TMPDIR): `guard-devplan-policy`, `hooks/guard-devplan`, `architecture-map-scaffold`, `project-onboarding-v3`, `project-onboarding-temp-root`, `check-doc-contracts` if `AGENTS.md` text changes, `generate-agent-obligations.test.mjs` only if the obligations source changes (it should not). Registration: `guard-devplan-policy` and `architecture-map-scaffold` are in `harness/verify-suites.json`; `hooks/guard-devplan.test.mjs` and `project-onboarding-v3.test.mjs` were not found there by name (INFERRED they run through another route; check before building). No new test file is needed, so `TP-13` is not touched.
+
+What needs the PO: every production file named above is plugin source (protected in the real checkout): the PO applies the held patch as human operator. None matches `TP-1..TP-13`. No gate, signature, approval, security scan, Critic evidence, record shape, digest, key byte or stored status changes; existing onboarded projects gain only the README admission, not the seed.
+
+## Recommendation
+
+Build one stage: seed function plus plan wiring plus ONE exact entry `README.md` in the scaffold list, with the failing-first cases above, as a clone-slice patch (about 70 lines of production, 120 of test). Do not copy the repository's backlog ledger. Do not add a check that the README "How to start" is filled: that would be a new gate; a derived close-report hint can be a later stage.
+
+## Open decisions (default in brackets)
+
+- D1 Backlog skeleton: `backlog/README.md` only, no `backlog/items/` placeholder [README only].
+- D2 "Pipeline-owned" means the scaffold exemption list, not `pipeline-owned-files.mjs` [scaffold list].
+- D3 Not-ready recovery lane (PORG-INVALID-OBSERVATION) stays closed to root README.md [unchanged; a not-ready session writes nothing but records].
+- D4 Existing onboarded projects (run A, run B) get no backfill seed; a later explicit command like `--init-version` may add it [no backfill].
+- D5 Seed also for a non-greenfield `existing-unmanaged` root [no: the README of an existing project is theirs; same gate as `AGENTS.md`].
+- D6 Name `README.md` and `backlog/README.md` in the `AGENTS.md` seed [yes, one sentence; touches the pinned entry text, restate its test].
+- D7 The L11 default extension set is not overridden by a consumer policy; not checked [assumed].
