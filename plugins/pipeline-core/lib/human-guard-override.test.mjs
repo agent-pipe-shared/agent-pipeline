@@ -7598,14 +7598,14 @@ function l16Setup(fn) {
     };
     const plan = (spawn) => planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256, nowMs: 2_000, scriptPath, spawn });
-    return fn({ calls, makeSpawn, plan });
+    return fn({ calls, makeSpawn, plan, clock });
   } finally {
     mock.restoreAll();
     rmSync(root, { recursive: true, force: true });
   }
 }
 
-test("L16-1: a first git ETIMEDOUT followed by a success inside the deadline: the planning succeeds", () => {
+test("L16-1:a first git ETIMEDOUT followed by a success inside the deadline: the planning succeeds", () => {
   l16Setup(({ calls, makeSpawn, plan }) => {
     const planned = plan(makeSpawn({ timeouts: 1 }));
     assert.equal(planned.status, "planned");
@@ -7639,5 +7639,26 @@ test("L16-4: no retry when the planning deadline is already spent", () => {
       (error) => error instanceof HumanGuardOverrideError
         && error.code === "HGO-GIT" && error.message.includes("outcome=ETIMEDOUT"));
     assert.equal(calls.toplevel, 1, "the retry must not run past the hook limit");
+  });
+});
+
+test("L16-5: every attempt of the planning is capped by what is left of the deadline, the first of the next call too", () => {
+  l16Setup(({ clock, plan }) => {
+    const timeouts = [];
+    let toplevel = 0;
+    const spawn = (command, args, options) => {
+      if (command === "git") timeouts.push(options.timeout);
+      if (command === "git" && args[0] === "rev-parse" && args[1] === "--show-toplevel") {
+        toplevel += 1;
+        // The first attempt times out after its full 5 s; the retry then succeeds slowly (3.9 s of the 4 s left), which leaves 100 ms of the 9 s.
+        clock.offsetMs += toplevel === 1 ? 5000 : 3900;
+        if (toplevel === 1) return { status: null, error: Object.assign(new Error("spawnSync git ETIMEDOUT"), { code: "ETIMEDOUT" }) };
+      }
+      return spawnSync(command, args, options);
+    };
+    const planned = plan(spawn);
+    assert.equal(planned.status, "planned");
+    assert.deepEqual(timeouts.slice(0, 3), [5000, 4000, 500],
+      "first attempt at the full 5 s, the retry at what is left, the next call at the positive floor instead of a fresh 5 s");
   });
 });

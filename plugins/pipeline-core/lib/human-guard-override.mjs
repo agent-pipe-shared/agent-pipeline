@@ -209,18 +209,25 @@ const GIT_TIMEOUT_MS = 5000;
 const PLANNING_DEADLINE_MS = 9000;
 const GIT_RETRY_MIN_MS = 2000;
 
+// A call that finds the budget already spent still gets this much, so a fast git call is never starved and the timeout stays a positive number
+// (spawnSync reads 0 as "no limit"). The overrun is bounded by this floor per remaining call, not by the full 5 s.
+const GIT_MIN_ATTEMPT_MS = 500;
+
 function planningDeadline(budgetMs = PLANNING_DEADLINE_MS) {
   return { startMs: Date.now(), budgetMs };
 }
 
-// `deadline` is optional: a caller that carries none keeps the single, unretried attempt.
+// `deadline` is optional: a caller that carries none keeps the single, unretried attempt at the full timeout.
+// With a deadline EVERY attempt (the first of each call as well as the retry) is capped by what is left of it (C31c, cloud review of candidate 31),
+// so a retry that used the budget cannot be followed by a next call that runs another full 5 s past the hook limit.
 function git(root, args, spawn = spawnSync, deadline = null) {
   const run = (timeout) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout });
-  let result = run(GIT_TIMEOUT_MS);
+  const remaining = () => deadline.budgetMs - (Date.now() - deadline.startMs);
+  let result = run(deadline ? Math.min(GIT_TIMEOUT_MS, Math.max(remaining(), GIT_MIN_ATTEMPT_MS)) : GIT_TIMEOUT_MS);
   if (deadline && result?.error?.code === "ETIMEDOUT") {
     // ETIMEDOUT only (never a non-zero exit or another error); the calls it serves are read-only
     // or idempotent, so the identical call may run once more.
-    const remainingMs = deadline.budgetMs - (Date.now() - deadline.startMs);
+    const remainingMs = remaining();
     if (remainingMs >= GIT_RETRY_MIN_MS) result = run(Math.min(GIT_TIMEOUT_MS, remainingMs));
   }
   if (result?.status !== 0 || result?.error) {
