@@ -37,6 +37,21 @@ export function posixPathArgv(argv) {
   return shaped.every((value, index) => value === argv[index]) ? argv : shaped;
 }
 
+const BARE_WORD = /^[\w@%+=:,./-]+$/u;
+
+/**
+ * C31-L9: the SINGLE-LINE command a prose text hands a human to copy (a rerun, a signing line). Windows-style absolute paths are shown with
+ * forward slashes (valid in bash, PowerShell and node), a word that needs quoting gets double quotes with \ " $ ` escaped, and the
+ * line never breaks. Display only: the argv a caller holds is not changed.
+ */
+export function humanCommandLine({ executable = "node", argv } = {}) {
+  const word = (value) => {
+    const text = String(value);
+    return BARE_WORD.test(text) ? text : `"${text.replace(/[\\"$`]/gu, "\\$&")}"`;
+  };
+  return [toForwardSlashes(executable), ...posixPathArgv(argv)].map(word).join(" ");
+}
+
 /**
  * The line-break-safe string for ONE shell: the bounded bash (`CMD=` fragments, `eval "$CMD"`) or PowerShell block.
  * `pathStyle` "posix" shows Windows-style paths with forward slashes, "native" leaves them as built; the default is "posix" for bash

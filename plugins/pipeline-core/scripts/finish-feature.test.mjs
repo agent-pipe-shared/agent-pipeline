@@ -2152,3 +2152,11 @@ test("C30G-D2: every stop of the one-shot names a way on: a non-empty repair wit
   assert.deepEqual(failing.filter((code) => !Object.hasOwn(CONTRACT_EXCEPTIONS, code)), [], "these stops name no runnable command and no human actor: fix their repair text");
   assert.deepEqual([...reached].sort(), Object.keys(CONTRACT_EXCEPTIONS).sort(), "every listed exception is still a real exception");
 });
+
+// C31-L9 (AC-112, closest accepted criterion): a command finish-feature prints for the human is built by the shared renderer, never by string concatenation.
+test("C31-L9: no printed rerun or signing command of finish-feature is a node-plus-path string template", () => {
+  const source = readFileSync(new URL("./finish-feature.mjs", import.meta.url), "utf8");
+  assert.match(source, /human-command-render\.mjs/u, "the shared renderer is imported");
+  assert.doesNotMatch(source, /`node \$\{fileURLToPath\(import\.meta\.url\)\}/u, "the rerun command is not concatenated");
+  assert.doesNotMatch(source, /node \$\{PO_HUMAN_APPROVAL\} sign-intent/u, "the PO signing command is not concatenated");
+});

@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync,
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { humanCommandLine } from "../lib/human-command-render.mjs";
 import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
@@ -148,7 +149,7 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
   // arms the commit of exactly the bytes it wrote, so the close's own outputs are committed without a human override. A fault
   // in arming never changes a stage's outcome: it is recorded in `stages` and the hook then keeps its old refusal.
   const writerCommitStages = [];
-  const rerun = `node ${fileURLToPath(import.meta.url)} --root ${root} --by ${JSON.stringify(by.trim())} --architecture-impact ${architectureImpact} --audit-request ${JSON.stringify(auditRequest)} --critic-verify-lifecycle ${criticVerifyLifecycle}${continuityCloseRequest === null ? "" : ` --continuity-close-request ${JSON.stringify(continuityCloseRequest)}`} --resume-lifecycle-id ${id}`;
+  const rerun = humanCommandLine({ argv: [fileURLToPath(import.meta.url), "--root", root, "--by", by.trim(), "--architecture-impact", String(architectureImpact), "--audit-request", String(auditRequest), "--critic-verify-lifecycle", String(criticVerifyLifecycle), ...(continuityCloseRequest === null ? [] : ["--continuity-close-request", continuityCloseRequest]), "--resume-lifecycle-id", id] });
   const armStage = (stage, run, succeeded = () => true) => {
     const before = captureWorktree(root);
     const out = run();
@@ -289,7 +290,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const featureId = state.activeFeature?.id;
   const statePath = statePathFor(root);
   const evidenceDir = featureId === undefined ? null : `specs/${featureId}/evidence`;
-  const rerunBase = `node ${fileURLToPath(import.meta.url)} --one-shot --root ${root} --by ${JSON.stringify(actor)} --architecture-impact ${architectureImpact}`;
+  const rerunBase = humanCommandLine({ argv: [fileURLToPath(import.meta.url), "--one-shot", "--root", root, "--by", actor, "--architecture-impact", String(architectureImpact)] });
   let packetForRerun = criticPacketId;
   // C24 (Claude greenfield): a resume dropped the packet, and with two Critic rounds on record the printed command stopped at ONESHOT-CRITIC-PACKET-MISSING.
   const rerun = (id) => `${rerunBase}${packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
@@ -452,7 +453,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         const request = head === null || headTree === null ? null : createSbomOverrideRequest({ featureId, blocked: sbom.blocks, candidate: { commit: head, tree: headTree } });
         if (request === null) return stopResult("sbom", sbom.blocks[0].code, blockedText, `${helps.join(" ")} The commit (HEAD) could not be read, so a signed override cannot be prepared: repair the repository, then rerun the identical command: ${rerun(again)}`);
         const requestPath = `scratch/sbom-override-request-${request.intentSha256.slice(0, 16)}.json`; const proofPath = requestPath.replace("request", "proof");
-        const signText = `The PO can accept the gap by signature, in their own terminal (never the agent): node ${PO_HUMAN_APPROVAL} sign-intent --repo-root ${root} --request ${requestPath} -- it shows the findings and writes the proof to ${proofPath}. Then rerun the identical command with the proof added: ${rerun(again)} --sbom-override-proof ${proofPath}. Do not commit or change the tree in between: the signature names the current commit.`;
+        const signText = `The PO can accept the gap by signature, in their own terminal (never the agent): ${humanCommandLine({ argv: [PO_HUMAN_APPROVAL, "sign-intent", "--repo-root", root, "--request", requestPath] })} -- it shows the findings and writes the proof to ${proofPath}. Then rerun the identical command with the proof added: ${rerun(again)} --sbom-override-proof ${proofPath}. Do not commit or change the tree in between: the signature names the current commit.`;
         if (sbomOverrideProof === null) {
           mkdirSync(resolve(root, "scratch"), { recursive: true }); writeFileSync(resolve(root, requestPath), `${JSON.stringify(request, null, 2)}\n`);
           return stopResult("sbom", sbom.blocks[0].code, blockedText, `${helps.join(" ")} ${signText}`);

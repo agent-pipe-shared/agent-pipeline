@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { boundedCopySafeCommand, renderHumanCopySafeCommand } from "./copy-safe-command.mjs";
 import { authorizeCriticalPushCommand, poHumanApprovalSetupCommand } from "../scripts/po-human-approval.mjs";
-import { boundedCopySafeCommandForBash, posixPathArgv, renderHumanCommand, renderHumanStep } from "./human-command-render.mjs";
+import { boundedCopySafeCommandForBash, humanCommandLine, posixPathArgv, renderHumanCommand, renderHumanStep } from "./human-command-render.mjs";
 
 const WIN_SCRIPT = "C:\\Users\\someone\\.claude\\plugins\\pipeline-core\\scripts\\pipeline-state.mjs";
 const WIN_PROOF = "C:\\work\\proj\\scratch\\critical-push-request-abcdef123456.json";
@@ -89,4 +89,15 @@ test("the bounded helper hands back the input unchanged when no path needs resha
   const built = boundedCopySafeCommandForBash({ executable: "node", argv: ["/opt/plugin/scripts/x.mjs", "--by", "po"] });
   assert.equal(built.argv.length, 3);
   assert.equal(built.command, "node /opt/plugin/scripts/x.mjs --by po");
+});
+
+// C31-L9 (AC-112, closest accepted criterion): one single-line command for prose a human copies, in the same path style as the block renderer.
+test("humanCommandLine shows Windows-style paths forward-slashed on one line and quotes only what needs it", () => {
+  const line = humanCommandLine({ executable: "node", argv: [WIN_SCRIPT, "--root", "C:\\work\\proj", "--by", "Some One", "--resume-lifecycle-id", "abc-1"] });
+  assert.equal(line, 'node C:/Users/someone/.claude/plugins/pipeline-core/scripts/pipeline-state.mjs --root C:/work/proj --by "Some One" --resume-lifecycle-id abc-1');
+});
+
+test("humanCommandLine leaves a POSIX command as a plain join would and escapes shell-live characters", () => {
+  assert.equal(humanCommandLine({ executable: "node", argv: ["/opt/p/x.mjs", "--root", "/w/p"] }), "node /opt/p/x.mjs --root /w/p");
+  assert.equal(humanCommandLine({ executable: "node", argv: ["x.mjs", "a$b`c\"d"] }), 'node x.mjs "a\\$b\\`c\\"d"');
 });
