@@ -5580,7 +5580,8 @@ for (const runner of ["claude", "codex", "antigravity"]) {
         rootDir: path,
         runner,
         run(executable, argv) {
-          if (executable !== "node" || argv[0] !== ONBOARDING_SCRIPT) {
+          // C32: the driver spawns a published bare `node` as its own interpreter (restated pin, was the bare name).
+          if (executable !== process.execPath || argv[0] !== ONBOARDING_SCRIPT) {
             return { status: 1, stdout: "{}", stderr: "unexpected driver command" };
           }
           let stdout = "";
