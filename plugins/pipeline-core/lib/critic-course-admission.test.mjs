@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { transitionCode as lineageTransitionCode, compiledRequest, recordCore, validateCriticReviewLineage } from "./critic-review-lineage-core.mjs";
-import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
+import { deriveSealedSuccessorOf, readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 
 const H = (c) => c.repeat(64);
@@ -1740,6 +1740,17 @@ test("C30F-G4B (d) an input that disagrees with the supersedes of the manifest i
   assert.equal(actual.decision.code, "CCA-SUCCESSOR-OF", JSON.stringify(actual.decision));
   assert.equal(successorOfIdentity(fx, {successorOf: "feature-b"}).code, "CCA-SUCCESSOR-OF");
   assert.equal(successorOfIdentity(fx, {successorOf: PREDECESSOR}).ok, true);
+});
+// C31-L20: the sealed predecessor of a consumed first round is derived, never supplied. Without a consumed packet that seals it (an unsealed value), for an ordinary course (the base holds
+// the manifest) and for a malformed request the derivation answers null, and the identity of a flag-less request keeps refusing exactly as before. The consumed-packet cases run through the
+// real finalizer in register-feature-package-readback.test.mjs (C31-L20-1 .. 5).
+test("C31-L20 (admission) deriveSealedSuccessorOf answers null without a sealed consumed packet, for an ordinary course and for a malformed request, and changes no flag-less resolution", () => {
+  const fx = unitFixture({late: true}); recordDiscarded(fx);
+  const request = {repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.pre, candidateCommit: fx.candidate, registrationCommit: fx.candidate, packetId: "a".repeat(32)};
+  assert.equal(deriveSealedSuccessorOf(request), null, "no consumed packet seals a predecessor: a State record alone is never enough");
+  assert.equal(deriveSealedSuccessorOf({...request, baseCommit: fx.code}), null, "a base that holds the manifest is an ordinary course");
+  for (const bad of [{packetId: "not-a-packet"}, {packetId: undefined}, {featureId: "Not A Feature"}, {candidateCommit: "xyz"}, {repoRoot: join(fx.root, "missing")}]) assert.equal(deriveSealedSuccessorOf({...request, ...bad}), null, JSON.stringify(Object.keys(bad)));
+  assert.equal(successorOfIdentity(fx).code, "CCA-MANIFEST-READ", "the flag-less resolution is unchanged");
 });
 function retainSuccessorRound1(fx, course) {
   const template = consumedCourseRoundFixture();

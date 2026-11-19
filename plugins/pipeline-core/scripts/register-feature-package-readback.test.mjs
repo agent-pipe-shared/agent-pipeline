@@ -417,7 +417,7 @@ const SPEC_ARGV = (root, base, candidate, diagnosticPath, registrationCommit) =>
  * A consumer repository: DISCARDED predecessor `feature-a` (manifest and review unit retained, no review round) and the active successor `feature-b`; round 1 of
  * the successor is walked through preflight, admission and the finalizer.
  */
-function consumedRound({ withPredecessor = true, supersedes = null } = {}) {
+function consumedRound({ withPredecessor = true, supersedes = null, viaSuccessorOf = false } = {}) {
   const root = tempRoot();
   git(root, ["init", "-q", "-b", "main"]);
   put(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngovernance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
@@ -427,9 +427,12 @@ function consumedRound({ withPredecessor = true, supersedes = null } = {}) {
   put(root, "project/pipeline.json", jsonText({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md"] }));
   put(root, "docs/state.md", "state v1\n"); put(root, "docs/findings.md", "findings quoted here\n"); put(root, "pipeline.user.yaml", "gates:\n  human_approval: chat\n");
   // The State is not a tracked file in a consumer; a successor course reads the predecessor's discard record from it (the manifest relation alone is not enough for the admission).
-  if (supersedes !== null) put(root, ".claude/pipeline-state.json", jsonText({ schema: "pipeline.state.v0", activeFeature: null, discardedFeatures: [{ id: supersedes, planPath: `specs/${supersedes}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null }] }));
+  // L20 (viaSuccessorOf): the same State record, but the manifest of the successor keeps supersedes:null and the first review base lies BEFORE that manifest (admission through --successor-of).
+  const discardedId = supersedes ?? (viaSuccessorOf ? PREDECESSOR : null);
+  if (discardedId !== null) put(root, ".claude/pipeline-state.json", jsonText({ schema: "pipeline.state.v0", activeFeature: null, discardedFeatures: [{ id: discardedId, planPath: `specs/${discardedId}/prd.md`, phaseAtDiscard: "implementation", discardedAt: "2026-11-16T10:00:00.000Z", discardedBy: "Operator", reason: "abandoned", forCommit: null }] }));
   git(root, ["add", "--", "."]); git(root, ["commit", "-qm", "base"]);
   if (withPredecessor) { featurePackage(root, PREDECESSOR); commitPaths(root, [`specs/${PREDECESSOR}`], "the discarded predecessor keeps its registration"); }
+  const preSuccessor = git(root, ["rev-parse", "HEAD"]);
   const manifest = featurePackage(root, SUCCESSOR, { supersedes });
   const genesis = commitPaths(root, [`specs/${SUCCESSOR}`], "declare feature review unit");
   put(root, CRITIC_SPEC(SUCCESSOR), "# Complete behavior\nAC-1: deliver complete behavior\nImplemented behavior.\n");
@@ -437,7 +440,10 @@ function consumedRound({ withPredecessor = true, supersedes = null } = {}) {
   put(root, `specs/${SUCCESSOR}/lifecycle.json`, JSON.stringify(manifest));
   const candidate = commitPaths(root, [CRITIC_SPEC(SUCCESSOR), `specs/${SUCCESSOR}/lifecycle.json`], "integrate feature behavior");
   const registered = registerDiagnosticFor(root, candidate, "r1");
-  return { root, genesis, candidate, manifest, ...walkRound(root, { genesis, candidate, diagnosticPath: registered.diagnosticPath, registrationCommit: registered.registration, n: 1 }) };
+  const round = viaSuccessorOf
+    ? walkRound(root, { genesis: preSuccessor, candidate, diagnosticPath: registered.diagnosticPath, registrationCommit: registered.registration, n: 1, extraArgv: ["--successor-of", PREDECESSOR] })
+    : walkRound(root, { genesis, candidate, diagnosticPath: registered.diagnosticPath, registrationCommit: registered.registration, n: 1 });
+  return { root, genesis, preSuccessor, candidate, manifest, ...round };
 }
 function registerDiagnosticFor(root, candidate, tag) {
   const manifestPath = `specs/${SUCCESSOR}/lifecycle.json`, logPath = `specs/${SUCCESSOR}/evidence/targeted-${tag}.log`, diagnosticPath = `specs/${SUCCESSOR}/evidence/diagnostic-${tag}.json`, capturedPath = `evidence/${SUCCESSOR}-targeted-${tag}.log`;
@@ -451,8 +457,8 @@ function registerDiagnosticFor(root, candidate, tag) {
   return { diagnosticPath, registration: commitPaths(root, [manifestPath, logPath, diagnosticPath], `register the ${tag} diagnostic`) };
 }
 /** Preflight (real CLI), admission and finalizer of one round; the finalizer writes the lineage itself (D223) and returns what it observed. */
-function walkRound(root, { genesis, candidate, diagnosticPath, registrationCommit, n }) {
-  const argv = SPEC_ARGV(root, genesis, candidate, diagnosticPath, registrationCommit);
+function walkRound(root, { genesis, candidate, diagnosticPath, registrationCommit, n, extraArgv = [] }) {
+  const argv = [...SPEC_ARGV(root, genesis, candidate, diagnosticPath, registrationCommit), ...extraArgv];
   const preflight = spawnSync(process.execPath, [join(SCRIPTS_DIR, "critic-dispatch-preflight.mjs"), ...argv], { encoding: "utf8", shell: false, env: GIT_ENV, cwd: root });
   const body = JSON.parse(preflight.stdout.split("\n")[0]);
   assert.equal(body.status, "packet-ready", `${preflight.stdout}${preflight.stderr}`);
@@ -464,7 +470,7 @@ function walkRound(root, { genesis, candidate, diagnosticPath, registrationCommi
   const origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
   const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: origin });
   assert.equal(finalized.status, "completed", JSON.stringify(finalized));
-  return { packetId, finalized };
+  return { packetId, finalized, replay: (verdict) => finalizeSessionCriticReview(verdict === undefined ? request : { ...request, verdict }, { readOriginalSourceReturnFn: origin }) };
 }
 
 test("J13-1: a retained discarded predecessor with a manifest and a review unit no longer makes the lineage of the consumed round ambiguous (the finalizer and the verb choose the successor)", () => {
@@ -684,4 +690,90 @@ test("J16-4: where the claim binds none of the several features the guard stays 
   assert.ok(verdict.detail.includes(f.packetId), verdict.detail);
   for (const id of [PREDECESSOR, "feature-c"]) assert.ok(verdict.detail.includes(`register-feature-package.mjs --root <root> --add-review-lineage --packet ${f.packetId} --feature ${id}`), `${id}: ${verdict.detail}`);
   assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "the guard writes nothing");
+});
+
+// C31 lane L20 (consumer greenfield): the successor S of a DISCARDED predecessor P is reviewed with --successor-of P, its manifest keeps supersedes:null and the first review
+// base lies BEFORE that manifest. The consumed packet seals the successor course (courseSourceSha256), so the lineage writer and the delta path read it from there. Neutral ids only.
+const handoverCommit = (root, text) => { put(root, "docs/state.md", text); return commitPaths(root, ["docs/state.md"], "docs: handover"); };
+const lineageFiles = (root) => readdirSync(join(root, "specs", SUCCESSOR, "evidence")).filter((name) => name.startsWith("critic-lineage-"));
+const STATE_FILE = ".claude/pipeline-state.json";
+
+test("C31-L20-1: the consumed review of a successor admitted through successorOf registers its first lineage (at finalize and by the verb), repeats as a no-op and changes no manifest relation or base", () => {
+  const f = consumedRound({ viaSuccessorOf: true });
+  assert.equal(f.finalized.lineage?.status, "written", `the finalizer writes the lineage of the successor course itself: ${JSON.stringify(f.finalized.lineage)}`);
+  const lineagePath = f.finalized.lineage.lineagePath;
+  const record = JSON.parse(readFileSync(join(f.root, lineagePath), "utf8"));
+  assert.equal(record.courseBinding.genesisCandidate.base, f.preSuccessor, "the historical base (before the manifest of the successor) is unchanged");
+  assert.equal(JSON.parse(readFileSync(join(f.root, `specs/${SUCCESSOR}/lifecycle.json`), "utf8")).supersedes, null, "the manifest relation is never written");
+  // Only a handover commit follows the consume; the verb itself registers the same record again from the sealed course.
+  unregisterLineage(f);
+  handoverCommit(f.root, "state v2\n");
+  const before = treeDigests(f.root, PREDECESSOR);
+  assert.equal(addCriticReviewLineage({ root: f.root, packetId: f.packetId, dryRun: true }).status, "lineage-registrable");
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "the dry run writes nothing");
+  const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR });
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
+  assert.equal(added.lineagePath, lineagePath, "the same record as the one the finalizer wrote");
+  const manifestBytes = readFileSync(join(f.root, added.manifestPath));
+  for (const selector of [{ featureId: SUCCESSOR }, {}]) {
+    const again = addCriticReviewLineage({ root: f.root, packetId: f.packetId, ...selector });
+    assert.equal(again.status, "already-registered", JSON.stringify(again));
+  }
+  assert.deepEqual(readFileSync(join(f.root, added.manifestPath)), manifestBytes, "the replay rewrites no manifest");
+  assert.equal(lineageFiles(f.root).length, 1);
+  assert.deepEqual(treeDigests(f.root, PREDECESSOR), before, "the predecessor is never touched");
+});
+
+test("C31-L20-2: the next delta round resolves the successor feature (the discarded predecessor is never selected) and registers its request without a selector", () => {
+  const f = consumedRound({ viaSuccessorOf: true });
+  assert.equal(f.finalized.lineage?.status, "written", JSON.stringify(f.finalized.lineage));
+  correctedRound(f);
+  const before = treeDigests(f.root, PREDECESSOR);
+  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
+  const mapStep = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(mapStep.code, "FPR-DELTA-MAP", JSON.stringify(mapStep));
+  deltaInput(f.root, Object.fromEntries(mapStep.changedPaths.map((path) => [path, ["inv-one"]])));
+  const added = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  assert.ok(added.commitPaths.every((path) => path.startsWith(`specs/${SUCCESSOR}/`)), JSON.stringify(added.commitPaths));
+  assert.deepEqual(treeDigests(f.root, PREDECESSOR), before, "the predecessor is never touched");
+});
+
+test("C31-L20-3: the successor is taken from the sealed course only: a State that no longer records the sealed predecessor refuses the lineage with its typed code and a repair that names the cause and a runnable command; nothing is written", () => {
+  const f = consumedRound({ viaSuccessorOf: true });
+  unregisterLineage(f);
+  const state = readFileSync(join(f.root, STATE_FILE), "utf8");
+  // Another feature recorded as discarded is not the sealed predecessor: the course source digest of the consumed packet matches none of the candidates.
+  writeFileSync(join(f.root, STATE_FILE), state.replaceAll(PREDECESSOR, "feature-q"));
+  const refused = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR });
+  assert.equal(refused.code, "FPR-LINEAGE-COMPILE", JSON.stringify(refused));
+  assert.equal(refused.compileCode, "CCA-MANIFEST-READ", JSON.stringify(refused));
+  assert.match(refused.reason, /successor of a discarded feature/u, refused.reason);
+  assert.match(refused.reason, /records? it under discardedFeatures/u, refused.reason);
+  assert.ok(refused.reason.includes(`register-feature-package.mjs --root <root> --add-review-lineage --packet ${f.packetId} --feature ${SUCCESSOR}`), refused.reason);
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "a refusal writes nothing");
+  // Restoring the State record is the named repair: the same call then registers.
+  writeFileSync(join(f.root, STATE_FILE), state);
+  assert.equal(addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR }).status, "lineage-added");
+});
+
+// Cause of the old SCF-PRELAUNCH-ADMISSION (CPP-GIT) on a replay: the prelaunch admission read needs the packet's disposable checkout, which the first finalize removes after the consume
+// (the claimed-phase check fails the same way). The replay of the identical finalize reads the consumed state back instead; another verdict never does.
+test("C31-L20-5: a replay of the identical finalize after the consume stays refused (single-use caller-authored authorization, pinned by the finalizer suite); the lineage verb is the route that completes a consumed round", () => {
+  for (const viaSuccessorOf of [false, true]) {
+    const f = consumedRound({ viaSuccessorOf });
+    assert.throws(() => f.replay(), (error) => error.code === "SCF-PRELAUNCH-ADMISSION", "a replay is not answered from the consumed state");
+    const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: viaSuccessorOf ? SUCCESSOR : f.featureId });
+    assert.ok(["lineage-added", "already-registered"].includes(added.status), JSON.stringify(added));
+  }
+});
+
+test("C31-L20-4: with two features recorded as discarded the sealed one is chosen by the course source digest, never the first or the only one", () => {
+  const f = consumedRound({ viaSuccessorOf: true });
+  unregisterLineage(f);
+  const state = JSON.parse(readFileSync(join(f.root, STATE_FILE), "utf8"));
+  state.discardedFeatures.unshift({ ...state.discardedFeatures[0], id: "feature-q", planPath: "specs/feature-q/prd.md" });
+  writeFileSync(join(f.root, STATE_FILE), jsonText(state));
+  const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR });
+  assert.equal(added.status, "lineage-added", JSON.stringify(added));
 });

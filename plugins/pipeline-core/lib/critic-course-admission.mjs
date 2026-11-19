@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
-import { readConsumedCriticCourseResult } from "./critic-verify-lifecycle.mjs";
+import { readConsumedCriticCourseResult, readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { installEvidenceOnlyFollowerClassifier, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
@@ -1123,6 +1123,28 @@ export function deriveCriticCourseRegistrationCommit({repoRoot,featureId,baseCom
   }
   return admitted.length===1?{status:'derived',commit:admitted[0],commits:admitted}:{status:admitted.length===0?'none':'ambiguous',commits:admitted};
  }catch{return none;}}
+// C31-L20: the predecessor a CONSUMED first round was admitted with (`--successor-of`), read from what the consumed packet sealed, never from a caller value. The admission stores
+// only the digests of its course source and decision; the predecessor is part of the course source (courseIdentity.successor). Each feature the State records as discarded is therefore
+// tried as `successorOf` and accepted only when the admission it yields reproduces BOTH sealed digests of the consumed packet. Nothing is stored and no flag is added:
+// a pure derivation that answers null (the ordinary course, or no sealed match) and never a guess. Used only for a first round (no registered course history yet): once a round is
+// registered, its course binding recovers the successor by itself (recoverSuccessor above).
+export function deriveSealedSuccessorOf({repoRoot,featureId,baseCommit,candidateCommit,registrationCommit,packetId}){
+ try{
+  if(!FEATURE_ID.test(featureId??'')||![baseCommit,candidateCommit,registrationCommit].every(v=>OID.test(v??''))||!/^[a-f0-9]{32}$/u.test(packetId??''))return null;
+  const repo=repository(repoRoot),root=repo.repoRoot;
+  if(manifestReadable(root,baseCommit,`specs/${featureId}/lifecycle.json`))return null;
+  const tree=gitBytes(root,['rev-parse',`${candidateCommit}^{tree}`],'CCA-RANGE-TREE').toString('utf8').trim();
+  const claim=readConsumedCourseClaimBinding({resolvedRepository:{repoRoot:root,gitCommonDir:repo.gitCommonDir,controlRoot:repo.controlRoot,registrationCommit},packetId,expectedCandidate:{commit:candidateCommit,tree}});
+  if(!claim.ok)return null;
+  const matches=[];
+  for(const id of discardedFeatureIds(root)){
+   if(id===featureId)continue;
+   const projection=readCriticCourseAdmission({repoRoot:root,featureId,baseCommit,candidateCommit,registrationCommit,requestedMode:'full',acceptedReference:null,criterionLocator:null,deltaRequestPath:null,successorOf:id});
+   const {decision,...subject}=projection;
+   if(decision?.status==='admitted'&&sha256Canonical(subject)===claim.value.courseSourceSha256&&sha256Canonical(decision)===claim.value.courseDecisionSha256)matches.push(id);
+  }
+  return matches.length===1?matches[0]:null;
+ }catch{return null;}}
 function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
 export function prepareRegisteredCriticDeltaRequest(input){try{
  if(!exactOptionalTrust(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
