@@ -397,3 +397,38 @@ test("M3-05 a class a module owns source in is left out, and a map with no modul
   assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: root })), [["over-line-bound", "public/big.js", null]], "an owned tree keeps its line bound");
   assert.equal(design.baselineBoundaryPolicy(m3Modules({ app: ["docs/**", "public/**", "static/**", "assets/**"] })), null, "nothing left to cover writes nothing");
 });
+
+// C32 (second Antigravity greenfield report, PO 2026-11-19): the direct CLI and Verify give one answer, generated output is no project source, and a test file is exempt from the hard line bound.
+test("ABC17 the direct check and the Verify measurement agree on the files the Pipeline keeps in a project", () => {
+  const files = { "src/app/main.mjs": "export {};\n", "project/consumer-verify.mjs": "export {};\n", ".claude/settings.mjs": "export {};\n" };
+  const direct = checkArchitectureBoundaries({ rootDir: fixture({ files }) });
+  assert.equal(direct.status, "pass", "the consumer Verify adapter and .claude/** belong to no module and are no finding");
+  assert.equal(direct.counts.sourceFiles, 1);
+  const measured = measureArchitecture({ rootDir: fixture({ files }) });
+  assert.equal(measured.status, direct.status);
+  assert.equal(measured.counts.sourceFiles, direct.counts.sourceFiles);
+  assert.equal(measured.policy.excludedPaths, direct.policy.excludedPaths, "the same exclusions are counted once on both paths");
+  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { ...files, "other/loose.mjs": "export {};\n" } }) })), [["unowned-path", "other/loose.mjs", null]], "an ordinary unowned file is still a finding");
+});
+
+test("ABC18 a generated bundle, a minified file and everything under dist are no project source", () => {
+  const big = lines(DEFAULT_LINE_BOUND * 3);
+  const files = { "src/app/main.mjs": "export {};\n", "src/app/app.bundle.js": big, "src/lib/lib.min.js": big, "dist/out.js": big, "app/assets/family-hub.bundle.js": big };
+  const result = checkArchitectureBoundaries({ rootDir: fixture({ files }) });
+  assert.equal(result.status, "pass", JSON.stringify(rules(result)));
+  assert.equal(result.counts.sourceFiles, 1, "generated output is not counted as a source of the project");
+  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/main.mjs": big } }) })), [["over-line-bound", "src/app/main.mjs", null]], "hand-written code keeps the bound");
+  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/bundler.mjs": big } }) })), [["over-line-bound", "src/app/bundler.mjs", null]], "a name that only contains 'bundle' is hand-written");
+});
+
+test("ABC19 a test file has no hard line bound, but its ownership and imports are still checked", () => {
+  const big = lines(DEFAULT_LINE_BOUND + 7);
+  const owned = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "src/lib/x.test.mjs": big } }) });
+  assert.equal(owned.status, "pass", "a regression test added in a correction round must not fail the line bound");
+  assert.equal(owned.counts.sourceFiles, 2, "the test still counts as a source of its module");
+  const unowned = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "tests/misc.test.mjs": big } }) });
+  assert.deepEqual(rules(unowned), [["unowned-path", "tests/misc.test.mjs", null]], "an unowned test is still unowned, but is not also over the bound");
+  const importing = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "src/lib/y.test.mjs": `import "../app/m.mjs";\n${big}`, "src/app/m.mjs": "export {};\n" } }) });
+  assert.deepEqual(rules(importing), [["forbidden-dependency", "src/lib/y.test.mjs", "src/app/m.mjs"]], "the import rule still applies to a long test");
+  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/big.mjs": big } }) })), [["over-line-bound", "src/lib/big.mjs", null]], "a source file keeps the bound");
+});

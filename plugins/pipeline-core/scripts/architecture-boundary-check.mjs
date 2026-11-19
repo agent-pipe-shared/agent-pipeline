@@ -136,6 +136,12 @@ const order = (a, b) => a.file.localeCompare(b.file) || a.rule.localeCompare(b.r
 const TEST_DIRECTORIES = new Set(["test", "tests", "__tests__", "spec"]);
 const isTestFile = (file) => /\.(?:test|spec)\.[^./]+$/u.test(file) || /_test\.[^./]+$/u.test(file) || /(?:^|\/)test_[^/]+$/u.test(file)
   || file.split("/").slice(0, -1).some((segment) => TEST_DIRECTORIES.has(segment));
+// C32 (second Antigravity greenfield report, PO 2026-11-19): a generated file is not project source. A single-file offline bundle of 3375 lines forced a compaction dispatch that squeezed it to 166 lines to pass the bound, and a test
+// file that grew past the bound after a Critic's regression test forced a whole extra correction and review round. A bundle (`*.bundle.js`), a minified file (`*.min.js`) and everything under `dist/` are generated output and
+// belong to no module's size, ownership or import checks; the bound applies to hand-written code, and a test file is exempt from the hard line bound (its ownership and imports are still checked, and the report-only size
+// budgets of the fitness model still list it).
+const GENERATED_ARTIFACT = /\.(?:bundle|min)\.[cm]?jsx?$/u;
+const isGeneratedArtifact = (file) => GENERATED_ARTIFACT.test(file) || file.split("/").slice(0, -1).includes("dist");
 const testStem = (file) => path.posix.basename(file).replace(/\.[^./]+$/u, "").replace(/\.(?:test|spec)$/u, "").replace(/_test$/u, "").replace(/^test_/u, "");
 
 function testOwners(file, modules, mirrored) {
@@ -154,7 +160,7 @@ function testOwners(file, modules, mirrored) {
  * (C31c, cloud review of candidate 31). The exception stays used, so it is never reported stale; dropping it hands the file to the derivation.
  */
 function observe(root, modules, policy, listed, readFile, extensions, keepUnowned = new Set()) {
-  const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
+  const excluded = (file) => isGeneratedArtifact(file) || policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
   const sources = listed.filter((file) => extensions.has(path.extname(file)) && !excluded(file)).sort();
   const violations = [];
   const usage = new Map(); // module id -> { files, lines } of its source files
@@ -189,7 +195,7 @@ function observe(root, modules, policy, listed, readFile, extensions, keepUnowne
       const row = usage.get(owners[0].id) ?? { files: 0, lines: 0 };
       usage.set(owners[0].id, { files: row.files + 1, lines: row.lines + lines });
     }
-    if (lines > policy.lineBound) {
+    if (lines > policy.lineBound && !isTestFile(file)) {
       violations.push({ file, module: owners.length === 1 ? owners[0].id : null, rule: "over-line-bound", lines,
         detail: `${file} has ${lines} lines, over the bound of ${policy.lineBound}` });
     }
@@ -245,7 +251,8 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
   if (!bundle.ok) return { ...base, status: "map-invalid", errors: bundle.errors, violations: [] };
   const policyRead = (deps.readPolicy ?? readBoundaryPolicy)(root);
   if (!policyRead.ok) return { ...base, status: "policy-invalid", errors: policyRead.errors, violations: [] };
-  const { policy } = policyRead;
+  // C32: the files the Pipeline itself keeps in a consumer project belong to no module for the direct CLI call exactly as for Verify, so both give one answer (they differed before).
+  const policy = { ...policyRead.policy, excludedPaths: [...policyRead.policy.excludedPaths, ...MANAGED_EXCLUSIONS] };
   const listed = (deps.listFiles ?? trackedFiles)(root);
   if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the check needs a Git work tree", violations: [] };
   const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
@@ -326,12 +333,8 @@ const MANAGED_EXCLUSIONS = Object.freeze([
 ]);
 
 export function measureArchitecture({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
-  const readPolicy = deps.readPolicy ?? readBoundaryPolicy;
-  const withManaged = (root) => {
-    const read = readPolicy(root);
-    return read.ok ? { ok: true, policy: { ...read.policy, excludedPaths: [...read.policy.excludedPaths, ...MANAGED_EXCLUSIONS] } } : read;
-  };
-  const result = checkArchitectureBoundaries({ rootDir, sourceExtensions }, { ...deps, readPolicy: withManaged });
+  // The managed exclusions are applied by the check itself since C32; Verify and the direct call share them.
+  const result = checkArchitectureBoundaries({ rootDir, sourceExtensions }, deps);
   const measured = result._measured;
   const publicOut = publicResult(result);
   if (!measured) return publicOut;
