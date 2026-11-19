@@ -175,6 +175,20 @@ test("J6 a data operation's journeys name recoverability and unintended valid in
   has(reviewer, /not a block/u, "the question never blocks");
 });
 
+// C31-B12 (AC-112, PO decision 2026-11-19): ONE fixed readiness question about an expensive decision no module declares in adrReferences.
+test("J7 the readiness reviewer asks one fixed question about an expensive decision with no adrReferences entry, as a question with the create-adr command", () => {
+  const reviewer = flat(read("plugins/pipeline-core/agents/readiness-reviewer.md"));
+  has(reviewer, /expensive to reverse/u, "the item names the decision that is expensive to reverse");
+  for (const kind of ["data shape", "public interface", "security boundary", "cross-module contract", "technology choice"]) {
+    assert.ok(reviewer.includes(kind), `the item names "${kind}"`);
+  }
+  has(reviewer, /no entry in any module's `adrReferences`/u, "the item names adrReferences");
+  has(reviewer, /DESIGN-QUESTION[^.]*never a blocking finding|question, never a blocking finding/u, "the answer is a question, never a blocking finding");
+  has(reviewer, /create-adr\.mjs --root <root> --slug <slug> --title "<title>"/u, "the item names the create-adr command");
+  has(reviewer, /--from-design/u, "the item names the --from-design form");
+  has(reviewer, /says explicitly when there is none/u, "the reviewer says when there is none");
+});
+
 test("J5 the close readback reports journey coverage per criterion as covered / not covered, never a bare count", async () => {
   const { closeQualityReadback, QUALITY_ROW_IDS } = await load("lib/close-quality-readback.mjs");
   assert.ok(QUALITY_ROW_IDS.includes("journey-coverage"));

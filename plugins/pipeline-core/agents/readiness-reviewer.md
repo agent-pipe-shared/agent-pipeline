@@ -123,6 +123,15 @@ the design makes such a choice and no module names an ADR path for it in
 and point to the `architecture-decision` skill. This is a question, never a
 block; the close only reports which named ADR paths exist.
 
+Then ask this one fixed question, once, in the full round: is there a decision in
+the design that is expensive to reverse (a data shape, a public interface, a
+security boundary, a cross-module contract, a technology choice) and has no entry
+in any module's `adrReferences`? The answer is a question, never a blocking
+finding. Name the decision in one line and the command
+`create-adr.mjs --root <root> --slug <slug> --title "<title>"` (or `--from-design`
+after declaring the path in `adrReferences`). The reviewer says explicitly when there is none.
+Nothing is stored and the report shape does not change.
+
 Accepted risks: when the Spec carries the closed risk table (header
 `| id | source | statement | trace |`), read its `trace` cells. A risk row needs a
 test reference (a test path or `command:<id>`) or an explicit residual statement
