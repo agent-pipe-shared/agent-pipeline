@@ -378,6 +378,7 @@ function codexHumanChars(payload) {
 function codexTimelineEvents(records) {
   const events = [];
   const calls = new Map(); // call_id -> group of the call that the output answers
+  let previousCumulativeTotal = null;
   const provenanceForm = records.some((record) => isTimelineObject(record) && record.type === "response_item" && isTimelineObject(record.payload) && codexHumanChars(record.payload) !== null);
   for (const record of records) {
     if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
@@ -391,6 +392,11 @@ function codexTimelineEvents(records) {
       if (payload.type === "user_message" && !provenanceForm) events.push({ kind: "human", ms, chars: typeof payload.message === "string" ? timelineChars(payload.message) : null });
       else if (payload.type === "task_complete") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
       else if (payload.type === "token_count" && isTimelineObject(payload.info) && isTimelineObject(payload.info.last_token_usage)) {
+        // C32 (Codex greenfield report): a rollout can repeat one token_count event (same cumulative total, same last response) for the one
+        // response it records; a genuine next response always grows the cumulative total, so an unchanged total is a repeat and counts once.
+        const total = isTimelineObject(payload.info.total_token_usage) ? JSON.stringify(payload.info.total_token_usage) : null;
+        if (total !== null && total === previousCumulativeTotal) continue;
+        if (total !== null) previousCumulativeTotal = total;
         const last = payload.info.last_token_usage;
         events.push({ kind: "response", ms, listed: true, model: null, usage: { input: timelineNumber(last.input_tokens), output: timelineNumber(last.output_tokens), cacheWrite: null, cacheRead: timelineNumber(last.cached_input_tokens) } });
       }

@@ -307,7 +307,8 @@ normative shape is:
    If the full Critic finds corrections, assign one fresh Correction Goldfish
    to the whole coherent batch. That owner carries the findings through test
    cases, fixes, targeted checks and subsequent correction-diff findings in
-   the same context until genuine PASS or the three-review correction limit.
+   the same context until genuine PASS or an explicit PO decision (no count
+   of review rounds refuses a correction-diff review on its own, D190).
    Do not create one correction dispatch per item; keep the original batch,
    members and review lineage fixed.
 

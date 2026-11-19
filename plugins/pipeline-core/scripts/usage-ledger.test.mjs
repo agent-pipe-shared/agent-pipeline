@@ -482,6 +482,31 @@ test("usage-ledger --timeline (codex rollout) reads user_message, token_count an
   }
 });
 
+// C32 (Codex greenfield report): the native rollout repeats one token_count event for one response (same cumulative total, same last usage), which
+// the timeline counted twice (68,114 input too many in that run). A genuine next response grows the total and still counts.
+test("usage-ledger --timeline (codex rollout) counts a repeated token_count event once and a real next response again", () => {
+  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
+  const usage = (input, output) => ({ input_tokens: input, cached_input_tokens: input - 10, output_tokens: output, reasoning_output_tokens: 0, total_tokens: input + output });
+  const count = (at, total, last) => rec(at, "event_msg", { type: "token_count", info: { total_token_usage: total, last_token_usage: last } });
+  const { dir, file } = timelineFile([
+    rec("2026-11-03T10:00:00.000Z", "session_meta", { id: "thread-1", cwd: "/somewhere" }),
+    rec("2026-11-03T10:00:01.000Z", "event_msg", { type: "user_message", message: HUMAN_TEXT }),
+    count("2026-11-03T10:00:05.000Z", usage(1000, 50), usage(1000, 50)),
+    count("2026-11-03T10:00:06.000Z", usage(1000, 50), usage(1000, 50)),
+    count("2026-11-03T10:00:07.000Z", usage(1000, 50), usage(1000, 50)),
+    count("2026-11-03T10:00:09.000Z", usage(3000, 170), usage(2000, 120)),
+    rec("2026-11-03T10:00:10.000Z", "event_msg", { type: "task_complete" }),
+  ]);
+  try {
+    const result = run(["--timeline", file, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const responses = JSON.parse(result.stdout).responses;
+    assert.deepEqual(responses.map((entry) => [entry.usage.inputTokens, entry.usage.outputTokens]), [[1000, 50], [2000, 120]], "the repeated event counts once, the next response counts again");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("usage-ledger --timeline (antigravity transcript) prints n/a for what the format does not carry", () => {
   const { dir, file } = timelineFile([
     { type: "turn.started", timestamp: "2026-08-19T10:00:00.000Z" },
