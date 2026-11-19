@@ -723,6 +723,18 @@ test("C31a: a label line ends the section, an id-anchored resolved status drops 
   // A status that is not directly after the id does not count: the item stays open (fail open towards the hold).
   const hidden = "Blocking findings:\n- DESIGN-REVIEW-3 the import is refused; an earlier version of this was resolved elsewhere\n";
   assert.deepStrictEqual(designReviewReportSections(hidden).blocking, ["DESIGN-REVIEW-3"]);
+  // C31b (cloud review of C31a): an intro sentence directly under the heading never ends the section, and an item that merely begins with
+  // the word "Resolved" or "Closed-loop" is a genuine finding, not a status.
+  const intro = "Blocking findings:\nThese two items block the build:\n- DR-1 first finding\n- DR-2 second finding\n";
+  assert.deepStrictEqual(designReviewReportSections(intro).blocking, ["DR-1", "DR-2"]);
+  const looksLikeStatus = "Blocking findings:\n- SEC-2: Resolved symlinks are not re-checked\n- SEC-3 - Closed-loop retry has no cap\n- SEC-4: withdrawn paths are still read\n";
+  assert.deepStrictEqual(designReviewReportSections(looksLikeStatus).blocking, ["SEC-2", "SEC-3", "SEC-4"]);
+  // An unrelated label after a blank line does not end the section either (it names no earlier round or status).
+  const unrelated = "Blocking findings:\n- DR-1 one\n\nAlso these block the build:\n- DR-2 two\n";
+  assert.deepStrictEqual(designReviewReportSections(unrelated).blocking, ["DR-1", "DR-2"]);
+  // The status tokens of the real report shape are still recognised.
+  const statusTokens = "Blocking findings:\n- DR-9 (scope): resolved. now lists it\n- DR-10 (x): resolved in substance.\n- DR-11: withdrawn\n- DR-12 (y): resolved for AC-2 (redirect), AC-8.\n";
+  assert.deepStrictEqual(designReviewReportSections(statusTokens).blocking, []);
   // A markdown heading still ends the section as before.
   assert.deepStrictEqual(designReviewReportSections("Blocking findings:\n- DESIGN-REVIEW-4 x\n## Notes\n- DESIGN-REVIEW-5 y").blocking, ["DESIGN-REVIEW-4"]);
 });

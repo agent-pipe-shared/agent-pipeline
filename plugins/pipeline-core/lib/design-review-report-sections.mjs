@@ -14,9 +14,11 @@
  * C31a (greenfield 2026-11-19): a delta report lists the earlier round's items under a label of its own ("Round 1 questions,
  * status against the current text:"). That line matched no heading, so the blocking section ran on through it and nine
  * `resolved` questions became open findings the receipt could not carry (`DRC-FINDINGS-SPLIT`), which stopped the next
- * review dispatch. A section now also ends at a label line (an unindented line that is no item and ends in a colon), and an
- * item whose id is followed directly by `resolved`, `withdrawn` or `closed` is not open. The second rule is anchored on the id
- * on purpose: a genuine finding that says "must be fixed before build" later in its line stays open.
+ * review dispatch. A section now also ends at a label line (unindented, no item, at least three words, ending in a colon, after a
+ * blank line, after at least one item, and naming a round, earlier/previous/prior items or a status), and an item whose id is
+ * followed directly by a status token (`resolved`, `withdrawn` or `closed`, alone or with "in substance" / "for ...", then a
+ * sentence end) is not open. Both rules are narrow on purpose (C31b, after the cloud review of C31a): an intro sentence under the
+ * heading, a finding that begins "Resolved paths ..." or "Closed-loop ...", or one that says "must be fixed before build" stays open.
  */
 
 const BLOCKING_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*blocking(?:\s+findings?)?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(?:\(.*\))?\s*$/iu;
@@ -26,7 +28,11 @@ const ITEM_ID = /^\s*(?:[-*+]|\d+[.)])?\s*(?:\*\*|__)?\[?([A-Z][A-Z0-9]*(?:-[A-Z
 // An unindented, non-bullet line of at least three words that ends in a colon. A one- or two-word "Repair:" inside an item does not end the section.
 const LABEL_LINE = /^(?![-*+]\s|\d+[.)]\s)\S+(?:[ \t]+\S+){2,}[ \t]*(?:\*\*|__)?[ \t]*$/u;
 const ENDS_WITH_COLON = /:\s*(?:\*\*|__)?\s*$/u;
-const RESOLVED_STATUS = /^\s*(?:\([^)]*\))?\s*[:\-—–]?\s*(?:\*\*|__)?(?:resolved|withdrawn|closed)\b/iu;
+// A status token, not a sentence that happens to start with the word: the word stands alone or is followed by "in substance" / "for ...",
+// then a sentence end. "DR-4: Resolved paths escape the root" and "DR-5 - Closed-loop retry has no cap" stay open findings.
+const RESOLVED_STATUS = /^\s*(?:\([^)]*\))?\s*[:\-—–]?\s*(?:\*\*|__)?(?:resolved|withdrawn|closed)(?:\*\*|__)?(?:[ \t]+(?:in[ \t]+substance|for[ \t]+[^.;\n]{1,60}?))?[ \t]*(?:[.;,)]|$)/iu;
+// A label line names an earlier round's status list; it must say so (round, earlier, previous, prior, status) to end a section.
+const LABEL_KEYWORD = /\b(?:round|earlier|previous|prior|status)\b/iu;
 
 /** The report scanned once: each item with the 1-based line it was read from. */
 function scan(text) {
@@ -35,16 +41,21 @@ function scan(text) {
   const blocking = [];
   const questions = [];
   let section = null;
+  let itemsInSection = 0;
   lines.forEach((line, index) => {
-    if (BLOCKING_HEADING.test(line)) { section = "blocking"; return; }
-    if (QUESTIONS_HEADING.test(line)) { section = "questions"; return; }
+    const previousBlank = index === 0 || lines[index - 1].trim() === "";
+    if (BLOCKING_HEADING.test(line)) { section = "blocking"; itemsInSection = 0; return; }
+    if (QUESTIONS_HEADING.test(line)) { section = "questions"; itemsInSection = 0; return; }
     if (OTHER_HEADING.test(line)) { section = null; return; }
     if (section === null) return;
     const match = ITEM_ID.exec(line);
     if (match === null) {
-      if (line.length <= 160 && ENDS_WITH_COLON.test(line) && LABEL_LINE.test(line)) section = null;
+      // The section ends only at a label line that follows a blank line, comes after at least one item and names an earlier round's
+      // status; an intro sentence under the heading ("These two block the build:") never ends it, so no finding after it is lost.
+      if (itemsInSection > 0 && previousBlank && line.length <= 160 && ENDS_WITH_COLON.test(line) && LABEL_LINE.test(line) && LABEL_KEYWORD.test(line)) section = null;
       return;
     }
+    itemsInSection += 1;
     if (section === "blocking" && RESOLVED_STATUS.test(line.slice(match[0].length))) return;
     const bucket = section === "blocking" ? blocking : questions;
     if (!bucket.some((entry) => entry.id === match[1])) bucket.push({ id: match[1], line: index + 1 });
