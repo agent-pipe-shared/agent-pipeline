@@ -1,0 +1,45 @@
+diff --git a/backlog/items/2026-11-19-codex-dispatch-passes-no-model-or-effort-and-observes-none.md b/backlog/items/2026-11-19-codex-dispatch-passes-no-model-or-effort-and-observes-none.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..38b2d1a14797fe9621b07a825e554ef8386188da
+--- /dev/null
++++ b/backlog/items/2026-11-19-codex-dispatch-passes-no-model-or-effort-and-observes-none.md
+@@ -0,0 +1,39 @@
++---
++schema: "pipeline.backlog-item.v1"
++id: "pipeline.codex-dispatch-passes-no-model-or-effort-and-observes-none"
++type: "defect"
++owner: "pipeline"
++status: "open"
++created: "2026-11-19"
++source: "Codex greenfield report of the candidate 31 run (analysis of the delivered run), checked against plugins/pipeline-core/scripts/codex-native-dispatch-prepare.mjs"
++sprint: "nightwing"
++done_when: manual
++---
++
++# A Codex implementation dispatch declares a model and effort but passes and observes neither
++
++## Description
++
++The model routing of a project names, per duty and runner, the model and effort an implementation dispatch should run on (the greenfield project declared `gpt-6-luna` at effort `high` for the Codex implementer). The Codex prepare command prints the arguments of the `spawn_agent` call as `{ agent_type, message }` only, so no model or effort reaches the tool layer, and nothing observes what the child ran on. The dispatch record of such a run says so itself: `modelAssurance: declared-unobserved`, "model and effort are the briefing's declaration, not an observation". In the run, the six implementation children reported `gpt-6.1-sol` while the briefings and the record named `gpt-6-luna`; the readiness reviewer ran on `gpt-6-luna` and the two Critics on `gpt-6-sol`. The difference is evidenced; whether it cost quality or money is not, and the cause (the role's own configuration, an inherited session model, or an ignored prompt line) is not provable from the report.
++
++## Triggering situation
++
++The Codex greenfield report of the candidate 31 run (priority P0.2 of that report). `policies/model-policy.md` MP-29 already states that a model named only in the dispatch text does not steer the tool layer.
++
++## Affected artifact
++
++`plugins/pipeline-core/scripts/codex-native-dispatch-prepare.mjs` (the printed `spawn_agent` arguments), the SubagentStart/SubagentStop hooks of `native-goldfish-host.mjs` (what they could observe), the dispatch record (`modelAssurance`), the projected Codex role files, `policies/model-policy.md` MP-29.
++
++## Proposal
++
++1. Probe once, live, which arguments the Codex `spawn_agent` tool accepts and which model and effort the SubagentStart payload reports; nothing should be built before that is measured.
++2. If the tool takes a model and effort, let the prepare command print them from the routing and let the guard compare the call with the routing before the first product write.
++3. If the hook reports the child's model, record it in the dispatch record as an observation and show a typed mismatch beside the declaration (a notice, as on Antigravity, never silently).
++4. If neither exists, say so in the dispatch record and the briefing instead of naming a model as if it were set.
++
++## Triage (filled in by the Elephant of the next Pipeline session)
++
++- **Decision:**
++- **Rationale:**
++- **Assignment (if accepted):**
++- **Date:**

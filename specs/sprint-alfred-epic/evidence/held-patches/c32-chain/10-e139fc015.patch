@@ -1,0 +1,14 @@
+diff --git a/plugins/pipeline-core/lib/human-guard-override.test.mjs b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+index 6c94cf5768a0635e887305700f6d59d2ef6f94a5..1268ac6992f424987b560c8201cb083679ab34fc 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+@@ -7654,7 +7654,8 @@ test("L16-5: every attempt of the planning is capped by what is left of the dead
+         clock.offsetMs += toplevel === 1 ? 5000 : 3900;
+         if (toplevel === 1) return { status: null, error: Object.assign(new Error("spawnSync git ETIMEDOUT"), { code: "ETIMEDOUT" }) };
+       }
+-      return spawnSync(command, args, options);
++      // The requested timeout is recorded above; git itself runs with a generous one, so a loaded machine cannot turn the 500 ms floor of the third call into a real timeout.
++      return spawnSync(command, args, { ...options, timeout: 30_000 });
+     };
+     const planned = plan(spawn);
+     assert.equal(planned.status, "planned");

@@ -1,0 +1,12 @@
+fix(guard): the override planning's git deadline also bounds the repository observation that follows the topology
+
+The cloud review of candidate 31 found that only the topology phase of an override planning was capped by the per-planning deadline: the repository observation that follows in the same planning (common dir, unborn probe, status, HEAD, tree: up to six git calls, the unborn probe with its own fixed 5 s) ran every call at the full 5 s again, so a slow repository could still run past the 10 s hook limit.
+
+topology() now carries the planning deadline on its result as a non-enumerable property (nothing that compares, spreads or serialises the result sees it), and repositoryObservation() takes it as an optional argument that bounds every one of its git calls, the unborn-branch probe included, by what is left of the same budget (the existing 500 ms floor, so a fast call is never starved and a timeout is never 0). Three flows pass it: recordHumanGuardDenial and consumeHumanGuardOverrideCore (both run inside the PreTool hook) and planHumanGuardOverride (run by the guard's denial route, and also by hand through guard-human-override.mjs plan: a hand-run plan on a repository slower than the 9 s budget now gets the floor for its later calls, exactly as its topology calls already did since 31c; below 9 s nothing changes, every call keeps its 5 s cap). The flows that only a person runs (armTimeFreshnessCheck, refreeze, prepare/authorize, the reconcile arm) pass none and are byte-identical to before. Without a deadline the observation keeps its single 5 s attempt per call (pinned).
+
+One latent defect surfaced by the floor: isUnbornBranch read a probe that did not run (ETIMEDOUT, spawn error) as "unborn", which would have bound head null and the empty tree of a repository that has commits. A probe that did not run is now the same typed HGO-GIT refusal every other call of the observation gives; a git that ran and exited non-zero is still the unborn case, unchanged.
+
+Cases: the observation after a topology that spent the budget runs every git call at the floor; without a deadline every call stays at 5 s; the unborn probe timeout is HGO-GIT and a non-zero exit is still unborn. The existing L16-5 case asserted an exact 4000 ms for the retry although the mocked clock rides on the real one, so it flaked by 1 ms; it now asserts the first attempt, the retry range and the floor.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

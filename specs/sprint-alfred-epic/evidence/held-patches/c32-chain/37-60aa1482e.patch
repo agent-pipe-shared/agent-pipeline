@@ -1,0 +1,31 @@
+diff --git a/scripts/export-held-chain.mjs b/scripts/export-held-chain.mjs
+index 12ad61720a6818ccb776eb6043f41ac41e594dd3..ff4e52d6a57822e2521352d0a233509ee39ed4c5 100644
+--- a/scripts/export-held-chain.mjs
++++ b/scripts/export-held-chain.mjs
+@@ -44,8 +44,14 @@ function withoutDerivedHunks(diff) {
+   }
+   return kept.join("");
+ }
+-const shas = git("rev-list", "--reverse", `${base}..HEAD`).split("\n").filter(Boolean)
+-  .filter((sha) => !DERIVED_REFRESH_SUBJECT.test(git("log", "-1", "--format=%s", sha).trim()));
++// A commit whose every hunk is derived (a Reader-input sync under another subject than the refresh one) has an EMPTY patch once the derived hunks are dropped, and
++// `git apply` refuses an empty patch ("No valid patches in input", the candidate 32 rehearsal): it is left out as well, the apply script's own refresh writes what it changed.
++const diffOf = (sha) => withoutDerivedHunks(git("diff", "--binary", "--full-index", `${sha}^`, sha));
++const exported = git("rev-list", "--reverse", `${base}..HEAD`).split("\n").filter(Boolean)
++  .filter((sha) => !DERIVED_REFRESH_SUBJECT.test(git("log", "-1", "--format=%s", sha).trim()))
++  .map((sha) => ({ sha, diff: diffOf(sha) }))
++  .filter((entry) => entry.diff.trim() !== "");
++const shas = exported.map((entry) => entry.sha);
+ if (shas.length === 0) { console.error(`no commits in ${base}..HEAD`); process.exit(1); }
+ mkdirSync(outDir, { recursive: true });
+ // At least two digits: a chain that grows past nine patches keeps its file names, so a re-export leaves no second, stale copy of each patch.
+@@ -55,8 +61,7 @@ shas.forEach((sha, index) => {
+   const number = String(index + 1).padStart(width, "0");
+   const short = sha.slice(0, 9);
+   const name = `${number}-${short}`;
+-  const diff = withoutDerivedHunks(git("diff", "--binary", "--full-index", `${sha}^`, sha));
+-  writeFileSync(join(outDir, `${name}.patch`), diff);
++  writeFileSync(join(outDir, `${name}.patch`), exported[index].diff);
+   const subject = git("log", "-1", "--format=%s", sha).trim();
+   let message = git("log", "-1", "--format=%B", sha).trimEnd();
+   // GIT-03: the trailer block is the last paragraph and carries AI-Assisted plus one Dispatch line; add what the clone commit lacks.

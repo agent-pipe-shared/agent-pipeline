@@ -1,0 +1,131 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 506d374b6dea8e7e7a05a912dd9a67ffa21a4c57..09a0c4d9318f1fd7c223ec6f4d2776c60cd17273 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -213,7 +213,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["darwin-requester-integration-tests","plugins/pipeline-core/lib/darwin-requester-integration.test.mjs","top-level-assertions",13],
+     ["design-approval-command-admission-tests","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs","top-level-assertions",5],
+     ["design-approval-route-tests","plugins/pipeline-core/lib/design-approval-route.test.mjs","top-level-assertions",66],
+-    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",45],
++    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",51],
+     ["design-course-command-admission-tests","plugins/pipeline-core/hooks/design-course-command-admission.test.mjs","top-level-assertions",44],
+     ["design-course-coordinator-tests","plugins/pipeline-core/scripts/design-course-coordinator.test.mjs","top-level-assertions",6],
+     ["design-course-session-tests","plugins/pipeline-core/scripts/design-course-session.test.mjs","top-level-assertions",66],
+diff --git a/plugins/pipeline-core/lib/design-authoring.mjs b/plugins/pipeline-core/lib/design-authoring.mjs
+index 5eecc9c289a12230c3fe22ccbe517989dd6ab1ff..543c6f675ca8b161e48606cbad9376ca527a5c60 100644
+--- a/plugins/pipeline-core/lib/design-authoring.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.mjs
+@@ -36,15 +36,28 @@ export function hasGeneratedCriterionPlaceholder(text) {
+   return matches(text.replace(legacy, `- **AC-1:** ${placeholder}`));
+ }
+ 
++/**
++ * The draft markers one generated document still holds, as short labels (C32 F10: two runners searched the plugin source to learn which marker keeps the bind blocked).
++ * Derived from the file bytes on every call, nothing stored. `stagingDesignNeedsAuthoring` is exactly "some marker is left", so the labels cannot drift from the signal.
++ */
++function draftMarkers(text) {
++  if (typeof text !== "string") return [];
++  const markers = [];
++  if (text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")) markers.push("the `<!-- DRAFT TEMPLATE: replace every REPLACE value ... -->` comment");
++  if (/^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)) markers.push("a table row that still says `REPLACE: input reference`, `REPLACE: requirement` or `REPLACE: test path and case`");
++  if (/"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)) markers.push("an architecture block value (responsibility, rationale or profileId) that still starts with `REPLACE: `");
++  if (hasGeneratedCriterionPlaceholder(text)) markers.push("the generated placeholder criterion `AC-1: WHEN <trigger>, the system SHALL <observable result>.`");
++  return markers;
++}
++
++/** The labels of the draft markers still present in the generated PRD and Spec, per document; `[]` when both are authored. */
++export function stagingDesignAuthoringMarkers(prdText, specText) {
++  return [["PRD", draftMarkers(prdText)], ["Spec", draftMarkers(specText)]].flatMap(([label, markers]) => markers.map(marker => `${label}: ${marker}`));
++}
++
+ /** Read-only draft signal for the coordinator; binding still validates the exact source bytes. */
+ export function stagingDesignNeedsAuthoring(prdText, specText) {
+-  const unfinished = text => typeof text === "string" && (
+-    text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
+-    || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
+-    || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
+-    || hasGeneratedCriterionPlaceholder(text)
+-  );
+-  return unfinished(prdText) || unfinished(specText);
++  return draftMarkers(prdText).length > 0 || draftMarkers(specText).length > 0;
+ }
+ 
+ /** Keep full evidence on disk; avoid repeating document payloads in the action readback. */
+diff --git a/plugins/pipeline-core/lib/design-authoring.test.mjs b/plugins/pipeline-core/lib/design-authoring.test.mjs
+index 187ad5a336c9e6c7a8a41220a3121a8978974a65..524dbf20ed6b309dab85d8db243f18eefccc29d0 100644
+--- a/plugins/pipeline-core/lib/design-authoring.test.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.test.mjs
+@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { openSync as openCompletionDescriptor } from "node:fs";
+ import { parseArchitectureDesign } from "./architecture-design.mjs";
+-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, stagingDesignNeedsAuthoring, compactActionReadback } from "./design-authoring.mjs";
++import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, stagingDesignAuthoringMarkers, stagingDesignNeedsAuthoring, compactActionReadback } from "./design-authoring.mjs";
+ import { createHash } from "node:crypto";
+ import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
+ import { devNull } from "node:os";
+@@ -108,7 +108,23 @@ test("staging authoring distinguishes generated placeholders from reviewed sourc
+   assert.equal(stagingDesignNeedsAuthoring("# Product brief\nReviewed goals.\n", "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n"), false);
+ });
+ 
+-if (completionCases.length !== 5) throw new Error("case completion count drift: expected 5, got " + completionCases.length);
++// C32 F10 (Claude and Codex greenfield 2026-11-19): both searched the plugin source for the marker that keeps the bind blocked. The labels are derived from the bytes and agree with the signal.
++test("the staging markers name what is still draft, per document, and agree with the needs-authoring signal", () => {
++  const draftPrd = renderArchitectureDesignSkeleton();
++  const draftSpec = renderDesignTraceabilitySkeleton();
++  const labels = stagingDesignAuthoringMarkers(draftPrd, draftSpec);
++  assert.ok(labels.some(label => label.startsWith("PRD: the `<!-- DRAFT TEMPLATE: replace every REPLACE value")), labels.join("\n"));
++  assert.ok(labels.some(label => label.startsWith("PRD: an architecture block value")), labels.join("\n"));
++  assert.ok(labels.some(label => label.startsWith("Spec: a table row that still says `REPLACE:")), labels.join("\n"));
++  assert.ok(labels.some(label => label.startsWith("Spec: the generated placeholder criterion")), labels.join("\n"));
++  const authoredSpec = "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n";
++  assert.deepEqual(stagingDesignAuthoringMarkers("# Product brief\nReviewed goals.\n", authoredSpec), [], "an authored pair lists nothing");
++  for (const [prd, spec] of [[draftPrd, draftSpec], [draftPrd, authoredSpec], ["# Product brief\n", draftSpec], ["# Product brief\n", authoredSpec], [undefined, null]]) {
++    assert.equal(stagingDesignNeedsAuthoring(prd, spec), stagingDesignAuthoringMarkers(prd, spec).length > 0, "the signal and the labels never disagree");
++  }
++});
++
++if (completionCases.length !== 6) throw new Error("case completion count drift: expected 6, got " + completionCases.length);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 7e0549b9a01eeda45483534047930e18f74c78d3..9d7b995a7a7f2f961a800cdff974e97b3174d789 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -13,7 +13,7 @@ import { CONSUMER_VERSION_INITIAL } from "./consumer-release.mjs";
+ import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets, initialGreenfieldProjectDocTargets } from "./architecture-map-scaffold.mjs";
+ import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
+-import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
++import { stagingDesignAuthoringMarkers, stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
+ // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
+ // real function with the module's existing `fs.inspectArchitectureDesign` injection, not by reading source text.
+ export { designToImplementationHandoverAction };
+@@ -4142,11 +4142,12 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
+         }
+       }
+       let draftIncomplete;
++      let draftMarkerLabels = [];
+       try {
+-        draftIncomplete = stagingDesignNeedsAuthoring(
+-          readFileSync(join(root, acknowledgement.prd.path), "utf8"),
+-          readFileSync(join(root, acknowledgement.spec.path), "utf8"),
+-        );
++        const prdText = readFileSync(join(root, acknowledgement.prd.path), "utf8");
++        const specText = readFileSync(join(root, acknowledgement.spec.path), "utf8");
++        draftIncomplete = stagingDesignNeedsAuthoring(prdText, specText);
++        draftMarkerLabels = stagingDesignAuthoringMarkers(prdText, specText);
+       } catch {
+         return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
+           repository, runtime, continuity, appServer, nextAction: null,
+@@ -4162,7 +4163,8 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
+             prdPath: acknowledgement.prd.path, specPath: acknowledgement.spec.path,
+             guidance: "Author and review the generated PRD and Spec, then inspect again before bootstrap binding." },
+           diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_authoring_required",
+-            "the generated PRD and Spec still contain draft framing",
++            // C32 F10: name what is still present, so nobody searches the plugin source for the marker that keeps the bind blocked.
++            `the generated PRD and Spec still contain draft framing${draftMarkerLabels.length === 0 ? "" : ` (${draftMarkerLabels.join("; ")})`}`,
+             "author both documents before bootstrap-bind-plan")],
+         });
+       }

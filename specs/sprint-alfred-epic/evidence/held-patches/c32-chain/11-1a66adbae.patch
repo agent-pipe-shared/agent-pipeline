@@ -1,0 +1,28 @@
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index 029f5ae4750aced3d3b6724e1d558a1a6ce8a174..19bad1a2e26a8fe0edaa42bb249099028408673e 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -353,6 +353,8 @@ test("C28 ADR gate: an unbound draft refuses submit-plan before the PO signs, na
+   assert.ok(refused.err.includes(`bind-adr-proposals.mjs --root ${f.root} --feature pin-adr-unbound --carrier specs/pin-adr-unbound/design.md --selection specs/pin-adr-unbound/po-selection.json --draft storage-adapter`), refused.err);
+   assert.ok(refused.err.includes(`create-adr.mjs --root ${f.root} --slug storage-adapter --discard --reason "<why it is not wanted>"`), refused.err);
+   assert.match(refused.err, /No submission or signature request was recorded\./u);
++  // C32 F15: the carrier is explained where it is named, so nobody has to learn it from the bind's own refusal.
++  assert.match(refused.err, /the carrier is a Markdown file of this design package that must already exist: write specs\/pin-adr-unbound\/design\.md with a title line first, the bind adds the decision block to it/u);
+   assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 1baa575308e6061a20c598aa848738f30e6d8fc8..1fbbe011d99d6b345ad9cf49b2affb36352c1c88 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12305,7 +12305,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+             const featureFolder = featureDirs[0] ?? "specs";
+             console.error(`Error: submit-plan blocked by ADR-DRAFT-UNBOUND (${unbound.map((entry) => entry.path).join(", ")}); ${unbound.length === 1 ? "this ADR proposal was" : "these ADR proposals were"} written but never bound into the design package, `
+               + `so the design approval would pass and no decision would ever become an accepted ADR. Bind ${unbound.length === 1 ? "it" : "them"}: node ${scripts("bind-adr-proposals.mjs")} --root ${dir} --feature ${base.activeFeature.id} `
+-              + `--carrier ${featureFolder}/design.md --selection ${featureFolder}/po-selection.json ${unbound.map((entry) => `--draft ${entry.slug}`).join(" ")} (the selection file holds the PO's own words as JSON; skills/architecture-decision/SKILL.md shows its shape), `
++              + `--carrier ${featureFolder}/design.md --selection ${featureFolder}/po-selection.json ${unbound.map((entry) => `--draft ${entry.slug}`).join(" ")} (the selection file holds the PO's own words as JSON; skills/architecture-decision/SKILL.md shows its shape; `
++              // C32 (Claude greenfield 2026-11-19, F15): the bind refused "design.md does not exist" and the agent created the carrier by hand; the refusal here now says what it is.
++              + `the carrier is a Markdown file of this design package that must already exist: write ${featureFolder}/design.md with a title line first, the bind adds the decision block to it), `
+               + `commit the written files, then run submit-plan again. A proposal that is deliberately not wanted is discarded with a reason instead, one command per draft (an audit record, no signature): `
+               + `${unbound.map((entry) => `node ${scripts("create-adr.mjs")} --root ${dir} --slug ${entry.slug} --discard --reason "<why it is not wanted>"`).join(" ; ")}. No submission or signature request was recorded.`);
+             return 2;

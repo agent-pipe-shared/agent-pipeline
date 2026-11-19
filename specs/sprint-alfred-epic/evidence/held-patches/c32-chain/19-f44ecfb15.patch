@@ -1,0 +1,77 @@
+diff --git a/plugins/pipeline-core/lib/resume-hint.mjs b/plugins/pipeline-core/lib/resume-hint.mjs
+index 242876e7b2491afbcc518665cc771cabc0b95ff2..2b3d17a2b1b99afe1ff66c6f82a90359c5719f82 100644
+--- a/plugins/pipeline-core/lib/resume-hint.mjs
++++ b/plugins/pipeline-core/lib/resume-hint.mjs
+@@ -107,8 +107,13 @@ function validTimestamp(value) { return typeof value === "string" && Number.isFi
+ // lower case or one leading capital, at least three letters), a short all-capital abbreviation (at most six letters) or a one- or
+ // two-digit number. A key or token is random mixed case or longer digit runs and never has that shape in every segment.
+ const WORD_JOINED = /^(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2})(?:-(?:[A-Z]?[a-z]{2,}|[A-Z]{2,6}|\d{1,2}))+$/;
++// C32 (second Antigravity greenfield report, PO 2026-11-19): `Familien-Küchen-Tablet-App` was refused as a key. A German compound written with hyphens is capitalised words, short capital abbreviations
++// and one- or two-digit numbers joined by hyphens, with umlauts and ß as letters; a random key is not capitalised word by word. Lower-case hyphenated words keep their earlier treatment (they are still read as a key at 24 characters).
++const CAPITALISED_WORD = String.raw`(?:\p{Lu}\p{Ll}{2,}|\p{Lu}{2,6}|\d{1,2})`;
++const CAPITALISED_COMPOUND = new RegExp(`^${CAPITALISED_WORD}(?:-${CAPITALISED_WORD})+$`, "u");
+ function opaqueToken(value) {
+   return value.split(/\s+/).some((token) => {
++    if (CAPITALISED_COMPOUND.test(token.replace(/[^\p{L}\p{N}_=-]/gu, ""))) return false;
+     const compact = token.replace(/[^A-Za-z0-9_=-]/g, "");
+     if (compact.length < 16) return false;
+     const hasLower = /[a-z]/.test(compact); const hasUpper = /[A-Z]/.test(compact); const hasDigit = /\d/.test(compact);
+@@ -203,11 +208,12 @@ function validContext(value) {
+ }
+ 
+ // C32 (Antigravity greenfield 2026-11-19: `Familien-Küchen-Tablet-App` was read as a key by the length-24 rule of opaqueToken() and the repair was a guess).
+-// The detector stays exactly as strict; only the diagnosis names the shape that can fire it, without echoing the value.
++// The diagnosis names the shape that can fire the length-24 rule, without echoing the value (a capitalised compound no longer fires it, see CAPITALISED_COMPOUND).
+ function longJoinedWordHint(textOrList) {
+   const texts = Array.isArray(textOrList) ? textOrList : [textOrList];
+   const fires = texts.some((text) => typeof text === "string"
+-    && text.split(/\s+/).some((token) => token.replace(/[^A-Za-z0-9_=-]/g, "").length >= 24 && /[_=-]/.test(token)));
++    && text.split(/\s+/).some((token) => token.replace(/[^A-Za-z0-9_=-]/g, "").length >= 24 && /[_=-]/.test(token)
++      && !CAPITALISED_COMPOUND.test(token.replace(/[^\p{L}\p{N}_=-]/gu, ""))));
+   return fires ? "; a word of 24 or more characters joined by hyphens or underscores reads as a key, so write a long compound word with spaces" : "";
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/resume-hint.test.mjs b/plugins/pipeline-core/lib/resume-hint.test.mjs
+index aafb83dae4660d0c01f0c12366b9e4f5def9117e..ca0f82e0d8df520b3476630209f86fd1af94a9ec 100644
+--- a/plugins/pipeline-core/lib/resume-hint.test.mjs
++++ b/plugins/pipeline-core/lib/resume-hint.test.mjs
+@@ -182,6 +182,21 @@ test("C30E-RH1: words and short numbers joined by hyphens are admitted, random m
+   ]) rejects(text);
+ });
+ 
++// C32-RH2 (second Antigravity greenfield report, PO 2026-11-19): a capitalised German compound with umlauts is plain prose, however long.
++test("C32-RH2: capitalised German compounds with umlauts are admitted, keys and lower-case hyphenated words are still not", () => {
++  for (const text of [
++    "Familien-Küchen-Tablet-App mit Startseite und sechs Modulen",
++    "Die Haushalts-Kassen-Abrechnung für die Wochen-Ausgaben-Übersicht",
++    "Eltern-PIN-Schutz und Zutaten-Fänger-Spiel",
++  ]) accepts(text);
++  for (const text of [
++    "tablet notes Familien-Küchen-Tablet-App-4f9a2c71b83d05e6",
++    "tablet notes Xk9-Zq2-Wv7-Rt4-Yb8-Hn3",
++    "tablet notes documentation-reconciliation-status",
++    "tablet notes Küchen-aB3dE5fG7hJ9kL1mN3pQ",
++  ]) rejects(text);
++});
++
+ test("pins the residual the shape filter cannot close without a word list", () => {
+   for (const text of ADMITTED_RESIDUAL) accepts(text);
+ });
+@@ -410,12 +425,14 @@ test("resumeHintContextDetail never echoes the rejected value itself", () => {
+   assert.doesNotMatch(detail, /documentation-reconciliation/u, "a diagnostic must not repeat a value flagged as secret-shaped");
+ });
+ 
+-// C32: a long German compound joined by hyphens fires the key rule; the refusal names that shape (not the value) so the repair is not a guess.
++// C32: a long lower-case hyphenated word fires the key rule; the refusal names that shape (not the value) so the repair is not a guess.
++// (Restated, not reverted: this case used `Familien-Küchen-Tablet-App`, which the PO decided on 2026-11-19 is ordinary German and must be admitted, see C32-RH2.)
+ test("RH-SCHEMA-DIAG-3 a 24+ character hyphenated word in intent is named as the shape that reads as a key, without echoing it", () => {
+-  const detail = resumeHintContextDetail(withIntent("Familien-Küchen-Tablet-App mit Startseite und sechs Modulen"));
++  const detail = resumeHintContextDetail(withIntent("documentation-reconciliation-status mit Startseite und sechs Modulen"));
+   assert.match(detail, /^intent must be one non-empty single-line string/u);
+   assert.match(detail, /24 or more characters joined by hyphens or underscores.*write a long compound word with spaces/u);
+-  assert.doesNotMatch(detail, /Familien/u, "the diagnostic must not repeat the flagged value");
++  assert.doesNotMatch(detail, /reconciliation/u, "the diagnostic must not repeat the flagged value");
++  assert.doesNotMatch(resumeHintContextDetail(withIntent("Familien-Küchen-Tablet-App mit Startseite und sechs Modulen")), /compound word/u, "a capitalised German compound is admitted, so it needs no hint");
+   assert.doesNotMatch(resumeHintContextDetail(withIntent("short intent with abc123DEF456ghi789JKL012mno345")), /compound word/u, "a key-shaped value without a joined word gets no compound hint");
+ });
+ 

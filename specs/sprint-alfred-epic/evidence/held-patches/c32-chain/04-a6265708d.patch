@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/lib/resume-hint.mjs b/plugins/pipeline-core/lib/resume-hint.mjs
+index d9859f08271f34ddd7114cb5647624c6de1e2c1d..242876e7b2491afbcc518665cc771cabc0b95ff2 100644
+--- a/plugins/pipeline-core/lib/resume-hint.mjs
++++ b/plugins/pipeline-core/lib/resume-hint.mjs
+@@ -202,6 +202,15 @@ function validContext(value) {
+   return !Object.hasOwn(value, "progress") || validTextList(value.progress, 4);
+ }
+ 
++// C32 (Antigravity greenfield 2026-11-19: `Familien-Küchen-Tablet-App` was read as a key by the length-24 rule of opaqueToken() and the repair was a guess).
++// The detector stays exactly as strict; only the diagnosis names the shape that can fire it, without echoing the value.
++function longJoinedWordHint(textOrList) {
++  const texts = Array.isArray(textOrList) ? textOrList : [textOrList];
++  const fires = texts.some((text) => typeof text === "string"
++    && text.split(/\s+/).some((token) => token.replace(/[^A-Za-z0-9_=-]/g, "").length >= 24 && /[_=-]/.test(token)));
++  return fires ? "; a word of 24 or more characters joined by hyphens or underscores reads as a key, so write a long compound word with spaces" : "";
++}
++
+ /**
+  * Which field a rejected card actually failed on, as one short clause.
+  *
+@@ -230,12 +239,12 @@ export function resumeHintContextDetail(value) {
+       + `${unexpected.length > 0 ? `; unexpected: ${unexpected.join(", ")}` : ""}`;
+   }
+   if (!validText(value.intent)) {
+-    return "intent must be one non-empty single-line string, free of secrets and opaque tokens";
++    return `intent must be one non-empty single-line string, free of secrets and opaque tokens${longJoinedWordHint(value.intent)}`;
+   }
+   for (const [key, maximum] of [["scope", 4], ["constraints", 4], ["questions", 3]]) {
+     if (validTextList(value[key], maximum)) continue;
+     return Array.isArray(value[key])
+-      ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens`
++      ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens${longJoinedWordHint(value[key])}`
+       : `${key} must be an ARRAY of at most ${maximum} short strings, not a ${typeof value[key]}`;
+   }
+   if (Object.hasOwn(value, "progress") && !validTextList(value.progress, 4)) {
+diff --git a/plugins/pipeline-core/lib/resume-hint.test.mjs b/plugins/pipeline-core/lib/resume-hint.test.mjs
+index 253eaed923421b837f92ebcf5ae948c87d9c9b77..aafb83dae4660d0c01f0c12366b9e4f5def9117e 100644
+--- a/plugins/pipeline-core/lib/resume-hint.test.mjs
++++ b/plugins/pipeline-core/lib/resume-hint.test.mjs
+@@ -410,6 +410,15 @@ test("resumeHintContextDetail never echoes the rejected value itself", () => {
+   assert.doesNotMatch(detail, /documentation-reconciliation/u, "a diagnostic must not repeat a value flagged as secret-shaped");
+ });
+ 
++// C32: a long German compound joined by hyphens fires the key rule; the refusal names that shape (not the value) so the repair is not a guess.
++test("RH-SCHEMA-DIAG-3 a 24+ character hyphenated word in intent is named as the shape that reads as a key, without echoing it", () => {
++  const detail = resumeHintContextDetail(withIntent("Familien-Küchen-Tablet-App mit Startseite und sechs Modulen"));
++  assert.match(detail, /^intent must be one non-empty single-line string/u);
++  assert.match(detail, /24 or more characters joined by hyphens or underscores.*write a long compound word with spaces/u);
++  assert.doesNotMatch(detail, /Familien/u, "the diagnostic must not repeat the flagged value");
++  assert.doesNotMatch(resumeHintContextDetail(withIntent("short intent with abc123DEF456ghi789JKL012mno345")), /compound word/u, "a key-shaped value without a joined word gets no compound hint");
++});
++
+ // RH-SCHEMA-DIAG-2. A fully-valid `context` with an invalid `createdAt` must NOT be
+ // blamed on context: resumeHintContextDetail() would find nothing wrong and fall
+ // through to its generic "context is not accepted in this shape", which is false --

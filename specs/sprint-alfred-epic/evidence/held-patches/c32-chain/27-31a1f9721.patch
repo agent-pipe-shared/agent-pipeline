@@ -1,0 +1,100 @@
+diff --git a/plugins/pipeline-core/scripts/audit-bundle.mjs b/plugins/pipeline-core/scripts/audit-bundle.mjs
+index 3aa905baa1984baad71118e45deb94154ad05f1a..7b68922eaf5012f9552961706292ee927f68d376 100644
+--- a/plugins/pipeline-core/scripts/audit-bundle.mjs
++++ b/plugins/pipeline-core/scripts/audit-bundle.mjs
+@@ -22,4 +22,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
+   if (options.sub === "build") return (deps.build ?? buildAuditBundle)({ repositoryRoot: options.repositoryRoot, outputPath: options.outputPath, plan: await load(options.planFile) });
+   return (deps.verify ?? verifyAuditBundle)({ bundleRoot: options.bundleRoot });
+ }
+-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { try { const result = await main(); process.stdout.write(`${JSON.stringify(result)}\n`); if (result?.status === "invalid") process.exitCode = 1; } catch (error) { process.stderr.write(`${error.code ?? "ABC-FAILED"}: ${error.message}\n`); process.exitCode = 2; } }
++// C32 (Codex greenfield report): a lone --help prints the usage and exits zero, like the other scripts of the close.
++export const HELP = "Usage: audit-bundle.mjs plan --repo <repo> --manifest <repo-relative manifest> --bundle-id <id> --core-version <version> --pack-file <policy pack json> [--pack-file ...]\n       audit-bundle.mjs build --repo <repo> --plan-file <plan json> --output <new bundle directory>\n       audit-bundle.mjs verify --bundle <bundle directory>\nEach form prints one JSON object on stdout; verify exits 1 on an invalid bundle.";
++if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) process.stdout.write(`${HELP}\n`);
++else if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { try { const result = await main(); process.stdout.write(`${JSON.stringify(result)}\n`); if (result?.status === "invalid") process.exitCode = 1; } catch (error) { process.stderr.write(`${error.code ?? "ABC-FAILED"}: ${error.message}\n`); process.exitCode = 2; } }
+diff --git a/plugins/pipeline-core/scripts/cli-help.test.mjs b/plugins/pipeline-core/scripts/cli-help.test.mjs
+index 5bc0a81fc7a77c51d50aa20cdbc5324aba5641ff..f6171b266dcf5a7a5f976fc960075b68632dcf00 100644
+--- a/plugins/pipeline-core/scripts/cli-help.test.mjs
++++ b/plugins/pipeline-core/scripts/cli-help.test.mjs
+@@ -10,7 +10,13 @@ const CASES = [
+   ["handover-rotate", "handover-rotate.mjs"],
+   ["session-critic-finalizer", "session-critic-finalizer.mjs"],
+   ["close-coordinator", "close-coordinator.mjs"],
++  // C32 (Codex greenfield report): the four scripts whose --help used to be a usage error.
++  ["usage-ledger", "usage-ledger.mjs"],
++  ["critic-split-merge", "critic-split-merge.mjs"],
++  ["finish-feature", "finish-feature.mjs"],
++  ["audit-bundle", "audit-bundle.mjs"],
+ ];
++const SHORT_FLAG = new Set(["usage-ledger", "critic-split-merge", "finish-feature", "audit-bundle"]);
+ const childEnv = () => {
+   const env = { ...process.env };
+   delete env.NODE_TEST_CONTEXT;
+@@ -28,6 +34,13 @@ for (const [name, filename] of CASES) {
+     assert.ok(result.stdout.length < 4_096, "help must stay bounded");
+   });
+ 
++  test(`${name} answers -h like --help`, { skip: !SHORT_FLAG.has(name) && "only the four C32 scripts take -h" }, () => {
++    const result = spawnSync(process.execPath, [script, "-h"], { encoding: "utf8", env: childEnv() });
++    assert.equal(result.status, 0, result.stderr);
++    assert.equal(result.stderr, "");
++    assert.match(result.stdout, new RegExp(`^Usage: ${name}\\.mjs`, "u"));
++  });
++
+   test(`${name} keeps strict grammar when --help is combined with another argument`, () => {
+     const result = spawnSync(process.execPath, [script, "--help", "--root", "."], { encoding: "utf8", env: childEnv() });
+     assert.notEqual(result.status, 0);
+diff --git a/plugins/pipeline-core/scripts/critic-split-merge.mjs b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+index d0c49bfbc7adfd72e82dd92da805f42f90f64ced..aa2e3649f1b66a2485e86137649ee6d73f68d32d 100644
+--- a/plugins/pipeline-core/scripts/critic-split-merge.mjs
++++ b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+@@ -67,6 +67,8 @@ function readJsonFile(root, path, label) {
+ 
+ /** Pure-ish entry for tests and the CLI: parse argv, read the files, merge, optionally write. Returns `{ exitCode, stdout, stderr }`. */
+ export function runCriticSplitMergeCli(argv) {
++  // C32 (Codex greenfield report): a lone --help prints the usage and exits zero, like the other scripts of the close.
++  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) return { exitCode: 0, stdout: `Usage: critic-split-merge.mjs --root <repo> --packet <packetId> [--out <merged verdict file>]\n       critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> [--child ...] [--out <merged verdict file>]\nMerges the verdicts of the module Critics of one split round into the verdict the session finalizer takes; --packet reads each child's Source return, so no verdict is copied by hand. --out creates the file exclusively.\n`, stderr: "" };
+   try {
+     const flags = { child: [] };
+     for (let index = 0; index < argv.length; index += 2) {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 365cb87a2c27464a8b1c474a06ae4e1f06bbd673..021e5c6a326cd04691b70a232763d5cf7b0e7b7a 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -1028,7 +1028,11 @@ function parse(argv) {
+   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], auditRequest: value["--audit-request"], criticVerifyLifecycle: value["--critic-verify-lifecycle"], continuityCloseRequest: value["--continuity-close-request"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
+ }
+ 
+-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes("--one-shot")) {
++// C32 (Codex greenfield report): a lone --help prints the usage and exits zero, like the other scripts of the close.
++const FINISH_HELP = "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override-proof scratch/sbom-override-proof-<16 hex>.json] [--stage]\n       finish-feature.mjs --root <repo> --by <name> --architecture-impact <value> --audit-request <repo-relative-json> --critic-verify-lifecycle <receipt-id> [--continuity-close-request <repo-relative-json>] [--resume-lifecycle-id <id>]\nThe first form is the normal close on every runner: it collects the evidence itself and stops with the next step; the second takes every input already at hand. Each prints one JSON object on stdout; a stop prints its repair on stderr and exits 2.";
++if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) {
++  process.stdout.write(`${FINISH_HELP}\n`);
++} else if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes("--one-shot")) {
+   // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
+   try {
+     if (process.argv.slice(2).filter((entry) => entry === "--one-shot").length !== 1) fail("FINISH-USAGE", "--one-shot may be given once");
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.mjs b/plugins/pipeline-core/scripts/usage-ledger.mjs
+index b7db8af10dbbb2561592b9f880387ab4aad282d0..911711770dd6c7467b6133440cdefea9c8927f11 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.mjs
+@@ -167,6 +167,20 @@ function usage(msg) {
+ //        everything else is an optional flag. ---
+ const argv = process.argv.slice(2);
+ 
++// C32 (Codex greenfield report): a lone --help prints the usage on stdout and exits zero (usage() above is the error path and exits 1).
++if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) {
++  process.stdout.write([
++    "Usage: usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>]",
++    "       usage-ledger.mjs --metering <sanitized-bundle.json...>",
++    "       usage-ledger.mjs --timeline <transcript-file> [--json]",
++    "       usage-ledger.mjs --row [label] --antigravity-transcript <transcript-file> [--model <name>]",
++    "       usage-ledger.mjs --row [label] --codex-rollout <transcript-file>",
++    "Reads session transcripts and prints a usage table, a close-block cost row or a run timeline; it writes nothing.",
++    "",
++  ].join("\n"));
++  process.exit(0);
++}
++
+ function readMeteringBundle(file) {
+   let descriptor;
+   try {

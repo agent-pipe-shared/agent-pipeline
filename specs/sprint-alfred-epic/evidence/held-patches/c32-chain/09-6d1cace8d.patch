@@ -1,0 +1,34 @@
+diff --git a/plugins/pipeline-core/scripts/resume-hint.mjs b/plugins/pipeline-core/scripts/resume-hint.mjs
+index c45b63f87b47655666197585a73b71678944d59e..463ddfdce7506dd99a6caa716f87658a7c154467 100644
+--- a/plugins/pipeline-core/scripts/resume-hint.mjs
++++ b/plugins/pipeline-core/scripts/resume-hint.mjs
+@@ -79,7 +79,8 @@ function main() {
+   // recorded bytes, never accepted here as a flag.
+   if (command === "consume" || command === "query") {
+     const sessionId = value(args, "--session-id");
+-    if (!sessionId) throw new Error(`${command} requires --session-id`);
++    // C32 (Antigravity greenfield 2026-11-19, F19): the refusal named the flag and not where its value comes from. The id is the caller's own opaque identity (see recordResumeHintConsumption).
++    if (!sessionId) throw new Error(`${command} requires --session-id <id>: any non-empty id of this session that you choose once and reuse, the same value for consume and query (the receipt is keyed by its hash); use the session id your runner shows when it shows one`);
+     return command === "consume"
+       ? recordResumeHintConsumption({ rootDir, sessionId })
+       : queryResumeHintConsumption({ rootDir, sessionId });
+diff --git a/plugins/pipeline-core/scripts/resume-hint.test.mjs b/plugins/pipeline-core/scripts/resume-hint.test.mjs
+index 197da472574165f861e59a98ac9bb24139839882..9c794c37e53ecccc5632909adb0442bc7c43daf1 100644
+--- a/plugins/pipeline-core/scripts/resume-hint.test.mjs
++++ b/plugins/pipeline-core/scripts/resume-hint.test.mjs
+@@ -249,6 +249,15 @@ test("query before any capture reports the no-card outcome", () => {
+   assert.equal(queried.outcome, "no-card");
+ });
+ 
++test("consume and query without --session-id say what the id is and that both verbs take the same value (C32 F19)", () => {
++  const root = freshRoot("no-session-id");
++  for (const verb of ["consume", "query"]) {
++    const refused = run([verb, "--root", root]);
++    assert.equal(refused.status, 2, verb);
++    assert.match(refused.stderr, new RegExp(`${verb} requires --session-id <id>: any non-empty id of this session that you choose once and reuse, the same value for consume and query`, "u"));
++  }
++});
++
+ test("query after capture but before consume reports not-consumed with an absent-receipt code", () => {
+   const root = freshRoot("query-not-consumed");
+   const cardFile = join(root, "card.json");

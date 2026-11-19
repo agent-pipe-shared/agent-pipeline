@@ -1,0 +1,72 @@
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index 19bad1a2e26a8fe0edaa42bb249099028408673e..c806fe67606d096190ad1455263c81ab70f7bad5 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+-import { run, statePath } from "../../scripts/pipeline-state.mjs";
++import { designApprovalRequestIsSuperseded, run, statePath } from "../../scripts/pipeline-state.mjs";
+ import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
+ import { recordOnboardingConsent } from "../../scripts/onboarding-consent-mark.mjs";
+ import { initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+@@ -358,6 +358,20 @@ test("C28 ADR gate: an unbound draft refuses submit-plan before the PO signs, na
+   assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
+ });
+ 
++// C32 F18: the scratch copy of the design approval request is named by the binding digest and its content binds the commit; a commit between two present-plan runs leaves the same name with other bytes.
++test("C32 F18 a stale copy of the request is told apart from an unrelated file by the same binding and another intent, never by anything unparsable", () => {
++  const request = { schema: "pipeline.design-approval-request.v1", bindingSha256: "a".repeat(64), approvalIntent: { value: { candidate: "new" }, sha256: "b".repeat(64) } };
++  const earlier = (patch) => Buffer.from(`${JSON.stringify({ ...request, ...patch })}\n`, "utf8");
++  assert.equal(designApprovalRequestIsSuperseded(earlier({ approvalIntent: { value: { candidate: "old" }, sha256: "c".repeat(64) } }), request), true, "same binding, another commit");
++  assert.equal(designApprovalRequestIsSuperseded(earlier({}), request), false, "identical intent is no stale copy");
++  assert.equal(designApprovalRequestIsSuperseded(earlier({ bindingSha256: "d".repeat(64), approvalIntent: { sha256: "c".repeat(64) } }), request), false, "another binding");
++  assert.equal(designApprovalRequestIsSuperseded(earlier({ schema: "pipeline.other.v1", approvalIntent: { sha256: "c".repeat(64) } }), request), false, "another schema");
++  assert.equal(designApprovalRequestIsSuperseded(earlier({ approvalIntent: {} }), request), false, "no earlier intent to compare");
++  assert.equal(designApprovalRequestIsSuperseded(Buffer.from("not json"), request), false, "unparsable fails closed");
++  assert.equal(designApprovalRequestIsSuperseded(Buffer.alloc(0), request), false);
++  assert.equal(designApprovalRequestIsSuperseded(earlier({}), undefined), false, "a missing request fails closed");
++});
++
+ test("C28 ADR gate: every unbound draft is listed once, in one refusal, with one --draft each", () => {
+   const f = adrDraftFixture("pin-adr-two");
+   const body = "# Second\n";
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 1fbbe011d99d6b345ad9cf49b2affb36352c1c88..a512d9fca9454ed9a97a7672c744969c30df224e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11080,6 +11080,19 @@ function inspectSubmissionSources(dir, authority, deps) {
+   return { ok: true, candidate, sources: [{ path: authority.planPath, sha256: prd.sha256 }, { path: authority.specPath, sha256: spec.sha256 }] };
+ }
+ 
++/**
++ * C32 F18 (Codex greenfield 2026-11-19): the scratch copy is named by the binding digest, but its content also binds the commit the request was presented at, so a commit between two
++ * present-plan runs of the same design leaves a copy with the same name and other bytes. True when `earlierBytes` is exactly that: a request of the same schema and binding whose intent
++ * differs. Read-only and fail-closed (anything unparsable is false); it only chooses the wording of the refusal, never whether the file is overwritten.
++ */
++export function designApprovalRequestIsSuperseded(earlierBytes, request) {
++  try {
++    const earlier = JSON.parse(Buffer.from(earlierBytes).toString("utf8"));
++    return earlier?.schema === request?.schema && earlier.bindingSha256 === request.bindingSha256
++      && typeof earlier.approvalIntent?.sha256 === "string" && earlier.approvalIntent.sha256 !== request.approvalIntent?.sha256;
++  } catch { return false; }
++}
++
+ function writeDesignWorkflowApprovalRequest(dir, request) {
+   const root = realpathSync(resolve(dir));
+   const scratch = join(root, "scratch");
+@@ -11096,7 +11109,12 @@ function writeDesignWorkflowApprovalRequest(dir, request) {
+     if (existsSync(target)) {
+       const stat = lstatSync(target);
+       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(target) !== target
+-        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT", path: `scratch/${name}`, message: `scratch/${name} already exists with different content or is not a plain single-link file; it is bound to this request digest and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again.` };
++        || !readFileSync(target).equals(bytes)) {
++        const superseded = stat.isFile() && !stat.isSymbolicLink() && stat.nlink === 1 && designApprovalRequestIsSuperseded(readFileSync(target), request);
++        return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT", path: `scratch/${name}`, message: superseded
++          ? `scratch/${name} is the request of an earlier present-plan for this same design at another commit: the request binds the commit it was presented at, and a commit since then changed it, so that copy is stale and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again, and make no further commit between that present-plan and the signature.`
++          : `scratch/${name} already exists with different content or is not a plain single-link file; it is bound to this request digest and is never overwritten. Repair: move or delete that one file (it is only a scratch copy of the request), then run the same command again.` };
++      }
+       return { ok: true, path: `scratch/${name}`, replay: true };
+     }
+     let fd;

@@ -1,0 +1,155 @@
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index 81c6bfea45ca48d0830c0f53ba00afe66f02b520..1acc574f77fa1d630faa1e4e5a3fa42ff37d9888 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -98,7 +98,11 @@ function openAdmittedPackets(controlRoot, runner, nowMs) {
+  */
+ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date.now(), readHandbackFn = null } = {}) {
+   try {
+-    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || !CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) return { status: "not-applicable" };
++    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop") return { status: "not-applicable" };
++    if (!CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) {
++      noteOtherAgentVerdict({ commonDir, runner, nowMs, input });
++      return { status: "not-applicable" };
++    }
+     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+     let verdict = extractCriticVerdict(input.last_assistant_message);
+     // C27: the text the verdict was looked for in is the text a problem is reported about. A child that ended with a hand-back has no useful last message of its own.
+@@ -110,10 +114,54 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
+     const child = childDigest(input.agent_id);
+     const result = issueForVerdict({ commonDir, runner, verdict, nowMs, child });
+     noteReturnProblem({ commonDir, runner, nowMs, child, result, text: returned });
++    writeStopNote({ commonDir, runner, nowMs, agentType: input.agent_type, status: result.status,
++      reason: result.status === "no-verdict" ? verdictProblemText(returned) : result.status === "contradictory-verdict" ? `its verdict contradicts its own pass: true (${result.reason})` : null });
+     return result;
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++// C32 (Codex greenfield report, candidate 31 run: the Critic stops produced no Source return and the cause could not be told afterwards): the last Critic stop the
++// hook saw is written down as a fixed small note next to the packets, so the close can say why no record was issued. It is a diagnostic only and never fails or
++// changes a stop: `<common-dir>/agent-pipeline/critic-packets/last-critic-stop.json`, mode 0600, overwritten by the next stop, written only where the packet directory exists.
++export const CRITIC_STOP_NOTE_FILE = "last-critic-stop.json";
++const cleanAgentType = (value) => (typeof value === "string" ? value.replace(/[^A-Za-z0-9:_.-]/gu, "?").slice(0, 40) : null);
++
++function writeStopNote({ commonDir, runner, nowMs, agentType, status, reason = null }) {
++  try {
++    if (typeof commonDir !== "string" || commonDir === "") return;
++    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
++    if (!existsSync(controlRoot)) return;
++    writeFileSync(join(controlRoot, CRITIC_STOP_NOTE_FILE), canonicalJson({ runner, atMs: nowMs, agentType: cleanAgentType(agentType), status: String(status).slice(0, 40), reason: reason === null ? null : String(reason).slice(0, 400) }), { mode: 0o600 });
++  } catch { /* a diagnostic never fails the stop */ }
++}
++
++/** A subagent that is no Critic type but returned a schema-shaped Critic verdict: the usual cause of a missing Source return on a runner that spawns every role as `default`. */
++function noteOtherAgentVerdict({ commonDir, runner, nowMs, input }) {
++  try {
++    const text = input.last_assistant_message;
++    if (typeof text !== "string" || text.length > 400_000 || !text.includes("{") || extractCriticVerdict(text) === null) return;
++    writeStopNote({ commonDir, runner, nowMs, agentType: input.agent_type ?? "none", status: "verdict-under-other-agent-type",
++      reason: `a subagent of type ${cleanAgentType(input.agent_type ?? "none")} returned a Critic verdict, but only the agent types ${[...CRITIC_AGENT_TYPES].join(" and ")} issue the Source return` });
++  } catch { /* a diagnostic never fails the stop */ }
++}
++
++/** The last Critic stop note of this repository, or null. */
++export function readCriticStopNote({ controlRoot } = {}) {
++  try {
++    if (typeof controlRoot !== "string") return null;
++    const note = JSON.parse(readFileSync(join(controlRoot, CRITIC_STOP_NOTE_FILE), "utf8"));
++    return note !== null && typeof note === "object" && Number.isSafeInteger(note.atMs) && typeof note.status === "string" ? note : null;
++  } catch { return null; }
++}
++
++/** One sentence for a close or merge refusal: what the hook saw at the last Critic stop. Pure. */
++export function describeCriticStopNote(note) {
++  if (note === null || typeof note !== "object") {
++    return " The stop hook recorded no Critic subagent stop in this repository: it did not fire for the Critic, or the Critic ran under an agent type it does not recognise and returned no verdict.";
++  }
++  return ` The last Critic subagent stop the hook saw (${new Date(note.atMs).toISOString()}, ${note.runner ?? "unknown runner"}, agent type ${note.agentType ?? "none"}) ended as ${note.status}${typeof note.reason === "string" && note.reason !== "" ? `: ${note.reason}` : ""}.`;
++}
++
+ /** In words, why a Critic's final message holds no verdict that can be recorded. */
+ function verdictProblemText(text) {
+   if (typeof text !== "string" || text.trim() === "") return "its final message was empty";
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index e8452f9c1abb30653b4d5b5fca280e12dfe1a135..d88dd57477b6d7d7a5719d29d16cc036d8c858b0 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -29,6 +29,7 @@ import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+ import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
++import { describeCriticStopNote, readCriticStopNote } from "../lib/critic-source-return.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+ import { featurePackageDigestRoute, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import {
+@@ -358,7 +359,7 @@ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
+   // route) admits the identical close; the label stays caller-authored-fallback and travels with the acknowledgement reference.
+   const acknowledgement = findCriticAcknowledgement({ gitCommonDir: common, packetId, receipt });
+   if (acknowledgement !== null) return Object.freeze({ independence, acknowledgement });
+-  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet, the wait for its proof and the follow-up command: hand the PO only the signing command, the PO reports nothing back, then run the wait and the follow-up yourself), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
++  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk;${describeCriticStopNote(readCriticStopNote({ controlRoot: join(common, "agent-pipeline", "critic-packets") }))} repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet, the wait for its proof and the follow-up command: hand the PO only the signing command, the PO reports nothing back, then run the wait and the follow-up yourself), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
+ }
+ function startPlan(values) {
+   const root = physicalRoot(values.root);
+diff --git a/plugins/pipeline-core/scripts/critic-split-merge.mjs b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+index aa2e3649f1b66a2485e86137649ee6d73f68d32d..5018546a1f6a60f18ab17662e7864fa915dd6e56 100644
+--- a/plugins/pipeline-core/scripts/critic-split-merge.mjs
++++ b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
+-import { readAdmittedSplit, readCriticReturnProblems, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
++import { describeCriticStopNote, readAdmittedSplit, readCriticReturnProblems, readCriticSplitSourceReturns, readCriticStopNote, settleSplitReturns } from "../lib/critic-source-return.mjs";
+ 
+ export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
+ const MAX_BYTES = 1024 * 1024;
+@@ -37,7 +37,7 @@ function childrenFromPacket(root, packetId) {
+   let records = [];
+   try { records = readCriticSplitSourceReturns({ controlRoot: packetsRoot, packetId }); } catch { records = []; }
+   const problems = problemText(readCriticReturnProblems({ controlRoot: packetsRoot, packetId }));
+-  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return${problems}; repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
++  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return${problems};${describeCriticStopNote(readCriticStopNote({ controlRoot: packetsRoot }))} repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
+   const digests = new Set(records.map((record) => record?.splitSha256));
+   const split = digests.size === 1 ? readAdmittedSplit(join(packetsRoot, packetId), [...digests][0]) : undefined;
+   if (split === undefined) throw new MergeUsageError(`the Source returns of packet ${packetId} do not bind one admitted split; repair: pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-SPLIT");
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index e621f58f3fe909ceeefe932978f02c23375be1e8..4db40ce66a10e5a06d98e9664507833cccff073c 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2018,6 +2018,35 @@ test("C21H (b) the namespaced critic-high-risk type is the Critic as well, and o
+   } finally { cleanup(fx); }
+ });
+ 
++// C32 (Codex greenfield report, candidate 31 run): a Critic stop that issues no Source return leaves one small diagnostic note, and the close and the split merge say why.
++test("C32 the last Critic stop is noted, also when no record is issued, and the sentence names what the hook saw", async () => {
++  const { issueCriticSourceReturn, readCriticStopNote, describeCriticStopNote } = await import("../lib/critic-source-return.mjs");
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    const commonDir = join(fx.root, ".git");
++    assert.equal(readCriticStopNote({ controlRoot: admitted.controlRoot }), null, "no stop yet");
++    assert.match(describeCriticStopNote(null), /recorded no Critic subagent stop/u);
++    // A Critic stop whose final message holds no verdict: no record, a note with the reason.
++    assert.equal(issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput("The review is finished; no machine-readable verdict was returned.", { agent_type: "critic" }) }).status, "no-verdict");
++    let note = readCriticStopNote({ controlRoot: admitted.controlRoot });
++    assert.deepEqual([note.runner, note.agentType, note.status], ["codex", "critic", "no-verdict"]);
++    assert.match(note.reason, /does not end in a fenced JSON verdict/u);
++    // A verdict under another agent type (what a `default` spawn returns): still not applicable, and the note names the type.
++    assert.equal(issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput(criticReturn(), { agent_type: "default" }) }).status, "not-applicable");
++    note = readCriticStopNote({ controlRoot: admitted.controlRoot });
++    assert.deepEqual([note.agentType, note.status], ["default", "verdict-under-other-agent-type"]);
++    assert.match(describeCriticStopNote(note), /agent type default\) ended as verdict-under-other-agent-type: a subagent of type default returned a Critic verdict, but only the agent types critic and critic-high-risk/u);
++    assert.equal(existsSync(target), false, "no record from a non-Critic type");
++    // A non-Critic stop without a verdict leaves the note as it was; an issued stop notes itself.
++    issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput("done", { agent_type: "goldfish-implementor" }) });
++    assert.equal(readCriticStopNote({ controlRoot: admitted.controlRoot }).status, "verdict-under-other-agent-type");
++    assert.equal(issueCriticSourceReturn({ commonDir, runner: "codex", input: stopInput(criticReturn(), { agent_type: "critic" }) }).status, "issued");
++    assert.equal(readCriticStopNote({ controlRoot: admitted.controlRoot }).status, "issued");
++  } finally { cleanup(fx); }
++});
++
+ // G20-41 (candidate 20, AC-108): on Antigravity the Critic CHILD's final `send_message` to its parent conversation issues the same record.
+ // Criterion-bound cases, written before the producer existed. The child is recognised only through runner-written facts: its own conversationId,
+ // the descriptor the host wrote under the PARENT's brain directory, and the Recipient; payloads are shaped like the M4c measurement.

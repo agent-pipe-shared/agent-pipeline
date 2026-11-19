@@ -1,0 +1,10 @@
+fix(architecture): the boundary check treats generated output and test files sensibly and the CLI agrees with Verify
+
+A second Antigravity greenfield report, the largest single loss of the run (about 35 to 40 minutes and 1.8 million cache tokens): the hard 1000-line bound of the architecture boundary check failed twice on files that are not hand-written source. A generated single-file offline bundle of 3375 lines forced a compaction dispatch that squeezed it to 166 lines only to pass the gate, and a test file that grew to 1007 lines after a Critic's regression test failed the one-shot close with ONESHOT-VERIFY-RED and cost a correction round, a fourth Critic round and a second close. Separately the direct CLI call did not apply the managed exclusions (the consumer Verify adapter and .claude/**) that the Verify measurement and the preview apply, so the two answered differently on the same tree.
+
+Three changes, PO decision 2026-11-19: (a) checkArchitectureBoundaries applies the managed exclusions itself, so the direct call, Verify and the preview share one answer (measureArchitecture no longer wraps the policy, so they are counted once). (b) A generated file belongs to no module's size, ownership or import checks: *.bundle.js, *.min.js (also .mjs/.cjs/.jsx) and everything under a dist/ directory; a name that only contains "bundle" is still hand-written. (c) A test file has no hard line bound; its ownership (including the derived test ownership) and its imports are still checked, it still counts as a source of its module, and the report-only size budgets of the fitness model still list it. A source file keeps the bound of 1000.
+
+Cases: the direct check and the measurement agree on consumer-verify.mjs and .claude/**, an ordinary unowned file is still a finding; generated output is no source and hand-written code keeps the bound; an owned long test passes, an unowned long test is only unowned, a long test with a forbidden import is still a forbidden-dependency finding. The happy-path guide states the bound and its exemptions.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

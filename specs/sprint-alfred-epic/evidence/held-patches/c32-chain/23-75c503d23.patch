@@ -1,0 +1,120 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index 2d91bea1babbaf28a22d5dce9ca2a288c365a7a9..8f0924ccfefe2351c1c76f798945d11bd383e39e 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -16,6 +16,8 @@
+ //   risk-trace            (AC-112, report-only) per row of the Spec's closed risk table (lib/spec-risk-trace.mjs): present when every row is covered,
+ //                         residual-stated or not-applicable; missing, with the untraced / stale / malformed ids listed, when any row is not;
+ //                         not-applicable when the Spec has no such table; unknown when the Spec or a named path cannot be read.
++//   readme-filled         (C32, report-only) present when README.md exists without the onboarding skeleton sentence "Not filled yet."; missing when it still carries it;
++//                         not-applicable without a README; unknown when it cannot be read.
+ // Reader contract: exists(rel)->bool, listDir(rel)->string[] (an absent directory is []), architectureImpact()->string|null, rigorHistory()->array|null,
+ // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
+ 
+@@ -27,7 +29,7 @@ import { inspectSpecRiskTrace, RISK_TRACE_HEADER } from "./spec-risk-trace.mjs";
+ import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
+ 
+ export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
+-export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
++export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace", "readme-filled"]);
+ export const QUALITY_READBACK_SCHEMA = "pipeline.close-quality-readback.v1";
+ export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
+ 
+@@ -208,6 +210,21 @@ function riskTraceRow(readers, specPath) {
+   return trace.open.length === 0 ? row(id, "present", listing) : row(id, "missing", listing, RISK_TRACE_REPAIR(trace.open));
+ }
+ 
++// C32 (second Antigravity greenfield report, ADR-0105 spirit: a hint, never a gate): the README the onboarding scaffold writes says "Not filled yet." until someone states how to start and test the project.
++// The report found it still so at the close. Present when a README exists without that sentence, missing (with the remedy) when it is still there, not-applicable without a README, unknown when it cannot be read.
++const README_PATH = "README.md";
++const README_SKELETON = /\bNot filled yet\./u;
++const README_REPAIR = "fill the placeholder sections of README.md: state the exact command that starts the product and the command that runs the tests, then commit it before the freeze (a hint, never a gate)";
++function readmeRow(readers) {
++  const id = "readme-filled";
++  const found = call(readers.exists, README_PATH);
++  if (!found.ok) return unknown(id);
++  if (found.value !== true) return row(id, "not-applicable");
++  const bytes = call(readers.readBytes, README_PATH);
++  if (!bytes.ok) return unknown(id);
++  return README_SKELETON.test(Buffer.from(bytes.value).toString("utf8")) ? row(id, "missing", README_PATH, README_REPAIR) : row(id, "present", README_PATH);
++}
++
+ function handoverRow(readers, handoverPath) {
+   const id = "handover-freshness";
+   const updated = call(readers.handoverUpdatedMs);
+@@ -225,6 +242,7 @@ export function closeQualityReadback({ featureId, handoverPath = "docs/state.md"
+     handoverRow(readers, handoverPath),
+     journeyRow(readers, specPath),
+     riskTraceRow(readers, specPath),
++    readmeRow(readers),
+   ];
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index df15db62bf5e31d4c07cf8ba63d0d45ee5c55076..0a7aafb43c01c311c9084c2934b0517e046267e9 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -43,19 +43,37 @@ test("CGF-23 the architecture-fitness evidence labels the observation and lists
+ 
+ // QG-04 restatement (candidate 30k K16, AC-112): the six ids above keep their order and shape; the readback gained a seventh, appended,
+ // report-only row "risk-trace" (cases below). `full()` carries no Spec reader, so journey-coverage and risk-trace are "unknown" here.
+-test("AC-239: exactly the seven ids, in order, with the closed row shape", () => {
++// QG-04 restatement (candidate 32, second Antigravity report): the seven ids keep their order and shape; the readback gained an eighth, appended,
++// report-only row "readme-filled" (cases below).
++test("AC-239: exactly the eight ids, in order, with the closed row shape", () => {
+   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
+-  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
++  assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace", "readme-filled"]);
+   assert.deepEqual(list.map((r) => r.id), [...QUALITY_ROW_IDS]);
+   for (const row of list) {
+     assert.deepEqual(Object.keys(row).sort(), ["evidence", "id", "remedy", "status"]);
+     assert.ok(["present", "missing", "not-applicable", "unknown"].includes(row.status));
+   }
+-  assert.ok(list.filter((r) => r.id !== "journey-coverage" && r.id !== "risk-trace").every((r) => r.status === "present"), JSON.stringify(list));
++  assert.ok(list.filter((r) => r.id !== "journey-coverage" && r.id !== "risk-trace" && r.id !== "readme-filled").every((r) => r.status === "present"), JSON.stringify(list));
++  assert.equal(list.find((r) => r.id === "readme-filled").status, "not-applicable", "`full()` has no README");
+   assert.equal(list.find((r) => r.id === "journey-coverage").status, "unknown");
+   assert.equal(list.find((r) => r.id === "risk-trace").status, "unknown");
+ });
+ 
++// C32: the report-only readme-filled row reports the onboarding skeleton sentence, as a hint (the chain guide lists a missing row as advice, never a gate).
++test("C32 readme-filled: present without the skeleton sentence, missing with the remedy while it is there, not-applicable without a README, unknown when unreadable", () => {
++  const readme = (text, exists = true) => rows(full({ exists: (rel) => (rel === "README.md" ? exists : true), readBytes: (rel) => Buffer.from(rel === "README.md" ? text : "x") }))["readme-filled"];
++  const filled = readme("# App\n\nStart: npm start\nTest: npm test\n");
++  assert.equal(filled.status, "present");
++  assert.equal(filled.evidence, "README.md");
++  const skeleton = readme("# App\n\n## Start\nNot filled yet. State the exact command that starts the product and what to expect\n");
++  assert.equal(skeleton.status, "missing");
++  assert.match(skeleton.remedy, /state the exact command that starts the product and the command that runs the tests.*a hint, never a gate/u);
++  assert.equal(readme("", false).status, "not-applicable");
++  assert.equal(rows(full({ exists: () => true, readBytes: () => { throw new Error("boom"); } }))["readme-filled"].status, "unknown");
++  assert.equal(rows(full({ exists: undefined }))["readme-filled"].status, "unknown", "a missing reader is never 'present'");
++  assert.deepEqual(Object.keys(skeleton).sort(), ["evidence", "id", "remedy", "status"]);
++});
++
+ // AC-112 (candidate 30k K16, stage S2): the report-only risk-trace row reads the Spec's closed risk table through inspectSpecRiskTrace.
+ const SPEC_PATH = `specs/${FEATURE}/spec.md`;
+ const TRACE_TEST = "plugins/pipeline-core/lib/x.test.mjs";
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index c910097f72f039a69b0d5a9c9d0abe4b00a91ece..a1844784491b1637bb7f60eb1efb0c53f7a58142 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -1116,7 +1116,8 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+   for (const out of [seen.drive, seen.dry]) {
+     // QG-04 restatement (C20 G20-27, AC-108): the five original ids keep their order; the readback gained an appended sixth row, "journey-coverage".
+     // QG-04 restatement (C30K K16): the readback gained an appended seventh row, "risk-trace" (report-only, unknown when the Spec cannot be read).
+-    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace"]);
++    // QG-04 restatement (candidate 32): the readback gained an appended eighth row, "readme-filled" (report-only hint).
++    assert.deepEqual(out.qualityReadback.map((r) => r.id), ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage", "risk-trace", "readme-filled"]);
+     const scan = out.qualityReadback.find((r) => r.id === "security-scan");
+     assert.equal(scan.status, "missing");
+     const ids = out.actions.actions.map((a) => a.id);
+@@ -1130,7 +1131,7 @@ test("process: AC-239 drive and --dry-run print qualityReadback, a missing row i
+   assert.deepEqual(seen.index.entries.map((e) => e.id), ["prd", "spec", "plan", "verify-evidence", "critic-reports", "security-scan-evidence", "fitness-evidence", "push-threat-model"]);
+   const prd = seen.index.entries.find((e) => e.id === "prd");
+   assert.equal(prd.sha256, digest("# PRD\n"));
+-  assert.equal(seen.index.qualityRows.length, 7); // QG-04 restatement (C30K K16): the five original rows plus the appended journey-coverage and risk-trace rows
++  assert.equal(seen.index.qualityRows.length, 8); // QG-04 restatement (C30K K16, candidate 32): the five original rows plus the appended journey-coverage, risk-trace and readme-filled rows
+   assert.equal(seen.dirtyAfter, seen.dirtyBefore, "audit-index writes no file");
+ });
+ 

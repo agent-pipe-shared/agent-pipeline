@@ -1,0 +1,14 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 19ec81c7a981a8f770de7605aba3d7ac29c7bbd2..e45d259d6efc426f35661d7d99041f4958403420 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -5580,7 +5580,8 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+         rootDir: path,
+         runner,
+         run(executable, argv) {
+-          if (executable !== "node" || argv[0] !== ONBOARDING_SCRIPT) {
++          // C32: the driver spawns a published bare `node` as its own interpreter (restated pin, was the bare name).
++          if (executable !== process.execPath || argv[0] !== ONBOARDING_SCRIPT) {
+             return { status: 1, stdout: "{}", stderr: "unexpected driver command" };
+           }
+           let stdout = "";

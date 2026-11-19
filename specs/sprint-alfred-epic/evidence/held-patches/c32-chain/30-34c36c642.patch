@@ -1,0 +1,111 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 919ab652be516cb9127cfe44bef7da4bba010e24..31856434386b39feaa4e743f4d858a9f75a3b636 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -47,7 +47,7 @@ export const BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
+ export const DEFAULT_LINE_BOUND = 1000;
+ export const BOUNDARY_RULES = Object.freeze(["unowned-path", "ambiguous-ownership", "forbidden-dependency", "over-line-bound"]);
+ /** What a pass of this check does and does not say (Codex greenfield report): a green verdict must not read as "every dependency was seen". */
+-export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, import paths built at runtime, and whether code honours a module's contract.";
++export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, relative imports written in JavaScript or TypeScript files, and the local <script src> of HTML files that belong to a module. Not seen: runtime or browser globals, CSS references, scripts an inline script loads, bundler output, imports in other languages, import paths built at runtime, and whether code honours a module's contract.";
+ export const DEFAULT_SOURCE_EXTENSIONS = Object.freeze([
+   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".go", ".rs", ".java", ".kt",
+   ".rb", ".cs", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".php", ".scala",
+@@ -218,9 +218,43 @@ function observe(root, modules, policy, listed, readFile, extensions, keepUnowne
+         detail: `module ${caller.id} imports ${target} of module ${targetOwners[0].id}, which is not in its allowedDependencies [${allowed.join(", ")}]` });
+     }
+   }
++  // C32 (Codex greenfield report): a classic browser app composes its modules in an HTML file with <script src>, not with imports, so the import rule above never saw its edges. An HTML file that
++  // belongs to exactly one module is read the same way: each local script it loads that lies in another module is an edge, and a forbidden one is a finding at the HTML file.
++  for (const file of listed.filter((entry) => MARKUP_EXTENSIONS.has(path.extname(entry)) && !excluded(entry)).sort()) {
++    const owners = owningModules(file, modules);
++    if (owners.length !== 1) continue;
++    let text;
++    try { text = readFile(path.join(root, file)); } catch { continue; }
++    const caller = owners[0];
++    const allowed = caller.allowedDependencies ?? [];
++    for (const spec of new Set(extractScriptSources(text))) {
++      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
++      if (target.startsWith("../") || isGeneratedArtifact(target)) continue;
++      const targetOwners = owningModules(target, modules);
++      if (targetOwners.length !== 1 || targetOwners[0].id === caller.id) continue;
++      if (!edges.has(caller.id)) edges.set(caller.id, new Set());
++      edges.get(caller.id).add(targetOwners[0].id);
++      if (allowed.includes(targetOwners[0].id)) continue;
++      violations.push({ file, module: caller.id, rule: "forbidden-dependency", target,
++        detail: `module ${caller.id} loads the script ${target} of module ${targetOwners[0].id} from ${file}, which is not in its allowedDependencies [${allowed.join(", ")}]` });
++    }
++  }
+   return { sources, violations: violations.sort(order), usage, edges };
+ }
+ 
++const MARKUP_EXTENSIONS = new Set([".html", ".htm"]);
++const SCRIPT_SRC = /<script\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/giu;
++/** The local, relative script sources of an HTML text: comments are ignored; an absolute URL, a protocol-relative or site-root path, a data URI, a query and a fragment are not part of a project path. */
++export function extractScriptSources(text) {
++  const found = [];
++  for (const match of text.replace(/<!--[\s\S]*?-->/gu, "").matchAll(SCRIPT_SRC)) {
++    const raw = (match[1] ?? match[2] ?? "").trim().split(/[?#]/u)[0];
++    if (raw === "" || raw.startsWith("/") || /^[a-z][a-z0-9+.-]*:/iu.test(raw)) continue;
++    found.push(raw);
++  }
++  return found;
++}
++
+ function headCandidate(rootDir) {
+   const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" });
+   const commit = result.status === 0 ? result.stdout.trim() : "";
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index 3414d2ecaf47fb3b9938f9ba243bb856fc6fc717..ce38c51e61641af6ec858c5180b8ef56dfd19919 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -15,6 +15,7 @@ import {
+   DEFAULT_LINE_BOUND,
+   checkArchitectureBoundaries,
+   exitCodeForBoundaryCheck,
++  extractScriptSources,
+   measureArchitecture,
+   owningModules,
+   previewArchitectureBoundaries,
+@@ -57,7 +58,8 @@ test("ABC01 a project without an architecture map is not-applicable, never faile
+ test("ABC13 every verdict states what the check does not see, in the result and on the human output", () => {
+   const root = fixture({ files: { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n" } });
+   const result = checkArchitectureBoundaries({ rootDir: root });
+-  assert.match(result.coverage, /Not seen: runtime or browser globals, HTML and CSS references/u);
++  // QG-04 restatement (candidate 32, Codex greenfield report): the local <script src> of an HTML file is now read, so it leaves the list of what is not seen.
++  assert.match(result.coverage, /the local <script src> of HTML files that belong to a module\. Not seen: runtime or browser globals, CSS references/u);
+   const run = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
+   assert.match(run.stdout, /Not seen: runtime or browser globals/u);
+ });
+@@ -421,6 +423,31 @@ test("ABC18 a generated bundle, a minified file and everything under dist are no
+   assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/bundler.mjs": big } }) })), [["over-line-bound", "src/app/bundler.mjs", null]], "a name that only contains 'bundle' is hand-written");
+ });
+ 
++// C32 (Codex greenfield report): a classic browser app composes its modules in an HTML file, with no import statement for the check to read.
++test("ABC20 the local script sources of an HTML file of a module are edges to the modules that own those scripts", () => {
++  const page = (...sources) => `<!doctype html>\n<html><body>\n${sources.map((src) => `<script src="${src}"></script>`).join("\n")}\n</body></html>\n`;
++  const files = { "src/app/index.html": page("../lib/x.js?v=3", "main.js"), "src/app/main.js": "export {};\n", "src/lib/x.js": "export {};\n" };
++  const allowed = checkArchitectureBoundaries({ rootDir: fixture({ files }) });
++  assert.equal(allowed.status, "pass", JSON.stringify(rules(allowed)));
++  const measured = measureArchitecture({ rootDir: fixture({ files }) });
++  assert.deepEqual(measured.measurement.modules.find((entry) => entry.id === "app").measuredDependencies, ["lib"], "the HTML edge is measured like an import");
++  const forbidden = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files }) });
++  assert.deepEqual(rules(forbidden), [["forbidden-dependency", "src/app/index.html", "src/lib/x.js"]], "a query string is no part of the path");
++  assert.match(forbidden.violations[0].detail, /module app loads the script src\/lib\/x\.js of module lib from src\/app\/index\.html/u);
++  const excepted = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files, policy: { schema: BOUNDARY_POLICY_SCHEMA, exceptions: [{ rule: "forbidden-dependency", path: "src/app/index.html", target: "src/lib/x.js", reason: "known" }] } }) });
++  assert.equal(excepted.status, "pass");
++  assert.equal(excepted.counts.excepted, 1);
++});
++
++test("ABC21 what is no project script is no edge: URLs, site-root paths, comments, inline scripts, generated bundles and an HTML file of no module", () => {
++  const html = `<!-- <script src="../lib/x.js"></script> -->\n<script src="https://cdn.example/x.js"></script>\n<script src="//cdn.example/x.js"></script>\n<script src="/lib/x.js"></script>\n<script src='data:text/javascript,1'></script>\n<script>import("../lib/x.js")</script>\n<script src="../lib/x.bundle.js"></script>\n`;
++  const files = { "src/app/index.html": html, "src/lib/x.js": "export {};\n", "src/lib/x.bundle.js": "export {};\n", "index.html": '<script src="src/lib/x.js"></script>\n' };
++  const result = checkArchitectureBoundaries({ rootDir: fixture({ deps: { app: [] }, files }) });
++  assert.equal(result.status, "pass", JSON.stringify(rules(result)));
++  assert.deepEqual(extractScriptSources(html), ["../lib/x.bundle.js"], "only a local, relative, non-comment script source is read");
++  assert.deepEqual(extractScriptSources("<script defer src = \"a.js#top\"></script><SCRIPT SRC='b/c.js'></SCRIPT>"), ["a.js", "b/c.js"]);
++});
++
+ test("ABC19 a test file has no hard line bound, but its ownership and imports are still checked", () => {
+   const big = lines(DEFAULT_LINE_BOUND + 7);
+   const owned = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "src/lib/x.test.mjs": big } }) });

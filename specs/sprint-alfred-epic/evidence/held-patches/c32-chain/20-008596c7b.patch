@@ -1,0 +1,66 @@
+diff --git a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+index ab107ee40b672883d8a4576781eadebb8785a985..dfd2d32fc141840546b798598aef5c727b7193cb 100644
+--- a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
++++ b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+@@ -57,8 +57,24 @@ function priorTranscriptRecoveryLine(root, sessionId, runner) {
+     + `${listCommand}. It lists only PRIOR Codex transcripts whose own session metadata matches this repository identity, excludes this session by its supplied identity, and returns bounded operational excerpts. Only when recovering a specific detail, read a session id returned by that list with exactly: ${readCommand}; that targeted read returns its complete JSONL and is never automatic context injection. If list or read reports unavailable, state that honestly and continue; never search $CODEX_HOME, ~/.codex, or any runner session directory directly.`;
+ }
+ 
++// C32 (second Antigravity greenfield report, PO 2026-11-19): once the design is approved the material input lives in the sealed PRD and Spec, and repeating every original chunk in every turn
++// cost over 30 redundant reads and a 40-line reminder per turn. True when the active feature's plan is approved or a feature has been closed. Any read problem answers false, so the full lines stay (fail-safe).
++function designSealed(root) {
++  try {
++    const authority = resolveProjectAuthorityPaths({ rootDir: root });
++    const statePath = authority.status === "ready"
++      ? authority.state
++      : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
++    const state = loadStateSafe(join(root, statePath));
++    return state?.activeFeature?.planApproved === true || (Array.isArray(state?.closedFeatures) && state.closedFeatures.length > 0);
++  } catch {
++    return false;
++  }
++}
++
+ // The intake checkpoint is the lossless, private authority store. Its material input is
+-// independent of a resume card and is therefore surfaced on every governed SessionStart.
++// independent of a resume card and is therefore surfaced on every governed SessionStart
++// until the design is approved; after that only a one-line pointer to the sealed documents remains.
+ export function intakeVerbatimContextLines(root) {
+   // The private checkpoint is Git-owned state. A governed fixture or project without
+   // Git cannot have one, so avoid asking its resolver to discover private storage.
+@@ -83,7 +99,9 @@ export function intakeVerbatimContextLines(root) {
+     if (parts.length > 0) lines.push(`Onboarding intake answered values (already answered, do not re-ask): ${parts.join("; ")}.`);
+   }
+   const chunks = Array.isArray(material?.chunks) ? material.chunks : [];
+-  if (chunks.length > 0) {
++  if (chunks.length > 0 && designSealed(root)) {
++    lines.push(`Onboarding intake material input (${chunks.length} chunk(s)) is condensed in the approved PRD and Spec; read those, the original chunks are not repeated here.`);
++  } else if (chunks.length > 0) {
+     lines.push(
+       `Onboarding intake verbatim material input is private authority and MUST be read in full now, not treated as already condensed by any resume-hint summary (${chunks.length} chunk(s)):`,
+     );
+diff --git a/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs b/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
+index f309e7d5d4d1e16e4ba9cba73b67ea19a3a70a2e..83ec80635c823c39225fe28739e4e97cf0f54e0d 100644
+--- a/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
+@@ -386,6 +386,20 @@ cases.push({ id: "SSH008", name: "verbatim onboarding intake and malformed check
+     assert.match(withVerbatim.context, /do not recapture an existing chunk merely to satisfy a ritual/u);
+     assert.match(withVerbatim.context, /do not substitute answered onboarding settings for product requirements/u);
+ 
++    // C32: after the design is approved the original chunks are no longer repeated (they live in the sealed PRD and Spec); the answered values stay.
++    const stateFile = join(verbatimRoot, ".claude", "pipeline-state.json");
++    mkdirSync(join(verbatimRoot, ".claude"), { recursive: true });
++    writeFileSync(stateFile, JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f", planApproved: true } }));
++    const sealed = sessionStartDecision(verbatimRoot, undefined, "verbatim-sealed");
++    assert.match(sealed.context, /Onboarding intake answered values \(already answered, do not re-ask\)/u, "the answered values stay");
++    assert.match(sealed.context, /Onboarding intake material input \(2 chunk\(s\)\) is condensed in the approved PRD and Spec/u);
++    assert.doesNotMatch(sealed.context, /Onboarding intake material input chunk 1 of 2/u, "the original chunks are not repeated after the approval");
++    writeFileSync(stateFile, JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f", planApproved: false } }));
++    assert.match(sessionStartDecision(verbatimRoot, undefined, "verbatim-unsealed").context, /Onboarding intake material input chunk 1 of 2/u, "before the approval the chunks stay");
++    writeFileSync(stateFile, "{ not json");
++    assert.match(sessionStartDecision(verbatimRoot, undefined, "verbatim-state-unreadable").context, /Onboarding intake material input chunk 1 of 2/u, "an unreadable state keeps the full lines (fail-safe)");
++    rmSync(join(verbatimRoot, ".claude"), { recursive: true, force: true });
++
+     // A read failure (malformed checkpoint bytes) must degrade to exactly the distilled-card
+     // output -- never a throw, never a crash, never a partial/garbled new line.
+     const { checkpoint: checkpointPath } = resolveIntakeCheckpointPaths({ rootDir: verbatimRoot });

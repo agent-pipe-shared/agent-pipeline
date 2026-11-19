@@ -1,0 +1,124 @@
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 98bf89e80aad6c5fb0c84da5b34e207c733bd5ad..5e404133ef3627369da1819cabf11b9301ba7c0f 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -35,7 +35,7 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
+ import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
+-import { awaitSignatureFields, commandText, poNowSentence, PROOF_WAIT_CLASS, waitForSignedProof } from "../signed-proof-wait.mjs";
++import { awaitSignatureFields, commandText, poNowSentence, PROOF_WAIT_CLASS, PROOF_WAIT_GIVE_UP, PROOF_WAIT_MAX_WINDOWS, waitForSignedProof } from "../signed-proof-wait.mjs";
+ import { boundedCopySafeCommand } from "../copy-safe-command.mjs";
+ import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+@@ -901,6 +901,12 @@ test("C29-C9: the signature wait is silent and its time is PO wait: a timeout do
+   const fields = awaitSignatureFields({ root: "/p", proofPath: proof });
+   assert.match(fields.afterSigning, /silently: no status message and no repeated signing command between waits/u);
+   assert.match(fields.afterSigning, /is PO wait, never active agent time/u);
++  // C32 (Codex greenfield report): one bounded rule for every gate. The silent repeat has a number of windows and then one line; the instruction,
++  // the timeout repair and the push driver's humanGate all carry the same sentence, so they cannot disagree.
++  assert.ok(PROOF_WAIT_MAX_WINDOWS >= 2 && PROOF_WAIT_MAX_WINDOWS <= 6);
++  assert.ok(fields.afterSigning.includes(PROOF_WAIT_GIVE_UP), "the instruction names the window limit");
++  assert.ok(timeout.repair.includes(PROOF_WAIT_GIVE_UP), "the timeout repair names the same limit");
++  assert.match(PROOF_WAIT_GIVE_UP, new RegExp(`at most ${PROOF_WAIT_MAX_WINDOWS} windows in all.*end the turn with one line`, "u"));
+ });
+ 
+ test("C29-P2-6: every signing step carries one fixed 'Now from you' sentence naming its one command, handed over once before the wait", () => {
+diff --git a/plugins/pipeline-core/lib/signed-proof-wait.mjs b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+index 426938f61361ecead5f82f77042032e476c2c209..910065f370720f581d16f9cab11cac797e90ff27 100644
+--- a/plugins/pipeline-core/lib/signed-proof-wait.mjs
++++ b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+@@ -23,6 +23,10 @@ export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
+ // Greenfields 2026-11-08: 120 s ended every wait before a human had signed (8 and 39 minutes measured). Below the 600 s cap of a foreground shell call.
+ export const PROOF_WAIT_DEFAULT_SECONDS = 570;
+ export const PROOF_WAIT_MAX_SECONDS = 600;
++/** C32 (Codex greenfield report, six 570 s polls in a row while the PO asked what the signature was for): one rule for every gate. The agent waits silently for at most this many windows (about 38 minutes), then ends its turn with one line. */
++export const PROOF_WAIT_MAX_WINDOWS = 4;
++/** The one sentence every wait instruction ends in, so the push driver, the acknowledgement route and the timeout repair cannot disagree. */
++export const PROOF_WAIT_GIVE_UP = `Wait for at most ${PROOF_WAIT_MAX_WINDOWS} windows in all; if no proof is there after the last one, end the turn with one line saying the step still waits for the PO's signature and the PO tells you once it is signed, then continue from the same inspect readback.`;
+ /** C29 (C9): the label every wait result carries; the time waited for a human signature is PO wait, never active agent time. */
+ export const PROOF_WAIT_CLASS = "po-wait";
+ export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
+@@ -162,7 +166,7 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
+       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
+       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
+     },
+-    afterSigning: `Hand the PO the poNow sentence once, verbatim, as the last thing before the wait. Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
++    afterSigning: `Hand the PO the poNow sentence once, verbatim, as the last thing before the wait. Do not ask the PO to report back. After handing over the one signing command once, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again, silently: no status message and no repeated signing command between waits. ${PROOF_WAIT_GIVE_UP} The waited time (waitedSeconds, waitClass "${PROOF_WAIT_CLASS}") is PO wait, never active agent time. Tell the PO which command to run, never that it happens automatically.`
+       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
+   };
+ }
+@@ -206,7 +210,7 @@ export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DE
+     // message on every timeout is the toil the run showed (570 s of active waiting with repeated messages).
+     const handed = isCriticalMirrorProof(proof) ? CRITICAL_SIGNING_STEP : (sign === null ? "the signing step" : text(sign));
+     return { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, ...waited(), reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s; signing is a human step and the time waited is PO wait`,
+-      repair: `the PO already has the one signing command (${handed}); do not repeat it and post no status message; wait silently again: ${again}` };
++      repair: `the PO already has the one signing command (${handed}); do not repeat it and post no status message; wait silently again: ${again} ${PROOF_WAIT_GIVE_UP}` };
+   }
+   if (last.state === "stale") {
+     return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, ...waited(), reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 5d2e09e20e902e2dba21f5114f5d79f909bb5a7b..683c75e0862e0040da0fc8c7877c24f85637fd7e 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -122,6 +122,7 @@ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
+ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
++import { PROOF_WAIT_GIVE_UP } from "../lib/signed-proof-wait.mjs";
+ import { PUSH_TRANSPORT_KINDS, readPushTransport, recordPushTransport } from "../lib/machine-plane.mjs";
+ import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
+ import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
+@@ -664,7 +665,7 @@ function drivePushInitCore({
+     // CGF-07/22: a Codex and a Claude run each spent turn after turn re-checking a signature only the human can produce.
+     // Claude greenfield report: the design step sees its own signature arrive, the push made the PO paste the output back. The same bounded wait, when the proof lands where it can be watched.
+     ...(prepare.report.awaitSignature ? { awaitSignature: prepare.report.awaitSignature } : {}),
+-    humanGate: `Hand the signature command to the human once.${prepare.report.awaitSignature ? " Then run awaitSignature.waitAction exactly once: it returns by itself when the proof arrives or its window ends, and the human reports nothing back. If it ends without a proof," : " Then"} end the turn. Nothing changes until the human answers: do not re-run this driver, poll the proof by hand or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.`,
++    humanGate: `Hand the signature command to the human once.${prepare.report.awaitSignature ? ` Then run awaitSignature.waitAction as awaitSignature.afterSigning says: it returns by itself when the proof arrives or its window ends, and the human reports nothing back. ${PROOF_WAIT_GIVE_UP}` : " Then end the turn."} Nothing changes until the human answers: do not re-run this driver, poll the proof by hand or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.`,
+     signatureCommand: {
+       executedByDriver: false,
+       note: "Run this at the PO's own attended terminal. This driver never executes it and cannot -- "
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 25cb7df2af8287865948452d92c8631c6127f05f..1affdf9d0f5f83b1664374744ca00f54c6c98d35 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -33,6 +33,7 @@ import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+ import { fixtureGit } from "./architecture-adoption-test-fixture.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
+ import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { PROOF_WAIT_MAX_WINDOWS } from "../lib/signed-proof-wait.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
+@@ -672,9 +673,13 @@ test("drivePushInit: a proof that can be watched is handed over with its wait ac
+     const watched = drive(true);
+     assert.equal(watched.outcome, "signature-required", JSON.stringify(watched));
+     assert.deepEqual(watched.awaitSignature.waitAction, waitAction);
+-    assert.match(watched.humanGate, /run awaitSignature\.waitAction exactly once/u);
++    // QG-04 restatement (candidate 32, Codex greenfield report): the driver no longer says "exactly once" while the wait text says "again, silently";
++    // both name one rule, a bounded number of silent windows and then one line.
++    assert.match(watched.humanGate, /run awaitSignature\.waitAction as awaitSignature\.afterSigning says/u);
+     assert.match(watched.humanGate, /human reports nothing back/u);
+-    assert.match(watched.humanGate, /end the turn/u, "a wait that ended without a proof still stops");
++    assert.match(watched.humanGate, new RegExp(`at most ${PROOF_WAIT_MAX_WINDOWS} windows in all`, "u"));
++    assert.match(watched.humanGate, /end the turn with one line/u, "a wait that ended without a proof still stops");
++    assert.doesNotMatch(watched.humanGate, /exactly once/u);
+     const unwatched = drive(false);
+     assert.equal(Object.hasOwn(unwatched, "awaitSignature"), false);
+     assert.doesNotMatch(unwatched.humanGate, /waitAction/u);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index ee4e922d77fca1dd5e16104a04faabb518a3b529..279d760013555063ba12bdc06af984efa53dc8f1 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -7,7 +7,10 @@ step's `poNow` sentence verbatim, once: it names the one command and says the
+ PO reports nothing back. Waiting means the step's own
+ bounded `waitAction` (`proof-wait.mjs`), run silently: no status message and no
+ repeated request between waits, never a re-run of the driver; after a
+-`PROOF-WAIT-TIMEOUT` run the same wait again. The waited time is labelled PO
++`PROOF-WAIT-TIMEOUT` run the same wait again, for at most four windows in all
++(about 38 minutes). If no proof is there after the last window, end the turn
++with one line saying the step still waits for the signature; the PO tells you
++once it is signed and you continue from the same readback. The waited time is labelled PO
+ wait (`waitClass: "po-wait"`), never active agent time. A new commit voids the
+ prepared approval.
+ 

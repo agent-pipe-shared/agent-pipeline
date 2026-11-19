@@ -1,0 +1,43 @@
+diff --git a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+index 3042c9aaf161bb159d13f6c8234e34e1515defe9..87e36bb3e3713b88037042634bba6619e0fb4efe 100644
+--- a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
++++ b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+@@ -77,6 +77,21 @@ test("J1 the same Spec with the journeys and the asserted effect is ready", asyn
+   assert.equal(verdict.code, "PLR-HANDOFF-READY");
+ });
+ 
++// C32 (Claude greenfield 2026-11-19): the Spec author read a plugin test file to learn the clause shape, because the reference only named it.
++// The example row of the kickoff reference is a worked criterion: with its clauses the hand-off admits it, with the clauses cut it refuses it.
++test("J8 the example criterion of the kickoff reference passes the hand-off, and the same row without its clauses does not", async () => {
++  const reference = flat(read("plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"));
++  const example = reference.match(/`(\| AC-3 \|[^`]*?\|)`/u)?.[1];
++  assert.ok(example, "the kickoff reference carries a worked criterion row (| AC-3 | ... |)");
++  assert.match(example, /Journeys:.*Asserts:/u);
++  const ready = await handoff(spec(example));
++  assert.equal(ready.ok, true, JSON.stringify(ready));
++  const bare = example.replace(/ Journeys:.*?(?= \| named suite \|$)/u, "");
++  assert.doesNotMatch(bare, /Journeys:/u);
++  const refused = await handoff(spec(bare));
++  assert.equal(refused.code, "PLR-HANDOFF-NO-JOURNEY", JSON.stringify(refused));
++});
++
+ // C29 G6 (Glossover): the hand-off admitted a Spec as soon as one row was locatable, so a row the registration cannot locate passed it,
+ // submit-plan's registration refused it afterwards, and the journey gaps only surfaced on the attempt after that.
+ test("J1/G6 a criterion row the registration cannot locate is refused at the hand-off, together with the journey gaps, in one refusal", async () => {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index fe92908fbc6cf25aabc77f290753d99d8d069da3..9e066c5843042f0a7f8d4a3a5fc29fa8a7966244 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -258,7 +258,11 @@ interfaces/state/data, operational constraints, test/verification approach,
+ and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
+ names its journeys and state transitions and the actual effect asserted
+ (`Journeys:` and `Asserts:` clauses); the plan
+-hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The Spec's plan
++hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The two clauses sit inside the
++criterion text (a table cell or an indented continuation line), for example: `| AC-3 | WHEN the
++user reloads the page, THE SYSTEM SHALL keep every entry. Journeys: add from the start page and from the
++standalone view; reload in the middle of adding; a second add after an error. Asserts: the stored list
++still holds the entry, not only that the text shows it. | named suite |`; a criterion no user sees is tagged `[not user-facing: <reason>]`. The Spec's plan
+ is sliced vertical first: one thin
+ end-to-end path for the most important journey, then widened journey by journey,
+ never all of one horizontal layer before the next. Favor thorough, comprehensive coverage of the

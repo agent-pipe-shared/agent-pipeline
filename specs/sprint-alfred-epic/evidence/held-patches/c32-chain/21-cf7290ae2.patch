@@ -1,0 +1,116 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 927f87b19f17f44e26b89aa4b4901717e3df9a39..919ab652be516cb9127cfe44bef7da4bba010e24 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -136,6 +136,12 @@ const order = (a, b) => a.file.localeCompare(b.file) || a.rule.localeCompare(b.r
+ const TEST_DIRECTORIES = new Set(["test", "tests", "__tests__", "spec"]);
+ const isTestFile = (file) => /\.(?:test|spec)\.[^./]+$/u.test(file) || /_test\.[^./]+$/u.test(file) || /(?:^|\/)test_[^/]+$/u.test(file)
+   || file.split("/").slice(0, -1).some((segment) => TEST_DIRECTORIES.has(segment));
++// C32 (second Antigravity greenfield report, PO 2026-11-19): a generated file is not project source. A single-file offline bundle of 3375 lines forced a compaction dispatch that squeezed it to 166 lines to pass the bound, and a test
++// file that grew past the bound after a Critic's regression test forced a whole extra correction and review round. A bundle (`*.bundle.js`), a minified file (`*.min.js`) and everything under `dist/` are generated output and
++// belong to no module's size, ownership or import checks; the bound applies to hand-written code, and a test file is exempt from the hard line bound (its ownership and imports are still checked, and the report-only size
++// budgets of the fitness model still list it).
++const GENERATED_ARTIFACT = /\.(?:bundle|min)\.[cm]?jsx?$/u;
++const isGeneratedArtifact = (file) => GENERATED_ARTIFACT.test(file) || file.split("/").slice(0, -1).includes("dist");
+ const testStem = (file) => path.posix.basename(file).replace(/\.[^./]+$/u, "").replace(/\.(?:test|spec)$/u, "").replace(/_test$/u, "").replace(/^test_/u, "");
+ 
+ function testOwners(file, modules, mirrored) {
+@@ -154,7 +160,7 @@ function testOwners(file, modules, mirrored) {
+  * (C31c, cloud review of candidate 31). The exception stays used, so it is never reported stale; dropping it hands the file to the derivation.
+  */
+ function observe(root, modules, policy, listed, readFile, extensions, keepUnowned = new Set()) {
+-  const excluded = (file) => policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
++  const excluded = (file) => isGeneratedArtifact(file) || policy.excludedPaths.some((entry) => pathMatchesPattern(file, entry.pattern));
+   const sources = listed.filter((file) => extensions.has(path.extname(file)) && !excluded(file)).sort();
+   const violations = [];
+   const usage = new Map(); // module id -> { files, lines } of its source files
+@@ -189,7 +195,7 @@ function observe(root, modules, policy, listed, readFile, extensions, keepUnowne
+       const row = usage.get(owners[0].id) ?? { files: 0, lines: 0 };
+       usage.set(owners[0].id, { files: row.files + 1, lines: row.lines + lines });
+     }
+-    if (lines > policy.lineBound) {
++    if (lines > policy.lineBound && !isTestFile(file)) {
+       violations.push({ file, module: owners.length === 1 ? owners[0].id : null, rule: "over-line-bound", lines,
+         detail: `${file} has ${lines} lines, over the bound of ${policy.lineBound}` });
+     }
+@@ -245,7 +251,8 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
+   if (!bundle.ok) return { ...base, status: "map-invalid", errors: bundle.errors, violations: [] };
+   const policyRead = (deps.readPolicy ?? readBoundaryPolicy)(root);
+   if (!policyRead.ok) return { ...base, status: "policy-invalid", errors: policyRead.errors, violations: [] };
+-  const { policy } = policyRead;
++  // C32: the files the Pipeline itself keeps in a consumer project belong to no module for the direct CLI call exactly as for Verify, so both give one answer (they differed before).
++  const policy = { ...policyRead.policy, excludedPaths: [...policyRead.policy.excludedPaths, ...MANAGED_EXCLUSIONS] };
+   const listed = (deps.listFiles ?? trackedFiles)(root);
+   if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the check needs a Git work tree", violations: [] };
+   const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
+@@ -326,12 +333,8 @@ const MANAGED_EXCLUSIONS = Object.freeze([
+ ]);
+ 
+ export function measureArchitecture({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
+-  const readPolicy = deps.readPolicy ?? readBoundaryPolicy;
+-  const withManaged = (root) => {
+-    const read = readPolicy(root);
+-    return read.ok ? { ok: true, policy: { ...read.policy, excludedPaths: [...read.policy.excludedPaths, ...MANAGED_EXCLUSIONS] } } : read;
+-  };
+-  const result = checkArchitectureBoundaries({ rootDir, sourceExtensions }, { ...deps, readPolicy: withManaged });
++  // The managed exclusions are applied by the check itself since C32; Verify and the direct call share them.
++  const result = checkArchitectureBoundaries({ rootDir, sourceExtensions }, deps);
+   const measured = result._measured;
+   const publicOut = publicResult(result);
+   if (!measured) return publicOut;
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index c21f76570c68d24daac4fa422b40805f2ebd21f9..3414d2ecaf47fb3b9938f9ba243bb856fc6fc717 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -397,3 +397,38 @@ test("M3-05 a class a module owns source in is left out, and a map with no modul
+   assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: root })), [["over-line-bound", "public/big.js", null]], "an owned tree keeps its line bound");
+   assert.equal(design.baselineBoundaryPolicy(m3Modules({ app: ["docs/**", "public/**", "static/**", "assets/**"] })), null, "nothing left to cover writes nothing");
+ });
++
++// C32 (second Antigravity greenfield report, PO 2026-11-19): the direct CLI and Verify give one answer, generated output is no project source, and a test file is exempt from the hard line bound.
++test("ABC17 the direct check and the Verify measurement agree on the files the Pipeline keeps in a project", () => {
++  const files = { "src/app/main.mjs": "export {};\n", "project/consumer-verify.mjs": "export {};\n", ".claude/settings.mjs": "export {};\n" };
++  const direct = checkArchitectureBoundaries({ rootDir: fixture({ files }) });
++  assert.equal(direct.status, "pass", "the consumer Verify adapter and .claude/** belong to no module and are no finding");
++  assert.equal(direct.counts.sourceFiles, 1);
++  const measured = measureArchitecture({ rootDir: fixture({ files }) });
++  assert.equal(measured.status, direct.status);
++  assert.equal(measured.counts.sourceFiles, direct.counts.sourceFiles);
++  assert.equal(measured.policy.excludedPaths, direct.policy.excludedPaths, "the same exclusions are counted once on both paths");
++  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { ...files, "other/loose.mjs": "export {};\n" } }) })), [["unowned-path", "other/loose.mjs", null]], "an ordinary unowned file is still a finding");
++});
++
++test("ABC18 a generated bundle, a minified file and everything under dist are no project source", () => {
++  const big = lines(DEFAULT_LINE_BOUND * 3);
++  const files = { "src/app/main.mjs": "export {};\n", "src/app/app.bundle.js": big, "src/lib/lib.min.js": big, "dist/out.js": big, "app/assets/family-hub.bundle.js": big };
++  const result = checkArchitectureBoundaries({ rootDir: fixture({ files }) });
++  assert.equal(result.status, "pass", JSON.stringify(rules(result)));
++  assert.equal(result.counts.sourceFiles, 1, "generated output is not counted as a source of the project");
++  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/main.mjs": big } }) })), [["over-line-bound", "src/app/main.mjs", null]], "hand-written code keeps the bound");
++  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/app/bundler.mjs": big } }) })), [["over-line-bound", "src/app/bundler.mjs", null]], "a name that only contains 'bundle' is hand-written");
++});
++
++test("ABC19 a test file has no hard line bound, but its ownership and imports are still checked", () => {
++  const big = lines(DEFAULT_LINE_BOUND + 7);
++  const owned = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "src/lib/x.test.mjs": big } }) });
++  assert.equal(owned.status, "pass", "a regression test added in a correction round must not fail the line bound");
++  assert.equal(owned.counts.sourceFiles, 2, "the test still counts as a source of its module");
++  const unowned = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "tests/misc.test.mjs": big } }) });
++  assert.deepEqual(rules(unowned), [["unowned-path", "tests/misc.test.mjs", null]], "an unowned test is still unowned, but is not also over the bound");
++  const importing = checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/x.mjs": "export {};\n", "src/lib/y.test.mjs": `import "../app/m.mjs";\n${big}`, "src/app/m.mjs": "export {};\n" } }) });
++  assert.deepEqual(rules(importing), [["forbidden-dependency", "src/lib/y.test.mjs", "src/app/m.mjs"]], "the import rule still applies to a long test");
++  assert.deepEqual(rules(checkArchitectureBoundaries({ rootDir: fixture({ files: { "src/lib/big.mjs": big } }) })), [["over-line-bound", "src/lib/big.mjs", null]], "a source file keeps the bound");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 300bf5b1faf00c14bc339e61899e44fcd815cce0..0ec12de472b90e22121f96d1a17e8f8fe0ddddd1 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -48,7 +48,7 @@ The acceptance question of the one-shot close is asked after the candidate Verif
+    names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
+ 4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
+    present the plan to the PO; its digest is part of what the one signature covers. Pass every receipt of the review chain, initial first; while the last one is `open-findings` and a delta round is left it refuses (`PLAN-DESIGN-REVIEW-OPEN`) until a delta round passes; the review is one full round and at most two delta rounds, and after round 3 the open findings go to the PO's signature (C30-6). This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
+-   Before asking for a signature on a design that changes the architecture rules of code that already exists, preview what the check will say: `architecture-boundary-check.mjs --root <root> --preview-prd <repo-relative PRD path>` (read-only, no signature, writes nothing). It checks the tracked tree against the modules of the PRD's PROPOSED design block, with the same rules as the real check (ownership, forbidden dependency, line bound); the map that the real check reads exists only after the signature. Fix the PRD, not the code, when it names a finding the design should have allowed. A pass is a preview, not an approval.
++   Before asking for a signature on a design that changes the architecture rules of code that already exists, preview what the check will say: `architecture-boundary-check.mjs --root <root> --preview-prd <repo-relative PRD path>` (read-only, no signature, writes nothing). It checks the tracked tree against the modules of the PRD's PROPOSED design block, with the same rules as the real check (ownership, forbidden dependency, line bound: 1000 lines per hand-written source file; generated output such as `*.bundle.js`, `*.min.js` and `dist/` and the files the Pipeline keeps in the project are no source, and a test file has no hard line bound); the map that the real check reads exists only after the signature. Fix the PRD, not the code, when it names a finding the design should have allowed. A pass is a preview, not an approval.
+ 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
+    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
+    the action `pipeline-state.mjs inspect` returns. Whenever you wait for a PO signature (this one, a push, a residual acceptance), the

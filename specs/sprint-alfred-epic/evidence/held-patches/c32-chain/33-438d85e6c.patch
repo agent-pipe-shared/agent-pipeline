@@ -1,0 +1,322 @@
+diff --git a/docs/README.md b/docs/README.md
+index d7ae7bee007e5780f8da7e679fae707e530766b7..65e1fefcabbcab78901ed70a4786a1d744cf3fdb 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -33,8 +33,8 @@ guides, release records, architecture decision records, and state archives.
+ - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
+   — read-only status and proposal before an existing project adopts the
+   architecture controls.
+-- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
+-  Nova product strands.
++- [`overview.md`](overview.md) — what the product is for, what you get, and the
++  `0.7.0` release status.
+ - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
+   preview-first migration and the Codex lifecycle V4.
+ - [`migration.md`](migration.md) — pointer to the current onboarding and V3
+diff --git a/docs/known-issues.md b/docs/known-issues.md
+index 5c7d723ce70e2d2dc0394f31b3419071ace9cd4a..ee87ab84d68bf351f6eef81d7632a752bc55a2bd 100644
+--- a/docs/known-issues.md
++++ b/docs/known-issues.md
+@@ -1,20 +1,19 @@
+ # Known Issues
+ 
+-## 0.7.0 candidate: limits you can meet on the feature path
++## 0.7.0: limits you can meet on the feature path
+ 
+-Found in greenfield runs on all three runners and listed with what to do. None
++Found in end-to-end runs on all three runners and listed with what to do. None
+ of them is hidden by a green check; each ends in a typed refusal or notice. The
+ path itself is in [usage](usage.md#from-an-idea-to-the-implementation-phase).
+ 
+ | Limit | Where you meet it | What to do |
+ | --- | --- | --- |
+-| A design signed after a **third** review round could not be read back (the retained approval was bounded at two receipts). | `set-phase implementation` after the signature, on a candidate older than the interim fix. | Install a candidate that carries the fix; the refusal names the cause. A project already signed needs no new signature. |
+ | A node installed under a version manager may not start inside a runner's sandbox. | The start preflight reports `NODE-SANDBOX-UNREACHABLE`; on Codex a published `node` action failed with `EPERM`. | The onboarding Driver now runs its own interpreter for the actions it spawns. For the rest, follow the one-time remedy the preflight prints: a system `node`, or allow the version-manager directory in the runner's sandbox. |
+ | A wildcard in the architecture block's owned paths is refused. | The design inspection, before the review. | Write the exact files or directories; the refusal names the field, the rule and the rejected value. |
+ | A very long hyphenated word in a resume-hint field is read as a key and refused. | `resume-hint.mjs capture`. | The refusal names the word; shorten it or write it as separate words. |
+ | A commit between `present-plan` and the signature makes the presented request stale. | The next `present-plan`, refused with `DWP-REQUEST-EXISTS-DRIFT`. | Delete the one scratch file the refusal names, present again, and make no commit before the signature. |
+ | A project command that already uses the reserved Verify id `browser-smoke` for another tool is taken over by the browser preflight. | The browser smoke step of the Verify. | Rename the project command ([Verify reference](usage.md#verify-reference)). |
+-| The Full Verify of the installed candidate, the independent Critic review and your acceptance are not complete. | Every statement about `0.7.0`. | See [what's new in 0.7.0](whats-new-0.7.0.md#what-remains-open). |
++| `0.7.0` is not released: its full verification, the independent review and the final acceptance are outstanding. | Every statement about `0.7.0`. | See [what's new in 0.7.0](whats-new-0.7.0.md#what-remains-open). |
+ 
+ The maintainer-side record of the V3 foundation transfer and its rollback scope
+ moved to [the maintainer transfer record](maintainer-v3-transfer-record.md).
+diff --git a/docs/overview.md b/docs/overview.md
+index 327d0bc59b8c05c78a17c981b1cdabc8b0492948..2aa50cf2f290eff4a71e64d509d344da2cf4f720 100644
+--- a/docs/overview.md
++++ b/docs/overview.md
+@@ -1,50 +1,55 @@
+ # Overview
+ 
+-Agent-Pipeline is for controlled, agent-assisted software delivery where a team
+-needs a reviewable record beyond a chat history. It turns an intent into a
+-bounded change, deterministic evidence, independent review, and a preserved
+-decision. Receipts bound to the candidate commit and validated packages can
+-support an audit trail; they do not certify compliance or replace an auditor.
++Agent-Pipeline is for software teams that let AI agents write code and still
++have to show afterwards what was decided, what was checked and by whom. It turns
++an idea into a bounded change, deterministic checks, an independent review and a
++preserved decision. Its receipts are bound to the exact commit that was checked
++and can support an audit trail; they do not certify compliance and do not
++replace an auditor.
++
++## What you get
++
++- **A written design before code.** The agent drafts a requirements document
++  and a spec with you; an independent read-only reviewer reads them; you approve
++  once.
++- **Work cut into small, checkable pieces.** Each piece is built by a fresh agent
++  with a defined write scope, then checked by tests and security scans.
++- **An independent review of the result**, by an agent that never saw the
++  implementing agent's reasoning.
++- **A record you can hand over.** Receipts, decisions and review reports stay in
++  the repository and can be exported as an offline bundle.
++- **Humans decide at a few fixed points**: the design, the final acceptance and
++  every push. Everything in between is agent work.
++
++It works with Claude Code, Codex and Antigravity. The method is the same on all
++three; what each host can enforce natively differs and is stated per runner in
++[runner support](runner-support.md).
+ 
+ ## The next release line: 0.7.0
+ 
+-**Names.** *Alfred* is the working name of the `0.7.0` scope. *Phoenix* and
+-*Nova* are the two product strands it integrates. *Sprint Alfred* is the
+-maintainer sprint that builds the scope.
+-
+-`0.7.0` names the next distributed Alfred architecture scope. Until that
+-version is released, an application repository continues to use its approved
+-GitHub-distributed plugin version; a maintainer release candidate is not an
+-installation recommendation, production-availability claim, or proof that
+-release gates passed. The scope adds a staged adoption route for existing
+-repositories, a machine-readable architecture map, baseline and fitness
+-checks, and typed architecture impact at feature close. Where the installed
+-plugin contains the architecture-adoption CLI (read back the installed plugin
+-version and root in a fresh `pipeline-start` session first), begin with the
+-read-only [adoption status and proposal](usage.md#assess-architecture-adoption-in-an-existing-project)
+-in the repository you intend to govern.
+-
+-| Product strand | What it contributes to this release scope | Status |
+-| --- | --- | --- |
+-| Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
+-| Nova | Runner-aware execution and guided adoption: public [Driver](README.md#terms-used-across-these-documents) actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Implemented in the repository; final `0.7.0` acceptance pending. |
+-
+-**Status.** The `0.7.0` release candidate is not yet qualified: it still needs
+-criterion-level evidence, full Verify, security checks, independent review, and
+-any applicable human acceptance, and host-dependent behavior needs readback from
+-the runner that actually executes it. This overview claims neither a released
+-nor a fully accepted `0.7.0`.
+-
+-The documented Greenfield route (empty directory to first implementation step)
+-is covered for Claude, Codex, and Antigravity; see [Usage](usage.md), in
+-particular [from an idea to the implementation phase](usage.md#from-an-idea-to-the-implementation-phase),
+-and [what's new in 0.7.0](whats-new-0.7.0.md) for what the release candidate
+-adds and what stays open. Runner
+-integrations are described by their evidence: a common methodology does not
+-mean that every host has identical native hooks, sandbox isolation, model
+-identity, or platform coverage. Missing, stale, or malformed evidence, and
+-evidence that does not match the candidate commit, stays a typed non-success.
+-
+-For the product entry point, use the top-level [README](../README.md); for
+-everything else, the [documentation map](README.md). The
+-[Operating Model](operating-model.md) is the normative process contract.
++`0.7.0` adds a guided path from an empty directory to a signed design and into
++implementation, a machine-readable architecture map with boundary checks, a
++quality readback at the close, and a staged route for adopting the architecture
++controls in an existing repository. What it contains is listed in
++[what's new in 0.7.0](whats-new-0.7.0.md).
++
++**Status.** `0.7.0` is not released. Until it is, an application repository
++keeps using the plugin version it already has approved; a pre-release build is
++not an installation recommendation and not a claim that the release checks
++passed. Full verification, the security checks, the independent review and the
++final human acceptance of `0.7.0` are still outstanding. The new path has been
++run end to end on all three runners, but those runs are not a release proof.
++
++## Where to start
++
++1. Read the top-level [README](../README.md), then [Setup](../SETUP.md).
++2. Follow [Usage](usage.md); for a new project start with
++   [from an idea to the implementation phase](usage.md#from-an-idea-to-the-implementation-phase),
++   for an existing one with the
++   [adoption assessment](usage.md#assess-architecture-adoption-in-an-existing-project).
++3. The limits you may meet are in [known issues](known-issues.md); everything
++   else is in the [documentation map](README.md). The
++   [Operating Model](operating-model.md) is the normative process contract.
++
++Missing, stale or mismatching evidence is always reported as a typed
++non-success, never counted as a pass.
+diff --git a/docs/whats-new-0.7.0.md b/docs/whats-new-0.7.0.md
+index a986c24a89214cde6d469f80c01374f12429799c..4dca965e12ac8efddc8c990779b664f99f4dd5f9 100644
+--- a/docs/whats-new-0.7.0.md
++++ b/docs/whats-new-0.7.0.md
+@@ -1,78 +1,53 @@
+-# What's new in 0.7.0 (release candidate)
++# What's new in 0.7.0
+ 
+-> **Status.** `0.7.0` is a release candidate on a local development branch. It
+-> is not tagged, not published and not a production-installation
+-> recommendation. The independent Critic review, the Full Verify of the
+-> installed candidate and the PO's acceptance have not been completed; this page
+-> names what changed, not what has been accepted. The release status is in the
+-> [overview](overview.md#the-next-release-line-070).
++> **Status.** `0.7.0` is not released: it is not tagged, not published and not a
++> recommendation for production use. Full verification, the independent review
++> and the final acceptance are still outstanding; this page names what changed,
++> not what has been accepted. See the [overview](overview.md#the-next-release-line-070).
+ 
+-`0.7.0` (working name *Alfred*) is the scope that turns the guided adoption of
+-`0.6.0` into a path a fresh project can walk from an idea to a signed design and
+-on into implementation, on Claude Code, Codex and Antigravity, with a typed
+-reason and a repair at every stop. Each of the three runners ran a greenfield
+-project against the candidate; what those runs found, not a review of the code,
+-is what this page reports. No run has been accepted as a release proof.
++`0.7.0` turns the guided adoption of `0.6.0` into a path a new project can walk
++from an idea to a signed design and on into implementation, on Claude Code,
++Codex and Antigravity. At every stop the tool names the reason and the repair.
+ 
+ ## What you can do now
+ 
+-- **Take a feature from an idea to a signed design.** The agent writes the PRD
+-  and the Spec with you, an independent read-only reviewer reads them, and you
+-  sign once. The chapter [From an idea to the implementation phase](usage.md#from-an-idea-to-the-implementation-phase)
++- **Take a feature from an idea to a signed design.** The agent writes the
++  requirements document (PRD) and the spec with you, an independent read-only
++  reviewer reads them, and you sign once. The chapter
++  [From an idea to the implementation phase](usage.md#from-an-idea-to-the-implementation-phase)
+   walks the path and says who does each step.
+-- **One review course with a cap.** One full design review and at most two delta
+-  rounds. After the third round the findings that are still open go to your
+-  signature instead of a fourth round.
+-- **Decisions travel with the design.** An architecture decision you accept with
+-  the design is recorded as a proposal first and is published by the same one
+-  design signature; there is no separate approval step for it.
++- **A review with an upper bound.** One full review and at most two follow-up
++  rounds. Findings that are still open after the third go to your signature
++  instead of a fourth round.
++- **Architecture decisions travel with the design.** A decision you accept with
++  the design is recorded as a proposal and published by the same signature.
+ - **An architecture boundary check you can preview.** Before you sign a design
+-  that changes the architecture rules of existing code, the check reports what it
+-  would say, without a signature and without writing anything.
+-- **Restart without losing what you said.** Material input given in the session
+-  is captured in a bounded resume hint and read back at the start of the next
+-  session.
++  that changes the architecture rules of existing code, the check shows what it
++  would report, without a signature and without writing anything. It also reads
++  the local `<script src>` of HTML files that belong to a module.
++- **Restart without losing what you said.** Input you gave in the session is
++  kept in a short, bounded note and read back at the start of the next session.
+ - **A quality readback at the close.** The close lists the acceptance criteria
+-  with their journeys, the risk trace and the scanner results next to the Verify
+-  result, and asks one acceptance question once the Verify has passed.
++  with their user journeys, the risk trace and the scanner results next to the
++  Verify result, and asks one acceptance question once the Verify has passed.
+ - **A browser smoke step.** The Verify id `browser-smoke` is reserved: its
+-  command runs only behind a preflight for Playwright and Chromium, and without a
+-  launchable browser it stops with a typed "browser verification pending" and one
+-  human step.
+-
+-## What the runs changed
+-
+-The greenfield runs found blockades that no unit test had; each is fixed in the
+-candidate and pinned by a test:
+-
+-- The design approval of a run with a third review round could not be read back
+-  after signing, because the retained record was bounded at two receipts while the
+-  review course allows three. The bound is now three, and the refusal names the
+-  cause.
+-- A review report whose findings were resolved in the same report no longer
+-  counts as open, and a review round whose sources were corrected before its
+-  receipt existed can be bound with `design-review-receipt.mjs create
+-  --sources-at <commit>`.
+-- A second `present-plan` of the same design after a commit is refused with the
+-  reason: the scratch request binds the commit it was presented at, so it is
+-  stale; delete that one file and run again.
+-- The refusals that used to say only that something was wrong now say what and
+-  where: the draft markers still left in the PRD or Spec, the field and the
+-  rejected value in the architecture block, the unbound ADR proposal and its
+-  carrier file, the missing output directory of a receipt export, the long
+-  hyphenated word in a resume-hint field, and what the session id of a resume
+-  hint is.
+-- The override planning's git calls share one time budget, so a slow repository
+-  ends in a typed refusal inside the hook's time limit.
++  command runs only behind a check for Playwright and Chromium. Without a
++  launchable browser it stops with a typed "browser verification pending" and
++  one human step.
++- **Clear refusals.** A refusal now says what is wrong and where: the draft
++  markers left in the PRD or Spec, the field and value in the architecture
++  block, a missing output directory, or a stale scratch file.
++- **`--help` on the close scripts**, and one rule for waiting on a signature:
++  the agent waits in a few bounded windows and then tells you what is open.
+ 
+ ## What remains open
+ 
+ `0.7.0` does not claim:
+ 
+ - publication, a Git tag, marketplace availability or production support;
+-- that the three greenfield runs substitute for the candidate-bound Full Verify,
+-  security checks, independent Critic review, your acceptance and the remote
+-  readback, none of which has been completed for this candidate;
++- that the end-to-end runs substitute for full verification, security checks,
++  independent review, your acceptance and the remote readback, none of which is
++  complete;
+ - that every host and platform enforces the same way: runner evidence and
+   platform evidence stay separate ([runner support](runner-support.md));
+ - native macOS support.
+@@ -84,38 +59,24 @@ today, each with its repair.
+ 
+ ## Deutsche Lesefassung (nicht normativ)
+ 
+-`0.7.0` (Arbeitsname *Alfred*) ist ein Release-Kandidat auf einem lokalen
+-Entwicklungszweig. Er ist weder getaggt noch veröffentlicht und keine Empfehlung
+-für eine Produktivinstallation. Das unabhängige Critic-Review, der Full Verify
+-des installierten Kandidaten und die Abnahme durch den PO sind nicht
+-abgeschlossen; diese Seite nennt, was sich geändert hat, nicht, was abgenommen
+-ist.
++`0.7.0` ist noch nicht veröffentlicht, nicht getaggt und keine Empfehlung für
++den Produktivbetrieb. Vollständige Verifikation, unabhängiges Review und die
++finale Abnahme stehen aus.
+ 
+-**Was jetzt geht:** Ein frisches Projekt soll auf Claude Code, Codex und
++**Was jetzt geht:** Ein neues Projekt wird auf Claude Code, Codex und
+ Antigravity von der Idee über ein signiertes Design bis in die Implementierung
+-geführt werden können; jeder der drei Runner hat ein Greenfield-Projekt gegen
+-den Kandidaten laufen lassen, keiner dieser Läufe ist als Release-Nachweis
+-abgenommen. Der Agent schreibt PRD und Spec mit dem PO, ein unabhängiger
+-lesender Reviewer prüft sie, und der PO signiert einmal. Das Review hat eine
+-Obergrenze: eine volle Runde und höchstens zwei Delta-Runden; nach der dritten
+-gehen offene Befunde in die Signatur. Eine Architekturentscheidung, die der PO
+-mit dem Design annimmt, wird zuerst als Vorschlag erfasst und mit derselben
+-Design-Signatur veröffentlicht. Die Architekturgrenzprüfung lässt sich vor der
+-Signatur ansehen, ohne etwas zu schreiben. Material aus der Sitzung bleibt über
+-einen Neustart in einem begrenzten Resume-Hinweis erhalten. Der Abschluss zeigt
+-Kriterien, Journeys, Risikospur und Scanner-Ergebnisse neben dem Verify und
+-stellt die Abnahmefrage einmal. Die Verify-ID `browser-smoke` ist reserviert und
+-läuft nur hinter dem Playwright-/Chromium-Preflight.
+-
+-**Was die Läufe geändert haben:** Die Greenfield-Läufe fanden Blockaden, die
+-kein Unit-Test fand: Die Design-Freigabe eines Laufs mit dritter Review-Runde
+-ließ sich nach der Signatur nicht mehr lesen (Aufbewahrungsgrenze zwei statt
+-drei Belege), ein Review-Bericht mit im selben Bericht gelösten Befunden zählte
+-als offen, und ein zweites `present-plan` nach einem Commit wurde ohne Grund
+-abgelehnt. Die Ablehnungen nennen jetzt, was und wo, und alle Git-Aufrufe der
+-Override-Planung teilen sich ein Zeitbudget.
++geführt. Der Agent schreibt PRD und Spec mit dir, ein unabhängiger lesender
++Reviewer prüft sie, und du signierst einmal. Das Review hat eine Obergrenze: eine
++volle Runde und höchstens zwei Folgerunden; danach gehen offene Befunde in deine
++Signatur. Eine Architekturentscheidung, die du mit dem Design annimmst, wird mit
++derselben Signatur veröffentlicht. Die Architekturgrenzprüfung lässt sich vor
++der Signatur ansehen, ohne etwas zu schreiben, und liest auch lokale
++`<script src>` in HTML-Dateien eines Moduls. Material aus der Sitzung bleibt über
++einen Neustart in einer kurzen Notiz erhalten. Der Abschluss zeigt Kriterien,
++Journeys, Risikospur und Scanner-Ergebnisse neben dem Verify und stellt die
++Abnahmefrage einmal. Die Verify-ID `browser-smoke` ist reserviert und läuft nur
++hinter dem Playwright-/Chromium-Check. Ablehnungen nennen jetzt, was und wo.
+ 
+ **Offen:** keine Veröffentlichung, kein Tag, keine Marketplace-Verfügbarkeit;
+-die Greenfield-Läufe ersetzen weder Full Verify noch Critic-Review, Abnahme und
+-Remote-Readback; Runner- und Plattformnachweise bleiben getrennt; keine native
+-macOS-Unterstützung.
++die Läufe ersetzen weder Full Verify noch Review, Abnahme und Remote-Readback;
++Runner- und Plattformnachweise bleiben getrennt; keine native macOS-Unterstützung.

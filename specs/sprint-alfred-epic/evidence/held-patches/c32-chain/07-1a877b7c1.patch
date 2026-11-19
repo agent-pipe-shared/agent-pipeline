@@ -1,0 +1,192 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 6fa33c1eee9a9143bf141e406e5f45e6379e343f..2cd36de5ecd63a145c5bea4c55b343f9ec1afd17 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -28,6 +28,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
+ | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
+ | Build, test, package and rehearse a held-patch candidate through scratch clones (the clone-slice route of candidate 18); re-run only the red suites of a Full Verify record | `scripts/clone-slice/*.mjs` (copy to `scratch/agent-out/` to use; see "Clone-slice route" below) | clones and patch files only |
++| Watch a live greenfield run read-only (candidate 32): list the runner transcripts touched recently, print a compact digest of one transcript (human turns, commands with a short result, coded refusals), count escalations and refusals, list the Codex calls that ran with `require_escalated`. Claude Code under Windows is read through `/mnt/c/Users/<user>/.claude/projects/`, Antigravity under `~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl`, Codex under `~/.codex/sessions/`; a restarted Codex session writes a new rollout file | `node scripts/greenfield-watch/gf-find.mjs [minutes]`, `gf-digest.mjs <transcript> [fromLine] [maxLines]` (env `GF_ONLY`, `GF_LONG`, `GF_CMD`, `GF_WIDE`), `gf-count.mjs <transcript>...`, `gf-esc.mjs <codex rollout>`; with `usage-ledger.mjs --timeline <transcript>` (without `--json`) for timing and refusals per code | none; reads transcripts only, never writes to a project (run them from the repository root; a shell read outside the root is refused, a `node` script reads the transcript itself) |
+ | Remove the test and Verify leftovers the suites and Full Verify runs leave in the home folder (signing-method, b1i, existing-public-anchor, k79-scan, local-supervisor and design-route test homes, old Full Verify clones, the shared fixture and tmp folders). Candidate 30 (C30-5) runs it automatically: `scripts/full-verify.mjs` sweeps at the end of every run (a green run also removes its own private home, a red run keeps it for the red-suite reruns, every run removes the homes and clones of finished runs older than 3 days so a kept red home never orphans, and a new unlisted fixture-shaped folder fails the wrapper), `scripts/run-quiet.mjs` removes a green suite's private TMPDIR and sweeps old label folders, and the suites remove what they create; `PIPELINE_KEEP_TEST_HOMES=1` keeps everything for a diagnosis | `scripts/clean-test-leftovers.mjs [--apply] [--min-age-hours <n>] [--verify-homes <days>]` (`node --test scripts/full-verify.test.mjs`; shared removal in `plugins/pipeline-core/lib/test-home-cleanup.mjs`) | without `--apply` the plan only; `--apply` removes exactly the planned name-matched entries older than the minimum age (default 12 h); live state is not in its allowlist; `--verify-homes <days>` adds the children of `.fv` and `fvc` older than that many days |
+ | Remove the old build, rehearsal and work clones under this repository's `scratch/` (`scratch/clones`, `scratch/agent-out`, `scratch/agent-out/w24reh`; a measured 220 GB), the repository-side partner of the home-folder cleaner; run it on every machine, never while a Verify or test run is active | `scripts/clean-repo-scratch.mjs [plan\|apply] [--keep-days <n>]` (`node --test scripts/full-verify.test.mjs`) | `plan` (default) prints the plan and what stays and removes nothing; `apply` removes exactly the planned directories older than `--keep-days` (default 1), keeps the fixture and helper folders by name, skips links and files, and refuses while a Full Verify, parallel run or Verify run is active |
+ | Collect growing runtime state of a checkout; first collector: old git-hook `runtime-<sha256>` snapshots that no hook names (`plan` prints a digest, `apply --plan-sha256 <digest> --aside <dir outside the repository>` moves them aside, never deletes) | `scripts/housekeeping.mjs plan\|apply` (`node --test scripts/housekeeping.test.mjs`) | `plan` none; `apply` renames snapshots into the aside directory |
+diff --git a/scripts/greenfield-watch/gf-count.mjs b/scripts/greenfield-watch/gf-count.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..b090de3eba6f019336dff7cbc1a8bc9e0feaf73e
+--- /dev/null
++++ b/scripts/greenfield-watch/gf-count.mjs
+@@ -0,0 +1,20 @@
++// SPDX-License-Identifier: SUL-1.0
++// Tracked source of a greenfield watch tool (docs/operating-tools.md, section "Greenfield watch"). Reads runner transcripts, never writes to a project.
++// Read-only: friction counters of ONE runner transcript (substring counts per raw line, so a code inside a loaded document counts too: read the digest before quoting a number).
++// usage: node scripts/greenfield-watch/gf-count.mjs <transcript.jsonl>...
++import { readFileSync } from "node:fs";
++
++const PATTERNS = {
++  escalated: /require_escalated/gu,
++  guardBlocked: /BLOCKED \(guard-/gu,
++  claudeIsError: /"is_error":\s*true/gu,
++  nonZeroExit: /"exit_code":\s*[1-9]|exited with code [1-9]|Exit code [1-9]/gu,
++  toolCalls: /"type":"(?:function_call|custom_tool_call)"|"type":"tool_use"|"tool_calls":\[/gu,
++};
++for (const file of process.argv.slice(2)) {
++  const text = readFileSync(file, "utf8");
++  const lines = text.split("\n");
++  const escalatedCalls = lines.filter((l) => /"type":"(?:function_call|custom_tool_call)"/u.test(l) && /sandbox_permissions[^,]{0,8}require_escalated/u.test(l)).length;
++  const counts = [`escalatedCalls ${escalatedCalls}`, ...Object.entries(PATTERNS).map(([k, re]) => `${k} ${(text.match(re) ?? []).length}`)].join(" | ");
++  console.log(`${file.split(/[\\/]/u).slice(-1)[0].slice(0, 48)} (${text.split("\n").length} lines): ${counts}`);
++}
+diff --git a/scripts/greenfield-watch/gf-digest.mjs b/scripts/greenfield-watch/gf-digest.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..d3a60c812d9ded8d087b6dbd80c11b4b068ccc0a
+--- /dev/null
++++ b/scripts/greenfield-watch/gf-digest.mjs
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: SUL-1.0
++// Tracked source of a greenfield watch tool (docs/operating-tools.md, section "Greenfield watch"). Reads runner transcripts, never writes to a project.
++// Read-only: compact digest of ONE runner transcript (Codex rollout or Claude project JSONL): human turns, commands with a short result, coded refusals.
++// usage: node scripts/greenfield-watch/gf-digest.mjs <transcript.jsonl> [fromLine=0] [maxLines=400]   (prints the next line number to continue from)
++import { readFileSync } from "node:fs";
++
++if (process.env.GF_ONLY) { const log = console.log.bind(console); console.log = (s) => { if (/REFUSAL|NONZERO|-- next line/u.test(String(s))) log(s); }; }
++const [file, fromArg, maxArg] = process.argv.slice(2);
++const from = Number(fromArg ?? 0);
++const max = Number(maxArg ?? 400);
++const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
++const clip = (s, n) => String(s ?? "").replace(/\s+/gu, " ").trim().slice(0, n);
++const calls = new Map();
++let shown = 0;
++let i = from;
++const codeOf = (t) => (t.match(/\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+){1,6})\b/u) ?? [])[1] ?? "";
++for (; i < lines.length && shown < max; i += 1) {
++  let o;
++  try { o = JSON.parse(lines[i]); } catch { continue; }
++  const ts = (o.timestamp ?? o.created_at ?? "").slice(11, 19);
++  const p = o.payload ?? {};
++  // Antigravity brain transcript (.system_generated/logs/transcript.jsonl)
++  if (o.step_index !== undefined) {
++    if (o.type === "USER_INPUT") { console.log(`[${i}] ${ts} HUMAN: ${clip(o.content, 260)}`); shown += 1; }
++    else if (o.type === "PLANNER_RESPONSE") {
++      for (const tc of o.tool_calls ?? []) { console.log(`[${i}] ${ts} CALL ${tc.name}: ${clip(tc.args?.CommandLine ?? tc.args?.toolSummary ?? JSON.stringify(tc.args), Number(process.env.GF_CMD ?? 220))}`); shown += 1; }
++      if (!(o.tool_calls ?? []).length && o.content) { console.log(`[${i}] ${ts} agent: ${clip(o.content, 200)}`); shown += 1; }
++    } else if (o.type === "GENERIC" && /Command exited with code/u.test(o.content ?? "")) {
++      const code = (o.content.match(/Command exited with code (\d+)/u) ?? [])[1];
++      const guard = (o.content.match(/\b(GUARD-[A-Z0-9-]+)\b/u) ?? [])[1];
++      console.log(`[${i}] ${ts}   -> exit ${code}${code !== "0" || guard ? " NONZERO/REFUSAL " + (guard ?? "") : ""} | ${clip(o.content.split("Command output:").pop(), code !== "0" || guard ? Number(process.env.GF_LONG ?? 420) : 110)}`);
++      shown += 1;
++    }
++    continue;
++  }
++  // Codex
++  if (o.type === "event_msg" && p.type === "user_message") { console.log(`[${i}] ${ts} HUMAN: ${clip(p.message, 260)}`); shown += 1; continue; }
++  if (o.type === "event_msg" && p.type === "agent_message") { console.log(`[${i}] ${ts} agent: ${clip(p.message, 200)}`); shown += 1; continue; }
++  if (o.type === "response_item" && (p.type === "function_call" || p.type === "custom_tool_call")) {
++    let cmd = p.arguments ?? p.input ?? "";
++    try { const a = JSON.parse(cmd); cmd = a.cmd ?? a.command ?? cmd; } catch { /* raw */ }
++    calls.set(p.call_id, { ts, cmd: clip(Array.isArray(cmd) ? cmd.join(" ") : cmd, Number(process.env.GF_CMD ?? 220)), idx: i });
++    continue;
++  }
++  if (o.type === "response_item" && (p.type === "function_call_output" || p.type === "custom_tool_call_output")) {
++    const c = calls.get(p.call_id) ?? { ts, cmd: "(call before the window)", idx: i };
++    let out = typeof p.output === "string" ? p.output : JSON.stringify(p.output);
++    try { const j = JSON.parse(out); if (Array.isArray(j)) out = j.map((x) => x.text ?? "").join("\n"); } catch { /* plain */ }
++    let exit = (out.match(/Process exited with code (\d+)/u) ?? out.match(/"exit_code":\s*(\d+)/u) ?? [])[1];
++    try { const j = JSON.parse(out); if (j && typeof j === "object" && "output" in j) { out = String(j.output); exit = j.exit_code ?? exit; } } catch { /* plain */ }
++    const guard = (out.match(/\b(GUARD-[A-Z0-9-]+|[A-Z]{2,}-[A-Z0-9-]*(?:REFUSED|UNAVAILABLE|DENIED|BLOCKED|REQUIRED)[A-Z0-9-]*)\b/u) ?? [])[1];
++    const refusal = (exit !== undefined && String(exit) !== "0") || guard ? ` ${guard ? "REFUSAL " + guard : "NONZERO"}` : "";
++    console.log(`[${c.idx}] ${c.ts} CMD: ${c.cmd}\n      -> exit ${exit ?? "?"}${refusal} | ${clip(out, refusal ? Number(process.env.GF_LONG ?? 420) : 150)}`);
++    shown += 1;
++    continue;
++  }
++  // Claude project JSONL
++  if (o.type === "user" && typeof o.message?.content === "string") { console.log(`[${i}] ${ts} HUMAN: ${clip(o.message.content, 260)}`); shown += 1; continue; }
++  if (o.type === "assistant" && Array.isArray(o.message?.content)) {
++    for (const b of o.message.content) {
++      if (b.type === "tool_use") calls.set(b.id, { ts, cmd: clip(b.name + " " + JSON.stringify(b.input), Number(process.env.GF_CMD ?? 220)), idx: i });
++      else if (b.type === "text" && b.text.trim()) { console.log(`[${i}] ${ts} agent: ${clip(b.text, 200)}`); shown += 1; }
++    }
++    continue;
++  }
++  if (o.type === "user" && Array.isArray(o.message?.content)) {
++    for (const b of o.message.content) {
++      if (b.type !== "tool_result") continue;
++      const c = calls.get(b.tool_use_id) ?? { ts, cmd: "(call before the window)", idx: i };
++      const out = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
++      const refusal = b.is_error || /GUARD-|-REFUSED/u.test(out) ? ` ERR/REFUSAL ${codeOf(out)}` : "";
++      console.log(`[${c.idx}] ${c.ts} CMD: ${c.cmd}\n      ->${refusal} ${clip(out, b.is_error || process.env.GF_WIDE ? Number(process.env.GF_LONG ?? 420) : 170)}`);
++      shown += 1;
++    }
++  }
++}
++console.log(`-- next line: ${i} of ${lines.length}`);
+diff --git a/scripts/greenfield-watch/gf-esc.mjs b/scripts/greenfield-watch/gf-esc.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..56e2895e42be0c2fb3c65ed1c1b188278a77fdce
+--- /dev/null
++++ b/scripts/greenfield-watch/gf-esc.mjs
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: SUL-1.0
++// Tracked source of a greenfield watch tool (docs/operating-tools.md, section "Greenfield watch"). Reads runner transcripts, never writes to a project.
++// Read-only: list the Codex tool calls that ran with sandbox_permissions require_escalated (time, command head, justification head).
++// usage: node scripts/greenfield-watch/gf-esc.mjs <codex rollout.jsonl>
++import { readFileSync } from "node:fs";
++
++const lines = readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean);
++let n = 0;
++for (let i = 0; i < lines.length; i += 1) {
++  let o; try { o = JSON.parse(lines[i]); } catch { continue; }
++  const p = o.payload ?? {};
++  if (o.type !== "response_item" || !(p.type === "function_call" || p.type === "custom_tool_call")) continue;
++  const raw = String(p.arguments ?? p.input ?? "");
++  if (!/sandbox_permissions[^,]{0,8}require_escalated/u.test(raw)) continue;
++  n += 1;
++  const cmd = (raw.match(/cmd:\s*['"`]([^'"`]{0,140})/u) ?? raw.match(/"cmd":"([^"]{0,140})/u) ?? [])[1] ?? raw.slice(0, 100);
++  const just = (raw.match(/justification:\s*"([^"]{0,110})/u) ?? raw.match(/"justification":"([^"]{0,110})/u) ?? [])[1] ?? "";
++  console.log(`${String(n).padStart(2)} ${(o.timestamp ?? "").slice(11, 19)} ${cmd.replace(/\/home\/[^ ]*pipeline-core\/[^/ ]+\//u, "<plugin>/").replace(/\s+/gu, " ").slice(0, 120)} || ${just}`);
++}
+diff --git a/scripts/greenfield-watch/gf-find.mjs b/scripts/greenfield-watch/gf-find.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..fae05196eb578b98b7be8eac447317b61d47d02d
+--- /dev/null
++++ b/scripts/greenfield-watch/gf-find.mjs
+@@ -0,0 +1,40 @@
++// SPDX-License-Identifier: SUL-1.0
++// Tracked source of a greenfield watch tool (docs/operating-tools.md, section "Greenfield watch"). Reads runner transcripts, never writes to a project.
++// Read-only: list runner transcript files touched within the last N minutes (default 180). Names, size and mtime only, never content.
++// usage: node scripts/greenfield-watch/gf-find.mjs [minutes]
++import { readdirSync, statSync } from "node:fs";
++import { homedir } from "node:os";
++import { join } from "node:path";
++
++const minutes = Number(process.argv[2] ?? 180);
++const since = Date.now() - minutes * 60_000;
++// Homes: this WSL home plus every Windows profile visible under /mnt/c/Users (Claude Code runs under Windows, Antigravity and this Elephant under WSL).
++const homes = [homedir()];
++try { for (const u of readdirSync("/mnt/c/Users")) if (!/^(Public|Default|All Users|Default User|desktop\.ini)/u.test(u)) homes.push(join("/mnt/c/Users", u)); } catch { /* no Windows mount */ }
++const roots = [];
++for (const h of homes) {
++  const where = h === homedir() ? "wsl" : "win";
++  roots.push(
++    { runner: `claude/${where}`, dir: join(h, ".claude", "projects"), skip: /model-probe|pipeline-test-tmp|pipeline-verify-tmp/u },
++    { runner: `codex/${where}`, dir: join(h, ".codex", "sessions"), skip: null },
++    { runner: `antigravity/${where}`, dir: join(h, ".gemini"), skip: /node_modules|[\\/]tmp[\\/]/u },
++  );
++}
++function walk(dir, skip, depth, out) {
++  let entries;
++  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
++  for (const e of entries) {
++    const p = join(dir, e.name);
++    if (skip && skip.test(p)) continue;
++    if (e.isDirectory()) { if (depth < 9) walk(p, skip, depth + 1, out); continue; }
++    if (!/\.jsonl$/u.test(e.name)) continue;
++    try { const s = statSync(p); if (s.mtimeMs >= since) out.push({ p, size: s.size, mtime: new Date(s.mtimeMs).toISOString() }); } catch { /* gone */ }
++  }
++}
++for (const r of roots) {
++  const out = [];
++  walk(r.dir, r.skip, 0, out);
++  out.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
++  console.log(`== ${r.runner}: ${out.length} file(s) in the last ${minutes} min`);
++  for (const f of out.slice(0, 15)) console.log(`${f.mtime} ${String(f.size).padStart(9)} ${f.p}`);
++}

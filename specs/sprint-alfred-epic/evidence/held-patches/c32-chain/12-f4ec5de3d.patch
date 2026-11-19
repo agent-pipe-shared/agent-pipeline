@@ -1,0 +1,34 @@
+diff --git a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+index 87e36bb3e3713b88037042634bba6619e0fb4efe..59f6bfe07c931b443e8ec970cc6ed1aef289ced2 100644
+--- a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
++++ b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+@@ -92,6 +92,12 @@ test("J8 the example criterion of the kickoff reference passes the hand-off, and
+   assert.equal(refused.code, "PLR-HANDOFF-NO-JOURNEY", JSON.stringify(refused));
+ });
+ 
++// C32 F7 (Claude greenfield 2026-11-19): a German Spec written with transliterated umlauts was rewritten in full 1.5 minutes later. The kickoff reference says it once, where the language is bound.
++test("J9 the kickoff reference says to write the document language with its own characters, never transliterated", () => {
++  const reference = flat(read("plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"));
++  assert.match(reference, /Write the chosen language with its own characters from the first draft, never transliterated: German with `ä`, `ö`, `ü` and `ß`, not `ae`, `oe`, `ue` and `ss`\./u);
++});
++
+ // C29 G6 (Glossover): the hand-off admitted a Spec as soon as one row was locatable, so a row the registration cannot locate passed it,
+ // submit-plan's registration refused it afterwards, and the journey gaps only surfaced on the attempt after that.
+ test("J1/G6 a criterion row the registration cannot locate is refused at the hand-off, together with the journey gaps, in one refusal", async () => {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index 9e066c5843042f0a7f8d4a3a5fc29fa8a7966244..f2af06c82f600c847954b15eea46323c18680922 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -104,6 +104,12 @@ prose content is translated, never the machine-oriented section headings — no
+ validator anywhere reads heading text, so this is a documentary convention,
+ not an enforced schema.
+ 
++Write the chosen language with its own characters from the first draft, never
++transliterated: German with `ä`, `ö`, `ü` and `ß`, not `ae`, `oe`, `ue` and
++`ss`. A transliterated Spec has to be rewritten by hand afterwards (a script
++that converts it is a new tool call the lifecycle may refuse before the project
++is ready), which costs a full second write of the document.
++
+ Two different guard-drift refusals can hit this same PRD-authoring step in a
+ row — a `PO-GATE-PRD-LANGUAGE-MISMATCH` on the marker, then a separate
+ `projection-drift` refusal right after that repair — and they are DIFFERENT

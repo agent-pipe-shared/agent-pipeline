@@ -1,0 +1,74 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 9771743699bc5e7699f5daa26f6a392b5cd44454..50ad0c54717a486deeb9edd1cd484251f65effcc 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -307,7 +307,8 @@ normative shape is:
+    If the full Critic finds corrections, assign one fresh Correction Goldfish
+    to the whole coherent batch. That owner carries the findings through test
+    cases, fixes, targeted checks and subsequent correction-diff findings in
+-   the same context until genuine PASS or the three-review correction limit.
++   the same context until genuine PASS or an explicit PO decision (no count
++   of review rounds refuses a correction-diff review on its own, D190).
+    Do not create one correction dispatch per item; keep the original batch,
+    members and review lineage fixed.
+ 
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.mjs b/plugins/pipeline-core/scripts/usage-ledger.mjs
+index 222a29adfafee80db53bfb7ae702c308808e9ec6..b7db8af10dbbb2561592b9f880387ab4aad282d0 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.mjs
+@@ -378,6 +378,7 @@ function codexHumanChars(payload) {
+ function codexTimelineEvents(records) {
+   const events = [];
+   const calls = new Map(); // call_id -> group of the call that the output answers
++  let previousCumulativeTotal = null;
+   const provenanceForm = records.some((record) => isTimelineObject(record) && record.type === "response_item" && isTimelineObject(record.payload) && codexHumanChars(record.payload) !== null);
+   for (const record of records) {
+     if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
+@@ -391,6 +392,11 @@ function codexTimelineEvents(records) {
+       if (payload.type === "user_message" && !provenanceForm) events.push({ kind: "human", ms, chars: typeof payload.message === "string" ? timelineChars(payload.message) : null });
+       else if (payload.type === "task_complete") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
+       else if (payload.type === "token_count" && isTimelineObject(payload.info) && isTimelineObject(payload.info.last_token_usage)) {
++        // C32 (Codex greenfield report): a rollout can repeat one token_count event (same cumulative total, same last response) for the one
++        // response it records; a genuine next response always grows the cumulative total, so an unchanged total is a repeat and counts once.
++        const total = isTimelineObject(payload.info.total_token_usage) ? JSON.stringify(payload.info.total_token_usage) : null;
++        if (total !== null && total === previousCumulativeTotal) continue;
++        if (total !== null) previousCumulativeTotal = total;
+         const last = payload.info.last_token_usage;
+         events.push({ kind: "response", ms, listed: true, model: null, usage: { input: timelineNumber(last.input_tokens), output: timelineNumber(last.output_tokens), cacheWrite: null, cacheRead: timelineNumber(last.cached_input_tokens) } });
+       }
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.test.mjs b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+index 375a4f636d8302d4a3f4f8fefbc10fd547fcaca2..e57eaa42159e2a4176a97eb5111485b2a644b8f4 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.test.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+@@ -482,6 +482,31 @@ test("usage-ledger --timeline (codex rollout) reads user_message, token_count an
+   }
+ });
+ 
++// C32 (Codex greenfield report): the native rollout repeats one token_count event for one response (same cumulative total, same last usage), which
++// the timeline counted twice (68,114 input too many in that run). A genuine next response grows the total and still counts.
++test("usage-ledger --timeline (codex rollout) counts a repeated token_count event once and a real next response again", () => {
++  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
++  const usage = (input, output) => ({ input_tokens: input, cached_input_tokens: input - 10, output_tokens: output, reasoning_output_tokens: 0, total_tokens: input + output });
++  const count = (at, total, last) => rec(at, "event_msg", { type: "token_count", info: { total_token_usage: total, last_token_usage: last } });
++  const { dir, file } = timelineFile([
++    rec("2026-11-03T10:00:00.000Z", "session_meta", { id: "thread-1", cwd: "/somewhere" }),
++    rec("2026-11-03T10:00:01.000Z", "event_msg", { type: "user_message", message: HUMAN_TEXT }),
++    count("2026-11-03T10:00:05.000Z", usage(1000, 50), usage(1000, 50)),
++    count("2026-11-03T10:00:06.000Z", usage(1000, 50), usage(1000, 50)),
++    count("2026-11-03T10:00:07.000Z", usage(1000, 50), usage(1000, 50)),
++    count("2026-11-03T10:00:09.000Z", usage(3000, 170), usage(2000, 120)),
++    rec("2026-11-03T10:00:10.000Z", "event_msg", { type: "task_complete" }),
++  ]);
++  try {
++    const result = run(["--timeline", file, "--json"]);
++    assert.equal(result.status, 0, result.stderr);
++    const responses = JSON.parse(result.stdout).responses;
++    assert.deepEqual(responses.map((entry) => [entry.usage.inputTokens, entry.usage.outputTokens]), [[1000, 50], [2000, 120]], "the repeated event counts once, the next response counts again");
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
+ test("usage-ledger --timeline (antigravity transcript) prints n/a for what the format does not carry", () => {
+   const { dir, file } = timelineFile([
+     { type: "turn.started", timestamp: "2026-08-19T10:00:00.000Z" },

@@ -1,0 +1,75 @@
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 22a7dfef5c21d07fb0682209a599e2f20ba63eb7..3b0c9a23db3dfcef39575c486d782bb4232bf1c3 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -1188,11 +1188,18 @@ function applyInitialOnboardingAnswersCore({
+ // route is checked BEFORE the first mutating step and the host route is named in the answer, so nothing fails half way and nothing was changed.
+ const HOST_ROUTE_CODES = new Set(["EPERM", "EACCES"]);
+ 
++// C32 (Codex greenfield 2026-11-19: the first inspect step failed with `spawnSync node EPERM` and needed an escalated retry). A published action names the
++// bare executable `node`, which a sandboxed child resolves through PATH to a version-manager install it may not start. The Driver is itself running on a node
++// that can start, so a bare `node` is spawned as that same interpreter (`process.execPath`); every other executable is spawned exactly as published.
++function reachableNode(executable) {
++  return executable === "node" ? process.execPath : executable;
++}
++
+ /** Default route probe: can this context start the executable at all? Only a refused start (no status, EPERM/EACCES) says no; anything else is the step's own business. */
+ function probeExecutionRoute(executable) {
+   const base = String(executable).split(/[\\/]/u).pop().toLowerCase();
+   if (executable !== process.execPath && base !== "node" && base !== "node.exe") return { ok: true };
+-  const result = spawnSync(executable, ["--version"], { encoding: "utf8", shell: false, timeout: 10_000, windowsHide: true });
++  const result = spawnSync(reachableNode(executable), ["--version"], { encoding: "utf8", shell: false, timeout: 10_000, windowsHide: true });
+   const code = result?.error?.code;
+   return (result?.status === null || result?.status === undefined) && HOST_ROUTE_CODES.has(code) ? { ok: false, code } : { ok: true };
+ }
+@@ -1245,7 +1252,7 @@ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = nu
+       ...(bindProjectRoot ? { CLAUDE_PROJECT_DIR: projectRoot } : {}),
+     };
+   }
+-  const result = run(executable, argv, options);
++  const result = run(reachableNode(executable), argv, options);
+   if (result?.error?.code === "ETIMEDOUT") {
+     return { ok: false, faultCode: "execution-budget-exhausted", exitCode: result.status ?? null, stderr: "The child exceeded the remaining onboarding budget. Its operation may be partial; re-inspect before any retry." };
+   }
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index af32ecb82e65619d2ee689d277529581bfb7e496..20baad01008937cc8218d3df4d846ebb792d23f6 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -1878,7 +1878,8 @@ test("driveOnboardingInit: binds a returned root-less project action to the Driv
+         assert.equal(options.env.CLAUDE_PROJECT_DIR, root);
+         return respond({ schema: "pipeline.inspect.v1", status: "ready", nextAction: null });
+       }
+-      assert.equal(executable, "node");
++      // C32: the re-anchor step names `node`; it is spawned as the Driver's own interpreter (restated pin, was the bare name).
++      assert.equal(executable, process.execPath);
+       assert.equal(argv.includes("--root"), true);
+       return respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
+     };
+@@ -1890,6 +1891,27 @@ test("driveOnboardingInit: binds a returned root-less project action to the Driv
+   }
+ });
+ 
++test("driveOnboardingInit C32: the first inspect step and a published bare `node` action are spawned as the Driver's own interpreter", () => {
++  const root = freshRoot();
++  try {
++    const spawned = [];
++    const run = (executable, argv) => {
++      spawned.push(executable);
++      if (spawned.length === 1) {
++        return respond({ schema: "pipeline.project-onboarding.v4", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: false } });
++      }
++      return respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
++    };
++    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run, probeRoute: () => ({ ok: true }) });
++    assert.equal(result.outcome, "ready", JSON.stringify(result));
++    assert.ok(spawned.length >= 2);
++    for (const executable of spawned) assert.equal(executable, process.execPath, "no spawn names the bare `node` that a sandbox may not resolve (spawnSync node EPERM)");
++    assert.equal(result.steps[0].executable, "node", "the readback keeps the published name");
++  } finally {
++    dispose(root);
++  }
++});
++
+ test("driveOnboardingInit: accepts a completed WSL child when EPERM accompanies its zero exit status", () => {
+   const root = freshRoot();
+   try {

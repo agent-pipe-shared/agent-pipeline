@@ -1,0 +1,38 @@
+diff --git a/plugins/pipeline-core/lib/agy-native-goldfish.mjs b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+index 15e94b2baf6242b3f8d619b3c98a764adad8c420..ad0cc9125a2915a6c19f708e8cc0bb4e03fce045 100644
+--- a/plugins/pipeline-core/lib/agy-native-goldfish.mjs
++++ b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+@@ -281,7 +281,11 @@ export function nativeBrainWriteRefusal({ filePath, command } = {}) {
+     // nothing (it prints to stdout). Exactly `node <...>/scripts/usage-ledger.mjs --timeline <file> [--json]`, no shell operator.
+     const timelineRead = !/[<>|;&`$()]/u.test(command)
+       && /^\s*node(?:\.exe)?\s+\S*[\\/]scripts[\\/]usage-ledger\.mjs\s+--timeline\s+\S+(?:\s+--json)?\s*$/u.test(command);
+-    if (!readOnly && !timelineRead) return BRAIN_REFUSAL;
++    // C32 (second Antigravity greenfield report): the close's cost row reads the same transcript and only prints it. Exactly
++    // `node <...>/scripts/usage-ledger.mjs --row [label] --antigravity-transcript <file> [--model <name>]`, no shell operator; the refusal had left telemetry/costs.md empty.
++    const costRowRead = !/[<>|;&`$()]/u.test(command)
++      && /^\s*node(?:\.exe)?\s+\S*[\\/]scripts[\\/]usage-ledger\.mjs\s+--row(?:\s+(?:"[^"]*"|'[^']*'|[^\s"'-]\S*))?\s+--antigravity-transcript\s+\S+(?:\s+--model\s+\S+)?\s*$/u.test(command);
++    if (!readOnly && !timelineRead && !costRowRead) return BRAIN_REFUSAL;
+   }
+   return null;
+ }
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index bc23f03c606b96ce50806669d12fd07a945eb9ad..9a77f88270b545ade3147439531346fe5d298420 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -455,6 +455,16 @@ test("an agent write under the Antigravity brain or config directory is refused"
+       `node ${ledger} ${cli}/brain`, `node /tmp/other.mjs --timeline ${transcript}`, `node ${ledger} --timeline ${transcript} --row`]) {
+       assert.match(nativeBrainWriteRefusal({ filePath: null, command }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, command);
+     }
++    // C32: the close's cost row over the same transcript only prints; the same command with any other operator, script, flag or a second path stays refused.
++    for (const command of [`node ${ledger} --row --antigravity-transcript ${transcript}`, `node ${ledger} --row "S1/B2" --antigravity-transcript ${transcript}`,
++      `node ${ledger} --row S1-B2 --antigravity-transcript ${transcript} --model gemini-4-argon-medium`]) {
++      assert.equal(nativeBrainWriteRefusal({ filePath: null, command }), null, command);
++    }
++    for (const command of [`node ${ledger} --row --antigravity-transcript ${transcript} > ${transcript}`, `node ${ledger} --row "x" --antigravity-transcript ${transcript}; rm ${transcript}`,
++      `node /tmp/other.mjs --row --antigravity-transcript ${transcript}`, `node ${ledger} --row --antigravity-transcript ${transcript} --out ${transcript}`,
++      `node ${ledger} --row --antigravity-transcript ${transcript} ${cli}/brain`, `node ${ledger} --antigravity-transcript ${transcript} --row`]) {
++      assert.match(nativeBrainWriteRefusal({ filePath: null, command }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, command);
++    }
+     const res = runAdapter(fx, payload(fx, {
+       conversationId: PARENT, toolCall: { name: "write_to_file", args: { TargetFile: descriptorPath, CodeContent: "{}" } },
+     }));

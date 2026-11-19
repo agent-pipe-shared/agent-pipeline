@@ -1,0 +1,91 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 3fd5c84b9f328eb78e7fa359d3228aec202da538..0206be3a18fd2f2147a79c4bdc384ad870a95301 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -182,7 +182,7 @@ export function parseArchitectureDesign(prd) {
+     module.ownedPaths.forEach((path, pathIndex) => requireField(
+       typeof path === "string" && bounded(path.replace(/\/\*\*?$/u, "")),
+       "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
+-      "bounded repository-relative path or owned prefix ending in /**", path,
++      "a repository-relative path with no `*`, `?`, `\\`, `:` or `..` inside it, or an owned prefix ending in /** (for example app/js/features/**)", path,
+     ));
+     // A documentation module may omit verification entry points only when every owned path is non-executable.
+     if (module.kind === "documentation") {
+@@ -278,6 +278,17 @@ export function architectureDesignTargets(input) {
+ /** Read-only pre-presentation check for a fresh scaffold. It binds the bytes
+  * to the submitted PRD digest and never treats the scaffold itself as design
+  * approval or as a materialized architecture map. */
++/**
++ * The guidance of the `repair-required` next action for a draft PRD whose design block the validator refused. The generic sentence was all the
++ * agent got; the validator's own field, rule and rejected value (already carried by the draft inspection) now follow it.
++ */
++export function architectureDraftRepairGuidance(designDraft) {
++  const generic = "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.";
++  return typeof designDraft?.field === "string"
++    ? `${generic} First refusal: ${designDraft.field} (${designDraft.rejectedValue}) must be ${designDraft.expected}.`
++    : generic;
++}
++
+ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlanSha256 } = {}) {
+   const root = resolve(rootDir);
+   try {
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index 4a07cf0e4504b6a1c566aa55dd9ef48b58e05c3d..0963de7c3552754eb291a8ceb3727ec8406db73d 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -4,7 +4,7 @@ import test from "node:test";
+ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
+ import { join } from "node:path";
+ import { tmpdir } from "node:os";
+-import { parseArchitectureDesign, architectureDesignTargets, materializeArchitectureDesign, publishArchitectureDesignTargets } from "./architecture-design.mjs";
++import { parseArchitectureDesign, architectureDesignTargets, architectureDraftRepairGuidance, materializeArchitectureDesign, publishArchitectureDesignTargets } from "./architecture-design.mjs";
+ import { makeAggregateFixture as actualAuthorityFixture } from "./architecture-prospective-materialization.fixture.mjs";
+ import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+ import { generateAdoptionProposal } from "../scripts/architecture-adoption.mjs";
+@@ -108,6 +108,19 @@ test("field-local diagnostics identify the single invalid architecture input", (
+     error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH"
+       && error.field === "fitnessModel.modules[0].ownedPaths");
+ });
++// C32 (Claude and Codex greenfields 2026-11-19): the inspect next action said only "repair its exact physical source", although the validator knew the field and the rule.
++test("C32 the draft repair guidance carries the field, the rejected value and the path rule of the first refusal", () => {
++  const input = design(); input.modules[0].ownedPaths[0] = "app/js/features/shopping*.js";
++  let refusal = null;
++  try { parseArchitectureDesign(prd(input)); } catch (error) { refusal = error; }
++  assert.equal(refusal?.message, "ARCHITECTURE-DESIGN-PATH-INVALID");
++  const guidance = architectureDraftRepairGuidance({ ok: false, code: refusal.message, field: refusal.field, expected: refusal.expected, rejectedValue: refusal.rejectedValue });
++  assert.match(guidance, /^The draft PRD could not be safely read and bound to current authority/u);
++  assert.match(guidance, /First refusal: modules\[0\]\.ownedPaths\[0\] \(app\/js\/features\/shopping\*\.js\) must be /u);
++  assert.match(guidance, /no `\*`, `\?`/u, "the rule names the wildcard characters");
++  assert.match(guidance, /owned prefix ending in \/\*\*/u, "the rule names the accepted prefix form");
++  assert.equal(architectureDraftRepairGuidance({ ok: false, code: "ARCHITECTURE-DESIGN-PRD-UNAVAILABLE" }), "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.");
++});
+ test("fitness model sizeBudgets accepts positive integers, refuses others and is passed through unchanged (AC-108)", () => {
+   const accepted = design();
+   accepted.fitnessModel.sizeBudgets = { maxFileLines: 300, maxModuleLines: 1500 };
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 497c36b11be8f1d9c6a472d173d8cd5834a136b2..1baa575308e6061a20c598aa848738f30e6d8fc8 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -484,7 +484,7 @@ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicabili
+ import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
+ import { adrDraftHintText, inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+ import { adrDraftReferenceSlug } from "./module-inventory.mjs";
+-import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
++import { architectureDraftRepairGuidance, inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+ import { rebindApproval } from "../lib/rebind-approval.mjs";
+ import { profileSourceChangedKeys } from "../lib/plan-approval-device-rebind.mjs";
+ import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+@@ -4433,9 +4433,12 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+           kind: designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? "architecture-design-required" : "repair-required",
+           ...(designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" ? { prdPath: designDraft.prdPath } : {}),
+           code: designDraft.code,
++          // C32 (Claude and Codex greenfields 2026-11-19): the validator already knows the field, the rule and the rejected value; the repair action
++          // dropped them, so both agents read the validator source to learn which path rule they had broken.
++          ...(typeof designDraft.field === "string" ? { field: designDraft.field, expected: designDraft.expected, rejectedValue: designDraft.rejectedValue } : {}),
+           guidance: designDraft.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED"
+             ? "Author and validate the architecture design in this exact draft PRD before submit-plan. No PO signature request exists until the completed design and Advisor/readiness package are presented together once."
+-            : "The draft PRD could not be safely read and bound to current authority; repair its exact physical source and inspect again before submission.",
++            : architectureDraftRepairGuidance(designDraft),
+         };
+       }
+     }

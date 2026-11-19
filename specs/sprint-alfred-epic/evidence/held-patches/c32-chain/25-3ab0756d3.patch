@@ -1,0 +1,69 @@
+diff --git a/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs b/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
+index fd6992532cf4119d31b39c9ca7eef08431b9627c..995102b54ae90bd7890c9ef39336cdef69580f60 100644
+--- a/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
++++ b/plugins/pipeline-core/lib/guard/control-plane-script-scan.mjs
+@@ -103,6 +103,19 @@ function namesControlPlane(word, root) {
+   } catch { return false; }
+ }
+ 
++// C32 (Codex greenfield report): `cp <control-plane file> scratch/x` only reads the control plane and was refused as a write. A copy reads it when the
++// destination (the last operand) is not in it. Options that can write there or aim a later write at it keep the refusal: a target directory, a
++// backup suffix, and hard or symbolic links (a link in scratch/ would let a later write change the control-plane file itself).
++const COPY_WRITING_OPTION = /^-[A-Za-z]*[tSls]|^--(?:target-directory|link|symbolic-link|suffix)(?:=|$)/u;
++function copyOnlyReadsControlPlane(parts, root) {
++  const rest = parts.slice(1);
++  const end = rest.indexOf("--");
++  const before = end === -1 ? rest : rest.slice(0, end);
++  if (before.some((word) => word.startsWith("-") && COPY_WRITING_OPTION.test(word))) return false;
++  const operands = [...before.filter((word) => !word.startsWith("-")), ...(end === -1 ? [] : rest.slice(end + 1))];
++  return operands.length >= 2 && !namesControlPlane(operands.at(-1), root);
++}
++
+ /** Returns { segment } for the first shell segment that would write the control-plane directory, else null. */
+ export function controlPlaneShellWriteHit(command, root) {
+   if (typeof command !== "string") return null;
+@@ -112,7 +125,8 @@ export function controlPlaneShellWriteHit(command, root) {
+     const executable = basename(String(parts[0]).replaceAll("\\", "/"));
+     const sedInPlace = executable === "sed" && parts.some((word) => /^-[a-zA-Z]*i/u.test(word) || word.startsWith("--in-place"));
+     const findMutates = executable === "find" && parts.some((word) => ["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf", "-fls"].includes(word));
+-    const readOnly = (READ_ONLY_COMMANDS.has(executable) || (executable === "sed" && !sedInPlace) || (executable === "find" && !findMutates))
++    const readOnly = (READ_ONLY_COMMANDS.has(executable) || (executable === "sed" && !sedInPlace) || (executable === "find" && !findMutates)
++      || (executable === "cp" && copyOnlyReadsControlPlane(parts, root)))
+       && !REDIRECT.test(segment.replace(DISCARD_REDIRECT, ""));
+     if (!readOnly) return { segment: segment.trim().slice(0, 200) };
+   }
+diff --git a/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs b/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
+index f2e2135dda227c3776975bffd18d1b8c0e834c52..f38b4e6c1ce8f5550e4347a8bbdfcb3c69501269 100644
+--- a/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
++++ b/plugins/pipeline-core/lib/guard/control-plane-script-scan.test.mjs
+@@ -124,5 +124,30 @@ test("reading .git/agent-pipeline and writing elsewhere are not this refusal", (
+     "sed -n 1,5p .git/agent-pipeline/x.json",
+     "cp scratch/forged.json scratch/agent-pipeline-copy.json",
+     "mkdir -p scratch/agent-pipeline",
++    // C32 (Codex greenfield report): a copy OUT of the control plane is a read.
++    "cp .git/agent-pipeline/x.json scratch/copy.json",
++    "cp -p .git/agent-pipeline/x.json scratch/copy.json",
++    "cp -r .git/agent-pipeline/design-review-observations scratch/obs",
++    "cp -- .git/agent-pipeline/x.json scratch/copy.json",
+   ]) assert.equal(writeRefused(run(command)), false, command);
+ });
++
++test("a copy that could write the control plane or aim a later write at it is still refused", () => {
++  mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
++  put("scratch/forged.json", "{}\n");
++  for (const command of [
++    "cp .git/agent-pipeline/x.json .git/agent-pipeline/y.json",
++    "cp scratch/forged.json .git/agent-pipeline/",
++    "cp -t .git/agent-pipeline scratch/forged.json",
++    "cp -rt .git/agent-pipeline scratch/forged.json",
++    "cp --target-directory=.git/agent-pipeline scratch/forged.json",
++    "cp -l .git/agent-pipeline/x.json scratch/linked.json",
++    "cp -s .git/agent-pipeline/x.json scratch/linked.json",
++    "cp --symbolic-link .git/agent-pipeline/x.json scratch/linked.json",
++    "cp -S .bak .git/agent-pipeline/x.json scratch/copy.json",
++    "cp .git/agent-pipeline/x.json",
++    "cp .git/agent-pipeline/x.json scratch/copy.json > .git/agent-pipeline/z",
++    "cp -- scratch/forged.json .git/agent-pipeline/x.json",
++    "mv .git/agent-pipeline/x.json scratch/moved.json",
++  ]) assert.ok(writeRefused(run(command)), command);
++});
