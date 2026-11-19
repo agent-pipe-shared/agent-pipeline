@@ -7,10 +7,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readProjectRouting } from "../lib/runner-profiles-v3.mjs";
 
 const CLI_PATH = fileURLToPath(new URL("./usage-ledger.mjs", import.meta.url));
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
@@ -126,8 +127,8 @@ function listAllFiles(dir) {
   return out.sort();
 }
 
-function run(args) {
-  const result = spawnSync(process.execPath, [CLI_PATH, ...args], { encoding: "utf8" });
+function run(args, options = {}) {
+  const result = spawnSync(process.execPath, [CLI_PATH, ...args], { encoding: "utf8", ...options });
   return result;
 }
 
@@ -554,6 +555,9 @@ test("usage-ledger --timeline is exclusive with --row and --metering and refuses
 const agyStep = (index, at, type, extra) => ({ step_index: index, source: "MODEL", type, status: "DONE", created_at: at, ...extra });
 const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// C31-B11 restates this B5 case under QG-04 (the criterion AC-112 is unchanged; the PO decision of 2026-11-19 replaced "never estimated"
+// by a labelled list-price estimate). With no model argument and no project routing in the working directory (a fresh temporary
+// directory), the row still sums the steps and keeps the dollar half unavailable, now saying how to name a model.
 test("C31-B5 usage-ledger --row --antigravity-transcript sums the model steps' tokens into one row with the dollar half unavailable", () => {
   const { dir, file } = timelineFile([
     { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
@@ -562,11 +566,11 @@ test("C31-B5 usage-ledger --row --antigravity-transcript sums the model steps' t
     agyStep(3, "2026-08-19T10:00:10Z", "PLANNER_RESPONSE", { input_tokens: 2300, cache_read_tokens: 1150, output_tokens: 9 }),
   ]);
   try {
-    const result = run(["--row", "S1/B5", "--antigravity-transcript", file]);
+    const result = run(["--row", "S1/B5", "--antigravity-transcript", file], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
     const out = result.stdout;
     assert.match(out, /^Session\/Block: S1\/B5$/m);
-    assert.match(out, /^- antigravity-unrecorded: 3\.500 in \/ 16 out \/ n\/a cache-write \/ 1\.180 cache-read -> \$ unavailable \(model not recorded in this transcript\)$/m);
+    assert.match(out, /^- antigravity-unrecorded: 3\.500 in \/ 16 out \/ n\/a cache-write \/ 1\.180 cache-read -> \$ unavailable \(model not recorded; pass --model <name>\)$/m);
     assert.match(out, /TOTAL: n\/a \(no model recorded in this transcript, no dollar estimate\)/);
     assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for an unrecorded model");
     for (const text of [out, result.stderr]) {
@@ -601,6 +605,8 @@ test("C31-B5 usage-ledger --row --antigravity-transcript prints the skip sentenc
 const codexCounters = (input, cached, output) => ({ input_tokens: input, cached_input_tokens: cached, output_tokens: output, reasoning_output_tokens: 1, total_tokens: input + output });
 const codexTokenCount = (at, total) => ({ timestamp: at, type: "event_msg", payload: { type: "token_count", info: { total_token_usage: total } } });
 
+// C31-B11 restates this B5 case under QG-04: the model of this fixture (gpt-5.1-codex) has no entry in the list-price table, so the
+// dollar half stays unavailable, now with the reason "no list price for <model>" instead of "n/a (price unknown)".
 test("C31-B5 usage-ledger --row --codex-rollout prints the last complete cumulative total under the recorded model with no dollar figure", () => {
   const { dir, file } = timelineFile([
     { timestamp: "2026-11-18T10:00:00Z", type: "session_meta", payload: { id: SESSION_ID, cwd: "/work/project" } },
@@ -615,9 +621,9 @@ test("C31-B5 usage-ledger --row --codex-rollout prints the last complete cumulat
     assert.equal(result.status, 0, result.stderr);
     const out = result.stdout;
     assert.match(out, /^Session\/Block: S1\/B5$/m);
-    assert.match(out, /^- gpt-5\.1-codex: 3\.000 in \/ 120 out \/ n\/a cache-write \/ 1\.500 cache-read -> n\/a \(price unknown\)$/m);
+    assert.match(out, /^- gpt-5\.1-codex \(model source: observed\): 3\.000 in \/ 120 out \/ n\/a cache-write \/ 1\.500 cache-read -> \$ unavailable \(no list price for gpt-5\.1-codex\)$/m);
     assert.match(out, /^TOTAL: n\/a \(no model with known price\)$/m);
-    assert.match(out, /whether input includes cached tokens .* not measured/);
+    assert.match(out, /no dollar figure is computed/);
     assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for a model without a price");
     for (const text of [out, result.stderr]) assert.doesNotMatch(text, new RegExp(`${SECRET_MARKER}|/work/project|${escapeRe(dir)}|session\\.jsonl`), "no transcript text and no path");
   } finally {
@@ -664,6 +670,179 @@ test("C31-B5 usage-ledger --antigravity-transcript is an exclusive row mode and 
     assert.match(withRoot.stderr, /exclusive/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- C31-B11 (AC-112, lane L17; PO decision 2026-11-19): the Antigravity and Codex token rows ESTIMATE the dollar half from the
+// labelled list-price table plugins/pipeline-core/config/model-list-prices.json. The word "approx" and the asOf date are mandatory;
+// the model of an Antigravity row comes from --model, else from the project's configured implement route; Codex uses the model
+// observed in the rollout. Arithmetic below is worked by hand from the table (US dollars per million tokens).
+const PRICE_TABLE_PATH = join(dirname(CLI_PATH), "..", "config", "model-list-prices.json");
+const agyUsageSteps = (...triples) => triples.map(([input, cacheRead, output], index) => agyStep(index + 1, `2026-11-19T10:00:0${index}Z`, "PLANNER_RESPONSE", { input_tokens: input, cache_read_tokens: cacheRead, output_tokens: output }));
+const codexRollout = (model, total) => [
+  { timestamp: "2026-11-19T10:00:00Z", type: "session_meta", payload: { id: SESSION_ID, cwd: "/work/project" } },
+  { timestamp: "2026-11-19T10:00:01Z", type: "turn_context", payload: { model } },
+  codexTokenCount("2026-11-19T10:00:09Z", total),
+];
+
+test("C31-B11 the list-price table is labelled as an estimate and holds the decided entries", () => {
+  const table = JSON.parse(readFileSync(PRICE_TABLE_PATH, "utf8"));
+  assert.equal(table.asOf, "2026-11-19");
+  assert.match(table.source, /third-party list-price trackers, 2026-11-19; not verified against the vendor page; estimate/);
+  assert.match(table.note, /vendor pages win/i);
+  const expected = {
+    "gpt-5.3-codex": [1.75, 0.175, 14], "gpt-5.2-codex": [1.75, 0.175, 14], "gpt-5-codex": [1.25, null, 10],
+    "gemini-3.8-flash": [1.5, 0.15, 7.5], "gemini-3.6-flash": [1.5, 0.15, 7.5], "gemini-3.1-pro": [2, 0.2, 12], "gemini-3.1-flash-lite": [0.25, 0.025, 1.5],
+  };
+  assert.deepEqual(Object.keys(table.models).sort(), Object.keys(expected).sort());
+  for (const [name, [input, cachedInput, output]] of Object.entries(expected)) {
+    assert.deepEqual({ input: table.models[name].input, cachedInput: table.models[name].cachedInput, output: table.models[name].output }, { input, cachedInput, output }, name);
+    assert.match(table.models[name].note, /low confidence/i, `${name}: the entry says it is low confidence`);
+  }
+});
+
+test("C31-B11 usage-ledger --row --codex-rollout estimates the dollar half of a listed model from the list price, with cached tokens inside the input", () => {
+  // 4M input of which 2M cached, 1M output: 2M x 1.75 + 2M x 0.175 + 1M x 14 = 3.50 + 0.35 + 14.00 = 17.85
+  const { dir, file } = timelineFile(codexRollout("gpt-5.3-codex", codexCounters(4_000_000, 2_000_000, 1_000_000)));
+  try {
+    const result = run(["--row", "S1/B11", "--codex-rollout", file], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /^- gpt-5\.3-codex \(model source: observed\): 4\.000\.000 in \/ 1\.000\.000 out \/ n\/a cache-write \/ 2\.000\.000 cache-read -> approx \$17,85 \(estimate from list price, 2026-11-19; cached tokens at 0\.175 USD per 1M \(listed cached-input price\)\)$/m);
+    assert.match(out, /^TOTAL approx \$17,85 \(estimate from list price, 2026-11-19\)$/m);
+    assert.match(out, /ESTIMATE from third-party list prices/);
+    assert.doesNotMatch(out, /unavailable|price unknown/);
+    for (const text of [out, result.stderr]) assert.doesNotMatch(text, new RegExp(`${escapeRe(dir)}|/work/project|session\\.jsonl`), "no path");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --row --codex-rollout drops the effort suffix and prices cached tokens at the input price when no cached price is listed", () => {
+  // gpt-5-codex-high matches gpt-5-codex (1.25 / null / 10.00). 2M input of which 1M cached, 1M output: 1M x 1.25 + 1M x 1.25 + 1M x 10 = 12.50
+  const { dir, file } = timelineFile(codexRollout("gpt-5-codex-high", codexCounters(2_000_000, 1_000_000, 1_000_000)));
+  try {
+    const result = run(["--row", "S1/B11", "--codex-rollout", file], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^- gpt-5-codex-high \(model source: observed\): .* -> approx \$12,50 \(estimate from list price, 2026-11-19; cached tokens at the input price, 1\.25 USD per 1M \(no cached price listed, upper bound\)\)$/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --row --codex-rollout keeps the dollar half unavailable, with the reason, for several models in one rollout", () => {
+  const records = [...codexRollout("gpt-5.3-codex", codexCounters(1000, 100, 10)), { timestamp: "2026-11-19T10:00:02Z", type: "turn_context", payload: { model: "gpt-5.2-codex" } }];
+  const { dir, file } = timelineFile(records);
+  try {
+    const result = run(["--row", "S1/B11", "--codex-rollout", file], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /-> \$ unavailable \(several models in one rollout, no per-model split\)/);
+    assert.doesNotMatch(result.stdout, /approx/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --row --antigravity-transcript --model prices the step sums with the listed model, tier suffix dropped, source 'argument'", () => {
+  // 2M input, 1M cache-read, 1M output at gemini-3.8-flash 1.50 / 0.15 / 7.50: 3.00 + 0.15 + 7.50 = 10.65
+  const { dir, file } = timelineFile(agyUsageSteps([1_500_000, 600_000, 400_000], [500_000, 400_000, 600_000]));
+  try {
+    const result = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", "gemini-3.8-flash-medium"], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /^- gemini-3\.8-flash-medium \(model source: argument\): 2\.000\.000 in \/ 1\.000\.000 out \/ n\/a cache-write \/ 1\.000\.000 cache-read -> approx \$10,65 \(estimate from list price, 2026-11-19; cached tokens at 0\.15 USD per 1M \(listed cached-input price\), counted in addition to input\)$/m);
+    assert.match(out, /^TOTAL approx \$10,65 \(estimate from list price, 2026-11-19\)$/m);
+    assert.match(out, /ESTIMATE from third-party list prices/);
+    assert.doesNotMatch(out, /unavailable/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --row --antigravity-transcript picks the LONGEST listed name that prefixes the model (flash-lite is not the pro price)", () => {
+  // gemini-3.1-flash-lite-low -> 0.25 / 0.025 / 1.50: 1M x 0.25 + 4M x 0.025 + 1M x 1.50 = 0.25 + 0.10 + 1.50 = 1.85
+  const { dir, file } = timelineFile(agyUsageSteps([1_000_000, 4_000_000, 1_000_000]));
+  try {
+    const result = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", "gemini-3.1-flash-lite-low"], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /-> approx \$1,85 \(estimate from list price, 2026-11-19; cached tokens at 0\.025 USD per 1M/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --row --antigravity-transcript keeps the dollar half unavailable, with the reason, for a model without a list price", () => {
+  const { dir, file } = timelineFile(agyUsageSteps([1000, 100, 10]));
+  try {
+    for (const model of ["gemini-9-ultra", "gemini-3.8-flashy", "flash"]) {
+      const result = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", model], { cwd: dir });
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, new RegExp(`^- ${model} \\(model source: argument\\): 1\\.000 in / 10 out / n/a cache-write / 100 cache-read -> \\$ unavailable \\(no list price for ${model}\\)$`, "m"));
+      assert.match(result.stdout, /^TOTAL: n\/a \(no model with known price\)$/m);
+      assert.doesNotMatch(result.stdout, /approx/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --row --antigravity-transcript names the configured implement route as the model source when no --model is passed", (t) => {
+  const root = join(dirname(CLI_PATH), "..", "..", "..");
+  const routing = readProjectRouting(root);
+  if (routing.source !== "project") return t.skip("this checkout has no valid pipeline.user.yaml, so there is no configured route to read");
+  const model = routing.routing.duties.implement.antigravity.selector.value;
+  const { dir, file } = timelineFile(agyUsageSteps([1_000_000, 0, 1_000_000]));
+  try {
+    const result = run(["--row", "S1/B11", "--antigravity-transcript", file], { cwd: root });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`^- ${escapeRe(model)} \\(model source: configured route\\): `, "m"));
+    assert.match(result.stdout, /-> (approx \$[0-9.,]+ \(estimate from list price, 2026-11-19;|\$ unavailable \(no list price for )/);
+    const overridden = run(["--row", "S1/B11", "--antigravity-transcript", file, "--model", "gemini-3.1-pro"], { cwd: root });
+    assert.match(overridden.stdout, /^- gemini-3\.1-pro \(model source: argument\): .* -> approx \$14,00 \(estimate/m, "the argument wins over the configured route: 1M x 2.00 + 0 + 1M x 12.00 = 14.00");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 usage-ledger --model is refused for a Codex row and for a malformed value, naming the runnable form", () => {
+  const { dir, file } = timelineFile(agyUsageSteps([10, 1, 2]));
+  try {
+    const withCodex = run(["--row", "S1", "--codex-rollout", file, "--model", "gemini-3.8-flash"], { cwd: dir });
+    const noValue = run(["--row", "S1", "--antigravity-transcript", file, "--model"], { cwd: dir });
+    const badValue = run(["--row", "S1", "--antigravity-transcript", file, "--model", "bad name!"], { cwd: dir });
+    const twice = run(["--row", "S1", "--antigravity-transcript", file, "--model", "a", "--model", "b"], { cwd: dir });
+    for (const result of [withCodex, noValue, badValue, twice]) {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /--model/);
+      assert.match(result.stderr, /Runnable form: node plugins\/pipeline-core\/scripts\/usage-ledger\.mjs --row "<label>"/);
+      assert.doesNotMatch(result.stderr, new RegExp(escapeRe(dir)));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B11 the default Claude --row output stays byte-identical", () => {
+  const root = buildFixture();
+  try {
+    const result = run([root, "--session", SESSION_ID, "--row", "Test Row"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, [
+      "Session/Block: Test Row",
+      "Tokens per `/usage` (collected, script):",
+      "- claude-sonnet-5: 40 in / 16 out / 0 cache-write / 0 cache-read -> $0,00 (estimated)",
+      "TOTAL ≈ $0,00 (estimated)",
+      "",
+      "Notes: $ values estimated, price table asOf 2026-07-02 (model-prices.json); cache TTL per model taken from the transcript (ephemeral_5m/1h) where present, otherwise 5m rate assumed (declared assumption).",
+      "",
+      "Turns / tool calls per `/usage` (collected, script):",
+      "- claude-sonnet-5 / main: 3 turn(s) / 3 tool call(s)",
+      "- claude-sonnet-5 / subagent:agent-abc123: 1 turn(s) / 1 tool call(s)",
+      "TOTAL: 4 turn(s) / 4 tool call(s)",
+      "",
+    ].join("\n"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

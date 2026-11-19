@@ -55,8 +55,8 @@
     {
       "topic": "Telemetry row at close",
       "claude": "`usage-ledger.mjs`",
-      "codex": "token-only row: `usage-ledger.mjs --row <label> --codex-rollout <file>` (price prints n/a)",
-      "antigravity": "token-only row: `usage-ledger.mjs --row <label> --antigravity-transcript <file>` (no dollar half)",
+      "codex": "token row plus an estimated dollar half from list prices (labelled): `usage-ledger.mjs --row <label> --codex-rollout <file>`",
+      "antigravity": "token row plus an estimated dollar half from list prices (labelled): `usage-ledger.mjs --row <label> --antigravity-transcript <file> [--model <name>]`",
       "owner": "skills/close-feature/SKILL.md"
     },
     {

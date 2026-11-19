@@ -48,18 +48,24 @@ node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --l
 ```
 
 (Windows: `"%USERPROFILE%\.claude\projects"`.) This reader understands the Claude Code transcript layout
-only. On Antigravity use the token-only route instead, with the session's brain transcript file
+only. On Antigravity use the transcript route instead (a token row plus an estimated dollar half from list prices (labelled)), with the session's brain transcript file
 (`.system_generated/logs/transcript.jsonl`) as the argument:
 
 ```
-node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<feature-id>" --antigravity-transcript <transcript-file>
+node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<feature-id>" --antigravity-transcript <transcript-file> [--model <name>]
 ```
 
-It prints the summed input, output and cache-read tokens of the model steps under the model key
-`antigravity-unrecorded`, with the dollar half marked "unavailable (model not recorded in this
-transcript)"; never add an estimate. On Codex use the same shape with the session's rollout file
-(`--codex-rollout <transcript-file>`): it prints the last cumulative token total under the model the
-rollout names, with the dollar half "n/a (price unknown)". A transcript without a usable token record
+It prints the summed input, output and cache-read tokens of the model steps. The transcript records no
+model, so the model is `--model <name>` when you pass it, else the project's configured implement route
+(`pipeline.user.yaml`); the printed row says which one named it ("model source: argument" or
+"configured route"). The dollar half is an estimate from the list-price table
+`plugins/pipeline-core/config/model-list-prices.json`: it always reads "approx $X (estimate from list
+price, <date>; cached tokens at ...)" and is never an exact or billed figure. With no model it says
+"model not recorded; pass --model <name>" and with a model that has no listed price "no list price for
+<model>"; copy that sentence into the close report as it is. On Codex use the same shape with the
+session's rollout file (`--codex-rollout <transcript-file>`): it prints the last cumulative token total
+under the model the rollout names ("model source: observed") with the same labelled estimate (API
+dollar list price, not ChatGPT credits). A transcript without a usable token record
 prints the skip sentence and exits 0; say in the close report that the telemetry row is unavailable
 for it. Do not point the Claude command at another runner's directory and do not invent a row.
 With several project directories under the Claude root, name the directory

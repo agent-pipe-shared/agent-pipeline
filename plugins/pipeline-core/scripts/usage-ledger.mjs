@@ -15,10 +15,12 @@
  * so this script must never assume a path.
  *
  * Read-only: this script only opens transcript files for reading; it never writes,
- * modifies or deletes anything under the transcripts root. The optional `--prices`
- * file is the only other file this script reads (default: `model-prices.json` next
+ * modifies or deletes anything under the transcripts root. Besides the transcript files it
+ * reads: the optional `--prices` file (Claude path; default: `model-prices.json` next
  * to this script, resolved from the script's own location — never the process cwd —
- * so the default works regardless of the invoking directory).
+ * so the default works regardless of the invoking directory), and, for the
+ * Antigravity/Codex rows only, the list-price table `../config/model-list-prices.json`
+ * and (Antigravity without `--model`) `pipeline.user.yaml` in the working directory.
  *
  * Two output modes:
  *   - Default (no `--row`): full markdown table to stdout, one row per
@@ -37,11 +39,15 @@
  *     below. Same discipline as the token half: no transcript content, no
  *     absolute path, nothing written to disk — counts only, printed to stdout.
  *
- *   - `--row [label] --antigravity-transcript <file>` (exclusive, takes no root): a token-only close row for ONE Antigravity brain
- *     transcript (input, output and cache-read tokens summed over its model steps, one synthetic model key
- *     `antigravity-unrecorded`). The transcript records no model, so the dollar half prints "unavailable" and is never estimated.
- *   - `--row [label] --codex-rollout <file>` (same shape): the last complete cumulative token total of ONE Codex rollout under the
- *     model named in its `turn_context`; no Codex price exists, so the dollar half prints "n/a (price unknown)".
+ *   - `--row [label] --antigravity-transcript <file> [--model <name>]` (exclusive, takes no root): a token row for ONE Antigravity brain
+ *     transcript (input, output and cache-read tokens summed over its model steps). The transcript records no model, so the model is
+ *     `--model`, else the project's configured implement route (`pipeline.user.yaml`, read from the working directory); with neither
+ *     the row says "model not recorded; pass --model <name>" and prints no dollar figure.
+ *   - `--row [label] --codex-rollout <file>` (same shape, no `--model`): the last complete cumulative token total of ONE Codex rollout
+ *     under the model named in its `turn_context`.
+ *     For both, the dollar half is an ESTIMATE from the labelled list-price table `../config/model-list-prices.json` (third-party
+ *     list prices, never printed as exact: "approx" and the table's asOf date are always shown); a model without a listed price
+ *     leaves the dollar half unavailable with the reason "no list price for <model>".
  *
  *   - `--timeline <transcript-file> [--json]` (exclusive with `--row` and `--metering`; takes no root): the run
  *     timeline of ONE session file in any of the three runner formats (Claude project JSONL, Codex rollout JSONL,
@@ -130,6 +136,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { USAGE_ATTRIBUTION_LIMITS, UsageIngestionError, summarizeUsageAttribution } from "../lib/runner-usage-v1.mjs";
+import { readProjectRouting } from "../lib/runner-profiles-v3.mjs";
 
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Composite map-key separator: project dir names and Windows paths can never
@@ -141,11 +148,13 @@ const KEY_SEP = "::";
 // independent of the invoking cwd).
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
+// The labelled list-price table of the Antigravity and Codex rows (C31-B11); the Claude path above never reads it.
+const LIST_PRICES_PATH = path.join(SCRIPT_DIR, "..", "config", "model-list-prices.json");
 
 function usage(msg) {
   if (msg) console.error(msg);
   console.error(
-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json] | --row [label] --antigravity-transcript|--codex-rollout <transcript-file>",
+    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json] | --row [label] --antigravity-transcript <transcript-file> [--model <name>] | --row [label] --codex-rollout <transcript-file>",
   );
   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
   console.error(
@@ -552,28 +561,101 @@ function readTranscriptRecords(file, failMessage) {
 }
 
 // C31-B5 (AC-112, lane L17): `--row [label] --antigravity-transcript <file>` and `--row [label] --codex-rollout <file>` print a
-// token-only close row for ONE transcript of those runners. Counts only: no path, no transcript text, and no dollar figure is ever
-// estimated. A file without a usable token record prints the same sentence as an empty `--row` and exits 0 (a missing row never fails a close).
-//   antigravity  the step reader sums input, output and cache-read tokens per model step; the transcript names no model, so one
-//                synthetic model key stands in and the dollar half reads "unavailable".
+// token row for ONE transcript of those runners. Counts only: no path, no transcript text. C31-B11 (PO decision 2026-11-19): the dollar
+// half is an ESTIMATE from the labelled list-price table (LIST_PRICES_PATH), always printed as "approx" with the table's asOf date and
+// never as exact; with no usable model or no listed price it stays unavailable and says why. A file without a usable token record prints
+// the same sentence as an empty `--row` and exits 0 (a missing row never fails a close).
+//   antigravity  the step reader sums input, output and cache-read tokens per model step; the transcript names no model, so the model is
+//                the `--model` argument, else the project's configured implement route; cache-read tokens are counted IN ADDITION to
+//                input (whether input already includes them is not measured, so this is an upper bound).
 //   codex        the last complete cumulative `total_token_usage` of the rollout (the repository's own rule, runner-transcript-recovery
-//                `codexUsage`), the model name(s) from `turn_context`; no price exists for it, so the dollar half reads the existing
-//                "n/a (price unknown)". Whether input includes cached tokens is not measured, so the counters are printed as recorded.
+//                `codexUsage`), the model from `turn_context`; Codex defines `input_tokens` to include `cached_input_tokens`, so the
+//                uncached part is input minus cached.
 const TRANSCRIPT_ROW_FLAGS = ["--antigravity-transcript", "--codex-rollout"];
 const ROW_MODEL_RE = /^[A-Za-z0-9._-]{1,80}$/u;
 const isRowCounter = (value) => Number.isSafeInteger(value) && value >= 0;
 
-function antigravityRowLines(records) {
+function readListPrices() {
+  try {
+    const data = JSON.parse(readFileSync(LIST_PRICES_PATH, "utf8"));
+    return data !== null && typeof data === "object" && typeof data.asOf === "string" && data.models !== null && typeof data.models === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+// The longest listed name that is a prefix of the model (after the tier/effort suffix is dropped), cut at a "-" boundary so that
+// "gemini-3.8-flashy" never prices as "gemini-3.8-flash".
+const MODEL_TIER_SUFFIX_RE = /(?:-tiered)?-(?:minimal|low|medium|high|xhigh|max)$/u;
+function listPriceFor(table, model) {
+  if (table === null) return { reason: "list-price table unreadable: plugins/pipeline-core/config/model-list-prices.json" };
+  let name = model.toLowerCase();
+  while (MODEL_TIER_SUFFIX_RE.test(name)) name = name.replace(MODEL_TIER_SUFFIX_RE, "");
+  const listed = Object.keys(table.models).filter((key) => name === key || name.startsWith(`${key}-`)).sort((a, b) => b.length - a.length)[0];
+  if (listed === undefined) return { reason: `no list price for ${model}` };
+  const rates = table.models[listed];
+  const valid = rates !== null && typeof rates === "object" && [rates.input, rates.output].every((value) => Number.isFinite(value) && value >= 0)
+    && (rates.cachedInput === null || (Number.isFinite(rates.cachedInput) && rates.cachedInput >= 0));
+  return valid ? { rates } : { reason: `list price for ${model} is malformed in plugins/pipeline-core/config/model-list-prices.json` };
+}
+
+// The dollar half of one row: an estimate from the list price, or "$ unavailable (<reason>)". `cachedInsideInput` says whether the
+// cached counter is part of the input counter (Codex) or counted in addition to it (Antigravity, upper bound).
+function listPriceHalf(model, counts, cachedInsideInput) {
+  const table = readListPrices();
+  const found = listPriceFor(table, model);
+  if (!found.rates) return { priced: false, cell: `$ unavailable (${found.reason})` };
+  const { rates } = found;
+  const cacheRate = rates.cachedInput ?? rates.input;
+  const usd = estimateUsd(
+    { input: cachedInsideInput ? Math.max(0, counts.input - counts.cached) : counts.input, output: counts.output, cacheCreate5m: 0, cacheCreateUndetermined: 0, cacheCreate1h: 0, cacheRead: counts.cached },
+    { input: rates.input, output: rates.output, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: cacheRate },
+  );
+  const rule = `${rates.cachedInput === null ? `the input price, ${rates.input} USD per 1M (no cached price listed, upper bound)` : `${rates.cachedInput} USD per 1M (listed cached-input price)`}${cachedInsideInput ? "" : ", counted in addition to input"}`;
+  return { priced: true, asOf: table.asOf, cell: `approx $${fmtUsd(usd)} (estimate from list price, ${table.asOf}; cached tokens at ${rule})`, total: `TOTAL approx $${fmtUsd(usd)} (estimate from list price, ${table.asOf})` };
+}
+
+const ESTIMATE_NOTE = (asOf) => `the dollar half is an ESTIMATE from third-party list prices (table asOf ${asOf}, not verified against the vendor page, vendor pages win), not a billed amount`;
+
+// The model of an Antigravity row: `--model`, else the project's configured implement route for Antigravity (read from
+// `pipeline.user.yaml` in the working directory through the one route reader); null when neither names a model.
+function antigravityRowModel(modelArg) {
+  if (modelArg) return { model: modelArg, source: "argument" };
+  try {
+    const read = readProjectRouting(process.cwd());
+    const value = read.source === "project" ? read.routing.duties?.implement?.antigravity?.selector?.value : undefined;
+    if (typeof value === "string" && ROW_MODEL_RE.test(value)) return { model: value, source: "configured route" };
+  } catch {
+    // an unreadable routing file is the same as none: the row then says to pass --model
+  }
+  return null;
+}
+
+function antigravityRowLines(records, modelArg) {
   const steps = detectTimelineFormat(records) === "antigravity-steps"
     ? antigravityStepTimelineEvents(records).filter((event) => event.kind === "response" && event.usage && [event.usage.input, event.usage.output, event.usage.cacheRead].some((value) => value !== null))
     : [];
   if (steps.length === 0) return null;
   const sum = (key) => steps.reduce((total, event) => total + (event.usage[key] ?? 0), 0);
+  const counts = { input: sum("input"), output: sum("output"), cached: sum("cacheRead") };
+  const head = (key) => `- ${key}: ${fmtDe(counts.input)} in / ${fmtDe(counts.output)} out / n/a cache-write / ${fmtDe(counts.cached)} cache-read -> `;
+  const resolved = antigravityRowModel(modelArg);
+  if (resolved === null) {
+    return [
+      `${head("antigravity-unrecorded")}$ unavailable (model not recorded; pass --model <name>)`,
+      "TOTAL: n/a (no model recorded in this transcript, no dollar estimate)",
+      "",
+      `Notes: token row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; the transcript records no model and no implement route is configured for this project, so no price applies and no dollar figure is computed (pass --model <name>); cache-write is not recorded.`,
+    ];
+  }
+  const half = listPriceHalf(resolved.model, counts, false);
   return [
-    `- antigravity-unrecorded: ${fmtDe(sum("input"))} in / ${fmtDe(sum("output"))} out / n/a cache-write / ${fmtDe(sum("cacheRead"))} cache-read -> $ unavailable (model not recorded in this transcript)`,
-    "TOTAL: n/a (no model recorded in this transcript, no dollar estimate)",
+    `${head(`${resolved.model} (model source: ${resolved.source})`)}${half.cell}`,
+    half.priced ? half.total : "TOTAL: n/a (no model with known price)",
     "",
-    `Notes: token-only row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; the transcript records no model, so no price applies and no dollar figure is computed; cache-write is not recorded.`,
+    half.priced
+      ? `Notes: token row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; ${ESTIMATE_NOTE(half.asOf)}; the transcript records no model, so the model comes from the ${resolved.source}; whether input already includes cached tokens is not measured, so they are counted in addition (upper bound); cache-write is not recorded.`
+      : `Notes: token row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; no list price applies to the model, so no dollar figure is computed; cache-write is not recorded.`,
   ];
 }
 
@@ -588,19 +670,27 @@ function codexRowLines(records) {
     if (isTimelineObject(usageData) && ["input_tokens", "cached_input_tokens", "output_tokens"].every((key) => isRowCounter(usageData[key]))) total = usageData; // an invalid record never replaces a valid one
   }
   if (total === null) return null;
-  const model = models.size > 0 ? [...models].sort().join(", ") : "codex-unrecorded";
+  const names = [...models].sort();
+  const counts = { input: total.input_tokens, output: total.output_tokens, cached: total.cached_input_tokens };
+  const label = names.length > 0 ? `${names.join(", ")} (model source: observed)` : "codex-unrecorded";
+  const half = names.length === 1 ? listPriceHalf(names[0], counts, true)
+    : { priced: false, cell: `$ unavailable (${names.length === 0 ? "model not recorded in this rollout" : "several models in one rollout, no per-model split"})` };
   return [
-    `- ${model}: ${fmtDe(total.input_tokens)} in / ${fmtDe(total.output_tokens)} out / n/a cache-write / ${fmtDe(total.cached_input_tokens)} cache-read -> n/a (price unknown)`,
-    "TOTAL: n/a (no model with known price)",
+    `- ${label}: ${fmtDe(counts.input)} in / ${fmtDe(counts.output)} out / n/a cache-write / ${fmtDe(counts.cached)} cache-read -> ${half.cell}`,
+    half.priced ? half.total : "TOTAL: n/a (no model with known price)",
     "",
-    "Notes: token-only row from a Codex rollout, the last cumulative total of the session; whether input includes cached tokens (and output includes reasoning tokens) is not measured, so the counters are printed as recorded and no dollar figure is computed; cache-write is not recorded.",
+    half.priced
+      ? `Notes: token row from a Codex rollout, the last cumulative total of the session; ${ESTIMATE_NOTE(half.asOf)}; Codex counts cached tokens inside the input tokens, so only input minus cached is priced at the input price; output tokens include reasoning tokens as recorded; cache-write is not recorded.`
+      : "Notes: token row from a Codex rollout, the last cumulative total of the session; no usable list price applies, so no dollar figure is computed; cache-write is not recorded.",
   ];
 }
 
 function runTranscriptRow(args, flag) {
-  const form = `node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<label>" ${flag} <transcript-file>`;
+  const agy = flag === "--antigravity-transcript";
+  const form = `node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<label>" ${flag} <transcript-file>${agy ? " [--model <name>]" : ""}`;
   const refuse = (why) => usage(`${flag} is exclusive: ${why} Runnable form: ${form}`);
   let file;
+  let modelArg;
   let rowSeen = false;
   let label = "";
   for (let i = 0; i < args.length; i++) {
@@ -611,11 +701,16 @@ function runTranscriptRow(args, flag) {
       if (file !== undefined) refuse("name the transcript once.");
       file = args[++i];
       if (!file || file.startsWith("--")) refuse("a <transcript-file> value is required.");
-    } else refuse(`it accepts only --row [label] and ${flag} <file> (no transcripts root, no other flag).`);
+    } else if (args[i] === "--model") {
+      if (!agy) refuse("--model names the model of an Antigravity row and is accepted only with --antigravity-transcript (a Codex rollout records its own model).");
+      if (modelArg !== undefined) refuse("name --model once.");
+      modelArg = args[++i];
+      if (!modelArg || modelArg.startsWith("-") || !ROW_MODEL_RE.test(modelArg)) refuse("--model needs a model name of letters, digits, dot, dash or underscore (at most 80 characters).");
+    } else refuse(`it accepts only --row [label] and ${flag} <file>${agy ? " [--model <name>]" : ""} (no transcripts root, no other flag).`);
   }
   if (!rowSeen) refuse("--row is required.");
   const { records } = readTranscriptRecords(file, `usage-ledger ${flag}: ${flag.slice(2)}-unreadable. Pass an existing regular transcript file: ${form}`);
-  const rowLines = (flag === "--codex-rollout" ? codexRowLines : antigravityRowLines)(records);
+  const rowLines = agy ? antigravityRowLines(records, modelArg) : codexRowLines(records);
   const fragment = label ? [`Session/Block: ${label}`] : [];
   if (rowLines === null) fragment.push("Tokens per `/usage` (collected, script): no records found for the selected session/filter.");
   else fragment.push("Tokens per `/usage` (collected, script):", ...rowLines);

@@ -47,7 +47,10 @@ test("AC-239: the observation-boundary row exists per runner and claims no conta
   assert.ok(guide.includes(`| ${row.topic} | ${row.claude} | ${row.codex} | ${row.antigravity} |`), "the guide carries the same row");
 });
 
-test("AC-112: the telemetry row names the token-only Antigravity and Codex routes in the data, the guide and the close reference", () => {
+// C31-B11 restates this B7 case under QG-04 (criterion AC-112 unchanged; PO decision 2026-11-19): the Antigravity and Codex rows are no
+// longer "token-only, no dollar" but a token row plus a dollar half ESTIMATED from list prices and labelled as such. The cells must
+// say so ("estimate", "list prices") and still claim no concrete dollar figure.
+test("AC-112: the telemetry row names the Antigravity and Codex token routes with an estimated dollar half in the data, the guide and the close reference", () => {
   const row = readRunnerCapabilities().rows.find((candidate) => candidate.topic === "Telemetry row at close");
   assert.ok(row, "the Telemetry row at close exists");
   assert.match(row.claude, /usage-ledger\.mjs/u);
@@ -55,17 +58,24 @@ test("AC-112: the telemetry row names the token-only Antigravity and Codex route
   assert.match(row.codex, /--codex-rollout/u);
   for (const runner of ["codex", "antigravity"]) {
     assert.match(row[runner], /token/iu, `${runner} cell says token`);
-    assert.doesNotMatch(row[runner], /not available|\$\s?\d/u, `${runner} cell neither says not available nor claims a dollar figure`);
+    assert.match(row[runner], /estimated dollar half from list prices \(labelled\)/u, `${runner} cell says the dollar half is an estimate from list prices`);
+    assert.doesNotMatch(row[runner], /not available|no dollar|n\/a|\$\s?\d/u, `${runner} cell neither says not available nor claims a dollar figure`);
   }
   const guide = readFileSync(GUIDE, "utf8");
   const step = guide.split("\n").find((line) => line.startsWith("4. Telemetry row"));
   assert.ok(step, "the close step 4 telemetry line exists");
   assert.match(step, /--antigravity-transcript/u);
   assert.match(step, /--codex-rollout/u);
-  assert.doesNotMatch(step, /skip it/u);
+  assert.match(step, /estimated dollar half from list prices \(labelled\)/u);
+  assert.doesNotMatch(step, /skip it|no dollar/u);
   const close = readFileSync(join(PLUGIN, "skills", "close-block", "references", "close-light-and-extensions.md"), "utf8");
   assert.match(close, /--antigravity-transcript/u);
   assert.match(close, /--codex-rollout/u);
+  assert.match(close, /estimated dollar half from list prices \(labelled\)/u);
+  assert.doesNotMatch(close, /token-only row \(no dollar half\)/u);
+  const feature = readFileSync(join(PLUGIN, "skills", "close-feature", "SKILL.md"), "utf8");
+  assert.match(feature, /estimated dollar half from list prices \(labelled\)/u);
+  assert.doesNotMatch(feature, /token-only, no dollar|n\/a \(price unknown\)/u);
 });
 
 test("an owner that names a file in this plugin names one that ships", () => {

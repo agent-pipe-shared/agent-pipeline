@@ -1,0 +1,15 @@
+{
+  "$comment": "List-price table for the ESTIMATED dollar half of the Antigravity and Codex token rows of plugins/pipeline-core/scripts/usage-ledger.mjs (--row ... --antigravity-transcript|--codex-rollout). US dollars per million tokens. cachedInput null = cached tokens are priced at the input price (an upper bound). A model name is matched by the longest listed name that is a prefix of the observed or configured name (tier and effort suffixes such as -medium, -high, -low, -tiered-high are dropped first). Check every value against the vendor pages before relying on it; this table is NOT the Claude price table (scripts/model-prices.json, policies/model-policy.md section 6).",
+  "asOf": "2026-11-19",
+  "source": "third-party list-price trackers, 2026-11-19; not verified against the vendor page; estimate",
+  "note": "Every value is an estimate with low confidence. Vendor pages win: when a vendor page and this table disagree, the vendor page is right and this table is to be corrected.",
+  "models": {
+    "gpt-5.3-codex": { "input": 1.75, "cachedInput": 0.175, "output": 14.0, "note": "low confidence; API dollar list price, not ChatGPT credits" },
+    "gpt-5.2-codex": { "input": 1.75, "cachedInput": 0.175, "output": 14.0, "note": "low confidence; API dollar list price, not ChatGPT credits" },
+    "gpt-5-codex": { "input": 1.25, "cachedInput": null, "output": 10.0, "note": "low confidence; no cached-input price listed, cached tokens are priced at the input price (upper bound); API dollar list price, not ChatGPT credits" },
+    "gemini-3.8-flash": { "input": 1.5, "cachedInput": 0.15, "output": 7.5, "note": "low confidence; two conflicting listings exist, the higher one is used (PO decision 2026-11-19), the introductory 0.75 / 3.75 listing is not used" },
+    "gemini-3.6-flash": { "input": 1.5, "cachedInput": 0.15, "output": 7.5, "note": "low confidence; two conflicting listings exist, the higher one is used (PO decision 2026-11-19), the introductory 0.75 / 3.75 listing is not used" },
+    "gemini-3.1-pro": { "input": 2.0, "cachedInput": 0.2, "output": 12.0, "note": "low confidence; listed for prompts up to 200K context" },
+    "gemini-3.1-flash-lite": { "input": 0.25, "cachedInput": 0.025, "output": 1.5, "note": "low confidence" }
+  }
+}
