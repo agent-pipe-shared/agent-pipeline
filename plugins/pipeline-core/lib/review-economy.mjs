@@ -193,7 +193,8 @@ const DELTA_BINDING_FORMS = Object.freeze({
   changedPaths: "a non-empty list of repository-relative paths (derived from the range by the registration verb)",
   changedBehaviorClaims: "a non-empty list of bare ids of letters, digits, dot, underscore and hyphen; when it is not supplied the verb derives it from the invariant ids of pathInvariantMap, so an invalid id there fails here",
   priorReceipt: "an object { id, sha256 } of the previous consumed round (derived by the registration verb)",
-  pathInvariantMap: "an object that maps every changed path to a non-empty list of invariant ids made of letters, digits, dot, underscore and hyphen, without duplicates in one list",
+  evidencePaths: "a duplicate-free list of changed paths that the course classified as registered pipeline evidence (derived from the range by the course admission, never typed); absent means none",
+  pathInvariantMap: "an object that maps every changed path other than the registered pipeline evidence paths to a non-empty list of invariant ids made of letters, digits, dot, underscore and hyphen, without duplicates in one list",
   pathInvariantMapSha256: "the sha256 of the canonical pathInvariantMap (derived by the registration verb; a request file edited by hand fails here: write a new one)",
   coordinatorImpactConfirmed: "true (the Coordinator confirmed the impact)",
   trustBoundaryChanged: "true or false, or absent (it no longer steers a round)",
@@ -225,6 +226,9 @@ export function admitReviewAttempt(input) {
     ["head", () => SHA40.test(input.head ?? "")],
     ["tree", () => SHA40.test(input.tree ?? "")],
     ["changedPaths", () => Array.isArray(input.changedPaths) && input.changedPaths.length > 0 && input.changedPaths.every((path) => validRepoPath(path))],
+    // C31-M11 (L10a): the paths the course classified as registered pipeline evidence stay in changedPaths and need no invariant key. Absent means none (the strict rule).
+    ["evidencePaths", () => input.evidencePaths === undefined || (Array.isArray(input.evidencePaths) && new Set(input.evidencePaths).size === input.evidencePaths.length
+      && input.evidencePaths.every((path) => input.changedPaths.includes(path)))],
     ["changedBehaviorClaims", () => Array.isArray(input.changedBehaviorClaims) && input.changedBehaviorClaims.length > 0
       && input.changedBehaviorClaims.every((claim) => typeof claim === "string" && SAFE_ID.test(claim))],
     ["priorReceipt", () => isObject(input.priorReceipt) && exactKeys(input.priorReceipt, ["id", "sha256"])
@@ -243,7 +247,8 @@ export function admitReviewAttempt(input) {
   if (input.impactAmbiguous === true) {
     return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-FULL", reason: "impact-ambiguous", affectedInvariantIds: [] };
   }
-  const unknown = input.changedPaths.filter((path) => !Object.hasOwn(input.pathInvariantMap, path));
+  const evidence = new Set(input.evidencePaths ?? []);
+  const unknown = input.changedPaths.filter((path) => !evidence.has(path) && !Object.hasOwn(input.pathInvariantMap, path));
   if (unknown.length > 0) {
     return { ok: false, mode: null, code: "RE-DELTA-UNKNOWN-PATH", reason: `the changed path(s) ${unknown.join(", ")} have no entry in the field pathInvariantMap of the delta request; give each an entry "<path>": ["<invariant-id>"] in the input file and register the request again: ${DELTA_REGISTER_COMMAND}`, affectedInvariantIds: [] };
   }
@@ -251,7 +256,7 @@ export function admitReviewAttempt(input) {
     ok: true,
     mode: "delta",
     code: "RE-DELTA-ADMITTED",
-    affectedInvariantIds: sortedUnique(input.changedPaths.flatMap((path) => input.pathInvariantMap[path])),
+    affectedInvariantIds: sortedUnique(input.changedPaths.filter((path) => Object.hasOwn(input.pathInvariantMap, path)).flatMap((path) => input.pathInvariantMap[path])),
   };
 }
 

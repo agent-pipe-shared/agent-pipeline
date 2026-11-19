@@ -141,7 +141,7 @@ export function criticCourseParentRepair({ detail, candidate, specPath }) {
     steps: Object.freeze([
       Object.freeze({ step: 1, command: `node ${scripts}/session-critic-finalizer.mjs inspect-course-takeover --root <root> --request scratch/takeover-inspect.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-inspect-request.v1\",\"featureId\":\"<feature>\"} (the verb's --help prints the shape). Copy the printed digestSha256. If it reports CGB-TAKEOVER-COURSE there is no unregistered round: skip step 2." }),
       Object.freeze({ step: 2, command: `node ${scripts}/session-critic-finalizer.mjs supersede-course-takeover --root <root> --request scratch/takeover-supersede.json`, note: "Request file {\"schema\":\"pipeline.session-critic-course-takeover-supersede-request.v1\",\"featureId\":\"<feature>\",\"digestSha256\":\"<digest from step 1>\",\"reason\":\"<short reason>\"}. It retires only the rounds above the registered lineage." }),
-      Object.freeze({ step: 3, command: `node ${scripts}/register-feature-package.mjs --root <root> --add-delta-request <input.json>`, note: "Prints deltaRequestPath and commitPaths: commit both, the commit is the registration commit. The input file lists changedBehaviorClaims, pathInvariantMap, coordinatorImpactConfirmed and impactAmbiguous; run it once to read the changed paths a map must cover." }),
+      Object.freeze({ step: 3, command: `node ${scripts}/register-feature-package.mjs --root <root> --add-delta-request <input.json>`, note: "Prints deltaRequestPath and commitPaths: commit both, the commit is the registration commit. The input file requires coordinatorImpactConfirmed and impactAmbiguous; pathInvariantMap (an invariant id list for each changed source path; the registered pipeline evidence paths of the range need no entry) and changedBehaviorClaims (derived from the map) are optional; name an input file that does not exist yet and the command writes a skeleton of the changed paths." }),
       Object.freeze({ step: 4, command: `node ${scripts}/critic-dispatch-preflight.mjs --root <root> --base ${detail.expectedBase} --candidate ${candidate} --spec ${specPath} --evidence <evidence> --registration-commit <registration commit of step 3> --delta-request <delta request path printed by step 3> --correction-input-bindings <bindings file>`, note: "<bindings file>: node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-correction-input-bindings.mjs derive --root <root> --base <expectedBase> --head <candidate> --out <file under scratch/>." }),
     ]),
   });
@@ -1027,6 +1027,31 @@ function carryProof(root,commit,featureId,from,fromTree,to){
   if(!changed.every(p=>p===manifestPath||registered.has(p)))return null;
   return {schema:'pipeline.critic-diagnostic-evidence-carry.v1',from,fromTree,to:to.commit,toTree:to.tree,rangeCommits:commits};
  }catch{return null;}}
+/**
+ * C31-M11 (L10a part 1; AC-112 is the closest accepted criterion): which changed paths of a delta range are registered pipeline evidence, derived from the ONE per-commit
+ * definition of "evidence-only" (`classifyEvidenceOnlyCommit` with the `followers` profile: manifest registrations, exports of consumed reviews, disposition addenda;
+ * plus `evidenceCommitV2`, the registration rule the course counters already use). A path is evidence only if EVERY commit of base..candidate that touches it is evidence-only,
+ * so a source file, a lookalike file name the classifier does not list, or a manifest whose core a correction commit also changed is behaviour and keeps today's strict rule.
+ * Any doubt (a merge, an unreadable range or feature) exempts nothing. Nothing is stored: `changedPaths` stays the full list the Critic sees; only the invariant key requirement goes.
+ */
+export function splitCriticDeltaChangedPaths({repoRoot,featureId,baseCommit,candidateCommit,changedPaths}){
+ const strict={behaviourPaths:Array.isArray(changedPaths)?[...changedPaths]:[],evidencePaths:[]};
+ try{
+  if(!Array.isArray(changedPaths)||!changedPaths.every(safe)||![baseCommit,candidateCommit].every(v=>OID.test(v??''))||!FEATURE_ID.test(featureId??''))return strict;
+  const root=realpathSync(repoRoot),evidence=new Set(),behaviour=new Set();
+  for(const commit of range(root,baseCommit,candidateCommit)){
+   const parents=gitBytes(root,['rev-list','--parents','-n','1',commit],'CCA-RANGE-READ').toString('utf8').trim().split(/\s+/u);if(parents.length!==2)return strict;
+   const names=gitBytes(root,['diff','--name-only','-z','--no-renames',parents[1],commit,'--'],'CCA-RANGE-READ').toString('utf8').split('\0').filter(Boolean);
+   // The course's registration rule accepts any registered path; for the key exemption it is confined to the manifest and the feature's own evidence directory.
+   const own=name=>name===`specs/${featureId}/lifecycle.json`||name.startsWith(`specs/${featureId}/evidence/`);
+   const only=classifyEvidenceOnlyCommit({repoRoot:root,featureId,commit,profile:EVIDENCE_ONLY_PROFILES.followers})!==null||(names.every(own)&&(()=>{try{return evidenceCommitV2(root,commit,featureId);}catch{return false;}})());
+   for(const name of names)(only?evidence:behaviour).add(name);
+  }
+  const evidencePaths=changedPaths.filter(path=>evidence.has(path)&&!behaviour.has(path));
+  return {behaviourPaths:changedPaths.filter(path=>!evidencePaths.includes(path)),evidencePaths};
+ }catch{return strict;}}
+// A delta map must key every behaviour path and nothing that is not a changed path; an evidence path may be keyed (the registration verb still writes such maps) but need not be.
+function mapCovers(keys,behaviourPaths,changedPaths){return Array.isArray(keys)&&keys.every(safe)&&keys.every(key=>changedPaths.includes(key))&&behaviourPaths.every(path=>keys.includes(path));}
 function parentProjection(row){return row?{reviewId:row.record.reviewId,recordSha256:row.record.recordSha256,packetId:row.record.request.packetId,receiptSha256:row.consumed.receiptSha256}:null;}
 function requestRead(input,resolved,history,source,evidence){const id=resolved.courseIdentity.originalFeatureId;
  const registered=registeredArtifact(resolved.resolvedRepository.repoRoot,input.registrationCommit,id,input.deltaRequestPath);
@@ -1034,15 +1059,16 @@ function requestRead(input,resolved,history,source,evidence){const id=resolved.c
  if(!exactOptionalTrust(request,V2_DELTA_KEYS)||request.schema!=='pipeline.critic-delta-request.v1'||canonicalJson(request)!==registered.blob.bytes.toString('utf8')||input.deltaRequestPath!==`specs/${id}/evidence/critic-delta-request-${registered.blob.sha256}.json`)fail('CCA-DELTA-SHAPE');
  const identity=resolved.courseIdentity;
  if(request.featureId!==id||request.manifestPath!==identity.manifestPath||request.courseKey!==identity.courseKey||request.acceptedEnvelopeSha256!==identity.envelopeSha256||request.genesisRecordSha256!==identity.genesisRecordSha256||request.historySha256!==source.historySha256||!equal(request.parent,parentProjection(history.at(-1)))||!equal(request.candidate,source.candidate)||!exactSet(request.changedPaths,source.changedPaths)||!equal(request.deterministicEvidence,evidence.entries))fail('CCA-DELTA-BINDING');
- if(!exactSet(Object.keys(request.pathInvariantMap??{}),source.changedPaths))fail('CCA-DELTA-MAP');
- return {request,requestSha256:registered.blob.sha256,registration:registered.registration,parentConsumed:history.at(-1)?.consumed??null,source};}
+ const split=splitCriticDeltaChangedPaths({repoRoot:resolved.resolvedRepository.repoRoot,featureId:id,baseCommit:source.candidate.base,candidateCommit:source.candidate.commit,changedPaths:source.changedPaths});
+ if(!mapCovers(Object.keys(request.pathInvariantMap??{}),split.behaviourPaths,source.changedPaths))fail('CCA-DELTA-MAP');
+ return {request,requestSha256:registered.blob.sha256,registration:registered.registration,parentConsumed:history.at(-1)?.consumed??null,source,evidencePaths:split.evidencePaths};}
 export function readRegisteredCriticDeltaRequest(input){try{if(!exact(input,['repoRoot','candidateCommit','registrationCommit','requestPath','resolvedCourse']))fail('CCA-DELTA-READ-SHAPE');const r=input.resolvedCourse,h=consumedHistory(r),last=h.at(-1);if(!last)fail('CCA-DELTA-PARENT');const request={...input,baseCommit:last.record.candidate.commit,deltaRequestPath:input.requestPath};const source=runtimeSource(request,r),evidence=deterministic(input.repoRoot,input.registrationCommit,r.courseIdentity.originalFeatureId,source.candidate);return ok(requestRead(request,r,h,source,evidence));}catch(error){return refused(error);}}
 export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,consumedHistory:history,deltaRequest,deterministicEvidence:evidence,budgets}){
  const source=bound.source,identity=bound.courseIdentity,parent=parentProjection(history.at(-1));
  const acceptance=acceptedCriterion?.ok?{basis:acceptedCriterion.acceptance.authorityBasis,cryptographicallyAuthenticated:acceptedCriterion.acceptance.cryptographicallyAuthenticated,envelopeSha256:acceptedCriterion.acceptance.envelopeSha256,criterionSourcePath:acceptedCriterion.source.path,criterionSourceSha256:acceptedCriterion.source.sha256,criterionId:acceptedCriterion.locator.criterionId,criterionExcerptSha256:acceptedCriterion.locator.excerptSha256,criterionParserVersion:acceptedCriterion.criterion.parserVersion??'pipeline.critic-criterion-parser.v1',sourceBindingsSha256:acceptedCriterion.acceptance.bindingSha256}:null;
  const projection={schema:'pipeline.critic-course-admission.v2',courseIdentity:identity,source,parent,acceptance,deltaRequestSha256:deltaRequest?.requestSha256??null,deterministicEvidenceSha256:evidence?.sha256??null,budgets,decision:{status:'refused',mode:null,code:'RE-COURSE-INCOMPLETE',affectedInvariantIds:[]}};
  const last=history.at(-1);if(!deltaRequest && last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
- const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,...withTrust(d),impactAmbiguous:d.impactAmbiguous}:{})};
+ const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,...withTrust(d),impactAmbiguous:d.impactAmbiguous,...(deltaRequest.evidencePaths?.length>0?{evidencePaths:deltaRequest.evidencePaths}:{})}:{})};
  const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,...(admission.reason?{reason:admission.reason}:{}),affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
 // PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
 // otherwise the first commit of base..candidate whose manifest lists it (a manifest read error counts as not listing it).

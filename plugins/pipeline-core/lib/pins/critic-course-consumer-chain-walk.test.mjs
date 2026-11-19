@@ -160,7 +160,9 @@ function deltaRequestViaSkeleton(root, claims, flags, observed = {}) {
   const skeletonBytes = readFileSync(join(root, inputPath));
   const skeleton = JSON.parse(skeletonBytes.toString("utf8"));
   assert.deepEqual(Object.keys(skeleton), ["pathInvariantMap"], "the skeleton carries the path map only; no judgment field is filled, defaulted or inferred");
-  assert.ok(Object.keys(skeleton.pathInvariantMap).length > 0 && Object.values(skeleton.pathInvariantMap).every((list) => Array.isArray(list) && list.length === 0), "every changed path maps to an empty list");
+  // QG-04 restatement (C31-M11; the pin was already red at the base clone since C31-M2): a path whose invariant ids this course registered already carries them (nothing is invented), every other path maps to an empty list.
+  // What stays pinned: every changed path is listed and every list is an array of non-empty id strings (empty when the course knows no id for the path).
+  assert.ok(Object.keys(skeleton.pathInvariantMap).length > 0 && Object.values(skeleton.pathInvariantMap).every((list) => Array.isArray(list) && list.every((id) => typeof id === "string" && id !== "")), "every changed path maps to a list of registered ids, empty when the course registered none");
   // The skeleton never makes the verb succeed, and an existing file is never overwritten.
   const again = addCriticDeltaRequest({ root, inputPath });
   assert.equal(again.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(again));

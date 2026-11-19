@@ -1138,13 +1138,13 @@ const pf94WriteInput = (fx, value) => {
 const pf94WantsFullRound = (fx, inputPath) => { try { const input = JSON.parse(readFileSync(join(fx.root, inputPath), "utf8")); return input?.trustBoundaryChanged === true || input?.impactAmbiguous === true; } catch { return false; } };
 const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath, confirmFullRound: pf94WantsFullRound(fx, inputPath) });
 /** Failing round, lineage registered and committed, a correction commit; with diagnostic=true the correction diagnostic is produced and registered the way PF94 LINEAGE (g) does. */
-function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true, verdict = null } = {}) {
+function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true, verdict = null, extraCorrectionFiles = {} } = {}) {
   const fx = consumedCourseRoundFixture({ failing, verdict });
   let lineageAdded = null;
   if (lineage) { lineageAdded = pf94Written(fx); assert.equal(lineageAdded.status, "written", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
   else pf94Unwritten(fx); // no registered lineage yet: the tree an older build leaves (D223)
   let correctionCommit = null, evidenceRegistration = null;
-  if (correction) { mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n"); correctionCommit = pf94Commit(fx.root, "correction after the failing round"); }
+  if (correction) { mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n"); for (const [path, text] of Object.entries(extraCorrectionFiles)) { mkdirSync(dirname(join(fx.root, path)), { recursive: true }); writeFileSync(join(fx.root, path), text); } correctionCommit = pf94Commit(fx.root, "correction after the failing round"); }
   if (correction && diagnostic) {
     const specPath = `specs/${fx.featureId}/spec.md`, logPath = `specs/${fx.featureId}/evidence/targeted-correction.log`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`, capturedPath = `evidence/${fx.featureId}-targeted-correction.log`;
     const produced = produceCriticDiagnostic({ root: fx.root, candidate: correctionCommit, specPath, guardrailPaths: pf94Guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
@@ -1174,6 +1174,86 @@ test("PF94 DELTA (a) after the lineage, the correction and its diagnostic, the v
   assert.equal(after.decision.mode, "delta");
   assert.equal(after.decision.code, "RE-DELTA-ADMITTED");
   assert.deepEqual(after.decision.affectedInvariantIds, ["inv-one"]);
+});
+// C31-M11 (L10a part 1; AC-112 is the closest accepted criterion): the registered pipeline evidence of a correction range (the lineage file, the manifest registration) needs no pathInvariantMap key.
+// The registration verb is not part of this change, so the request is compiled and registered here with prepareRegisteredCriticDeltaRequest, the function the verb calls.
+import * as m11Cca from "./critic-course-admission.mjs";
+function m11RegisterDelta(fx, map) {
+  const head = git(fx.root, ["rev-parse", "HEAD"]);
+  const claims = [...new Set(Object.values(map).flat())].sort();
+  const prepared = m11Cca.prepareRegisteredCriticDeltaRequest({ courseRequest: { repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null }, changedBehaviorClaims: claims, pathInvariantMap: map, coordinatorImpactConfirmed: true, impactAmbiguous: false, deterministicEvidencePaths: null });
+  assert.equal(prepared.ok, true, JSON.stringify(prepared));
+  const { descriptor, artifact } = prepared.value;
+  writeFileSync(join(fx.root, artifact.path), artifact.bytes);
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  manifest.artifacts.push(artifact.registration);
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
+  const registration = pf94CommitPaths(fx.root, [fx.manifestPath, artifact.path], "register the delta request");
+  const admission = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration, requestedMode: "delta", deltaRequestPath: artifact.path });
+  return { descriptor, deltaRequestPath: artifact.path, registration, admission };
+}
+const m11Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.candidate, fx.correctionCommit, "--"]).split("\n").filter(Boolean).sort();
+const m11Split = (fx) => m11Cca.splitCriticDeltaChangedPaths({ repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, changedPaths: m11Changed(fx) });
+test("C31-M11-1: a delta over a range that also changes the lineage file and the manifest is admitted with a map that has no key for them; the Critic still sees them as changed paths", () => {
+  const fx = pf94DeltaFixture();
+  const changed = m11Changed(fx);
+  const lineage = changed.filter((path) => path.startsWith(`specs/${fx.featureId}/evidence/critic-lineage-`));
+  assert.equal(lineage.length, 1, changed.join(", "));
+  assert.ok(changed.includes(fx.manifestPath) && changed.includes("src/fix.mjs"), changed.join(", "));
+  // The registered diagnostic of the base round and its log are registered evidence as well: every changed path except the source file.
+  assert.deepEqual(m11Split(fx), { behaviourPaths: ["src/fix.mjs"], evidencePaths: changed.filter((path) => path !== "src/fix.mjs") });
+  assert.ok(m11Split(fx).evidencePaths.includes(fx.manifestPath) && m11Split(fx).evidencePaths.includes(lineage[0]));
+  const done = m11RegisterDelta(fx, { "src/fix.mjs": ["inv-one"] });
+  assert.deepEqual(Object.keys(done.descriptor.pathInvariantMap), ["src/fix.mjs"]);
+  assert.deepEqual([...done.descriptor.changedPaths].sort(), changed);
+  assert.equal(done.admission.decision.status, "admitted", JSON.stringify(done.admission.decision));
+  assert.equal(done.admission.decision.mode, "delta");
+  assert.equal(done.admission.decision.code, "RE-DELTA-ADMITTED");
+  assert.deepEqual(done.admission.decision.affectedInvariantIds, ["inv-one"]);
+});
+test("C31-M11-2: a changed source path without an invariant is still refused CCA-DELTA-MAP, even when every evidence path is keyed", () => {
+  const fx = pf94DeltaFixture();
+  const done = m11RegisterDelta(fx, Object.fromEntries(m11Changed(fx).filter((path) => path !== "src/fix.mjs").map((path) => [path, ["inv-one"]])));
+  assert.equal(done.admission.decision.status, "refused", JSON.stringify(done.admission.decision));
+  assert.equal(done.admission.decision.code, "CCA-DELTA-MAP", JSON.stringify(done.admission.decision));
+});
+test("C31-M11-3: a path under an evidence-looking name that the classifier does not list is behaviour: it needs its key, with the same strict rule as before", () => {
+  const lookalikes = { [`specs/held-feature/evidence/critic-lineage-forged.json`]: "{}\n", "backlog/evidence/forged-addendum-note.md": "an addendum-looking note nobody registered\n", [`specs/held-feature/evidence/targeted-notes.log`]: "note\n" };
+  const fx = pf94DeltaFixture({ extraCorrectionFiles: lookalikes });
+  const split = m11Split(fx);
+  for (const path of Object.keys(lookalikes)) assert.ok(split.behaviourPaths.includes(path) && !split.evidencePaths.includes(path), `${path}: ${JSON.stringify(split)}`);
+  assert.ok(split.evidencePaths.includes(fx.manifestPath), JSON.stringify(split));
+  const missing = m11RegisterDelta(fx, { "src/fix.mjs": ["inv-one"] });
+  assert.equal(missing.admission.decision.code, "CCA-DELTA-MAP", JSON.stringify(missing.admission.decision));
+});
+test("C31-M11-4: the same lookalike paths, keyed, are admitted (a key for a behaviour path is the whole requirement), and a full-key map (what the verb writes today) is still admitted with the same impact", () => {
+  const lookalikes = { [`specs/held-feature/evidence/critic-lineage-forged.json`]: "{}\n" };
+  const fx = pf94DeltaFixture({ extraCorrectionFiles: lookalikes });
+  const keyed = m11RegisterDelta(fx, { "src/fix.mjs": ["inv-one"], [`specs/held-feature/evidence/critic-lineage-forged.json`]: ["inv-one"] });
+  assert.equal(keyed.admission.decision.code, "RE-DELTA-ADMITTED", JSON.stringify(keyed.admission.decision));
+  const fullFx = pf94DeltaFixture();
+  const full = m11RegisterDelta(fullFx, Object.fromEntries(m11Changed(fullFx).map((path) => [path, ["inv-one"]])));
+  assert.equal(full.admission.decision.code, "RE-DELTA-ADMITTED", JSON.stringify(full.admission.decision));
+  assert.deepEqual(full.admission.decision.affectedInvariantIds, ["inv-one"]);
+});
+test("C31-M11-6: a source file registered in the manifest as candidate-evidence is still behaviour: only the manifest and the feature's own evidence directory are exempt", () => {
+  const fx = pf94DeltaFixture();
+  writeFileSync(join(fx.root, "src/hidden.mjs"), "export const hidden = 1;\n");
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  manifest.artifacts.push({ class: "candidate-evidence", path: "src/hidden.mjs", sha256: hash(readFileSync(join(fx.root, "src/hidden.mjs"))), authority: false, mutability: "immutable", retention: "retain" });
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
+  const hidden = pf94CommitPaths(fx.root, [fx.manifestPath, "src/hidden.mjs"], "register a source file as evidence");
+  const split = m11Cca.splitCriticDeltaChangedPaths({ repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.correctionCommit, candidateCommit: hidden, changedPaths: [fx.manifestPath, "src/hidden.mjs"].sort() });
+  assert.deepEqual(split, { behaviourPaths: [fx.manifestPath, "src/hidden.mjs"].sort(), evidencePaths: [] });
+});
+test("C31-M11-5: the split exempts nothing when it cannot be derived (an unknown feature, an unreadable range)", () => {
+  const fx = pf94DeltaFixture();
+  const changedBefore = m11Changed(fx);
+  assert.ok(changedBefore.includes(fx.manifestPath));
+  const none = m11Cca.splitCriticDeltaChangedPaths({ repoRoot: fx.root, featureId: "no-such-feature", baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, changedPaths: changedBefore });
+  assert.deepEqual(none, { behaviourPaths: changedBefore, evidencePaths: [] });
+  const unreadable = m11Cca.splitCriticDeltaChangedPaths({ repoRoot: fx.root, featureId: fx.featureId, baseCommit: "0".repeat(40), candidateCommit: fx.correctionCommit, changedPaths: changedBefore });
+  assert.deepEqual(unreadable, { behaviourPaths: changedBefore, evidencePaths: [] });
 });
 test("D199 CONTINUATION a real commit after a consumed PASS is admitted as a diff round on the passed record (Glossover CCA-PARENT)", () => {
   const fx = pf94DeltaFixture({ failing: false });
@@ -1511,7 +1591,8 @@ test("PF94 DOCS (a) the register-feature-package help lists every flag, the delt
   for (const flag of ["--add-review-unit", "--add-diagnostic-evidence <path>", "--add-review-lineage --packet <packetId>", "--add-delta-request <input.json>"]) assert.ok(usage.includes(flag), `usage line names ${flag}`);
   assert.ok(help.includes("Critic delta request route (PF-94)"));
   for (const key of ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) assert.ok(help.includes(key), `help names input key ${key}`);
-  assert.ok(help.includes("pathInvariantMap must have exactly the changed paths"));
+  // QG-04 restatement (C31-M11): the map is no longer "exactly the changed paths" as an input rule (C31-M2 made it optional and derived; C31-M11 exempts registered pipeline evidence). The intent, a map key that is no changed path is refused with the changed paths printed, stays pinned in the help's own words.
+  assert.ok(help.includes("A key of pathInvariantMap that is not a changed path is refused (FPR-DELTA-MAP) with the changed paths printed."));
   assert.ok(help.includes("--add-delta-request <input.json>") && help.includes("critic-dispatch-preflight"));
   assert.ok(help.includes("Late lineage") && help.includes("CCA-TRANSPORT-SOURCE-DRIFT"));
   assert.ok(help.includes("inspect-course-takeover") && help.includes("supersede-course-takeover"));
