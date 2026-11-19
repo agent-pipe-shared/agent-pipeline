@@ -2175,6 +2175,29 @@ export function observeBootstrapFacts({ rootDir = process.cwd(), status = null, 
   return facts;
 }
 
+/**
+ * C31-B10 (L19): a worktree-isolated dispatch is provisioned from `refs/remotes/origin/HEAD`, not from the checkout's HEAD. When that ref
+ * exists and resolves to another commit than HEAD, one short sentence says so and names the repair. Absent ref (no origin) prints nothing,
+ * as does any git fault: this is a read-only notice that never changes a ref, a status or an exit code. Same git call and timeout rule as
+ * `observeUnseenPushToRemote`; `run` is injectable so the fault path is exercised without breaking git.
+ */
+export function observeOriginHeadNotice({
+  rootDir = process.cwd(),
+  run = (args) => {
+    const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000 });
+    return result.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : null;
+  },
+} = {}) {
+  try {
+    const origin = run(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD^{commit}"]);
+    const head = origin ? run(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"]) : null;
+    if (!origin || !head || origin === head) return null;
+    return `refs/remotes/origin/HEAD (${origin.slice(0, 7)}) differs from HEAD (${head.slice(0, 7)}) and worktree-isolated dispatches start from it, not from HEAD; to repoint it run git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/<branch> or git remote set-head origin <branch> (read-only notice, nothing was changed).`;
+  } catch {
+    return null;
+  }
+}
+
 export const CLOSE_PUSH_CAPABILITY_SCHEMA = "pipeline.close-push-capability.v1";
 const READY_ROW = (id) => ({ id, status: "ready", nextAction: null });
 
@@ -2588,8 +2611,10 @@ export function main(options = {}) {
   } catch { closeAndPushCapability = undefined; }
   let bootstrapFacts;
   try { bootstrapFacts = observeBootstrapFacts({ rootDir: process.cwd(), status: result.status, role, modelRoleBootstrap }); } catch { bootstrapFacts = undefined; }
+  const originHeadNotice = observeOriginHeadNotice({ rootDir: process.cwd() });
   const envelope = {
     ...result,
+    ...(originHeadNotice === null ? {} : { originHeadNotice }),
     ...(Object.keys(bootstrapHousekeeping).length === 0 ? {} : { bootstrapHousekeeping }),
     ...(closeAndPushCapability === undefined ? {} : { closeAndPushCapability }),
     ...(bootstrapFacts === undefined ? {} : { bootstrapFacts }),
