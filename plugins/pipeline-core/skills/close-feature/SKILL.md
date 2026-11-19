@@ -48,9 +48,22 @@ node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --l
 ```
 
 (Windows: `"%USERPROFILE%\.claude\projects"`.) This reader understands the Claude Code transcript layout
-only. On Codex or Antigravity it has no source: skip the step and say in the close report that the
-telemetry row is unavailable for this runner. Do not point the command at another runner's directory and
-do not invent a row. Append the printed row to the project's
+only. On Antigravity use the token-only route instead, with the session's brain transcript file
+(`.system_generated/logs/transcript.jsonl`) as the argument:
+
+```
+node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<feature-id>" --antigravity-transcript <transcript-file>
+```
+
+It prints the summed input, output and cache-read tokens of the model steps under the model key
+`antigravity-unrecorded`, with the dollar half marked "unavailable (model not recorded in this
+transcript)"; never add an estimate. On Codex use the same shape with the session's rollout file
+(`--codex-rollout <transcript-file>`): it prints the last cumulative token total under the model the
+rollout names, with the dollar half "n/a (price unknown)". A transcript without a usable token record
+prints the skip sentence and exits 0; say in the close report that the telemetry row is unavailable
+for it. Do not point the Claude command at another runner's directory and do not invent a row.
+With several project directories under the Claude root, name the directory
+(`--latest <projectDirName>`), or the command refuses and lists them. Append the printed row to the project's
 `telemetry/costs.md`. If that file does not exist yet, note that explicitly and SKIP this step --
 do not fail the close over a missing telemetry file. This is per-SESSION cost data only; it is NOT
 a feature-wide cost total (see "Explicitly out of scope" below).

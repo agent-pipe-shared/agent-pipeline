@@ -37,6 +37,12 @@
  *     below. Same discipline as the token half: no transcript content, no
  *     absolute path, nothing written to disk — counts only, printed to stdout.
  *
+ *   - `--row [label] --antigravity-transcript <file>` (exclusive, takes no root): a token-only close row for ONE Antigravity brain
+ *     transcript (input, output and cache-read tokens summed over its model steps, one synthetic model key
+ *     `antigravity-unrecorded`). The transcript records no model, so the dollar half prints "unavailable" and is never estimated.
+ *   - `--row [label] --codex-rollout <file>` (same shape): the last complete cumulative token total of ONE Codex rollout under the
+ *     model named in its `turn_context`; no Codex price exists, so the dollar half prints "n/a (price unknown)".
+ *
  *   - `--timeline <transcript-file> [--json]` (exclusive with `--row` and `--metering`; takes no root): the run
  *     timeline of ONE session file in any of the three runner formats (Claude project JSONL, Codex rollout JSONL,
  *     Antigravity transcript, detected from the content): human turns, per-turn duration, human wait, net run time,
@@ -136,7 +142,7 @@ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
 function usage(msg) {
   if (msg) console.error(msg);
   console.error(
-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json]",
+    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json] | --row [label] --antigravity-transcript|--codex-rollout <transcript-file>",
   );
   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
   console.error(
@@ -436,25 +442,15 @@ function renderTimeline(timeline) {
   return lines.join("\n");
 }
 
-function runTimeline(args) {
-  if (args.includes("--row") || args.includes("--metering")) usage("--timeline is exclusive with --row and --metering.");
-  let file;
-  let json = false;
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--timeline") {
-      file = args[i + 1];
-      if (!file || file.startsWith("--")) usage("--timeline requires a <file> value.");
-      i++;
-    } else if (args[i] === "--json") json = true;
-    else usage("--timeline is exclusive: it accepts only one <file> and --json.");
-  }
+// One transcript file read as JSONL records (a regular file, bounded size); an unreadable file prints `failMessage` (never the path) and exits 1.
+function readTranscriptRecords(file, failMessage) {
   let text;
   try {
     const info = lstatSync(file);
     if (!info.isFile() || info.size > TIMELINE_MAX_BYTES) throw new Error("not-readable");
     text = readFileSync(file, "utf8");
   } catch {
-    console.error("usage-ledger --timeline: timeline-input-unreadable");
+    console.error(failMessage);
     process.exit(1);
   }
   const records = [];
@@ -467,6 +463,94 @@ function runTimeline(args) {
       malformed++;
     }
   }
+  return { records, malformed };
+}
+
+// C31-B5 (AC-112, lane L17): `--row [label] --antigravity-transcript <file>` and `--row [label] --codex-rollout <file>` print a
+// token-only close row for ONE transcript of those runners. Counts only: no path, no transcript text, and no dollar figure is ever
+// estimated. A file without a usable token record prints the same sentence as an empty `--row` and exits 0 (a missing row never fails a close).
+//   antigravity  the step reader sums input, output and cache-read tokens per model step; the transcript names no model, so one
+//                synthetic model key stands in and the dollar half reads "unavailable".
+//   codex        the last complete cumulative `total_token_usage` of the rollout (the repository's own rule, runner-transcript-recovery
+//                `codexUsage`), the model name(s) from `turn_context`; no price exists for it, so the dollar half reads the existing
+//                "n/a (price unknown)". Whether input includes cached tokens is not measured, so the counters are printed as recorded.
+const TRANSCRIPT_ROW_FLAGS = ["--antigravity-transcript", "--codex-rollout"];
+const ROW_MODEL_RE = /^[A-Za-z0-9._-]{1,80}$/u;
+const isRowCounter = (value) => Number.isSafeInteger(value) && value >= 0;
+
+function antigravityRowLines(records) {
+  const steps = detectTimelineFormat(records) === "antigravity-steps"
+    ? antigravityStepTimelineEvents(records).filter((event) => event.kind === "response" && event.usage && [event.usage.input, event.usage.output, event.usage.cacheRead].some((value) => value !== null))
+    : [];
+  if (steps.length === 0) return null;
+  const sum = (key) => steps.reduce((total, event) => total + (event.usage[key] ?? 0), 0);
+  return [
+    `- antigravity-unrecorded: ${fmtDe(sum("input"))} in / ${fmtDe(sum("output"))} out / n/a cache-write / ${fmtDe(sum("cacheRead"))} cache-read -> $ unavailable (model not recorded in this transcript)`,
+    "TOTAL: n/a (no model recorded in this transcript, no dollar estimate)",
+    "",
+    `Notes: token-only row from an Antigravity transcript, ${fmtDe(steps.length)} model step(s) summed; the transcript records no model, so no price applies and no dollar figure is computed; cache-write is not recorded.`,
+  ];
+}
+
+function codexRowLines(records) {
+  if (detectTimelineFormat(records) !== "codex") return null;
+  let total = null;
+  const models = new Set();
+  for (const record of records) {
+    if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
+    if (record.type === "turn_context" && typeof record.payload.model === "string" && ROW_MODEL_RE.test(record.payload.model)) models.add(record.payload.model);
+    const usageData = record.type === "event_msg" && record.payload.type === "token_count" ? record.payload.info?.total_token_usage : null;
+    if (isTimelineObject(usageData) && ["input_tokens", "cached_input_tokens", "output_tokens"].every((key) => isRowCounter(usageData[key]))) total = usageData; // an invalid record never replaces a valid one
+  }
+  if (total === null) return null;
+  const model = models.size > 0 ? [...models].sort().join(", ") : "codex-unrecorded";
+  return [
+    `- ${model}: ${fmtDe(total.input_tokens)} in / ${fmtDe(total.output_tokens)} out / n/a cache-write / ${fmtDe(total.cached_input_tokens)} cache-read -> n/a (price unknown)`,
+    "TOTAL: n/a (no model with known price)",
+    "",
+    "Notes: token-only row from a Codex rollout, the last cumulative total of the session; whether input includes cached tokens (and output includes reasoning tokens) is not measured, so the counters are printed as recorded and no dollar figure is computed; cache-write is not recorded.",
+  ];
+}
+
+function runTranscriptRow(args, flag) {
+  const form = `node plugins/pipeline-core/scripts/usage-ledger.mjs --row "<label>" ${flag} <transcript-file>`;
+  const refuse = (why) => usage(`${flag} is exclusive: ${why} Runnable form: ${form}`);
+  let file;
+  let rowSeen = false;
+  let label = "";
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--row") {
+      rowSeen = true;
+      if (args[i + 1] && !args[i + 1].startsWith("--")) label = args[++i];
+    } else if (args[i] === flag) {
+      if (file !== undefined) refuse("name the transcript once.");
+      file = args[++i];
+      if (!file || file.startsWith("--")) refuse("a <transcript-file> value is required.");
+    } else refuse(`it accepts only --row [label] and ${flag} <file> (no transcripts root, no other flag).`);
+  }
+  if (!rowSeen) refuse("--row is required.");
+  const { records } = readTranscriptRecords(file, `usage-ledger ${flag}: ${flag.slice(2)}-unreadable. Pass an existing regular transcript file: ${form}`);
+  const rowLines = (flag === "--codex-rollout" ? codexRowLines : antigravityRowLines)(records);
+  const fragment = label ? [`Session/Block: ${label}`] : [];
+  if (rowLines === null) fragment.push("Tokens per `/usage` (collected, script): no records found for the selected session/filter.");
+  else fragment.push("Tokens per `/usage` (collected, script):", ...rowLines);
+  console.log(fragment.join("\n"));
+  process.exit(0);
+}
+
+function runTimeline(args) {
+  if (args.includes("--row") || args.includes("--metering")) usage("--timeline is exclusive with --row and --metering.");
+  let file;
+  let json = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--timeline") {
+      file = args[i + 1];
+      if (!file || file.startsWith("--")) usage("--timeline requires a <file> value.");
+      i++;
+    } else if (args[i] === "--json") json = true;
+    else usage("--timeline is exclusive: it accepts only one <file> and --json.");
+  }
+  const { records, malformed } = readTranscriptRecords(file, "usage-ledger --timeline: timeline-input-unreadable");
   const runner = detectTimelineFormat(records);
   if (!runner) {
     console.error("usage-ledger --timeline: timeline-format-unknown");
@@ -477,6 +561,8 @@ function runTimeline(args) {
   process.exit(0);
 }
 
+const transcriptRowFlag = argv.find((arg) => TRANSCRIPT_ROW_FLAGS.includes(arg));
+if (transcriptRowFlag) runTranscriptRow(argv, transcriptRowFlag);
 if (argv.includes("--timeline")) runTimeline(argv);
 
 // Metering is intentionally an exclusive, selected-file mode. It never opens

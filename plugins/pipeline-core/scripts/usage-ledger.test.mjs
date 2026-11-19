@@ -548,3 +548,121 @@ test("usage-ledger --timeline is exclusive with --row and --metering and refuses
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- C31-B5 (AC-112, lane L17): `--row <label> --antigravity-transcript <file>` prints a token-only close row. ---
+// The brain transcript names no model, so the dollar half is marked unavailable and never estimated; the path and the text stay out.
+const agyStep = (index, at, type, extra) => ({ step_index: index, source: "MODEL", type, status: "DONE", created_at: at, ...extra });
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+test("C31-B5 usage-ledger --row --antigravity-transcript sums the model steps' tokens into one row with the dollar half unavailable", () => {
+  const { dir, file } = timelineFile([
+    { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
+    agyStep(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 1200, cache_read_tokens: 30, output_tokens: 7, content: SECRET_MARKER }),
+    agyStep(2, "2026-08-19T10:00:04Z", "GENERIC", { content: `tool result ${SECRET_MARKER}` }),
+    agyStep(3, "2026-08-19T10:00:10Z", "PLANNER_RESPONSE", { input_tokens: 2300, cache_read_tokens: 1150, output_tokens: 9 }),
+  ]);
+  try {
+    const result = run(["--row", "S1/B5", "--antigravity-transcript", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /^Session\/Block: S1\/B5$/m);
+    assert.match(out, /^- antigravity-unrecorded: 3\.500 in \/ 16 out \/ n\/a cache-write \/ 1\.180 cache-read -> \$ unavailable \(model not recorded in this transcript\)$/m);
+    assert.match(out, /TOTAL: n\/a \(no model recorded in this transcript, no dollar estimate\)/);
+    assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for an unrecorded model");
+    for (const text of [out, result.stderr]) {
+      assert.doesNotMatch(text, new RegExp(`${SECRET_MARKER}|please do|${escapeRe(dir)}|session\\.jsonl`), "no transcript text and no path");
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B5 usage-ledger --row --antigravity-transcript prints the skip sentence and exits 0 when the file holds no model step", () => {
+  const stepsOnly = timelineFile([
+    { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: HUMAN_TEXT },
+    agyStep(1, "2026-08-19T10:00:04Z", "GENERIC", { content: "ok" }),
+  ]);
+  const claudeLayout = timelineFile(claudeTimelineRecords());
+  try {
+    for (const { file } of [stepsOnly, claudeLayout]) {
+      const result = run(["--row", "S1/B5", "--antigravity-transcript", file]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /^Session\/Block: S1\/B5$/m);
+      assert.match(result.stdout, /Tokens per `\/usage` \(collected, script\): no records found for the selected session\/filter\./);
+      assert.doesNotMatch(result.stdout, /antigravity-unrecorded/);
+    }
+  } finally {
+    rmSync(stepsOnly.dir, { recursive: true, force: true });
+    rmSync(claudeLayout.dir, { recursive: true, force: true });
+  }
+});
+
+// The same shape for a Codex rollout: the last complete cumulative `total_token_usage`, the model from `turn_context`; no Codex price exists.
+const codexCounters = (input, cached, output) => ({ input_tokens: input, cached_input_tokens: cached, output_tokens: output, reasoning_output_tokens: 1, total_tokens: input + output });
+const codexTokenCount = (at, total) => ({ timestamp: at, type: "event_msg", payload: { type: "token_count", info: { total_token_usage: total } } });
+
+test("C31-B5 usage-ledger --row --codex-rollout prints the last complete cumulative total under the recorded model with no dollar figure", () => {
+  const { dir, file } = timelineFile([
+    { timestamp: "2026-11-18T10:00:00Z", type: "session_meta", payload: { id: SESSION_ID, cwd: "/work/project" } },
+    { timestamp: "2026-11-18T10:00:01Z", type: "turn_context", payload: { model: "gpt-5.1-codex" } },
+    { timestamp: "2026-11-18T10:00:02Z", type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: SECRET_MARKER }] } },
+    codexTokenCount("2026-11-18T10:00:03Z", codexCounters(1000, 400, 50)),
+    codexTokenCount("2026-11-18T10:00:09Z", codexCounters(3000, 1500, 120)),
+    codexTokenCount("2026-11-18T10:00:10Z", { ...codexCounters(9000, 9000, 900), input_tokens: -1 }),
+  ]);
+  try {
+    const result = run(["--row", "S1/B5", "--codex-rollout", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /^Session\/Block: S1\/B5$/m);
+    assert.match(out, /^- gpt-5\.1-codex: 3\.000 in \/ 120 out \/ n\/a cache-write \/ 1\.500 cache-read -> n\/a \(price unknown\)$/m);
+    assert.match(out, /^TOTAL: n\/a \(no model with known price\)$/m);
+    assert.match(out, /whether input includes cached tokens .* not measured/);
+    assert.doesNotMatch(out, /estimated|≈/, "no dollar figure is ever estimated for a model without a price");
+    for (const text of [out, result.stderr]) assert.doesNotMatch(text, new RegExp(`${SECRET_MARKER}|/work/project|${escapeRe(dir)}|session\\.jsonl`), "no transcript text and no path");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B5 usage-ledger --row --codex-rollout prints the skip sentence for a rollout without a complete total and refuses a mixed or unreadable call", () => {
+  const noTotal = timelineFile([{ type: "session_meta", payload: { id: SESSION_ID } }, codexTokenCount("2026-11-18T10:00:03Z", { input_tokens: 1, output_tokens: 2 })]);
+  try {
+    const skipped = run(["--row", "S1", "--codex-rollout", noTotal.file]);
+    assert.equal(skipped.status, 0, skipped.stderr);
+    assert.match(skipped.stdout, /Tokens per `\/usage` \(collected, script\): no records found for the selected session\/filter\./);
+    const mixed = run(["--row", "S1", "--codex-rollout", noTotal.file, "--antigravity-transcript", noTotal.file]);
+    const missing = run(["--row", "S1", "--codex-rollout", join(noTotal.dir, "absent.jsonl")]);
+    for (const result of [mixed, missing]) {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /--codex-rollout/);
+      assert.doesNotMatch(result.stderr, new RegExp(escapeRe(noTotal.dir)));
+    }
+    assert.match(missing.stderr, /codex-rollout-unreadable/);
+    assert.match(missing.stderr, /usage-ledger\.mjs --row "<label>" --codex-rollout <transcript-file>/);
+  } finally {
+    rmSync(noTotal.dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B5 usage-ledger --antigravity-transcript is an exclusive row mode and its refusals name the runnable form without a path", () => {
+  const { dir, file } = timelineFile([agyStep(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 5, cache_read_tokens: 1, output_tokens: 2 })]);
+  try {
+    const missing = run(["--row", "S1", "--antigravity-transcript", join(dir, "absent.jsonl")]);
+    const bare = run(["--row", "S1", "--antigravity-transcript"]);
+    const withRoot = run([dir, "--row", "S1", "--antigravity-transcript", file]);
+    const withTimeline = run(["--timeline", file, "--antigravity-transcript", file]);
+    const withSession = run(["--row", "S1", "--antigravity-transcript", file, "--session", SESSION_ID]);
+    const noRow = run(["--antigravity-transcript", file]);
+    for (const result of [missing, bare, withRoot, withTimeline, withSession, noRow]) {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /--antigravity-transcript/);
+      assert.doesNotMatch(result.stderr, new RegExp(escapeRe(dir)));
+    }
+    assert.match(missing.stderr, /antigravity-transcript-unreadable/);
+    assert.match(missing.stderr, /usage-ledger\.mjs --row "<label>" --antigravity-transcript <transcript-file>/);
+    assert.match(withRoot.stderr, /exclusive/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
