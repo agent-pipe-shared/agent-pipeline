@@ -115,6 +115,7 @@ Projects can add a `verifyImpact` object to their calibration (schema and
 example: [ADR-0081](adr/0081-boundary-aware-impacted-verify.md)). Each baseline
 or area command has a stable id; each area declares repository-relative paths.
 The existing `verify` field remains the full project command.
+The command id `browser-smoke` is reserved: its command runs only behind the browser preflight, which supports Playwright and Chromium. Without a launchable browser the step fails with a typed code, "browser verification pending" and one human step, and the command does not run. A project that already uses this id for another command is told here and must rename it.
 
 Eligible baseline results can resume on the same bound candidate; the opaque
 project command runs freshly. A changed candidate, failed run or interrupted

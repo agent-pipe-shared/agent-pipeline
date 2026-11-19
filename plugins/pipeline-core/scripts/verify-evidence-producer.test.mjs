@@ -674,6 +674,73 @@ test("consumer full fallback preserves the changed and unmatched paths", async (
   });
 });
 
+// C31-M7 (AC-112 binding): stage 1 of the browser smoke. The reserved verifyImpact id `browser-smoke` runs behind the browser preflight.
+// Marker-file commands only; the fixture project has no Playwright package, so the real preflight probe reports the package as missing.
+const SMOKE_MARKER_COMMAND = 'node -e "require(\'fs\').writeFileSync(\'.git/smoke-ran\', \'yes\')"';
+function commitImpact(root, impact) {
+  const calibrationPath = join(root, ".claude", "pipeline.json");
+  const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+  calibration.verifyImpact = { schema: "pipeline.project-verify-impact.v1", ...impact };
+  writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+  git(root, ["add", "."]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "impact policy"]);
+}
+const smokeEntry = { id: "browser-smoke", command: SMOKE_MARKER_COMMAND };
+
+test("C31-M7 a project that does not declare browser-smoke has no project-browser-smoke step and is never red from it", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    commitImpact(root, { baseline: [{ id: "common", command: 'node -e "process.exit(0)"' }], areas: [] });
+    const result = await produceVerifyEvidence({ rootDir: root });
+    assert.equal(result.status, "passed");
+    const names = result.evidence.steps.map(({ name }) => name);
+    assert.equal(names.includes("project-common"), true);
+    assert.equal(names.includes("project-browser-smoke"), false);
+  });
+});
+
+test("C31-M7 a declared browser-smoke without a browser fails that one step with the typed code, the pending words and a human step, and never runs the command", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    commitImpact(root, { baseline: [smokeEntry], areas: [] });
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }),
+      (error) => error.code === "VEP-VERIFY-FAILED" && /"suite":"project-browser-smoke","exitCode":1/u.test(error.message));
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false, "an unavailable browser is red: no success evidence");
+    assert.equal(existsSync(join(root, ".git", "smoke-ran")), false, "the declared command must not run without a launchable browser");
+    const runs = join(root, ".git/agent-pipeline/verify/runs");
+    const log = suiteLog(root, readdirSync(runs)[0], "project-browser-smoke");
+    assert.match(log, /BEP-PLAYWRIGHT-PACKAGE-UNAVAILABLE/u);
+    assert.match(log, /no browser test ran; this is not a product failure/u);
+    assert.match(log, /browser verification pending/u);
+    assert.match(log, /^human step: .*Playwright dev dependency/mu);
+    assert.doesNotMatch(log, /browser smoke failed/u);
+  });
+});
+
+test("C31-M7 a browser-smoke entry in an area is selected by its paths only; an unrelated change omits it and its command", async () => {
+  await withFixture('node -e "process.exit(9)"', async (root) => {
+    commitImpact(root, { baseline: [], areas: [
+      { id: "web", paths: ["web/**"], commands: [smokeEntry] },
+      { id: "docs", paths: ["docs/**"], commands: [{ id: "docs", command: 'node -e "process.exit(0)"' }] },
+    ] });
+    mkdirSync(join(root, "docs"));
+    writeFileSync(join(root, "docs", "guide.md"), "# Guide\n");
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "docs"]);
+    const omitted = await produceVerifyEvidence({ rootDir: root, mode: "critic", base: "HEAD^1" });
+    assert.equal(omitted.status, "passed");
+    assert.deepEqual(omitted.evidence.selection.matchedAreaIds, ["docs"]);
+    assert.equal(omitted.evidence.selection.omittedSuiteIds.includes("project-browser-smoke"), true);
+    assert.equal(omitted.evidence.steps.some(({ name }) => name === "project-browser-smoke"), false);
+    assert.equal(existsSync(join(root, ".git", "smoke-ran")), false);
+    mkdirSync(join(root, "web"));
+    writeFileSync(join(root, "web", "page.html"), "<p>page</p>\n");
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "web"]);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, mode: "critic", base: "HEAD^1" }),
+      (error) => error.code === "VEP-VERIFY-FAILED" && /"suite":"project-browser-smoke","exitCode":1/u.test(error.message));
+    assert.equal(existsSync(join(root, ".git", "smoke-ran")), false, "selected, but still behind the preflight");
+  });
+});
+
 test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
     const result = await produceVerifyEvidence({ rootDir: root });

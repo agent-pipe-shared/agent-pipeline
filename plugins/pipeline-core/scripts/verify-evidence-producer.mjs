@@ -90,6 +90,8 @@ import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISP
 import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
 // G20-25: the baseline-security suite's dispatcher, handed to the consumer adapter by URL (no import edge into the scanner tree).
 const SECURITY_CLOSE_DISPATCHER = new URL("./security-close-check.mjs", import.meta.url).href;
+const BROWSER_SMOKE_DISPATCHER = new URL("./browser-smoke-check.mjs", import.meta.url).href;
+const BROWSER_SMOKE_ID = "browser-smoke";
 import { prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
 import {
   GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
@@ -532,8 +534,10 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     // Its own dispatcher (scripts/security-close-check.mjs), never a branch of the kernel file consumer-verify-check.mjs (GMWKC01).
     { name: "baseline-security", file, args: [SECURITY_CLOSE_DISPATCHER, "security", attempt] },
   ];
-  const configuredBaselineSuites = configuration.baseline.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) }));
-  const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) })));
+  // C31-M7: the reserved id `browser-smoke` runs behind the browser preflight in its own dispatcher; every other id keeps the consumer dispatcher.
+  const configuredSuite = (entry) => ({ name: `project-${entry.id}`, file, args: entry.id === BROWSER_SMOKE_ID ? [BROWSER_SMOKE_DISPATCHER, BROWSER_SMOKE_ID] : [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) });
+  const configuredBaselineSuites = configuration.baseline.map(configuredSuite);
+  const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map(configuredSuite));
   const fullSuite = command === null ? null : { name: "configured-verify", file, args: [CONSUMER_VERIFY_DISPATCHER, "product", attempt], dependsOn: standardSuites.map((suite) => suite.name) };
   const selectionInput = selectionInputs(root, mode, base, started.commit);
   const baselineIds = [...standardSuites, ...configuredBaselineSuites].map((suite) => suite.name);
