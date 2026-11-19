@@ -48,7 +48,10 @@
  *     Antigravity transcript, detected from the content): human turns, per-turn duration, human wait, net run time,
  *     per-response usage with actor, refusals per code. `--json` prints the same data as
  *     `pipeline.usage-timeline.v1`. Counts, times and codes only; never message text or a path; `n/a` where the
- *     format carries no such field.
+ *     format carries no such field. After the TOTAL line it prints the bytes of every tool result (UTF-8 bytes of the
+ *     result text) grouped by the script its call ran (else the tool name) and by refusal code, with count, total, largest
+ *     and share of all tool-result bytes (`toolResults` in `--json`); the Antigravity brain transcript does not name the
+ *     tool of a result, so it prints one `tool:not-recorded` group; the older Antigravity form prints `n/a`.
  *
  * Session scoping: `--session <uuid>` restricts aggregation to one session (incl.
  * its subagent transcripts, via the shared `sessionId` field — see schema notes
@@ -216,6 +219,61 @@ function timelineRefusal(text, requireMarker) {
   return match ? match[0] : null;
 }
 
+// C31-B9 (M0): the size of a tool result is the UTF-8 byte length of its TEXT as the transcript decodes it (not tokens, not the JSONL
+// record; a non-text block such as an image counts 0). A text-block list is summed block by block, so no separator byte is invented.
+const timelineBytes = (text) => Buffer.byteLength(text, "utf8");
+function timelineResultBytes(content) {
+  if (typeof content === "string") return timelineBytes(content);
+  if (!Array.isArray(content)) return timelineBytes(timelineResultText(content));
+  return content.reduce((sum, block) => sum + (typeof block === "string" ? timelineBytes(block) : isTimelineObject(block) && typeof block.text === "string" ? timelineBytes(block.text) : 0), 0);
+}
+
+// A result is grouped by the repository script its call ran (`node <...>/scripts/<name>.mjs`, either path separator, optional quotes
+// and node flags), else by the tool name. Only a name from the closed character class is ever printed; anything else prints `other`.
+const TOOL_NAME_RE = /^[A-Za-z0-9._:-]{1,80}$/u;
+const SCRIPT_RUN_RE = /\bnode\s+(?:-{1,2}[A-Za-z][\w-]*(?:=\S+)?\s+)*["']?(?:[^\s"']*[\\/])?scripts[\\/]([A-Za-z0-9._-]+)\.mjs\b/u;
+function timelineToolGroup(name, command) {
+  const script = typeof command === "string" ? SCRIPT_RUN_RE.exec(command) : null;
+  if (script) return `script:${script[1]}`;
+  return `tool:${typeof name === "string" && TOOL_NAME_RE.test(name) ? name : "other"}`;
+}
+
+const flattenCommand = (value) => (typeof value === "string" ? value : Array.isArray(value) ? value.filter((part) => typeof part === "string").join(" ") : null);
+// The command text of a Codex call: `function_call` carries JSON `arguments` (`cmd` or `command`, a string or an argv list),
+// `local_shell_call` an `action.command` argv, a `custom_tool_call` its raw `input` (an `apply_patch` input is a patch, never a command).
+function codexCallCommand(payload) {
+  if (payload.type === "local_shell_call") return flattenCommand(payload.action?.command);
+  if (payload.type === "custom_tool_call") return payload.name === "apply_patch" || typeof payload.input !== "string" ? null : payload.input;
+  if (typeof payload.arguments !== "string") return null;
+  try {
+    const parsed = JSON.parse(payload.arguments);
+    return isTimelineObject(parsed) ? flattenCommand(parsed.cmd ?? parsed.command) : null;
+  } catch {
+    return null;
+  }
+}
+const CODEX_CALL_TYPES = ["function_call", "custom_tool_call", "local_shell_call"];
+
+function summarizeToolResults(events) {
+  const groups = new Map();
+  const codes = new Map();
+  let count = 0;
+  let bytes = 0;
+  const add = (map, name, size) => {
+    const entry = map.get(name) ?? { count: 0, bytes: 0, largest: 0 };
+    entry.count++;
+    entry.bytes += size;
+    entry.largest = Math.max(entry.largest, size);
+    map.set(name, entry);
+  };
+  for (const event of events) {
+    if (event.kind === "tool-result") { add(groups, event.group, event.bytes); count++; bytes += event.bytes; }
+    else if (event.kind === "refusal" && Number.isSafeInteger(event.bytes)) add(codes, event.code, event.bytes);
+  }
+  const rows = (map) => [...map].map(([name, entry]) => ({ name, ...entry })).sort((a, b) => b.bytes - a.bytes || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return { count, bytes, groups: rows(groups), refusalCodes: rows(codes) };
+}
+
 function detectTimelineFormat(records) {
   for (const record of records.slice(0, 200)) {
     if (!isTimelineObject(record)) continue;
@@ -241,15 +299,24 @@ function timelineProofWaitMs(text) {
   return null;
 }
 
-// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code} | {kind:"po-wait", ms} (ms = the duration waited).
+// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code, bytes} | {kind:"po-wait", ms} (ms = the duration waited)
+// | {kind:"tool-result", group, bytes} (every tool result, with the group of the call that made it; a refusal is one of them).
 // `listed` = the response is printed in the per-response usage list; a time-only response just ends a turn.
 function claudeTimelineEvents(records) {
   const events = [];
   const byId = new Map();
+  const calls = new Map(); // tool_use id -> group; every raw assistant record is scanned (a streamed message repeats its blocks)
   for (const record of records) {
     if (!isTimelineObject(record) || !isTimelineObject(record.message)) continue;
     const ms = timelineMs(record.timestamp);
     const message = record.message;
+    if (record.type === "assistant" && Array.isArray(message.content)) {
+      for (const block of message.content) if (isTimelineObject(block) && block.type === "tool_use" && typeof block.id === "string") calls.set(block.id, timelineToolGroup(block.name, isTimelineObject(block.input) ? block.input.command : null));
+    }
+    // A tool result counts wherever it sits (a subagent file marks its records as sidechain); the human-turn rules below do not apply to it.
+    if (record.type === "user" && message.role === "user" && Array.isArray(message.content)) {
+      for (const block of message.content) if (isTimelineObject(block) && block.type === "tool_result") events.push({ kind: "tool-result", group: calls.get(block.tool_use_id) ?? "tool:unknown", bytes: timelineResultBytes(block.content) });
+    }
     if (record.type === "assistant") {
       if (message.model === "<synthetic>") continue;
       const usage = isTimelineObject(message.usage)
@@ -281,7 +348,7 @@ function claudeTimelineEvents(records) {
           if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
           if (block.is_error !== true) continue;
           const code = timelineRefusal(timelineResultText(block.content), false);
-          if (code) events.push({ kind: "refusal", code });
+          if (code) events.push({ kind: "refusal", code, bytes: timelineResultBytes(block.content) });
         }
       }
     }
@@ -301,6 +368,7 @@ function codexHumanChars(payload) {
 
 function codexTimelineEvents(records) {
   const events = [];
+  const calls = new Map(); // call_id -> group of the call that the output answers
   const provenanceForm = records.some((record) => isTimelineObject(record) && record.type === "response_item" && isTimelineObject(record.payload) && codexHumanChars(record.payload) !== null);
   for (const record of records) {
     if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
@@ -319,11 +387,15 @@ function codexTimelineEvents(records) {
       }
     } else if (record.type === "response_item") {
       if (payload.type === "message" && payload.role === "assistant") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
-      else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
+      else if (CODEX_CALL_TYPES.includes(payload.type)) {
+        if (typeof payload.call_id === "string") calls.set(payload.call_id, timelineToolGroup(payload.name ?? (payload.type === "local_shell_call" ? "shell" : undefined), codexCallCommand(payload)));
+      } else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
         const waitedMs = timelineProofWaitMs(timelineResultText(payload.output));
         if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
+        const bytes = timelineResultBytes(payload.output);
+        events.push({ kind: "tool-result", group: calls.get(payload.call_id) ?? "tool:unknown", bytes });
         const code = timelineRefusal(timelineResultText(payload.output), true);
-        if (code) events.push({ kind: "refusal", code });
+        if (code) events.push({ kind: "refusal", code, bytes });
       }
     }
   }
@@ -361,7 +433,10 @@ function antigravityStepTimelineEvents(records) {
       const waitedMs = text === "" ? null : timelineProofWaitMs(text);
       if (waitedMs !== null) events.push({ kind: "po-wait", ms: waitedMs });
       const code = text === "" ? null : timelineRefusal(text, true);
-      if (code) events.push({ kind: "refusal", code });
+      // The transcript does not say which tool a GENERIC step answers (not measured), so its result cannot be grouped by script.
+      const bytes = [record.error, record.content].reduce((sum, value) => sum + (typeof value === "string" ? timelineBytes(value) : 0), 0);
+      if (typeof record.error === "string" || typeof record.content === "string") events.push({ kind: "tool-result", group: "tool:not-recorded", bytes });
+      if (code) events.push({ kind: "refusal", code, bytes });
     }
   }
   return events;
@@ -407,6 +482,7 @@ function buildTimeline(format, records, actor, malformed) {
   return {
     schema: TIMELINE_SCHEMA, runner, malformedLines: malformed,
     humanTurns: observed ? humanTurns : null, responses, refusals: observed ? refusals : null,
+    toolResults: observed ? summarizeToolResults(events) : null,
     totals: {
       grossMs, humanWaitMs, signatureWaitMs: observed ? signatureWaitMs : null,
       netMs: grossMs !== null && humanWaitMs !== null ? grossMs - humanWaitMs : null,
@@ -439,6 +515,15 @@ function renderTimeline(timeline) {
   if (timeline.malformedLines > 0) lines.push("", `Malformed lines skipped: ${timeline.malformedLines}`);
   const totals = timeline.totals;
   lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)}${totals.signatureWaitMs ? ` (of it signature wait ${secs(totals.signatureWaitMs)})` : ""} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
+  // C31-B9 (M0): after the existing lines, so those stay as they were.
+  const tool = timeline.toolResults;
+  if (tool === null) lines.push("", "Tool results: n/a (this format records no tool result)");
+  else if (tool.count > 0) {
+    const row = (entry) => `- ${entry.name} | count ${entry.count} | bytes ${entry.bytes} | largest ${entry.largest} | share ${tool.bytes === 0 ? "0.0" : ((entry.bytes * 100) / tool.bytes).toFixed(1)} %`;
+    lines.push("", "Tool results (UTF-8 bytes of the result text):", "By script or tool:", ...tool.groups.map(row));
+    if (tool.refusalCodes.length > 0) lines.push("By refusal code (a refused result is also counted above):", ...tool.refusalCodes.map(row));
+    if (timeline.runner === "antigravity") lines.push("Note: this transcript layout does not record which tool produced a result, so results are not grouped by script.");
+  }
   return lines.join("\n");
 }
 

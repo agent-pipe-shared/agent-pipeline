@@ -666,3 +666,184 @@ test("C31-B5 usage-ledger --antigravity-transcript is an exclusive row mode and 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- C31-B9 (AC-112, M0 of the main-context recon): `--timeline` also prints the bytes of every tool result, grouped by the script
+// the call ran (else the tool name) and by refusal code. Derived at read time; the unit is UTF-8 bytes of the result TEXT (not tokens,
+// not the JSONL record). The existing lines stay as they are; the table follows the TOTAL line. Fixtures give every result a known size.
+const sizedText = (prefix, bytes) => {
+  const pad = bytes - Buffer.byteLength(prefix, "utf8");
+  assert.ok(pad >= 0, "the fixture prefix is longer than its size");
+  return prefix + "y".repeat(pad);
+};
+const SCRIPT_ALPHA = (extra = "") => `node "/some/where/plugins/pipeline-core/scripts/alpha-tool.mjs" --arg ${SECRET_MARKER}${extra}`;
+const SCRIPT_BETA = "node plugins/pipeline-core/scripts/beta-tool.mjs --json";
+const READ_TEXT = `\u00e9${"y".repeat(48)}`; // 49 characters, 50 UTF-8 bytes: tells characters from bytes
+const CLAUDE_REFUSAL = sizedText("PreToolUse:Bash hook error: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: ", 200);
+const CODEX_REFUSAL = sizedText("Script error:\nCommand blocked by PreToolUse hook: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-GRAMMAR-REDIRECT-REFUSED: ", 200);
+const AGY_REFUSAL = sizedText("BLOCKED (Antigravity native child): AGY-NATIVE-BRAIN-WRITE: ", 200);
+const toolUse = (id, name, input) => ({ type: "tool_use", id, name, input });
+const toolResult = (id, content, extra = {}) => ({ type: "tool_result", tool_use_id: id, content, ...extra });
+
+function claudeToolResultRecords() {
+  return [
+    claudeUser("2026-08-19T10:00:00.000Z", "go"),
+    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_1", { input_tokens: 1, output_tokens: 1 }, [toolUse("toolu_a", "Bash", { command: SCRIPT_ALPHA() }), toolUse("toolu_b", "Bash", { command: SCRIPT_BETA })]),
+    claudeUser("2026-08-19T10:00:11.000Z", [toolResult("toolu_a", sizedText(`alpha ${SECRET_MARKER} `, 500))]),
+    claudeUser("2026-08-19T10:00:12.000Z", [toolResult("toolu_b", sizedText("beta ", 250))]),
+    claudeAssistant("2026-08-19T10:00:20.000Z", "msg_2", { input_tokens: 1, output_tokens: 1 }, [toolUse("toolu_c", "Read", { file_path: `/some/where/${SECRET_MARKER}.txt` }), toolUse("toolu_d", "Bash", { command: "rg -n x y" })]),
+    claudeUser("2026-08-19T10:00:21.000Z", [toolResult("toolu_c", READ_TEXT)]),
+    claudeUser("2026-08-19T10:00:22.000Z", [toolResult("toolu_d", CLAUDE_REFUSAL, { is_error: true })]),
+  ];
+}
+
+function assertToolResultTable(out, { refusalCode, refusalGroup, refusalBytes }) {
+  const lines = out.split("\n");
+  assert.ok(lines.indexOf("Tool results (UTF-8 bytes of the result text):") > lines.findIndex((line) => line.startsWith("TOTAL:")), "the table follows the existing TOTAL line");
+  assert.ok(lines.includes("- script:alpha-tool | count 1 | bytes 500 | largest 500 | share 50.0 %"), out);
+  assert.ok(lines.includes("- script:beta-tool | count 1 | bytes 250 | largest 250 | share 25.0 %"), out);
+  assert.ok(lines.includes("- tool:Read | count 1 | bytes 50 | largest 50 | share 5.0 %") || lines.includes("- tool:read_file | count 1 | bytes 50 | largest 50 | share 5.0 %"), out);
+  assert.ok(lines.includes(`- ${refusalGroup} | count 1 | bytes ${refusalBytes} | largest ${refusalBytes} | share 20.0 %`), out);
+  assert.ok(lines.includes("By refusal code (a refused result is also counted above):"), out);
+  assert.ok(lines.includes(`- ${refusalCode} | count 1 | bytes ${refusalBytes} | largest ${refusalBytes} | share 20.0 %`), out);
+  assert.ok(lines.includes(`- ${refusalCode}: 1`), "the code row matches the existing Refusals section");
+  assert.doesNotMatch(out, new RegExp(SECRET_MARKER), "no transcript content");
+  assert.doesNotMatch(out, /\/some\/where|"\/some|usage-ledger-timeline-/u, "no path");
+}
+
+test("C31-B9 usage-ledger --timeline (claude) lists the bytes of every tool result by script, by tool and by refusal code", () => {
+  const { dir, file } = timelineFile(claudeToolResultRecords());
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    assertToolResultTable(result.stdout, { refusalCode: "GUARD-READ-COMMAND-UNSUPPORTED", refusalGroup: "tool:Bash", refusalBytes: 200 });
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(escapeRe(dir)), "no absolute path");
+    const json = run(["--timeline", file, "--json"]);
+    const data = JSON.parse(json.stdout);
+    assert.deepEqual(data.toolResults, {
+      count: 4, bytes: 1000,
+      groups: [
+        { name: "script:alpha-tool", count: 1, bytes: 500, largest: 500 },
+        { name: "script:beta-tool", count: 1, bytes: 250, largest: 250 },
+        { name: "tool:Bash", count: 1, bytes: 200, largest: 200 },
+        { name: "tool:Read", count: 1, bytes: 50, largest: 50 },
+      ],
+      refusalCodes: [{ name: "GUARD-READ-COMMAND-UNSUPPORTED", count: 1, bytes: 200, largest: 200 }],
+    });
+    assert.deepEqual(data.refusals, { "GUARD-READ-COMMAND-UNSUPPORTED": 1 }, "the existing refusal figure is untouched");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B9 usage-ledger --timeline (claude) prints no table for a transcript without tool results", () => {
+  const { dir, file } = timelineFile([
+    claudeUser("2026-08-19T10:00:00.000Z", HUMAN_TEXT),
+    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_1", { input_tokens: 1, output_tokens: 1 }),
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /Tool results/u);
+    assert.doesNotMatch(result.stdout, /share \d/u);
+    assert.deepEqual(JSON.parse(run(["--timeline", file, "--json"]).stdout).toolResults, { count: 0, bytes: 0, groups: [], refusalCodes: [] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B9 usage-ledger --timeline (claude) attributes streamed, array, orphan, Windows-path and sidechain results without printing a path or a name outside the closed set", () => {
+  const sub = (content) => ({ ...content, isSidechain: true });
+  const { dir, file } = timelineFile([
+    // the same assistant message streamed twice repeats its tool_use blocks: one call, one group
+    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_1", { input_tokens: 1, output_tokens: 1 }, [toolUse("toolu_w", "Bash", { command: String.raw`node C:\Users\x\proj\plugins\pipeline-core\scripts\win-tool.mjs` })]),
+    claudeAssistant("2026-08-19T10:00:11.000Z", "msg_1", { input_tokens: 1, output_tokens: 1 }, [toolUse("toolu_w", "Bash", { command: String.raw`node C:\Users\x\proj\plugins\pipeline-core\scripts\win-tool.mjs` }), toolUse("toolu_n", "Bash", { command: `echo ${SECRET_MARKER}` }), toolUse("toolu_x", "bad name with spaces", {})]),
+    // a result whose content is a list of text blocks sums the blocks (no separator bytes), a sidechain result still counts
+    sub(claudeUser("2026-08-19T10:00:12.000Z", [toolResult("toolu_w", [{ type: "text", text: "aaaa" }, { type: "text", text: "bbbbbb" }])])),
+    claudeUser("2026-08-19T10:00:13.000Z", [toolResult("toolu_n", "12345", { is_error: true })]),
+    claudeUser("2026-08-19T10:00:14.000Z", [toolResult("toolu_x", "123")]),
+    claudeUser("2026-08-19T10:00:15.000Z", [toolResult("toolu_orphan", "1234567")]),
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.split("\n");
+    assert.ok(lines.includes("- script:win-tool | count 1 | bytes 10 | largest 10 | share 40.0 %"), result.stdout);
+    assert.ok(lines.includes("- tool:Bash | count 1 | bytes 5 | largest 5 | share 20.0 %"), result.stdout);
+    assert.ok(lines.includes("- tool:other | count 1 | bytes 3 | largest 3 | share 12.0 %"), result.stdout);
+    assert.ok(lines.includes("- tool:unknown | count 1 | bytes 7 | largest 7 | share 28.0 %"), result.stdout);
+    assert.doesNotMatch(result.stdout, new RegExp(`${SECRET_MARKER}|bad name|Users`), "no content, no path, no free tool name");
+    assert.doesNotMatch(result.stdout, /By refusal code/u, "a result that names no code adds no code row");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B9 usage-ledger --timeline (codex rollout) lists the bytes of every tool output by script, by tool and by refusal code", () => {
+  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
+  const { dir, file } = timelineFile([
+    rec("2026-08-19T10:00:00.000Z", "session_meta", { id: "thread-1", cwd: "/some/where" }),
+    rec("2026-08-19T10:00:01.000Z", "event_msg", { type: "user_message", message: "go" }),
+    rec("2026-08-19T10:00:02.000Z", "response_item", { type: "function_call", name: "shell", call_id: "c1", arguments: JSON.stringify({ command: ["bash", "-lc", SCRIPT_ALPHA()] }) }),
+    rec("2026-08-19T10:00:03.000Z", "response_item", { type: "function_call_output", call_id: "c1", output: sizedText(`alpha ${SECRET_MARKER} `, 500) }),
+    rec("2026-08-19T10:00:04.000Z", "response_item", { type: "custom_tool_call", name: "exec", call_id: "c2", input: SCRIPT_BETA }),
+    rec("2026-08-19T10:00:05.000Z", "response_item", { type: "custom_tool_call_output", call_id: "c2", output: sizedText("beta ", 250) }),
+    rec("2026-08-19T10:00:06.000Z", "response_item", { type: "function_call", name: "read_file", call_id: "c3", arguments: JSON.stringify({ path: `/some/where/${SECRET_MARKER}` }) }),
+    rec("2026-08-19T10:00:07.000Z", "response_item", { type: "function_call_output", call_id: "c3", output: READ_TEXT }),
+    rec("2026-08-19T10:00:08.000Z", "response_item", { type: "function_call", name: "shell", call_id: "c4", arguments: JSON.stringify({ cmd: "rg -n x y" }) }),
+    rec("2026-08-19T10:00:09.000Z", "response_item", { type: "function_call_output", call_id: "c4", output: CODEX_REFUSAL }),
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    assertToolResultTable(result.stdout, { refusalCode: "GUARD-GRAMMAR-REDIRECT-REFUSED", refusalGroup: "tool:shell", refusalBytes: 200 });
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(escapeRe(dir)), "no absolute path");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B9 usage-ledger --timeline (antigravity brain transcript) lists result bytes and codes and says it cannot name the script", () => {
+  const { dir, file } = timelineFile([
+    { step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-08-19T10:00:00Z", content: "go" },
+    agyStep(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 5, cache_read_tokens: 1, output_tokens: 2, tool_calls: [] }),
+    agyStep(2, "2026-08-19T10:00:03Z", "GENERIC", { content: sizedText(`alpha ${SECRET_MARKER} `, 500) }),
+    agyStep(3, "2026-08-19T10:00:04Z", "GENERIC", { content: sizedText("beta ", 250) }),
+    agyStep(4, "2026-08-19T10:00:05Z", "GENERIC", { content: READ_TEXT }),
+    agyStep(5, "2026-08-19T10:00:06Z", "GENERIC", { status: "ERROR", content: "", error: AGY_REFUSAL }),
+    agyStep(6, "2026-08-19T10:00:07Z", "GENERIC", {}),
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const lines = result.stdout.split("\n");
+    assert.ok(lines.indexOf("Tool results (UTF-8 bytes of the result text):") > lines.findIndex((line) => line.startsWith("TOTAL:")));
+    assert.ok(lines.includes("- tool:not-recorded | count 4 | bytes 1000 | largest 500 | share 100.0 %"), result.stdout);
+    assert.ok(lines.includes("- AGY-NATIVE-BRAIN-WRITE | count 1 | bytes 200 | largest 200 | share 20.0 %"), result.stdout);
+    assert.ok(lines.includes("- AGY-NATIVE-BRAIN-WRITE: 1"));
+    assert.ok(lines.includes("Note: this transcript layout does not record which tool produced a result, so results are not grouped by script."), result.stdout);
+    assert.doesNotMatch(result.stdout, new RegExp(SECRET_MARKER));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("C31-B9 usage-ledger --timeline prints the unavailable line, not zeros, for the older Antigravity form and no table for a brain transcript without results", () => {
+  const old = timelineFile([
+    { type: "turn.started", timestamp: "2026-08-19T10:00:00.000Z" },
+    { type: "turn.completed", timestamp: "2026-08-19T10:00:30.000Z", usage: { input_tokens: 50, output_tokens: 6, cached_tokens: 20 } },
+  ]);
+  const none = timelineFile([agyStep(1, "2026-08-19T10:00:02Z", "PLANNER_RESPONSE", { input_tokens: 5, cache_read_tokens: 1, output_tokens: 2 })]);
+  try {
+    const oldOut = run(["--timeline", old.file]);
+    assert.equal(oldOut.status, 0, oldOut.stderr);
+    assert.ok(oldOut.stdout.split("\n").includes("Tool results: n/a (this format records no tool result)"), oldOut.stdout);
+    assert.doesNotMatch(oldOut.stdout, /share \d/u);
+    assert.equal(JSON.parse(run(["--timeline", old.file, "--json"]).stdout).toolResults, null);
+    const noneOut = run(["--timeline", none.file]);
+    assert.equal(noneOut.status, 0, noneOut.stderr);
+    assert.doesNotMatch(noneOut.stdout, /Tool results/u);
+  } finally {
+    rmSync(old.dir, { recursive: true, force: true });
+    rmSync(none.dir, { recursive: true, force: true });
+  }
+});
