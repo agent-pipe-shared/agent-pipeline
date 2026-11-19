@@ -136,7 +136,7 @@ export function evaluateNativeChildCall(input, { routeSource } = {}) {
   if (status !== "mismatch") return { ok: true, attributed, modelCheck };
   return {
     ok: true, attributed, modelCheck,
-    notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model).`,
+    notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model). If the parent call passed inherit or no Model, re-issue it with Model: "flash" (the dispatch guard requires it for this role); if it passed flash, the host resolved the alias to the session model: nothing to repair, the observation is recorded in the verdict modelCheck.`,
   };
 }
 

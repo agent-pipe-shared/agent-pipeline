@@ -103,6 +103,8 @@ node <loaded-plugin-root>/scripts/elephant-implementation-dispatch.mjs dispatch 
 It is documented as the Codex-to-Antigravity route, takes a signed session consent, and is not how an Antigravity-hosted Elephant
 implements. Make at most one attempt and never retry a launched job. The child gets no stdin and is killed after its bounded timeout.
 
+A returned `readiness-reviewer` design review has no `export-report` or `finalize` step on Antigravity; the per-runner step before `design-review-receipt.mjs create` is the table in `design-course.md`.
+
 Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `pipeline-core:critic`, `readiness-reviewer`, `plan-verifier`,
 `consult-advisor`. Prepare the call first with the command below. One example packet (field list: `schema`, `dispatchId`, `transport`, `role`,
 `prompt`, `candidate{commit,tree}`, `requiredPaths`, `requiredPathSha256`, `resultDestination`):

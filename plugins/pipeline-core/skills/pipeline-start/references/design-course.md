@@ -81,6 +81,14 @@ was needed; capability evidence is not an Advisor answer.
    **Before `create`:** run `export-report` (above) so the report exists on disk
    and its observation is bound; a `create` without the exported report has
    nothing to bind. Order per round: review returns, `export-report`, `create`, commit.
+   The step between the returned review and `create`, per runner (`design-review-receipt.mjs` has the
+   subcommands `create` and `export-report` only; there is no `finalize` step for a design review):
+
+   | Runner | Step before `create` |
+   |---|---|
+   | Claude | `design-review-receipt.mjs export-report --repo <root> --out <report path>` |
+   | Codex | no `export-report` (it needs a Claude observation); write the returned text to the report file as returned, then `create --report` (receipt says `unobserved`) |
+   | Antigravity | no `export-report` (it needs a Claude observation); write the returned text to the report file as returned, then `create --report` (receipt says `unobserved`) |
    Dispatching the design review: the `critic-review` skill is for implementation
    batches (diff range, batch preflight) and does not fit uncommitted design
    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.

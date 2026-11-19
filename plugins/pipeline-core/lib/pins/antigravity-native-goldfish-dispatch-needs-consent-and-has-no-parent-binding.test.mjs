@@ -762,3 +762,42 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
     `plan --root '${root}' --branch ${branch} --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch ${branch} --allowed-path a --force`,
   ]) assert.equal(admitted(args), false, args);
 });
+
+// C31-B6 / L15: the notice named no repair. A real mismatch (an unknown family) now says what to do for both ways it can happen.
+test("C31-B6: the child model notice names both repairs; a tier match still earns no notice", async () => {
+  const fx = brainFixture();
+  try {
+    descriptor(fx, CHILD, "goldfish-implementor");
+    writeFileSync(join(fx.workspace, "x.txt"), "x\n");
+    const { evaluateNativeChildCall } = await loadModule();
+    const childCall = { name: "view_file", args: { AbsolutePath: join(fx.workspace, "x.txt") } };
+    const odd = evaluateNativeChildCall(payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: "gemini-4-hydrogen-tiered-high", toolCall: childCall }));
+    assert.equal(odd.modelCheck.status, "mismatch");
+    assert.ok(odd.notice.includes('Model: "flash"'), odd.notice);
+    assert.match(odd.notice, /inherit/u);
+    assert.match(odd.notice, /modelCheck/u);
+    assert.equal(odd.notice.includes("\n"), false, "one notice line");
+    const tierName = selectedModel("implement").includes("pro") ? "pro" : "flash";
+    const same = evaluateNativeChildCall(payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement").replace(/flash.*|pro.*/u, "") + `${tierName}-agent`, toolCall: childCall }));
+    assert.equal(same.modelCheck.status, "tier-match");
+    assert.equal(same.notice, undefined);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// C31-B6: the design-review reference names, per runner, only commands that exist (design-review-receipt.mjs has `export-report` and `create`
+// and no other subcommand; `finalize` is a Goldfish Final Return step, never a design-review step).
+test("C31-B6: the design-course reference gives a per-runner table of the step before design-review-receipt create, naming only existing commands", () => {
+  const refs = join(libDir, "..", "skills", "pipeline-start", "references");
+  const course = readFileSync(join(refs, "design-course.md"), "utf8");
+  const agy = readFileSync(join(refs, "antigravity-native-dispatch.md"), "utf8");
+  const receipt = readFileSync(join(libDir, "..", "scripts", "design-review-receipt.mjs"), "utf8");
+  assert.match(receipt, /command === "export-report"/u);
+  assert.match(receipt, /command !== "create"\) return refuse\("DRC-USAGE", `expected the subcommand/u);
+  const table = course.split("\n").map((line) => line.trimStart()).filter((line) => /^\|/u.test(line) && /Claude|Codex|Antigravity/u.test(line));
+  assert.equal(table.length >= 3, true, "one table row per runner");
+  for (const runner of ["Claude", "Codex", "Antigravity"]) assert.ok(table.some((line) => line.startsWith(`| ${runner} `)), runner);
+  assert.ok(table.find((line) => line.startsWith("| Claude ")).includes("export-report"));
+  assert.ok(table.find((line) => line.startsWith("| Antigravity ")).includes("no `export-report`"));
+  for (const text of [course, agy]) assert.doesNotMatch(text, /finalize[^\n]{0,40}before[^\n]{0,40}create/iu);
+  assert.match(agy, /design-course\.md/u, "the Antigravity reference points at the table");
+});
