@@ -3039,3 +3039,41 @@ test("C30D-G3 the Goldfish pointer and its marker are unchanged: kind goldfish, 
   }
   assert.equal(ref.renderPointerPrompt({ text: written, path: "scratch/briefing-ALF-T1.md" }), built.dispatchCall.promptPointer);
 });
+
+// C31-M4 (L7 + L8, AC-112): the briefing says who commits per runner and admits the RED evidence path in its own write scope.
+const HOST_COMMIT_LINE = "- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).";
+const RED_EVIDENCE_PATH = "specs/feat-x/evidence/ALF-T1-red-evidence.txt";
+
+test("C31-M4 L7: the Antigravity branch-worktree briefing tells the child to commit its owned files on its branch with the Dispatch trailer", async () => {
+  const { runDispatchBriefing } = await lib();
+  const route = await agyRouteOf("duty.implement");
+  const { fx, argv } = packageFixture({ modelId: route.nativeTier, runner: "antigravity" });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
+  assert.equal(built.text.includes(HOST_COMMIT_LINE), false, "the host-commit line is not true for a branch worktree child");
+  assert.match(built.text, /commits its owned files on its worktree branch with the briefed `Dispatch: ALF-T1 \(goldfish\)` trailer before reporting/u);
+  assert.match(built.text, /AGYI-NO-COMMITS/u);
+});
+
+test("C31-M4 L7: the Claude briefing keeps the host-commit line byte-identical and carries no branch-commit instruction", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({ criterion: "AC-1" });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
+  assert.equal(built.text.split(`\n${HOST_COMMIT_LINE}\n`).length, 2);
+  assert.doesNotMatch(built.text, /AGYI-NO-COMMITS/u);
+});
+
+test("C31-M4 L8: the write scope statement admits the RED evidence file derived from the dispatch id, optional and outside the changed paths", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({ criterion: "AC-1" });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
+  const scope = built.text.split("### 4. Forbidden")[1].split("### 5.")[0];
+  assert.ok(scope.includes(`\`${RED_EVIDENCE_PATH}\``), scope);
+  assert.match(scope, /RED evidence file/u);
+  assert.ok(built.text.split("### 1. Goal")[0].includes(RED_EVIDENCE_PATH), "the testFirst paragraph names the same path");
+  const plain = packageFixture();
+  const noCriterion = runDispatchBriefing(plain.argv, depsOf(plain.fx));
+  assert.equal(noCriterion.text.includes(RED_EVIDENCE_PATH), false, "no testFirst paragraph, no evidence path");
+});

@@ -296,9 +296,32 @@ function visualCheckBlock(pkg) {
 
 // C18-19 (AC-239): one fixed paragraph, only for a package that carries a criterion and names a test among its paths or its check.
 const TEST_PATH = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)(?:tests?|__tests__)\/)/u;
+function testFirstEvidenceParagraphApplies(pkg) {
+  return typeof pkg?.criterion === "string" && [...(pkg.paths ?? []), ...(typeof pkg.check === "string" ? [pkg.check] : [])].some((path) => TEST_PATH.test(path));
+}
 export function testFirstEvidenceParagraph(pkg) {
-  if (typeof pkg?.criterion !== "string" || ![...(pkg.paths ?? []), ...(typeof pkg.check === "string" ? [pkg.check] : [])].some((path) => TEST_PATH.test(path))) return "";
-  return `\n\nTest-first evidence in the return (optional, self-attested): add one more key to the JSON object, \`testFirst\`: \`{"red":[{"command":"<the RED command>","exitCode":<its non-zero exit code>,"evidencePath":"<repo-relative evidence file>"}],"greenCommand":"<the GREEN command>"}\`. Write the evidence file with the redacting evidence writer the template names, from the RED run you made before your first production edit. The host only checks that each evidence file exists, is a regular non-empty file inside the repository, and shows the result as \`testFirstEvidence\` (attested, unverifiable or absent) in the dispatch record; the flag is for the Critic and the close readback, never a gate, and the host never refuses a commit because of it. It is your own statement plus file existence: nobody observes the order of events.`;
+  if (!testFirstEvidenceParagraphApplies(pkg)) return "";
+  return `\n\nTest-first evidence in the return (optional, self-attested): add one more key to the JSON object, \`testFirst\`: \`{"red":[{"command":"<the RED command>","exitCode":<its non-zero exit code>,"evidencePath":"<repo-relative evidence file>"}],"greenCommand":"<the GREEN command>"}\`. Write the evidence file${redEvidencePath(pkg) === null ? "" : ` at \`${redEvidencePath(pkg)}\``} with the redacting evidence writer the template names, from the RED run you made before your first production edit. The host only checks that each evidence file exists, is a regular non-empty file inside the repository, and shows the result as \`testFirstEvidence\` (attested, unverifiable or absent) in the dispatch record; the flag is for the Critic and the close readback, never a gate, and the host never refuses a commit because of it. It is your own statement plus file existence: nobody observes the order of events.`;
+}
+
+// C31-M4 (L8): the briefing asks for test-first evidence but its write scope never named a file for it, so no RED evidence was written.
+// The path is derived from the dispatch id and the spec's feature folder (specs/<feature>/evidence/); null when no testFirst paragraph is rendered.
+export function redEvidencePath(pkg) {
+  if (testFirstEvidenceParagraphApplies(pkg) === false || typeof pkg.id !== "string") return null;
+  const feature = /^specs\/([^/]+)\//u.exec(typeof pkg.spec === "string" ? pkg.spec.replace(/\\/gu, "/") : "")?.[1];
+  return `${feature === undefined ? "evidence" : `specs/${feature}/evidence`}/${pkg.id}-red-evidence.txt`;
+}
+function redEvidenceScopeClause(pkg) {
+  const path = redEvidencePath(pkg);
+  return path === null ? "" : `, plus the optional RED evidence file \`${path}\` (written only by the redacting evidence writer; it is not a changed path and is never a gate)`;
+}
+
+// C31-M4 (L7): an Antigravity child runs in its own branch worktree and commits there (agy-native-integrate refuses AGYI-NO-COMMITS otherwise);
+// the host-commit line stays byte-identical for every other runner.
+const HOST_COMMIT_LINE = "- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).";
+function commitLine(pkg, dispatchId) {
+  if (pkg?.runner !== "antigravity") return HOST_COMMIT_LINE;
+  return `- Own branch worktree (this runner): no dispatch record and no push; the host-commit rule above does not apply to you. The child commits its owned files on its worktree branch with the briefed \`Dispatch: ${dispatchId} (goldfish)\` trailer before reporting (plus \`AI-Assisted: true\`, by explicit pathspec, never \`git add -A\`); the orchestrator integrates that branch, and without a commit \`agy-native-integrate\` refuses with AGYI-NO-COMMITS.`;
 }
 
 // Candidate 19 (B1, role rule GF-10): one fixed paragraph, our own wording of the smallest-complete-change rule, for every dispatch that carries a
@@ -405,10 +428,10 @@ ${verify}
 
 ### 4. Forbidden
 
-- Scope: touch ONLY ${b.allowedPaths.map((path) => `\`${path}\``).join(", ")}; any other file is out of scope.
+- Scope: touch ONLY ${b.allowedPaths.map((path) => `\`${path}\``).join(", ")}${redEvidenceScopeClause(pkg, b.dispatchId)}; any other file is out of scope.
 - Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
 - No-go paths: everything outside the write scope, and every protected path in \`templates/prompts/agent-obligations.md\` §2 and the plugin's protected baseline; \`.git/\` is never a working location; use \`scratch/\` for anything temporary.
-- No \`git add\`, no \`git commit\`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+${commitLine(pkg, b.dispatchId)}
 - Never run a command that dumps the environment.
 - Restore-before-yield: leave no temporary breakage in the checkout.
 - Calibration file: \`${calibration.path}\` (project \`${calibration.project}\`, handover \`${calibration.handover}\`); read it without changing it. These name the project and calibration for your bootstrap confirmation line.
