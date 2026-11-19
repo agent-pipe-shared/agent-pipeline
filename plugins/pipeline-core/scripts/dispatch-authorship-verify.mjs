@@ -972,7 +972,11 @@ function main(argv) {
     try {
       root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     } catch {
-      process.stderr.write("not inside a git repository: run from the project or pass --root <project>\n");
+      // Outside a repository a call with nothing to check (for example --help) still answers with the usage line, never with the repository refusal.
+      const hasRevisionInput = argv.some((arg) => !arg.startsWith("--"));
+      process.stderr.write(hasRevisionInput || argv.includes("--range")
+        ? "not inside a git repository: run from the project or pass --root <project>\n"
+        : "usage: dispatch-authorship-verify.mjs [--strict] [--json] [--root <project>] <sha>... | --range <a>..<b>\n");
       return 3;
     }
   }
