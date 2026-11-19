@@ -4,7 +4,7 @@
 // Rehearse a PO apply script in a fresh clone of the current HEAD (never in the real tree). Writes the full output to out.log next to this file.
 // usage: node scratch/agent-out/w24reh/rehearse.mjs <apply script relative to repo root>
 import { spawnSync } from "node:child_process";
-import { mkdirSync, copyFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, copyFileSync, cpSync, rmSync, writeFileSync } from "node:fs";
 import { resolve, dirname, basename } from "node:path";
 const repo = resolve(import.meta.dirname, "../../..");
 const clone = resolve(import.meta.dirname, process.argv[3] ?? "clone"); // a second name keeps a running Full Verify clone untouched
@@ -17,6 +17,8 @@ sh("git", ["checkout", "--detach", head], clone);
 sh("git", ["remote", "add", "upstream", repo], clone); // the Full Verify's security step looks for a remote named upstream
 mkdirSync(resolve(clone, "scratch"), { recursive: true });
 copyFileSync(resolve(repo, script), resolve(clone, "scratch", basename(script)));
+// The apply script reads its patches and messages from its own directory (an exported chain, untracked until the PO's apply): a clone of HEAD does not have it, the rehearsal stopped on "can't open patch" (candidate 32).
+if (dirname(script) !== "." && dirname(script) !== "scratch") cpSync(resolve(repo, dirname(script)), resolve(clone, dirname(script)), { recursive: true });
 const r = sh("bash", [`scratch/${basename(script)}`], clone, { GIT_AUTHOR_NAME: "Rehearsal", GIT_AUTHOR_EMAIL: "rehearsal@example.invalid", GIT_COMMITTER_NAME: "Rehearsal", GIT_COMMITTER_EMAIL: "rehearsal@example.invalid" });
 writeFileSync(resolve(import.meta.dirname, `out-${basename(process.argv[3] ?? "clone")}.log`), `${r.stdout}\n--- stderr ---\n${r.stderr}`);
 // Candidate 19 (w155): applying the chain is not enough; a registered suite that the capability inventory does not name makes a Full Verify red. Run the registration checker on the resulting tree.
