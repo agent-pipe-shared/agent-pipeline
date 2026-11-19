@@ -188,6 +188,21 @@ test("a preflight refusal keeps its own code and reason", () => {
   assert.deepEqual(result.stop, { step: "preflight", code: "CDP-EVIDENCE", reason: "no evidence", repair: "produce it" });
 });
 
+// C31-M2 (L10a, run B: the agent could not see which field of the delta request failed): the inner refusal of the preflight reaches the agent with its code and its
+// whole reason, however long; a refusal that carries only structured fields shows the line the preflight printed.
+test("C31-M2 the inner refusal of the preflight is passed through unshortened with its inner code, and a structured refusal without words shows the printed line", () => {
+  const reason = `the delta request field changedBehaviorClaims is invalid: ${"expected a non-empty list of bare ids ".repeat(80)}END-OF-REASON`;
+  const long = stub({ "critic-dispatch-preflight.mjs": no({ status: "refused", code: "RE-DELTA-BINDINGS-INVALID", reason, repair: "register-feature-package.mjs --root <root> --add-delta-request <input.json>" }, 1) });
+  const result = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: long.runCommand });
+  assert.equal(result.stop.code, "RE-DELTA-BINDINGS-INVALID");
+  assert.equal(result.stop.reason, reason, "the reason is neither cut nor reworded");
+  const structured = stub({ "critic-dispatch-preflight.mjs": no({ status: "refused", code: "RE-DELTA-BINDINGS-INVALID", binding: "changedBehaviorClaims", detail: "x".repeat(2400) }, 1) });
+  const shown = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: structured.runCommand });
+  assert.equal(shown.stop.code, "RE-DELTA-BINDINGS-INVALID");
+  assert.match(shown.stop.reason, /"binding":"changedBehaviorClaims"/u);
+  assert.ok(shown.stop.reason.endsWith("}"), "the printed line is shown whole");
+});
+
 test("an explicit registration commit passes through, and a step with a code but no words shows its output", () => {
   const given = "9".repeat(40);
   const passed = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });

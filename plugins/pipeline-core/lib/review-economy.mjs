@@ -184,6 +184,23 @@ function validPathInvariantMap(map) {
     && new Set(invariants).size === invariants.length);
 }
 
+// C31-M2 (L10a): the expected form of each delta binding, said where the refusal is made (an id is made of letters, digits, dot, underscore and hyphen).
+const DELTA_REGISTER_COMMAND = "register-feature-package.mjs --root <root> --add-delta-request <input.json> (register-feature-package.mjs --help, section \"Critic delta request route\")";
+const DELTA_BINDING_FORMS = Object.freeze({
+  base: "a full 40-character commit id (derived by the registration verb, never typed)",
+  head: "a full 40-character commit id (derived by the registration verb, never typed)",
+  tree: "a full 40-character tree id (derived by the registration verb, never typed)",
+  changedPaths: "a non-empty list of repository-relative paths (derived from the range by the registration verb)",
+  changedBehaviorClaims: "a non-empty list of bare ids of letters, digits, dot, underscore and hyphen; when it is not supplied the verb derives it from the invariant ids of pathInvariantMap, so an invalid id there fails here",
+  priorReceipt: "an object { id, sha256 } of the previous consumed round (derived by the registration verb)",
+  pathInvariantMap: "an object that maps every changed path to a non-empty list of invariant ids made of letters, digits, dot, underscore and hyphen, without duplicates in one list",
+  pathInvariantMapSha256: "the sha256 of the canonical pathInvariantMap (derived by the registration verb; a request file edited by hand fails here: write a new one)",
+  coordinatorImpactConfirmed: "true (the Coordinator confirmed the impact)",
+  trustBoundaryChanged: "true or false, or absent (it no longer steers a round)",
+  impactAmbiguous: "true or false",
+});
+const deltaBindingReason = (binding) => `the delta request field ${binding} is invalid; expected ${DELTA_BINDING_FORMS[binding] ?? "the registered form"}. Correct the input file and register the request again: ${DELTA_REGISTER_COMMAND}`;
+
 export function admitReviewAttempt(input) {
   if (!isObject(input)) return { ok: false, mode: null, code: "RE-REVIEW-SHAPE" };
   // D190: the course is one full round, then diff rounds until PASS; no count refuses a diff round.
@@ -221,12 +238,15 @@ export function admitReviewAttempt(input) {
     ["impactAmbiguous", () => typeof input.impactAmbiguous === "boolean"],
   ];
   const failed = structural.find(([, valid]) => !valid());
-  if (failed) return { ok: false, mode: null, code: "RE-DELTA-BINDINGS-INVALID", binding: failed[0], affectedInvariantIds: [] };
+  // C31-M2 (L10a): the course admission projection forwards `reason`, not `binding`, so the field and its expected form travel in the reason.
+  if (failed) return { ok: false, mode: null, code: "RE-DELTA-BINDINGS-INVALID", binding: failed[0], reason: deltaBindingReason(failed[0]), affectedInvariantIds: [] };
   if (input.impactAmbiguous === true) {
     return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-FULL", reason: "impact-ambiguous", affectedInvariantIds: [] };
   }
   const unknown = input.changedPaths.filter((path) => !Object.hasOwn(input.pathInvariantMap, path));
-  if (unknown.length > 0) return { ok: false, mode: null, code: "RE-DELTA-UNKNOWN-PATH", affectedInvariantIds: [] };
+  if (unknown.length > 0) {
+    return { ok: false, mode: null, code: "RE-DELTA-UNKNOWN-PATH", reason: `the changed path(s) ${unknown.join(", ")} have no entry in the field pathInvariantMap of the delta request; give each an entry "<path>": ["<invariant-id>"] in the input file and register the request again: ${DELTA_REGISTER_COMMAND}`, affectedInvariantIds: [] };
+  }
   return {
     ok: true,
     mode: "delta",

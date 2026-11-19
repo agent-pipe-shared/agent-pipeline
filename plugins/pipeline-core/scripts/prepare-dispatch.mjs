@@ -68,7 +68,8 @@ function outcome(verb, status, fields) { return Object.freeze({ schema: DISPATCH
 function stopped(verb, step, value, fallback, extra = {}) {
   const code = typeof value?.code === "string" ? value.code : fallback;
   const reason = value?.reason ?? value?.message ?? value?.error ?? "the step did not return a usable result";
-  return outcome(verb, "stopped", { stop: { step, code, reason: String(reason).slice(0, 1500), repair: value?.repair ?? `read the output of step ${step}, fix the cause and run the identical command again` }, ...extra });
+  // C31-M2 (L10a): the preflight's own refusal reaches the agent whole (its code, and the field and expected form its reason names); only the other steps' free output is bounded.
+  return outcome(verb, "stopped", { stop: { step, code, reason: step === "preflight" ? String(reason) : String(reason).slice(0, 1500), repair: value?.repair ?? `read the output of step ${step}, fix the cause and run the identical command again` }, ...extra });
 }
 
 const defaultRunner = (root) => (executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } });

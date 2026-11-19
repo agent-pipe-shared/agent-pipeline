@@ -475,8 +475,13 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       if (parentDetail !== null) repair = criticCourseParentRepair({ detail: parentDetail, candidate: candidateCommit, specPath: spec });
       // A generic-batch refusal carries its own repair text; without this the caller sees only the bare code.
       if (repair === null && admission?.decision?.code?.startsWith("CGB-") && typeof admission.decision.reason === "string") repair = admission.decision.reason;
+      // C31-M2 (L10a): the inner refusal of the admission keeps its own words. A delta-request refusal (RE-DELTA-*) names the failing field and the expected form in `reason`
+      // (it used to be cut to the bare code), and without a table repair the one command that fixes the request is named.
+      const innerReason = typeof admission?.decision?.reason === "string" && admission.decision.reason !== "" ? admission.decision.reason : null;
+      if (repair === null && String(admission?.decision?.code).startsWith("RE-DELTA-")) repair = "Correct the field the reason names in the delta request input file and register the request again: register-feature-package.mjs --root <root> --add-delta-request <input.json>, commit the registration, then rerun this preflight with the arguments that verb prints.";
       return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+        ...(innerReason === null ? {} : { reason: innerReason }),
         ...(parentDetail === null ? {} : { detail: parentDetail }),
         ...(repair === null ? {} : { repair }),
         // CGR-02: the ready release of each open packet of an old round that holds this review unit (exact request, command and cost).
@@ -948,24 +953,24 @@ export function parseCriticDispatchPreflightArgs(argv) {
       if (derivation.status === "derived") selectors["--registration-commit"] = derivation.commit;
       else if (derivation.status === "ambiguous") {
         const reason = `An exact registration commit is required: ${derivation.commits.length} commits qualify (${derivation.commits.join(", ")}); the preflight never picks one. Pass --registration-commit with the commit that registered the evidence of this round.`;
-        fail("CDP-ARGUMENT", "An exact registration commit is required.", { reason, registrationCommitDerivation: { status: "ambiguous", commits: derivation.commits } });
+        fail("CDP-ARGUMENT", reason, { reason, registrationCommitDerivation: { status: "ambiguous", commits: derivation.commits } });
       }
     }
   }
   if (Object.keys(selectors).length !== 0) {
-    if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");
+    if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors (--registration-commit, --accepted-contract, --criterion-locator, --delta-request, --successor-of) cannot be mixed with the evidence sweep: run the sweep without them, or the course review without the sweep flag.");
     if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", selectors["--registration-commit"] === undefined
       ? "An exact registration commit is required: --registration-commit <full 40-hex commit id>."
       : "--registration-commit takes an exact commit id, not a short or symbolic one: pass the full 40-hex commit id (git rev-parse <ref> prints it).");
     const match = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
-    if (!match) fail("CDP-ARGUMENT", "Course selectors require a feature Spec.");
+    if (!match) fail("CDP-ARGUMENT", "Course selectors require a feature Spec: pass --spec specs/<feature id>/<spec file> (a path under specs/<feature id>/).");
     const acceptedPath = selectors["--accepted-contract"] === undefined ? null : normalizePath(selectors["--accepted-contract"], "accepted contract");
     const locatorPath = selectors["--criterion-locator"] === undefined ? null : normalizePath(selectors["--criterion-locator"], "criterion locator");
     let criterionLocator = null;
     if (locatorPath !== null) {
       try { criterionLocator = JSON.parse(localEvidence(values.root, locatorPath)); }
-      catch { fail("CDP-ARGUMENT", "Criterion locator is unavailable."); }
-      if (!isObject(criterionLocator) || Object.keys(criterionLocator).sort().join() !== ["criterionId", "endByte", "excerptSha256", "schema", "sourcePath", "sourceSha256", "startByte"].join()) fail("CDP-ARGUMENT", "Criterion locator must be closed.");
+      catch { fail("CDP-ARGUMENT", "Criterion locator is unavailable: --criterion-locator <path> must name a readable JSON file inside the repository."); }
+      if (!isObject(criterionLocator) || Object.keys(criterionLocator).sort().join() !== ["criterionId", "endByte", "excerptSha256", "schema", "sourcePath", "sourceSha256", "startByte"].join()) fail("CDP-ARGUMENT", "Criterion locator must be closed: the --criterion-locator file holds exactly the keys criterionId, endByte, excerptSha256, schema, sourcePath, sourceSha256, startByte.");
     }
     // K-30: the package's feature id at the candidate, not the Spec's folder name, when the approved Spec stayed in an earlier dated folder.
     const courseCandidate = typeof values.root === "string" && typeof values.candidate === "string" ? gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]) : null;

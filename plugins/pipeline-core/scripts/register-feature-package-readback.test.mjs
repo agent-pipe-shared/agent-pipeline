@@ -777,3 +777,91 @@ test("C31-L20-4: with two features recorded as discarded the sealed one is chose
   const added = addCriticReviewLineage({ root: f.root, packetId: f.packetId, featureId: SUCCESSOR });
   assert.equal(added.status, "lineage-added", JSON.stringify(added));
 });
+
+// C31-M2 (L10a + L12; AC-112 is the closest accepted criterion; consumer run B: six refusals before round 2). The behaviour-claims list is derived from the invariants of the
+// map, the map is derived from the invariants already registered in the course, and a path without a registered invariant is a typed refusal that names the path and the field.
+const deltaInputWithout = (root, fields) => put(root, "scratch/delta-input.json", JSON.stringify({ coordinatorImpactConfirmed: true, impactAmbiguous: false, ...fields }));
+const registeredRequest = (root, added) => JSON.parse(readFileSync(join(root, added.deltaRequestPath), "utf8"));
+
+test("C31-M2-1: the behaviour-claims list is not an input any more: it is derived from the invariant ids of the map, and a supplied list still wins", () => {
+  const f = consumedRound();
+  correctedRound(f);
+  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
+  const changed = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE }).changedPaths;
+  const map = Object.fromEntries(changed.map((path, index) => [path, index === 0 ? ["inv-one", "inv-two"] : ["inv-one"]]));
+  deltaInputWithout(f.root, { pathInvariantMap: map });
+  const added = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  assert.deepEqual(registeredRequest(f.root, added).changedBehaviorClaims, ["inv-one", "inv-two"], "the claims are the sorted unique invariant ids of the map");
+  // A supplied list is an override and wins over the derivation.
+  deltaInputWithout(f.root, { changedBehaviorClaims: ["claim-x"], pathInvariantMap: map });
+  const supplied = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(supplied.status, "delta-request-added", JSON.stringify(supplied));
+  assert.deepEqual(registeredRequest(f.root, supplied).changedBehaviorClaims, ["claim-x"]);
+});
+
+test("C31-M2-2: a map derived from the invariants already registered in the course is byte for byte the manual map of the same diff (the same request digest)", () => {
+  const f = consumedRound();
+  correctedRound(f);
+  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
+  const changed = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE }).changedPaths;
+  deltaInputWithout(f.root, { pathInvariantMap: Object.fromEntries(changed.map((path) => [path, ["inv-one"]])) });
+  const manual = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(manual.status, "delta-request-added", JSON.stringify(manual));
+  // The same diff once more, now with nothing but the two confirmations: the map and the claims come from what the course has registered.
+  deltaInputWithout(f.root, {});
+  const derived = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(derived.status, "already-registered", JSON.stringify(derived));
+  assert.equal(derived.deltaRequestPath, manual.deltaRequestPath, "the digest in the path is the digest of the bytes");
+});
+
+test("C31-M2-3: a changed path with no registered invariant is a typed refusal that names exactly those paths, the field and the one command; a supplied partial map covers its own paths only", () => {
+  const f = consumedRound();
+  correctedRound(f);
+  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
+  const changed = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE }).changedPaths;
+  assert.ok(changed.includes("src/fix2.mjs"), JSON.stringify(changed));
+  deltaInputWithout(f.root, {});
+  const none = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(none.code, "FPR-DELTA-INVARIANT-UNKNOWN", JSON.stringify(none));
+  assert.deepEqual(none.missingPaths, changed);
+  for (const path of changed) assert.ok(none.reason.includes(path), `${path}: ${none.reason}`);
+  assert.match(none.reason, /pathInvariantMap/u);
+  assert.match(none.reason, /register-feature-package\.mjs --root <root> --add-delta-request scratch\/delta-input\.json/u);
+  assert.equal(git(f.root, ["status", "--porcelain", "--untracked-files=all", "--", "specs"]), "", "a refusal writes nothing");
+  deltaInputWithout(f.root, { pathInvariantMap: { "src/fix2.mjs": ["inv-fix"] } });
+  const partial = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(partial.code, "FPR-DELTA-INVARIANT-UNKNOWN", JSON.stringify(partial));
+  assert.deepEqual(partial.missingPaths, changed.filter((path) => path !== "src/fix2.mjs"));
+  assert.ok(!partial.reason.includes("src/fix2.mjs"), "a covered path is not named as missing");
+});
+
+test("C31-M2-5: the real preflight refuses a delta request with an invalid supplied claim list naming the field, the expected form and the command (reason and repair on the printed line)", () => {
+  const f = consumedRound();
+  const candidate = correctedRound(f);
+  deltaInput(f.root, { "placeholder.mjs": ["inv-one"] });
+  const changed = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE }).changedPaths;
+  put(f.root, "scratch/delta-input.json", JSON.stringify({ changedBehaviorClaims: ["not a bare id!"], coordinatorImpactConfirmed: true, impactAmbiguous: false, pathInvariantMap: Object.fromEntries(changed.map((path) => [path, ["inv-one"]])) }));
+  const added = addCriticDeltaRequest({ root: f.root, inputPath: "scratch/delta-input.json", state: DISCARDED_STATE });
+  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
+  const registration = commitPaths(f.root, added.commitPaths, "register the delta request");
+  const argv = ["--root", f.root, "--base", added.preflight.baseCommit, "--candidate", candidate, "--spec", CRITIC_SPEC(SUCCESSOR), "--evidence", `specs/${SUCCESSOR}/evidence/diagnostic-r2.json`, "--registration-commit", registration, "--delta-request", added.deltaRequestPath];
+  const run = spawnSync(process.execPath, [join(SCRIPTS_DIR, "critic-dispatch-preflight.mjs"), ...argv], { encoding: "utf8", shell: false, env: GIT_ENV, cwd: f.root });
+  const printed = JSON.parse(`${run.stdout}${run.stderr}`.split("\n").find((line) => line.startsWith("{")));
+  assert.equal(printed.code, "RE-DELTA-BINDINGS-INVALID", `${run.stdout}${run.stderr}`);
+  assert.match(printed.reason, /changedBehaviorClaims/u);
+  assert.match(printed.reason, /bare ids/u);
+  assert.match(printed.repair, /register-feature-package\.mjs --root <root> --add-delta-request/u);
+});
+
+test("C31-M2-4: the help documents the optional fields with one complete copy-paste input", () => {
+  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /changedBehaviorClaims[^\n]*(?:optional|derived)/iu);
+  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /Complete input example/u);
+  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /FPR-DELTA-INVARIANT-UNKNOWN/u);
+  const example = /Complete input example[^\n]*\n\s*(\{[^\n]*\})/u.exec(REGISTER_FEATURE_PACKAGE_HELP);
+  assert.ok(example, "the example is one JSON line");
+  const parsed = JSON.parse(example[1]);
+  assert.equal(parsed.coordinatorImpactConfirmed, true);
+  assert.equal(parsed.impactAmbiguous, false);
+  assert.ok(Object.values(parsed.pathInvariantMap).every((ids) => Array.isArray(ids) && ids.length > 0));
+});

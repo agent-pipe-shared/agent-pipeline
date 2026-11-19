@@ -151,6 +151,16 @@ ok("RE22 ambiguous impact is admitted as an effective full round, never as a del
 ok("RE22b fallback still demands valid structural bindings and names the failing one", (() => { const r = admitReviewAttempt({ ...delta, trustBoundaryChanged: true, priorReceipt: null }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
 ok("RE22c fallback needs the coordinator impact confirmation", (() => { const r = admitReviewAttempt({ ...delta, impactAmbiguous: true, coordinatorImpactConfirmed: false }); return r.ok === false && r.binding === "coordinatorImpactConfirmed"; })());
 ok("RE22d a delta with an invalid prior receipt stays refused and names it", (() => { const r = admitReviewAttempt({ ...delta, priorReceipt: { id: "x", sha256: "nope" } }); return r.ok === false && r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === "priorReceipt"; })());
+// C31-M2 (L10a): a refused delta binding names the field and the expected form in `reason` (the course admission projection forwards `reason`, not `binding`), and an unknown path names the path.
+ok("RE22e every structural delta binding refusal carries a reason that names the field and its expected form", [
+  ["changedBehaviorClaims", { ...delta, changedBehaviorClaims: ["bad claim!"] }, /bare ids/u],
+  ["priorReceipt", { ...delta, priorReceipt: null }, /\{ id, sha256 \}/u],
+  ["pathInvariantMap", { ...delta, pathInvariantMap: { "src/a.mjs": [] } }, /non-empty list of invariant ids/u],
+  ["pathInvariantMapSha256", { ...delta, pathInvariantMapSha256: "0".repeat(64) }, /sha256 of the canonical/u],
+  ["coordinatorImpactConfirmed", { ...delta, coordinatorImpactConfirmed: false }, /true/u],
+  ["impactAmbiguous", { ...delta, impactAmbiguous: "no" }, /true or false/u],
+].every(([binding, attempt, form]) => { const r = admitReviewAttempt(attempt); return r.code === "RE-DELTA-BINDINGS-INVALID" && r.binding === binding && typeof r.reason === "string" && r.reason.includes(binding) && form.test(r.reason) && /register-feature-package\.mjs/u.test(r.reason); }));
+ok("RE22f an unknown changed path is refused naming the path and the field that fixes it", (() => { const r = admitReviewAttempt({ ...delta, changedPaths: [...delta.changedPaths, "src/new.mjs"] }); return r.code === "RE-DELTA-UNKNOWN-PATH" && typeof r.reason === "string" && r.reason.includes("src/new.mjs") && r.reason.includes("pathInvariantMap"); })());
 ok("RE23 D190 no round count (here the fourth) creates a course gate for a diff round",admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
 // D190: the old cap now gates only a FULL request; a diff round past it is admitted.
 ok("RE24 fourth Critic round creates course gate for a full request", admitReviewAttempt({ ...delta, round: 5, requestedMode: "full" }).courseGateRequired === true);

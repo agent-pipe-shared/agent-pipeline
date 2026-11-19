@@ -941,6 +941,15 @@ test("C18-8 a CDP-ARGUMENT refusal prints its reason on stderr and a short commi
   assert.match(duplicate.reason, /Duplicate --task-id/u);
 });
 
+// C31-M2 (L10a): the CDP-ARGUMENT refusals of the course selectors name the flag and the expected form, not only that something is wrong.
+test("C31-M2 a course selector without a feature Spec and a selector mixed with the sweep are refused naming the flag and the expected form", () => {
+  const commit = "a".repeat(40);
+  assert.throws(() => parseCriticDispatchPreflightArgs(["--registration-commit", commit, "--spec", "docs/spec.md"]),
+    (error) => error.code === "CDP-ARGUMENT" && /--spec specs\/<feature id>\/<spec file>/u.test(error.message));
+  assert.throws(() => parseCriticDispatchPreflightArgs(["--registration-commit", commit, "--sweep-evidence", "task-a", "--spec", "specs/f/spec.md"]),
+    (error) => error.code === "CDP-ARGUMENT" && /--registration-commit/u.test(error.message) && /--delta-request/u.test(error.message) && /sweep/u.test(error.message));
+});
+
 test("C18-8 the diagnostic-evidence help names the checked registration path specs/<feature>/evidence/", () => {
   const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
   assert.match(text, /--log specs\/<feature>\/evidence\//u);

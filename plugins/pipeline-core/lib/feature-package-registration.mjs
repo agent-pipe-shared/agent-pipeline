@@ -1015,15 +1015,32 @@ export function checkCriticLineageBeforeCommit({ root: rootInput } = {}) {
  * is not evidence-only, registrationCommit = HEAD. The request is compiled by prepareRegisteredCriticDeltaRequest, written as the
  * immutable `critic-delta-request-<sha>.json` and added to the manifest as non-authority candidate-evidence. Nothing is committed.
  */
-const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "impactAmbiguous"];
-const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"impactAmbiguous":false}';
+// C31-M2 (L10a + L12, PO tile 2026-11-18): the two confirmations are the only required keys. The behaviour-claims list is derived from the invariant ids of the map (a supplied
+// list still wins), and the map is completed from the invariant ids this course already registered for the same paths (a supplied entry still wins).
+const DELTA_INPUT_KEYS = ["coordinatorImpactConfirmed", "impactAmbiguous"];
+const DELTA_OPTIONAL_KEYS = ["changedBehaviorClaims", "pathInvariantMap"];
+const DELTA_INPUT_SHAPE = '{"coordinatorImpactConfirmed":true,"impactAmbiguous":false,"pathInvariantMap":{"<changed path>":["<invariant-id>"]}}';
+/** The invariant ids this course registered per path: the pathInvariantMap of every registered delta request of the manifest (a later request wins). Nothing is invented. */
+function registeredCourseInvariants(root, manifest) {
+  const known = new Map();
+  for (const entry of manifest.artifacts) {
+    if (entry.class !== "candidate-evidence" || !DELTA_REQUEST_FILE.test(entry.path)) continue;
+    const seen = inspect(root, entry.path);
+    if (seen.kind !== "file" || digest(seen.bytes) !== entry.sha256) continue;
+    let map = null;
+    try { map = JSON.parse(seen.bytes.toString("utf8"))?.pathInvariantMap; } catch { continue; }
+    if (!object(map)) continue;
+    for (const [path, ids] of Object.entries(map)) if (Array.isArray(ids) && ids.length > 0 && ids.every((id) => typeof id === "string" && id !== "")) known.set(path, ids);
+  }
+  return known;
+}
 // PO decision 2026-11-17 (AC-108): trustBoundaryChanged left the diff rounds. An input file that still carries it (written by an older build) is accepted, the value is carried into
 // the registered request unchanged and has no effect: it never makes a round full and never needs --confirm-full-round.
 const LEGACY_DELTA_INPUT_KEY = "trustBoundaryChanged";
 // The three fields (and the invariant lists) below are the Coordinator's judgment: no tool fills, defaults or infers them (PO decision D223).
-const DELTA_JUDGMENT_FIELDS = ["changedBehaviorClaims", "coordinatorImpactConfirmed", "impactAmbiguous"];
-/** Writes the path skeleton ({"pathInvariantMap": {"<changed path>": []}}) at the missing input path and refuses; wx: never overwrites. */
-function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
+const DELTA_JUDGMENT_FIELDS = ["coordinatorImpactConfirmed", "impactAmbiguous"];
+/** Writes the path skeleton ({"pathInvariantMap": {"<changed path>": [registered ids, or empty]}}) at the missing input path and refuses; wx: never overwrites. */
+function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate, known }) {
   const names = gitOut(root, ["diff", "--name-only", "-z", baseCommit, candidate, "--"]);
   if (names === null) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the changed paths of ${baseCommit}..${candidate} could not be read`, { inputPath });
   const changedPaths = names.split("\0").filter(Boolean).sort();
@@ -1031,9 +1048,9 @@ function writeDeltaInputSkeleton({ root, inputPath, baseCommit, candidate }) {
   try {
     mkdirSync(dirname(target), { recursive: true });
     if (realpathSync(dirname(target)) !== join(realpathSync(root), dirname(inputPath))) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath });
-    writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
+    writeFileSync(target, `${JSON.stringify({ pathInvariantMap: Object.fromEntries(changedPaths.map((path) => [path, known.get(path) ?? []])) }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
   } catch (error) { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not exist and the path skeleton could not be written there (${error?.code ?? "error"})`, { inputPath }); }
-  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}, each with an empty invariant list). The Coordinator completes it: fill pathInvariantMap with the invariant ids of every path, and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Mind the cost: impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
+  return refused("FPR-DELTA-INPUT-PATH", `${inputPath} did not exist: a path skeleton was written there (the ${changedPaths.length} changed path(s) of ${baseCommit}..${candidate}; a path whose invariant ids this course registered already carries them, the others an empty list). The Coordinator completes it: give every empty path its invariant ids (changedBehaviorClaims is derived from them and need not be written), and add ${DELTA_JUDGMENT_FIELDS.join(", ")} - these ${DELTA_JUDGMENT_FIELDS.length} fields stay a Coordinator judgment and are never filled, defaulted or inferred by a tool. Complete input example: ${DELTA_INPUT_SHAPE}. Mind the cost: impactAmbiguous set to true makes the next round a FULL round over the whole feature range (the verb then asks for --confirm-full-round). ${FULL_ROUND_GUIDANCE} Then rerun this command with the same path`, { inputPath, skeletonWritten: true, changedPaths, coordinatorJudgment: DELTA_JUDGMENT_FIELDS });
 }
 /** The manifest core of a commit: the manifest minus its candidate-evidence artifacts (the transport check's own definition), as a canonical digest; null when unreadable. */
 function manifestCoreSha256(root, commit, manifestPath) {
@@ -1057,7 +1074,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
   const head = gitOut(root, ["rev-parse", "HEAD"]);
   if (!head) return refused("FPR-ARGS", "root is not a git repository with a HEAD");
-  const shapeRepair = (why) => refused("FPR-DELTA-INPUT-SHAPE", `${why}; the input file holds exactly these keys and nothing else: ${DELTA_INPUT_KEYS.join(", ")}; expected shape: ${DELTA_INPUT_SHAPE}`, { inputPath, expectedShape: DELTA_INPUT_SHAPE });
+  const shapeRepair = (why) => refused("FPR-DELTA-INPUT-SHAPE", `${why}; the input file holds the required keys ${DELTA_INPUT_KEYS.join(", ")} and the optional keys ${DELTA_OPTIONAL_KEYS.join(", ")} and nothing else; complete input example: ${DELTA_INPUT_SHAPE}`, { inputPath, expectedShape: DELTA_INPUT_SHAPE });
   // The input file: a repository-relative regular file, no link on the way (the same refusals as the diagnostic file).
   const seen = repositoryRelative(inputPath) ? inspect(root, inputPath) : { kind: "invalid" };
   // D223 (slice 3): an input file that does not exist yet is not a dead end. The checks below that need no input run first (feature, lineage,
@@ -1069,11 +1086,12 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   if (!absent) {
     try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
     if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
-    const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key) && key !== LEGACY_DELTA_INPUT_KEY);
+    const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key) && !DELTA_OPTIONAL_KEYS.includes(key) && key !== LEGACY_DELTA_INPUT_KEY);
     if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
     const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
-    if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
-    if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
+    if (Object.hasOwn(input, "changedBehaviorClaims") && !stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims is optional (derived from the invariant ids of pathInvariantMap when absent); if it is given it must be a non-empty array of strings");
+    // An empty list for a path means "take what the course registered for it"; a path that stays without ids is refused later naming the path.
+    if (Object.hasOwn(input, "pathInvariantMap") && (!object(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every((ids) => Array.isArray(ids) && ids.every((id) => typeof id === "string" && id !== "")))) return shapeRepair("pathInvariantMap is optional; if it is given it must map a changed path to an array of invariant id strings (an empty array means: take the ids this course registered for the path)");
     for (const key of ["coordinatorImpactConfirmed", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
     if (Object.hasOwn(input, LEGACY_DELTA_INPUT_KEY) && typeof input[LEGACY_DELTA_INPUT_KEY] !== "boolean") return shapeRepair(`${LEGACY_DELTA_INPUT_KEY} is no longer supplied; if it is present it must be true or false and it is ignored`);
     // C30d (PO report on Claude Code, 2026-11-16): `true` in impactAmbiguous turns the next round into a FULL round over the whole feature range (RE-DELTA-FALLBACK-FULL),
@@ -1135,9 +1153,20 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     candidate = oid; break;
   }
   if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
-  if (absent) return writeDeltaInputSkeleton({ root, inputPath, baseCommit: tail.commit, candidate });
+  const known = registeredCourseInvariants(root, manifest);
+  if (absent) return writeDeltaInputSkeleton({ root, inputPath, baseCommit: tail.commit, candidate, known });
+  // C31-M2: the effective map is the supplied entries (an empty list counts as not given) completed by the ids this course registered for the same paths. A tool never invents an id.
+  const rangeNames = gitOut(root, ["diff", "--name-only", "-z", tail.commit, candidate, "--"]);
+  if (rangeNames === null) return refused("FPR-DELTA-COMPILE", `the changed paths of ${tail.commit}..${candidate} could not be read`, { manifestPath });
+  const rangePaths = rangeNames.split("\0").filter(Boolean).sort();
+  const effectiveMap = Object.fromEntries(Object.entries(input.pathInvariantMap ?? {}).filter(([, ids]) => ids.length > 0));
+  for (const path of rangePaths) if (!Object.hasOwn(effectiveMap, path) && known.has(path)) effectiveMap[path] = known.get(path);
+  const unknownPaths = rangePaths.filter((path) => !Object.hasOwn(effectiveMap, path));
+  // The other refusals of the compile (budget, transport, missing diagnostic) come first; a path without an id is compiled with a stand-in that is never registered.
+  const compileMap = { ...effectiveMap, ...Object.fromEntries(unknownPaths.map((path) => [path, ["pending-invariant"]])) };
+  const claimsOf = (map) => [...new Set(Object.values(map).flat())].sort();
   const courseRequest = { repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null };
-  const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, ...(Object.hasOwn(input, LEGACY_DELTA_INPUT_KEY) ? { [LEGACY_DELTA_INPUT_KEY]: input[LEGACY_DELTA_INPUT_KEY] } : {}), impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
+  const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims ?? claimsOf(compileMap), pathInvariantMap: compileMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, ...(Object.hasOwn(input, LEGACY_DELTA_INPUT_KEY) ? { [LEGACY_DELTA_INPUT_KEY]: input[LEGACY_DELTA_INPUT_KEY] } : {}), impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
   if (!compiled.ok) {
     const code = String(compiled.code);
     const extra2 = { compileCode: code, manifestPath };
@@ -1152,8 +1181,15 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
   }
   const { descriptor, artifact } = compiled.value;
-  const given = Object.keys(input.pathInvariantMap).sort(), derived = [...descriptor.changedPaths].sort();
-  if (given.length !== derived.length || given.some((path, index) => path !== derived[index])) return refused("FPR-DELTA-MAP", `pathInvariantMap must have exactly the changed paths of ${tail.commit}..${candidate} as keys; the derived changed paths are: ${derived.join(", ")}`, { changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath });
+  const derived = [...descriptor.changedPaths].sort();
+  const rerun = `register-feature-package.mjs --root <root> --add-delta-request ${inputPath}`;
+  const notChanged = Object.keys(effectiveMap).filter((path) => !derived.includes(path));
+  if (notChanged.length > 0) return refused("FPR-DELTA-MAP", `pathInvariantMap names path(s) that are not changed paths of ${tail.commit}..${candidate}: ${notChanged.join(", ")}; remove them from the field pathInvariantMap of ${inputPath} (the derived changed paths are: ${derived.join(", ")}) and run again: ${rerun}`, { changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath });
+  if (unknownPaths.length > 0) {
+    const shown = unknownPaths.slice(0, 40).join(", ") + (unknownPaths.length > 40 ? `, and ${unknownPaths.length - 40} more (all of them are in missingPaths)` : "");
+    const example = JSON.stringify({ pathInvariantMap: Object.fromEntries(unknownPaths.slice(0, 3).map((path) => [path, ["<invariant-id>"]])) });
+    return refused("FPR-DELTA-INVARIANT-UNKNOWN", `no invariant id is registered in this course for the changed path(s) ${shown}, and a tool never invents one. Fix: add them to the field pathInvariantMap of ${inputPath}, each as "<path>": ["<invariant-id>"] (a non-empty list of ids made of letters, digits, dot, underscore and hyphen, for example ${example}); the paths that carry ids from an earlier round need no entry, and changedBehaviorClaims is derived from the ids. Then run: ${rerun}`, { missingPaths: unknownPaths, changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath, field: "pathInvariantMap" });
+  }
   const preflight = { candidateCommit: candidate, baseCommit: tail.commit, deltaRequestPath: artifact.path, registrationCommit: "<the commit that contains commitPaths>", arguments: ["--root", "<root>", "--spec", manifest.artifacts.find((entry) => entry.class === "spec" && entry.authority === true)?.path ?? "<the feature spec path>", "--evidence", "<the registered diagnostic evidence path of the candidate>", "--base", tail.commit, "--candidate", candidate, "--registration-commit", "<the commit that contains commitPaths>", "--delta-request", artifact.path] };
   if (manifest.artifacts.some((entry) => entry.path === artifact.path && entry.sha256 === artifact.sha256)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, deltaRequestPath: artifact.path, preflight };
   const target = join(root, artifact.path), created = !existsSync(target);
