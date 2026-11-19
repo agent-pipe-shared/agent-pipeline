@@ -9,6 +9,7 @@ import {parseDesignDecisionBindings, prepareApprovedArchitectureMaterialization,
 import {inspectArchitectureDesign, inspectArchitectureMaterializationTargets, publishArchitectureDesignTargets} from './architecture-design.mjs';
 import {acquireContinuityLock, releaseContinuityLock} from '../scripts/pipeline-state.mjs';
 import {createDesignApprovalRequest} from './design-approval-binding.mjs';
+import {inspectEffectiveArchitectureDecisions} from './architecture-effective-decisions.mjs';
 import {canonical} from './po-approval-proof.mjs';
 const cases=[];
 const test=(id,name,run)=>cases.push({id,name,run});
@@ -174,5 +175,22 @@ test('APM019','a reopened design reads only the newest approval of its feature, 
   const read=readEffectiveDesignArchitectureAuthority({rootDir:f.dir});assert(read.ok,JSON.stringify(read));assert.equal(read.decisions.length,1);
   unlinkSync(older);plant('f','2999-01-01T00:00:00.000Z');
   refuse(readEffectiveDesignArchitectureAuthority({rootDir:f.dir}));
+});
+test('APM020','a design approved after the longest review chain (one full round and two delta rounds, three receipts) keeps a readable retained authority and the effective decisions stay ready; an unreadable one names its cause',()=>{
+  // C31b (greenfield 2026-11-19): the retention was written with three receipts but read back with a bound of two (DDB-RETENTION-SHAPE),
+  // so the effective decisions were blocked as `source-unresolved` and `set-phase implementation` was refused with no visible cause.
+  const f=fxt.makeAggregateFixture({reviewRounds:3});assert.equal(f.reviewChain.length,3);
+  fxt.must(f,['materialize-architecture']);
+  const effective=readEffectiveDesignArchitectureAuthority({rootDir:f.dir});assert(effective.ok,JSON.stringify(effective));assert.equal(effective.decisions.length,1);
+  const directory=join(f.dir,'project/aggregate-design-architecture-references'),[name]=readdirSync(directory),record=JSON.parse(readFileSync(join(directory,name),'utf8'));
+  assert.equal(record.receipts.length,3,'the retention holds all three receipts');
+  const projected=inspectEffectiveArchitectureDecisions({rootDir:f.dir,area:'project'});
+  assert.notEqual(projected.status,'blocked',JSON.stringify(projected));
+  // A fourth retained receipt stays refused, and the refusal now carries the reader's typed code instead of swallowing it.
+  const forged=path=>writeFileSync(path,json({...record,receipts:[...record.receipts,record.receipts[0]]}));
+  forged(join(directory,name));
+  const refused=inspectEffectiveArchitectureDecisions({rootDir:f.dir,area:'project'});
+  assert.equal(refused.status,'blocked');
+  assert.deepEqual(refused.findings.find(entry=>entry.code==='aggregate-design-authority-unverified')?.cause,'DDB-RETENTION-SHAPE',JSON.stringify(refused.findings));
 });
 registerTestCaseCompletion({cases,fd:3,maxBytes:8192});

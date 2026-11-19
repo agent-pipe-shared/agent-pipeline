@@ -187,7 +187,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["architecture-close-disposition-tests","plugins/pipeline-core/lib/architecture-close-disposition.test.mjs","top-level-assertions",16],
     ["architecture-entry-required-source-tests","harness/scripts/architecture-entry-required-source.test.mjs","top-level-assertions",13],
     ["architecture-prospective-companion-tests","plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs","top-level-assertions",21],
-    ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",62], // cand. 28 (QG-04: extension only, measured): 60->62, the cases the plan gates and the reopen route added
+    ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",69], // cand. 28 (QG-04: extension only, measured): 60->62, the cases the plan gates and the reopen route added; C31b: 62->69, the three-round review chain case (APM020) and its fixture setup
     ["audit-pack-command-admission-tests","plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs","top-level-assertions",30],
     ["audit-pack-tests","plugins/pipeline-core/scripts/audit-pack.test.mjs","top-level-assertions",51],
     ["bootstrap-acknowledgement-mode-tests","plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs","top-level-assertions",15],

@@ -87,7 +87,10 @@ const architecture={schema:'pipeline.architecture-design.v1',repositoryKind:'gre
 
 // `bindProposals(f, companions)`, when given, replaces the hand-built prospective subjects: the caller drives the sanctioned
 // create-adr / bind-adr-proposals scripts in f.dir and appends every companion path they name (C20 G20-23 end-to-end).
-export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion',bindProposals=null}={}){
+// `reviewRounds` 3 builds the longest review chain C30-6 allows (one full round and two delta rounds over unchanged sources that withdraw
+// their findings one after the other); the default builds the single receipt every earlier case used.
+export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion',bindProposals=null,reviewRounds=1}={}){
+  assert([1,3].includes(reviewRounds),'closed review chain length');
   assert(['draft','initialized','submitted','presented','approved-unmaterialized','approved','implementing'].includes(stage),'closed genuine fixture stage');
   COMPANIONS.splice(0, COMPANIONS.length, "specs/e2e/design.md", "specs/e2e/traceability.md");
   initialize();const f={dir:mkdtempSync(join(units,'unit-')),mode,trackedState,legacy,descriptorCarrier};
@@ -119,11 +122,19 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
   if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:join(common,'agent-pipeline')});
   mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
   const source=path=>({path,sha256:hash(bytes(f,path))});
-  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
+  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:reviewRounds===1?[]:['F-ONE','F-TWO'],reviewedAt:AT});
   assert(review.ok,'SETUP actual review producer: '+review.code);write(f,RECEIPT,Buffer.from(review.bytes));
+  const chain=[RECEIPT],extraReports=[];
+  for(let round=2;round<=reviewRounds;round+=1){
+    const reportPath=`specs/e2e/review/design-review-${round}.md`,receiptPath=`specs/e2e/review/design-review-receipt-${round}.json`;
+    write(f,reportPath,`# Synthetic method review round ${round}\nVerdict: ${round===reviewRounds?'pass':'not ready'}.\n`);
+    const delta=createDesignReviewReceipt({featureId:'e2e',previous:{path:chain.at(-1),bytes:bytes(f,chain.at(-1))},sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(reportPath).sha256},report:source(reportPath),openFindingIds:round===reviewRounds?[]:['F-TWO'],reviewedAt:AT});
+    assert(delta.ok,'SETUP actual delta review producer: '+delta.code);write(f,receiptPath,Buffer.from(delta.bytes));chain.push(receiptPath);extraReports.push(reportPath);
+  }
+  f.reviewChain=chain;
   const keys=generateKeyPairSync('ed25519');f.publicKey=keys.publicKey.export({type:'spki',format:'pem'});f.keyReference='synthetic-p16-key';f.signDigest=value=>sign(null,Buffer.from(value),keys.privateKey).toString('base64');
   writeJson(f,'project/critical-human-proof.json',{schema:'pipeline.critical-human-proof-policy.v3',requiredKinds:['push'],waivedKinds:[],trustAnchors:[{keyReference:f.keyReference,publicKeySha256:hash(f.publicKey)}]});
-  git(f,'add','--',PLAN,SPEC,...COMPANIONS,REPORT,RECEIPT,'project/critical-human-proof.json','specs/e2e/acceptance.md','specs/e2e/result.md','architecture/map/index.md','architecture/map/inventory.json','AGENTS.md','docs/adr/.gitkeep',NEUTRAL_MANIFEST);
+  git(f,'add','--',PLAN,SPEC,...COMPANIONS,REPORT,...chain,...extraReports,'project/critical-human-proof.json','specs/e2e/acceptance.md','specs/e2e/result.md','architecture/map/index.md','architecture/map/inventory.json','AGENTS.md','docs/adr/.gitkeep',NEUTRAL_MANIFEST);
   git(f,'commit','-q','-m','test(agd): bind aggregate method subjects\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
   must(f,['set-feature','--id','e2e','--plan-path',PLAN]);
   const continuity={schema:'pipeline.continuity.v0',featureId:'e2e',revision:0,runtime:{humanFacingLanguage:'de',activeDuty:'Coordinator',sessionCleanup:null},authority:{prd:source(PLAN),spec:source(SPEC),result:null},queueHead:{packageId:'initial-planning',actionId:'review-plan',nextAction:'review',productRetryCount:0,environmentRerouteCount:0,dispatch:null},blocker:null,acknowledgedFinal:null,resume:{mode:'immediate',sourceRevision:0,reasonCode:'active-turn'},recovery:null,decisionTxn:null,capacity:{concurrencyLimit:4,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:'defer'}};
@@ -134,7 +145,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
   if(stage==='initialized')return finishStage(f,stage);
   must(f,['submit-plan','--by','synthetic-author','--profile','feature']);
   if(stage==='submitted')return finishStage(f,stage);
-  must(f,['present-plan','--by','synthetic-presenter','--review-receipt',RECEIPT]);
+  must(f,['present-plan','--by','synthetic-presenter',...chain.flatMap(path=>['--review-receipt',path])]);
   f.requestPath=state(f).planPresentation.designApprovalRequestPath;f.request=json(f,f.requestPath);
   if(mode==='signature')writeJson(f,f.requestPath.replace('request-','proof-'),{schema:'pipeline.po-approval-proof.v1',intentSha256:f.request.approvalIntent.sha256,keyReference:f.keyReference,publicKey:f.publicKey,signatureBase64:sign(null,Buffer.from(f.request.approvalIntent.sha256),keys.privateKey).toString('base64')});
   if(stage==='presented')return finishStage(f,stage);
@@ -158,7 +169,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
 function finishStage(f,stage){f.fixtureStage=stage;f.initialState=rawState(f);return f;}
 import * as ddbModule from "./design-decision-bindings.mjs";
 export const ddb=ddbModule;
-export const makeAggregateFixture=({stage="approved-unmaterialized",legacy=false,descriptorCarrier="companion"}={})=>makeFixture("signature",{stage,legacy,descriptorCarrier});
+export const makeAggregateFixture=({stage="approved-unmaterialized",legacy=false,descriptorCarrier="companion",reviewRounds=1}={})=>makeFixture("signature",{stage,legacy,descriptorCarrier,reviewRounds});
 export function sourceSet(f){const source=path=>({path,sha256:hash(bytes(f,path))});return{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)};}
 export const draft=f=>ddb.inspectDesignDecisionBindingsDraft({rootDir:f.dir,sources:sourceSet(f)});
 export const inspect=(f,area="architecture")=>ddb.inspectApprovedDesignDecisionBindings({rootDir:f.dir,area});

@@ -23,8 +23,12 @@ export function composeArchitectureDecisionContinuity({ local, inherited, area,
     || waivers.status === "blocked" || !Array.isArray(waivers.waivers)
     || !Array.isArray(waivers.findings)
     || typeof local.projectionSha256 !== "string") {
+    // C31b: keep the blocked local source's own findings (with the reader's typed cause) in front of the generic code; they were
+    // dropped, so a refusal said only "source-unresolved" and the cause was invisible to every session.
+    const kept = local?.status === "blocked" && Array.isArray(local.findings)
+      ? local.findings.filter((entry) => entry && typeof entry.code === "string").slice(0, 6) : [];
     return fail("ARCH-CONTINUITY-SOURCE-UNRESOLVED", area ?? null,
-      [{ code: "source-unresolved" }]);
+      [...kept, { code: "source-unresolved" }]);
   }
   const inheritedForArea = inherited.decisions.filter((decision) => Array.isArray(decision.moduleIds)
     && decision.moduleIds.includes(area));

@@ -303,7 +303,7 @@ export function inspectPlanningDecisionApplicability(root, surface, now,
 /** Live on native Windows, 2026-11-10: the bare refusal sent the agent into the plugin's source to learn which finding blocked it. */
 function blockedDecisionFindings(applicability) {
   const named = [...new Set(applicability.areas.filter(item => item.status === "blocked").flatMap(item => (Array.isArray(item.findings) && item.findings.length
-    ? item.findings.map(entry => `${item.area}: ${entry.code}${entry.path ? ` (${entry.path})` : ""}`)
+    ? item.findings.map(entry => `${item.area}: ${entry.code}${entry.path ? ` (${entry.path})` : ""}${typeof entry.cause === "string" ? ` [${entry.cause}]` : ""}`)
     : [`${item.area}: ${item.code ?? "no finding recorded"}`])))];
   if (named.length === 0) return "";
   return ` Blocking: ${named.slice(0, 6).join("; ")}${named.length > 6 ? `; and ${named.length - 6} more` : ""}.`;

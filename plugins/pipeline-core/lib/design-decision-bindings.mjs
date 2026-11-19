@@ -505,12 +505,16 @@ export function retainApprovedDesignModelPolicyReference(handle) {
     return {ok:true,referencePath:REFERENCE_PATH,referenceSha256:hash(bytes)};
   } catch(error) { return refusal(error); }
 }
+// C31b (greenfield 2026-11-19): the design review is one full round and at most two delta rounds (C30-6), so an approval retains up to
+// three receipts. This bound stayed at two after C30-6: the retention was written with three receipts and then refused on every read
+// (DDB-RETENTION-SHAPE), which blocked the whole effective decision projection and `set-phase implementation` after a third round.
+const RETAINED_RECEIPTS_MAX = 3;
 function retained(root,path) {
   requireValue(path===REFERENCE_PATH,'DDB-RETENTION-PATH');
   const file=physical(root,path), record=parseStrictJson(file.bytes);
   requireValue(own(record,['schema','approvalBasis','request','receipts','approval']) && record.schema==='pipeline.aggregate-design-model-policy-reference.v1'
     && refValid(record.request) && record.request.path===`project/design-approval-evidence/${record.request.sha256}.json`
-    && Array.isArray(record.receipts) && record.receipts.length>=1 && record.receipts.length<=2,'DDB-RETENTION-SHAPE');
+    && Array.isArray(record.receipts) && record.receipts.length>=1 && record.receipts.length<=RETAINED_RECEIPTS_MAX,'DDB-RETENTION-SHAPE');
   const requestFile=physical(root,record.request.path); requireValue(requestFile.sha256===record.request.sha256,'DDB-RETENTION-DRIFT');
   const receipts=record.receipts.map(entry=>{
     requireValue(own(entry,['originalPath','retained']) && safePath(entry.originalPath) && refValid(entry.retained)
@@ -605,7 +609,7 @@ function retainedArchitecture(root, path) {
     && record.schema === 'pipeline.aggregate-design-architecture-reference.v1'
     && path === `${ARCHITECTURE_REFERENCES}/${digest(record.approvalBasis)}.json`
     && refValid(record.request) && record.request.path === `project/design-approval-evidence/${record.request.sha256}.json`
-    && Array.isArray(record.receipts) && record.receipts.length >= 1 && record.receipts.length <= 2, 'DDB-RETENTION-SHAPE');
+    && Array.isArray(record.receipts) && record.receipts.length >= 1 && record.receipts.length <= RETAINED_RECEIPTS_MAX, 'DDB-RETENTION-SHAPE');
   const requestFile = physical(root, record.request.path);
   requireValue(requestFile.sha256 === record.request.sha256, 'DDB-RETENTION-DRIFT');
   const receipts = record.receipts.map(entry => {

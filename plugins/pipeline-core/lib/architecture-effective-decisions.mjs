@@ -220,7 +220,9 @@ export function inspectEffectiveArchitectureDecisions(input = {}) {
   const authority = readEffectiveDesignArchitectureAuthority({ rootDir: resolve(input.rootDir) });
   const findings = [...structural.findings];
   if (!authority.ok) {
-    findings.push(finding("aggregate-design-authority-unverified", "project/aggregate-design-architecture-references"));
+    // C31b: name the reader's typed code (for example DDB-RETENTION-SHAPE); it was swallowed and a session could not tell why the projection was blocked.
+    findings.push({ ...finding("aggregate-design-authority-unverified", "project/aggregate-design-architecture-references"),
+      ...(typeof authority.code === "string" && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,6}$/u.test(authority.code) ? { cause: authority.code } : {}) });
     return { ...structural, status: "blocked", code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
       decisions: [], findings, projectionSha256: null };
   }
