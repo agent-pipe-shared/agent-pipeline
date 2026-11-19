@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.test.mjs b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+index 2e896b53a6e88b003e8c993d39b5691c7af0906f..3e34ea7798a560e9ffebd120783c73468dd133f0 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.test.mjs
+@@ -723,6 +723,18 @@ test("C31a: a label line ends the section, an id-anchored resolved status drops
+   // A status that is not directly after the id does not count: the item stays open (fail open towards the hold).
+   const hidden = "Blocking findings:\n- DESIGN-REVIEW-3 the import is refused; an earlier version of this was resolved elsewhere\n";
+   assert.deepStrictEqual(designReviewReportSections(hidden).blocking, ["DESIGN-REVIEW-3"]);
++  // C31b (cloud review of C31a): an intro sentence directly under the heading never ends the section, and an item that merely begins with
++  // the word "Resolved" or "Closed-loop" is a genuine finding, not a status.
++  const intro = "Blocking findings:\nThese two items block the build:\n- DR-1 first finding\n- DR-2 second finding\n";
++  assert.deepStrictEqual(designReviewReportSections(intro).blocking, ["DR-1", "DR-2"]);
++  const looksLikeStatus = "Blocking findings:\n- SEC-2: Resolved symlinks are not re-checked\n- SEC-3 - Closed-loop retry has no cap\n- SEC-4: withdrawn paths are still read\n";
++  assert.deepStrictEqual(designReviewReportSections(looksLikeStatus).blocking, ["SEC-2", "SEC-3", "SEC-4"]);
++  // An unrelated label after a blank line does not end the section either (it names no earlier round or status).
++  const unrelated = "Blocking findings:\n- DR-1 one\n\nAlso these block the build:\n- DR-2 two\n";
++  assert.deepStrictEqual(designReviewReportSections(unrelated).blocking, ["DR-1", "DR-2"]);
++  // The status tokens of the real report shape are still recognised.
++  const statusTokens = "Blocking findings:\n- DR-9 (scope): resolved. now lists it\n- DR-10 (x): resolved in substance.\n- DR-11: withdrawn\n- DR-12 (y): resolved for AC-2 (redirect), AC-8.\n";
++  assert.deepStrictEqual(designReviewReportSections(statusTokens).blocking, []);
+   // A markdown heading still ends the section as before.
+   assert.deepStrictEqual(designReviewReportSections("Blocking findings:\n- DESIGN-REVIEW-4 x\n## Notes\n- DESIGN-REVIEW-5 y").blocking, ["DESIGN-REVIEW-4"]);
+ });
+diff --git a/plugins/pipeline-core/lib/design-review-report-sections.mjs b/plugins/pipeline-core/lib/design-review-report-sections.mjs
+index 2606f9d3390c6646aea9152f8f17cb2576a967fd..14066fceaf06e185c5a2abe3a6258795e8e39ff8 100644
+--- a/plugins/pipeline-core/lib/design-review-report-sections.mjs
++++ b/plugins/pipeline-core/lib/design-review-report-sections.mjs
+@@ -14,9 +14,11 @@
+  * C31a (greenfield 2026-11-19): a delta report lists the earlier round's items under a label of its own ("Round 1 questions,
+  * status against the current text:"). That line matched no heading, so the blocking section ran on through it and nine
+  * `resolved` questions became open findings the receipt could not carry (`DRC-FINDINGS-SPLIT`), which stopped the next
+- * review dispatch. A section now also ends at a label line (an unindented line that is no item and ends in a colon), and an
+- * item whose id is followed directly by `resolved`, `withdrawn` or `closed` is not open. The second rule is anchored on the id
+- * on purpose: a genuine finding that says "must be fixed before build" later in its line stays open.
++ * review dispatch. A section now also ends at a label line (unindented, no item, at least three words, ending in a colon, after a
++ * blank line, after at least one item, and naming a round, earlier/previous/prior items or a status), and an item whose id is
++ * followed directly by a status token (`resolved`, `withdrawn` or `closed`, alone or with "in substance" / "for ...", then a
++ * sentence end) is not open. Both rules are narrow on purpose (C31b, after the cloud review of C31a): an intro sentence under the
++ * heading, a finding that begins "Resolved paths ..." or "Closed-loop ...", or one that says "must be fixed before build" stays open.
+  */
+ 
+ const BLOCKING_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*blocking(?:\s+findings?)?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(?:\(.*\))?\s*$/iu;
+@@ -26,7 +28,11 @@ const ITEM_ID = /^\s*(?:[-*+]|\d+[.)])?\s*(?:\*\*|__)?\[?([A-Z][A-Z0-9]*(?:-[A-Z
+ // An unindented, non-bullet line of at least three words that ends in a colon. A one- or two-word "Repair:" inside an item does not end the section.
+ const LABEL_LINE = /^(?![-*+]\s|\d+[.)]\s)\S+(?:[ \t]+\S+){2,}[ \t]*(?:\*\*|__)?[ \t]*$/u;
+ const ENDS_WITH_COLON = /:\s*(?:\*\*|__)?\s*$/u;
+-const RESOLVED_STATUS = /^\s*(?:\([^)]*\))?\s*[:\-—–]?\s*(?:\*\*|__)?(?:resolved|withdrawn|closed)\b/iu;
++// A status token, not a sentence that happens to start with the word: the word stands alone or is followed by "in substance" / "for ...",
++// then a sentence end. "DR-4: Resolved paths escape the root" and "DR-5 - Closed-loop retry has no cap" stay open findings.
++const RESOLVED_STATUS = /^\s*(?:\([^)]*\))?\s*[:\-—–]?\s*(?:\*\*|__)?(?:resolved|withdrawn|closed)(?:\*\*|__)?(?:[ \t]+(?:in[ \t]+substance|for[ \t]+[^.;\n]{1,60}?))?[ \t]*(?:[.;,)]|$)/iu;
++// A label line names an earlier round's status list; it must say so (round, earlier, previous, prior, status) to end a section.
++const LABEL_KEYWORD = /\b(?:round|earlier|previous|prior|status)\b/iu;
+ 
+ /** The report scanned once: each item with the 1-based line it was read from. */
+ function scan(text) {
+@@ -35,16 +41,21 @@ function scan(text) {
+   const blocking = [];
+   const questions = [];
+   let section = null;
++  let itemsInSection = 0;
+   lines.forEach((line, index) => {
+-    if (BLOCKING_HEADING.test(line)) { section = "blocking"; return; }
+-    if (QUESTIONS_HEADING.test(line)) { section = "questions"; return; }
++    const previousBlank = index === 0 || lines[index - 1].trim() === "";
++    if (BLOCKING_HEADING.test(line)) { section = "blocking"; itemsInSection = 0; return; }
++    if (QUESTIONS_HEADING.test(line)) { section = "questions"; itemsInSection = 0; return; }
+     if (OTHER_HEADING.test(line)) { section = null; return; }
+     if (section === null) return;
+     const match = ITEM_ID.exec(line);
+     if (match === null) {
+-      if (line.length <= 160 && ENDS_WITH_COLON.test(line) && LABEL_LINE.test(line)) section = null;
++      // The section ends only at a label line that follows a blank line, comes after at least one item and names an earlier round's
++      // status; an intro sentence under the heading ("These two block the build:") never ends it, so no finding after it is lost.
++      if (itemsInSection > 0 && previousBlank && line.length <= 160 && ENDS_WITH_COLON.test(line) && LABEL_LINE.test(line) && LABEL_KEYWORD.test(line)) section = null;
+       return;
+     }
++    itemsInSection += 1;
+     if (section === "blocking" && RESOLVED_STATUS.test(line.slice(match[0].length))) return;
+     const bucket = section === "blocking" ? blocking : questions;
+     if (!bucket.some((entry) => entry.id === match[1])) bucket.push({ id: match[1], line: index + 1 });

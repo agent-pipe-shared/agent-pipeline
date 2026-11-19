@@ -1,0 +1,180 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 5cad56aff5a3fa87b36783556928f60ae1eec996..506d374b6dea8e7e7a05a912dd9a67ffa21a4c57 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -187,7 +187,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["architecture-close-disposition-tests","plugins/pipeline-core/lib/architecture-close-disposition.test.mjs","top-level-assertions",16],
+     ["architecture-entry-required-source-tests","harness/scripts/architecture-entry-required-source.test.mjs","top-level-assertions",13],
+     ["architecture-prospective-companion-tests","plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs","top-level-assertions",21],
+-    ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",62], // cand. 28 (QG-04: extension only, measured): 60->62, the cases the plan gates and the reopen route added
++    ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",69], // cand. 28 (QG-04: extension only, measured): 60->62, the cases the plan gates and the reopen route added; C31b: 62->69, the three-round review chain case (APM020) and its fixture setup
+     ["audit-pack-command-admission-tests","plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs","top-level-assertions",30],
+     ["audit-pack-tests","plugins/pipeline-core/scripts/audit-pack.test.mjs","top-level-assertions",51],
+     ["bootstrap-acknowledgement-mode-tests","plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs","top-level-assertions",15],
+diff --git a/plugins/pipeline-core/lib/architecture-decision-continuity.mjs b/plugins/pipeline-core/lib/architecture-decision-continuity.mjs
+index fbea1e5c404ec822aba31a58e4a19bf03d79f1fd..5ed0ca12205c953317ba08d5859ed5be308528d1 100644
+--- a/plugins/pipeline-core/lib/architecture-decision-continuity.mjs
++++ b/plugins/pipeline-core/lib/architecture-decision-continuity.mjs
+@@ -23,8 +23,12 @@ export function composeArchitectureDecisionContinuity({ local, inherited, area,
+     || waivers.status === "blocked" || !Array.isArray(waivers.waivers)
+     || !Array.isArray(waivers.findings)
+     || typeof local.projectionSha256 !== "string") {
++    // C31b: keep the blocked local source's own findings (with the reader's typed cause) in front of the generic code; they were
++    // dropped, so a refusal said only "source-unresolved" and the cause was invisible to every session.
++    const kept = local?.status === "blocked" && Array.isArray(local.findings)
++      ? local.findings.filter((entry) => entry && typeof entry.code === "string").slice(0, 6) : [];
+     return fail("ARCH-CONTINUITY-SOURCE-UNRESOLVED", area ?? null,
+-      [{ code: "source-unresolved" }]);
++      [...kept, { code: "source-unresolved" }]);
+   }
+   const inheritedForArea = inherited.decisions.filter((decision) => Array.isArray(decision.moduleIds)
+     && decision.moduleIds.includes(area));
+diff --git a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+index fbd9d5d0e84dfe8bfb3bc8f6728457a0958356ec..ddfdc947977643d42f51d2de305a68a5da9d9f13 100644
+--- a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
++++ b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+@@ -220,7 +220,9 @@ export function inspectEffectiveArchitectureDecisions(input = {}) {
+   const authority = readEffectiveDesignArchitectureAuthority({ rootDir: resolve(input.rootDir) });
+   const findings = [...structural.findings];
+   if (!authority.ok) {
+-    findings.push(finding("aggregate-design-authority-unverified", "project/aggregate-design-architecture-references"));
++    // C31b: name the reader's typed code (for example DDB-RETENTION-SHAPE); it was swallowed and a session could not tell why the projection was blocked.
++    findings.push({ ...finding("aggregate-design-authority-unverified", "project/aggregate-design-architecture-references"),
++      ...(typeof authority.code === "string" && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,6}$/u.test(authority.code) ? { cause: authority.code } : {}) });
+     return { ...structural, status: "blocked", code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
+       decisions: [], findings, projectionSha256: null };
+   }
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 9f44d5303c6832e79bedf396115499b028fe2058..8fc0707f0cffa8233ca7acf9ff686c03ae5766a8 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -303,7 +303,7 @@ export function inspectPlanningDecisionApplicability(root, surface, now,
+ /** Live on native Windows, 2026-11-10: the bare refusal sent the agent into the plugin's source to learn which finding blocked it. */
+ function blockedDecisionFindings(applicability) {
+   const named = [...new Set(applicability.areas.filter(item => item.status === "blocked").flatMap(item => (Array.isArray(item.findings) && item.findings.length
+-    ? item.findings.map(entry => `${item.area}: ${entry.code}${entry.path ? ` (${entry.path})` : ""}`)
++    ? item.findings.map(entry => `${item.area}: ${entry.code}${entry.path ? ` (${entry.path})` : ""}${typeof entry.cause === "string" ? ` [${entry.cause}]` : ""}`)
+     : [`${item.area}: ${item.code ?? "no finding recorded"}`])))];
+   if (named.length === 0) return "";
+   return ` Blocking: ${named.slice(0, 6).join("; ")}${named.length > 6 ? `; and ${named.length - 6} more` : ""}.`;
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+index 8dd9d7859ad87c5102f49ef8f6640f284636a97b..13fb4c48e7076a29654c4f8c3c11db1197f31e11 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+@@ -87,7 +87,10 @@ const architecture={schema:'pipeline.architecture-design.v1',repositoryKind:'gre
+ 
+ // `bindProposals(f, companions)`, when given, replaces the hand-built prospective subjects: the caller drives the sanctioned
+ // create-adr / bind-adr-proposals scripts in f.dir and appends every companion path they name (C20 G20-23 end-to-end).
+-export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion',bindProposals=null}={}){
++// `reviewRounds` 3 builds the longest review chain C30-6 allows (one full round and two delta rounds over unchanged sources that withdraw
++// their findings one after the other); the default builds the single receipt every earlier case used.
++export function makeFixture(mode='signature',{trackedState=false,stage='implementing',withDecisionBindings=true,legacy=false,descriptorCarrier='companion',bindProposals=null,reviewRounds=1}={}){
++  assert([1,3].includes(reviewRounds),'closed review chain length');
+   assert(['draft','initialized','submitted','presented','approved-unmaterialized','approved','implementing'].includes(stage),'closed genuine fixture stage');
+   COMPANIONS.splice(0, COMPANIONS.length, "specs/e2e/design.md", "specs/e2e/traceability.md");
+   initialize();const f={dir:mkdtempSync(join(units,'unit-')),mode,trackedState,legacy,descriptorCarrier};
+@@ -119,11 +122,19 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+   if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:join(common,'agent-pipeline')});
+   mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
+   const source=path=>({path,sha256:hash(bytes(f,path))});
+-  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
++  const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(REPORT).sha256},report:source(REPORT),openFindingIds:reviewRounds===1?[]:['F-ONE','F-TWO'],reviewedAt:AT});
+   assert(review.ok,'SETUP actual review producer: '+review.code);write(f,RECEIPT,Buffer.from(review.bytes));
++  const chain=[RECEIPT],extraReports=[];
++  for(let round=2;round<=reviewRounds;round+=1){
++    const reportPath=`specs/e2e/review/design-review-${round}.md`,receiptPath=`specs/e2e/review/design-review-receipt-${round}.json`;
++    write(f,reportPath,`# Synthetic method review round ${round}\nVerdict: ${round===reviewRounds?'pass':'not ready'}.\n`);
++    const delta=createDesignReviewReceipt({featureId:'e2e',previous:{path:chain.at(-1),bytes:bytes(f,chain.at(-1))},sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},reviewerObservation:{assurance:'host-observed-child-transcript',modelsUsed:['claude-opus-4'],resultSha256:source(reportPath).sha256},report:source(reportPath),openFindingIds:round===reviewRounds?[]:['F-TWO'],reviewedAt:AT});
++    assert(delta.ok,'SETUP actual delta review producer: '+delta.code);write(f,receiptPath,Buffer.from(delta.bytes));chain.push(receiptPath);extraReports.push(reportPath);
++  }
++  f.reviewChain=chain;
+   const keys=generateKeyPairSync('ed25519');f.publicKey=keys.publicKey.export({type:'spki',format:'pem'});f.keyReference='synthetic-p16-key';f.signDigest=value=>sign(null,Buffer.from(value),keys.privateKey).toString('base64');
+   writeJson(f,'project/critical-human-proof.json',{schema:'pipeline.critical-human-proof-policy.v3',requiredKinds:['push'],waivedKinds:[],trustAnchors:[{keyReference:f.keyReference,publicKeySha256:hash(f.publicKey)}]});
+-  git(f,'add','--',PLAN,SPEC,...COMPANIONS,REPORT,RECEIPT,'project/critical-human-proof.json','specs/e2e/acceptance.md','specs/e2e/result.md','architecture/map/index.md','architecture/map/inventory.json','AGENTS.md','docs/adr/.gitkeep',NEUTRAL_MANIFEST);
++  git(f,'add','--',PLAN,SPEC,...COMPANIONS,REPORT,...chain,...extraReports,'project/critical-human-proof.json','specs/e2e/acceptance.md','specs/e2e/result.md','architecture/map/index.md','architecture/map/inventory.json','AGENTS.md','docs/adr/.gitkeep',NEUTRAL_MANIFEST);
+   git(f,'commit','-q','-m','test(agd): bind aggregate method subjects\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
+   must(f,['set-feature','--id','e2e','--plan-path',PLAN]);
+   const continuity={schema:'pipeline.continuity.v0',featureId:'e2e',revision:0,runtime:{humanFacingLanguage:'de',activeDuty:'Coordinator',sessionCleanup:null},authority:{prd:source(PLAN),spec:source(SPEC),result:null},queueHead:{packageId:'initial-planning',actionId:'review-plan',nextAction:'review',productRetryCount:0,environmentRerouteCount:0,dispatch:null},blocker:null,acknowledgedFinal:null,resume:{mode:'immediate',sourceRevision:0,reasonCode:'active-turn'},recovery:null,decisionTxn:null,capacity:{concurrencyLimit:4,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:'defer'}};
+@@ -134,7 +145,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+   if(stage==='initialized')return finishStage(f,stage);
+   must(f,['submit-plan','--by','synthetic-author','--profile','feature']);
+   if(stage==='submitted')return finishStage(f,stage);
+-  must(f,['present-plan','--by','synthetic-presenter','--review-receipt',RECEIPT]);
++  must(f,['present-plan','--by','synthetic-presenter',...chain.flatMap(path=>['--review-receipt',path])]);
+   f.requestPath=state(f).planPresentation.designApprovalRequestPath;f.request=json(f,f.requestPath);
+   if(mode==='signature')writeJson(f,f.requestPath.replace('request-','proof-'),{schema:'pipeline.po-approval-proof.v1',intentSha256:f.request.approvalIntent.sha256,keyReference:f.keyReference,publicKey:f.publicKey,signatureBase64:sign(null,Buffer.from(f.request.approvalIntent.sha256),keys.privateKey).toString('base64')});
+   if(stage==='presented')return finishStage(f,stage);
+@@ -158,7 +169,7 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+ function finishStage(f,stage){f.fixtureStage=stage;f.initialState=rawState(f);return f;}
+ import * as ddbModule from "./design-decision-bindings.mjs";
+ export const ddb=ddbModule;
+-export const makeAggregateFixture=({stage="approved-unmaterialized",legacy=false,descriptorCarrier="companion"}={})=>makeFixture("signature",{stage,legacy,descriptorCarrier});
++export const makeAggregateFixture=({stage="approved-unmaterialized",legacy=false,descriptorCarrier="companion",reviewRounds=1}={})=>makeFixture("signature",{stage,legacy,descriptorCarrier,reviewRounds});
+ export function sourceSet(f){const source=path=>({path,sha256:hash(bytes(f,path))});return{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)};}
+ export const draft=f=>ddb.inspectDesignDecisionBindingsDraft({rootDir:f.dir,sources:sourceSet(f)});
+ export const inspect=(f,area="architecture")=>ddb.inspectApprovedDesignDecisionBindings({rootDir:f.dir,area});
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
+index 8baee1b129d03a5a59e38b24b9b682013559206d..d207393af1f320be8f356c4fedcaf9e34b10a694 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
+@@ -9,6 +9,7 @@ import {parseDesignDecisionBindings, prepareApprovedArchitectureMaterialization,
+ import {inspectArchitectureDesign, inspectArchitectureMaterializationTargets, publishArchitectureDesignTargets} from './architecture-design.mjs';
+ import {acquireContinuityLock, releaseContinuityLock} from '../scripts/pipeline-state.mjs';
+ import {createDesignApprovalRequest} from './design-approval-binding.mjs';
++import {inspectEffectiveArchitectureDecisions} from './architecture-effective-decisions.mjs';
+ import {canonical} from './po-approval-proof.mjs';
+ const cases=[];
+ const test=(id,name,run)=>cases.push({id,name,run});
+@@ -175,4 +176,21 @@ test('APM019','a reopened design reads only the newest approval of its feature,
+   unlinkSync(older);plant('f','2999-01-01T00:00:00.000Z');
+   refuse(readEffectiveDesignArchitectureAuthority({rootDir:f.dir}));
+ });
++test('APM020','a design approved after the longest review chain (one full round and two delta rounds, three receipts) keeps a readable retained authority and the effective decisions stay ready; an unreadable one names its cause',()=>{
++  // C31b (greenfield 2026-11-19): the retention was written with three receipts but read back with a bound of two (DDB-RETENTION-SHAPE),
++  // so the effective decisions were blocked as `source-unresolved` and `set-phase implementation` was refused with no visible cause.
++  const f=fxt.makeAggregateFixture({reviewRounds:3});assert.equal(f.reviewChain.length,3);
++  fxt.must(f,['materialize-architecture']);
++  const effective=readEffectiveDesignArchitectureAuthority({rootDir:f.dir});assert(effective.ok,JSON.stringify(effective));assert.equal(effective.decisions.length,1);
++  const directory=join(f.dir,'project/aggregate-design-architecture-references'),[name]=readdirSync(directory),record=JSON.parse(readFileSync(join(directory,name),'utf8'));
++  assert.equal(record.receipts.length,3,'the retention holds all three receipts');
++  const projected=inspectEffectiveArchitectureDecisions({rootDir:f.dir,area:'project'});
++  assert.notEqual(projected.status,'blocked',JSON.stringify(projected));
++  // A fourth retained receipt stays refused, and the refusal now carries the reader's typed code instead of swallowing it.
++  const forged=path=>writeFileSync(path,json({...record,receipts:[...record.receipts,record.receipts[0]]}));
++  forged(join(directory,name));
++  const refused=inspectEffectiveArchitectureDecisions({rootDir:f.dir,area:'project'});
++  assert.equal(refused.status,'blocked');
++  assert.deepEqual(refused.findings.find(entry=>entry.code==='aggregate-design-authority-unverified')?.cause,'DDB-RETENTION-SHAPE',JSON.stringify(refused.findings));
++});
+ registerTestCaseCompletion({cases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/lib/design-decision-bindings.mjs b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+index b63dabc1db4c97b7d9c5967c72cb9e4bed8044ee..184fdb0a991a1ee277ae523afeed9ba415138f44 100644
+--- a/plugins/pipeline-core/lib/design-decision-bindings.mjs
++++ b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+@@ -505,12 +505,16 @@ export function retainApprovedDesignModelPolicyReference(handle) {
+     return {ok:true,referencePath:REFERENCE_PATH,referenceSha256:hash(bytes)};
+   } catch(error) { return refusal(error); }
+ }
++// C31b (greenfield 2026-11-19): the design review is one full round and at most two delta rounds (C30-6), so an approval retains up to
++// three receipts. This bound stayed at two after C30-6: the retention was written with three receipts and then refused on every read
++// (DDB-RETENTION-SHAPE), which blocked the whole effective decision projection and `set-phase implementation` after a third round.
++const RETAINED_RECEIPTS_MAX = 3;
+ function retained(root,path) {
+   requireValue(path===REFERENCE_PATH,'DDB-RETENTION-PATH');
+   const file=physical(root,path), record=parseStrictJson(file.bytes);
+   requireValue(own(record,['schema','approvalBasis','request','receipts','approval']) && record.schema==='pipeline.aggregate-design-model-policy-reference.v1'
+     && refValid(record.request) && record.request.path===`project/design-approval-evidence/${record.request.sha256}.json`
+-    && Array.isArray(record.receipts) && record.receipts.length>=1 && record.receipts.length<=2,'DDB-RETENTION-SHAPE');
++    && Array.isArray(record.receipts) && record.receipts.length>=1 && record.receipts.length<=RETAINED_RECEIPTS_MAX,'DDB-RETENTION-SHAPE');
+   const requestFile=physical(root,record.request.path); requireValue(requestFile.sha256===record.request.sha256,'DDB-RETENTION-DRIFT');
+   const receipts=record.receipts.map(entry=>{
+     requireValue(own(entry,['originalPath','retained']) && safePath(entry.originalPath) && refValid(entry.retained)
+@@ -605,7 +609,7 @@ function retainedArchitecture(root, path) {
+     && record.schema === 'pipeline.aggregate-design-architecture-reference.v1'
+     && path === `${ARCHITECTURE_REFERENCES}/${digest(record.approvalBasis)}.json`
+     && refValid(record.request) && record.request.path === `project/design-approval-evidence/${record.request.sha256}.json`
+-    && Array.isArray(record.receipts) && record.receipts.length >= 1 && record.receipts.length <= 2, 'DDB-RETENTION-SHAPE');
++    && Array.isArray(record.receipts) && record.receipts.length >= 1 && record.receipts.length <= RETAINED_RECEIPTS_MAX, 'DDB-RETENTION-SHAPE');
+   const requestFile = physical(root, record.request.path);
+   requireValue(requestFile.sha256 === record.request.sha256, 'DDB-RETENTION-DRIFT');
+   const receipts = record.receipts.map(entry => {

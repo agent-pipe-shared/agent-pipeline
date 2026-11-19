@@ -1,0 +1,8 @@
+fix(design-approval): the retained approval reads a three-receipt review chain, and a blocked decision projection names its cause
+
+The design review is one full round and at most two delta rounds (C30-6), so an approval can retain three receipts. The retention of the aggregate design approval was written without a bound but read back with a bound of two (DDB-RETENTION-SHAPE, in both the architecture and the model policy reference), so after a third review round the signed approval could not be read at all. The effective decision projection of every area then stayed blocked as source-unresolved, entry readiness refused, and set-phase implementation was refused with GUARD-ARCHITECTURE-FITNESS-NON-GREEN for the planned test entry points that cannot exist before implementation. Only the runner that took a third review round hit it; two rounds passed.
+
+The bound is three in both readers. The reader's typed code is no longer swallowed: the aggregate-design-authority-unverified finding carries it as cause, the continuity composition keeps the blocked source's findings in front of source-unresolved, and the entry readiness guidance prints the cause in brackets. The shared fixture builds the longest chain on request (reviewRounds: 3, two delta rounds that withdraw findings over unchanged sources) and APM020 reads it back and also pins that a fourth retained receipt stays refused with its code; with the old bound the case fails with DDB-RETENTION-SHAPE. The registered assertion count of the suite is restated to the measured 69 (QG-04, extension only).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
